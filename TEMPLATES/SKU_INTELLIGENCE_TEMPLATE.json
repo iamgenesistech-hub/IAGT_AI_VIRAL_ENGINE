@@ -1,0 +1,62 @@
+{
+  "sku": "",
+  "product_name": "",
+  "tier": "",
+  "status": "active",
+
+  "profit_metrics": {
+    "revenue": 0,
+    "net_profit": 0,
+    "profit_margin": 0,
+    "ad_spend": 0,
+    "cogs": 0,
+    "shipping_cost": 0,
+    "refund_cost": 0,
+    "creative_cost": 0
+  },
+
+  "awareness_metrics": {
+    "brand_awareness_score": 0,
+    "product_awareness_score": 0,
+    "momentum_score": 0,
+    "repeat_customer_rate": 0,
+    "attach_rate": 0
+  },
+
+  "creative_performance": {
+    "top_hooks": [],
+    "winning_ctas": [],
+    "winning_formats": [],
+    "best_platforms": [],
+    "active_creatives": [],
+    "fallout_creatives": []
+  },
+
+  "discount_logic": {
+    "current_discount": 0,
+    "discount_status": "inactive",
+    "discount_results": "",
+    "profit_impact": 0
+  },
+
+  "tier_tracking": {
+    "tier_history": [],
+    "days_in_tier_4": 0,
+    "recovery_window_active": false
+  },
+
+  "product_matching": {
+    "collections": [],
+    "categories": [],
+    "shop_by_goal": [],
+    "bundle_matches": []
+  },
+
+  "evics_rendering": {
+    "approved_ads": [],
+    "best_of_best_candidates": [],
+    "render_scores": []
+  },
+
+  "notes": ""
+}

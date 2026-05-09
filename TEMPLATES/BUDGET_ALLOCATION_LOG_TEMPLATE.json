@@ -1,0 +1,54 @@
+{
+  "date": "",
+
+  "total_marketing_budget": 0,
+
+  "top_30_allocation": {
+    "percentage": 80,
+    "allocated_amount": 0,
+    "ads": []
+  },
+
+  "promotion_pool": {
+    "percentage": 20,
+    "allocated_amount": 0,
+
+    "priority_order": [
+      "Tier 3 Momentum Products",
+      "Tier 2 Promotion Candidates",
+      "Tier 4 Recovery Products"
+    ],
+
+    "ads": []
+  },
+
+  "weighted_profit_scores": [
+    {
+      "ad_name": "",
+      "sku": "",
+      "profit_score": 0,
+      "momentum_score": 0,
+      "fatigue_risk": 0,
+      "refund_risk": 0
+    }
+  ],
+
+  "budget_reallocations": [
+    {
+      "from": "",
+      "to": "",
+      "amount": 0,
+      "reason": ""
+    }
+  ],
+
+  "tier_4_shutdowns": [
+    {
+      "sku": "",
+      "date_paused": "",
+      "reason": "Failed 2-month recovery window"
+    }
+  ],
+
+  "executive_notes": ""
+}

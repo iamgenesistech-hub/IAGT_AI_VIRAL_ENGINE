@@ -1,24 +1,66 @@
 require('dotenv').config();
 
 const axios = require('axios');
-const viralConfig = require('../configs/viralConfig');
 
-async function testScraper() {
-    try {
-        console.log("Genesis Viral Scraper Initialized...");
-        console.log("Brand:", viralConfig.brandFocus.brandName);
-        console.log("Platforms Loaded:", viralConfig.platforms.length);
-        console.log("Categories Loaded:", viralConfig.categories.length);
-        console.log("Minimum Viral Views:", viralConfig.thresholds.minimumViews);
+const {
+  calculateNetProfit,
+  calculateWeightedProfitScore
+} = require('../utils/profitScoreEngine');
 
-        const response = await axios.get('https://example.com');
+async function testSystem() {
 
-        console.log("Website Status:", response.status);
-        console.log("Scraper + Config Connected Successfully");
+  try {
 
-    } catch (error) {
-        console.error("Scraper Error:", error.message);
-    }
+    console.log("EVICS Profit Intelligence System Initialized...");
+
+    const financialData = {
+      revenue: 12000,
+      adSpend: 2500,
+      cogs: 1800,
+      shipping: 450,
+      fees: 300,
+      refunds: 200,
+      creativeProduction: 400,
+      marketingOverhead: 150
+    };
+
+    const netProfit = calculateNetProfit(financialData);
+
+    const weightedScore = calculateWeightedProfitScore(
+      {
+        netProfit: netProfit,
+        profitVelocity: 9,
+        profitStability: 8,
+        scalability: 9,
+        fatigueRisk: 2,
+        refundRisk: 1
+      },
+      {
+        netProfitWeight: 0.35,
+        velocityWeight: 0.2,
+        stabilityWeight: 0.15,
+        scalabilityWeight: 0.15,
+        fatigueRiskWeight: 0.075,
+        refundRiskWeight: 0.075
+      }
+    );
+
+    console.log("Net Profit:", netProfit);
+
+    console.log("Weighted Profit Score:", weightedScore);
+
+    const response = await axios.get('https://example.com');
+
+    console.log("Website Status:", response.status);
+
+    console.log("Profit Intelligence Engine Operational");
+
+  } catch (error) {
+
+    console.error("System Error:", error.message);
+
+  }
+
 }
 
-testScraper();
+testSystem();
