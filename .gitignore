@@ -1,0 +1,8 @@
+﻿node_modules/
+.env
+dist/
+build/
+coverage/
+.playwright/
+.cache/
+*.log
