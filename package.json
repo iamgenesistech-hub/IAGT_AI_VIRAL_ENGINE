@@ -1,0 +1,30 @@
+{
+  "name": "iagt_ai_viral_engine",
+  "version": "1.0.0",
+  "description": "AI viral content intelligence and ad recreation system for I AM GENESIS TECH e-commerce marketing.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE/issues"
+  },
+  "homepage": "https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE#readme",
+  "dependencies": {
+    "axios": "^1.16.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "playwright": "^1.59.1"
+  }
+}
