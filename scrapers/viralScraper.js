@@ -1,54 +1,42 @@
 require('dotenv').config();
 
 const {
-  calculateNetProfit,
-  calculateWeightedProfitScore
-} = require('../utils/profitScoreEngine');
-
-const {
-  determineProductTier,
-  getTierAction
-} = require('../utils/productTierEngine');
+  allocateMarketingBudget,
+  rankAdsByProfitScore,
+  determineBudgetAction
+} = require('../utils/capitalAllocatorEngine');
 
 function testSystem() {
-  console.log("EVICS Profit + Tier Intelligence Initialized...");
+  console.log("EVICS Capital Allocator Initialized...");
 
-  const financialData = {
-    revenue: 12000,
-    adSpend: 2500,
-    cogs: 1800,
-    shipping: 450,
-    fees: 300,
-    refunds: 200,
-    creativeProduction: 400,
-    marketingOverhead: 150
-  };
+  const totalBudget = 10000;
 
-  const netProfit = calculateNetProfit(financialData);
+  const ads = [
+    { name: "Sea Moss UGC Ad", sku: "ROC_SEAMOSS", weightedProfitScore: 2174.13 },
+    { name: "Nootropic Focus Ad", sku: "ROC_FOCUS", weightedProfitScore: 1425.55 },
+    { name: "Beauty Glow Ad", sku: "ROC_BEAUTY", weightedProfitScore: 725.2 },
+    { name: "Weak Test Ad", sku: "ROC_TEST", weightedProfitScore: 300.1 }
+  ];
 
-  const weightedScore = calculateWeightedProfitScore(
-    {
-      netProfit,
-      profitVelocity: 9,
-      profitStability: 8,
-      scalability: 9,
-      fatigueRisk: 2,
-      refundRisk: 1
-    },
-    {}
-  );
+  const rankedAds = rankAdsByProfitScore(ads);
 
-  const percentileRank = 18;
-  const tier = determineProductTier(percentileRank);
-  const tierAction = getTierAction(tier, 0);
+  const topAds = rankedAds.slice(0, 3);
+  const promotionAds = rankedAds.slice(3);
 
-  console.log("Net Profit:", netProfit);
-  console.log("Weighted Profit Score:", weightedScore);
-  console.log("Product Percentile Rank:", percentileRank);
-  console.log("Product Tier:", tier);
-  console.log("Recommended Action:", tierAction.action);
-  console.log("Ad Spend Status:", tierAction.adSpendStatus);
-  console.log("Product Tier Engine Operational");
+  const allocation = allocateMarketingBudget(totalBudget, topAds, promotionAds);
+
+  console.log("Total Budget:", allocation.totalBudget);
+  console.log("Top Ads Allocation:", allocation.top30.allocation);
+  console.log("Promotion Pool Allocation:", allocation.promotionPool.allocation);
+
+  console.log("Ranked Ads:");
+  rankedAds.forEach((ad, index) => {
+    console.log(
+      `${index + 1}. ${ad.name} | ${ad.sku} | Score: ${ad.weightedProfitScore} | Action: ${determineBudgetAction(ad.weightedProfitScore)}`
+    );
+  });
+
+  console.log("Capital Allocator Engine Operational");
 }
 
 testSystem();
