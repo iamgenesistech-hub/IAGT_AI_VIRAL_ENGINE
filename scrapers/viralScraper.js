@@ -1,47 +1,39 @@
 require('dotenv').config();
 
 const {
-  enforceTopCreativeCap,
-  selectEliteTop20,
-  shouldMoveToBestOfBest
-} = require('../utils/libraryStewardEngine');
+  generateExecutiveSummary,
+  createActionRecommendation
+} = require('../utils/executiveReporterEngine');
 
 function testSystem() {
+  console.log("EVICS Executive Reporter Initialized...");
 
-  console.log("EVICS Library Steward Initialized...");
+  const summary = generateExecutiveSummary({
+    date: "2026-05-09",
+    totalRevenue: 25000,
+    totalNetProfit: 8200,
+    totalAdSpend: 4300,
+    topRecommendations: [
+      "Scale Tier 1 Sea Moss ads carefully",
+      "Reduce spend on weak test ads",
+      "Push momentum SKUs into Promotion Pool"
+    ],
+    alerts: [
+      "Watch refund risk on beauty stack",
+      "Review Tier 4 recovery products"
+    ]
+  });
 
-  const creatives = [
-    { name: "Ad 1", performanceScore: 95 },
-    { name: "Ad 2", performanceScore: 89 },
-    { name: "Ad 3", performanceScore: 92 },
-    { name: "Ad 4", performanceScore: 70 },
-    { name: "Ad 5", performanceScore: 85 },
-    { name: "Ad 6", performanceScore: 60 },
-    { name: "Ad 7", performanceScore: 98 }
-  ];
+  console.log("Executive Summary:", summary);
 
-  const library = enforceTopCreativeCap(creatives, 5);
+  const recommendation = createActionRecommendation({
+    netProfit: 1200,
+    momentumScore: 85,
+    awarenessScore: 76
+  });
 
-  const eliteTop20 = selectEliteTop20(creatives);
-
-  const bestOfBest = shouldMoveToBestOfBest(95, 1750);
-
-  console.log(
-    "Active Creatives:",
-    library.activeCreatives.map(c => c.name)
-  );
-
-  console.log(
-    "Fallout Creatives:",
-    library.falloutCreatives.map(c => c.name)
-  );
-
-  console.log("Elite Top Count:", eliteTop20.length);
-
-  console.log("Move To Best Of Best:", bestOfBest);
-
-  console.log("Library Steward Engine Operational");
-
+  console.log("Action Recommendation:", recommendation);
+  console.log("Executive Reporter Engine Operational");
 }
 
 testSystem();
