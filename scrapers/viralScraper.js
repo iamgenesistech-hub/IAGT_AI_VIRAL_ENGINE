@@ -7,6 +7,7 @@ const {
 } = require('../utils/libraryStewardEngine');
 
 function testSystem() {
+
   console.log("EVICS Library Steward Initialized...");
 
   const creatives = [
@@ -20,14 +21,27 @@ function testSystem() {
   ];
 
   const library = enforceTopCreativeCap(creatives, 5);
+
   const eliteTop20 = selectEliteTop20(creatives);
+
   const bestOfBest = shouldMoveToBestOfBest(95, 1750);
 
-  console.log("Active Creatives:", library.activeCreatives.map(c => c.name));
-  console.log("Fallout Creatives:", library.falloutCreatives.map(c => c.name));
+  console.log(
+    "Active Creatives:",
+    library.activeCreatives.map(c => c.name)
+  );
+
+  console.log(
+    "Fallout Creatives:",
+    library.falloutCreatives.map(c => c.name)
+  );
+
   console.log("Elite Top Count:", eliteTop20.length);
+
   console.log("Move To Best Of Best:", bestOfBest);
+
   console.log("Library Steward Engine Operational");
+
 }
 
 testSystem();
