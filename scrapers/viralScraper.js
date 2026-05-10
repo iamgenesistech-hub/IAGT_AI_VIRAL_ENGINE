@@ -1,31 +1,37 @@
 require('dotenv').config();
 
 const {
-  extractCreativeDeltas,
-  rewriteDeltasForBrand
-} = require('../utils/creativeDeltaExtractor');
+  deconstructViralAd,
+  calculateViralFormatScore
+} = require('../utils/viralDeconstructionEngine');
 
 function testSystem() {
-  console.log("EVICS Creative Delta Extractor Initialized...");
+  console.log("EVICS Viral Deconstruction Engine Initialized...");
 
-  const viralAd = {
-    hook: "Fast curiosity hook",
-    pacing: "Quick cuts every 1.5 seconds",
-    proof: "Visible transformation/proof moment",
-    cta: "Simple direct action CTA",
-    visualStyle: "Bright product-forward lifestyle scene",
-    emotionalTrigger: "confidence"
+  const ad = {
+    whyItWorked: "It opened with a direct pain point, showed proof quickly, and closed with a simple CTA.",
+    hookScore: 94,
+    proofScore: 91,
+    pacingScore: 88,
+    ctaScore: 90,
+    visualClarityScore: 92,
+    emotionalTriggerScore: 95,
+    backgroundPalette: ["soft gold", "cream"],
+    foregroundPalette: ["black", "white"],
+    accentColors: ["purple", "gold"],
+    cameraStyle: "fast handheld UGC",
+    sceneTiming: "hook in first 2 seconds",
+    buyerIntent: "problem aware",
+    objections: ["trust", "price", "will it work"],
+    sophisticationLevel: "medium"
   };
 
-  const deltas = extractCreativeDeltas(viralAd);
-  const rewritten = rewriteDeltasForBrand(
-    deltas,
-    "Elite clinical-luxury transformation voice"
-  );
+  const report = deconstructViralAd(ad);
+  const score = calculateViralFormatScore(report.componentScores);
 
-  console.log("Extracted Deltas:", deltas);
-  console.log("Brand Rewritten Deltas:", rewritten);
-  console.log("Creative Delta Extractor Operational");
+  console.log("Deconstruction Report:", report);
+  console.log("Viral Format Score:", score);
+  console.log("Viral Deconstruction Engine Operational");
 }
 
 testSystem();
