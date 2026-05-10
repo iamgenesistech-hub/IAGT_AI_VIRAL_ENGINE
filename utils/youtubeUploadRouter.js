@@ -1,12 +1,9 @@
-function routeVideoUpload(video) {
-
-  if (video.grade >= 92) {
-    return "BEST_OF_BEST_FOLDER";
-  }
-
-  return "STANDARD_RENDER_FOLDER";
+﻿function routeYouTubeUpload(video) {
+  return {
+    videoTitle: video.title,
+    upload: true,
+    folder: video.grade >= 92 ? "EVICS Render Folder - Best of the Best" : "EVICS Approved Ads"
+  };
 }
 
-module.exports = {
-  routeVideoUpload
-};
+module.exports = { routeYouTubeUpload };
