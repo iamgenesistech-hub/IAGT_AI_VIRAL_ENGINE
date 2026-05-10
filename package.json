@@ -1,31 +1,17 @@
 {
   "name": "iagt_ai_viral_engine",
   "version": "1.0.0",
-  "description": "AI viral content intelligence and ad recreation system for I AM GENESIS TECH e-commerce marketing.",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
-  },
+  "description": "EVICS Autonomous Intelligence System",
+  "main": "backend/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node backend/server.js",
+    "test": "node scrapers/viralScraper.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE/issues"
-  },
-  "homepage": "https://github.com/iamgenesistech-hub/IAGT_AI_VIRAL_ENGINE#readme",
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.4",
-    "axios": "^1.16.0",
-    "cheerio": "^1.2.0",
-    "dotenv": "^17.4.2",
-    "playwright": "^1.59.1"
+    "@supabase/supabase-js": "^2.57.4",
+    "axios": "^1.11.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0"
   }
 }
