@@ -1,39 +1,38 @@
 require('dotenv').config();
 
-const {
-  generateExecutiveSummary,
-  createActionRecommendation
-} = require('../utils/executiveReporterEngine');
+const EVICS_MASTER_CONFIG = require('../configs/evicsMasterConfig');
 
 function testSystem() {
-  console.log("EVICS Executive Reporter Initialized...");
 
-  const summary = generateExecutiveSummary({
-    date: "2026-05-09",
-    totalRevenue: 25000,
-    totalNetProfit: 8200,
-    totalAdSpend: 4300,
-    topRecommendations: [
-      "Scale Tier 1 Sea Moss ads carefully",
-      "Reduce spend on weak test ads",
-      "Push momentum SKUs into Promotion Pool"
-    ],
-    alerts: [
-      "Watch refund risk on beauty stack",
-      "Review Tier 4 recovery products"
-    ]
-  });
+  console.log("EVICS Master Configuration Initialized...");
 
-  console.log("Executive Summary:", summary);
+  console.log(
+    "Minimum Viral Views:",
+    EVICS_MASTER_CONFIG.VIRAL_THRESHOLDS.minimumViews
+  );
 
-  const recommendation = createActionRecommendation({
-    netProfit: 1200,
-    momentumScore: 85,
-    awarenessScore: 76
-  });
+  console.log(
+    "Enabled Platforms:",
+    EVICS_MASTER_CONFIG.PLATFORM_RULES.enabledPlatforms
+  );
 
-  console.log("Action Recommendation:", recommendation);
-  console.log("Executive Reporter Engine Operational");
+  console.log(
+    "Strict People Of Color Mode:",
+    EVICS_MASTER_CONFIG.RENDER_SETTINGS.strictPeopleOfColorMode
+  );
+
+  console.log(
+    "Render Count:",
+    EVICS_MASTER_CONFIG.RENDER_SETTINGS.renderCountPerConcept
+  );
+
+  console.log(
+    "Elite Vault Grade:",
+    EVICS_MASTER_CONFIG.ELITE_VAULT.minimumRenderGrade
+  );
+
+  console.log("EVICS Master Config Operational");
+
 }
 
 testSystem();
