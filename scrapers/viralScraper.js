@@ -1,56 +1,31 @@
 require('dotenv').config();
 
 const {
-  matchProductsToAd,
-  selectTopProductsForRendering
-} = require('../utils/productMatchingEngine');
+  extractCreativeDeltas,
+  rewriteDeltasForBrand
+} = require('../utils/creativeDeltaExtractor');
 
 function testSystem() {
-  console.log("EVICS Product Matching Engine Initialized...");
+  console.log("EVICS Creative Delta Extractor Initialized...");
 
-  const adProfile = {
-    collection: "Wellness",
-    category: "Sea Moss",
-    goals: ["Energy", "Immune Support"],
-    emotionalTriggers: ["confidence", "daily vitality"]
+  const viralAd = {
+    hook: "Fast curiosity hook",
+    pacing: "Quick cuts every 1.5 seconds",
+    proof: "Visible transformation/proof moment",
+    cta: "Simple direct action CTA",
+    visualStyle: "Bright product-forward lifestyle scene",
+    emotionalTrigger: "confidence"
   };
 
-  const products = [
-    {
-      sku: "ROC_SEAMOSS",
-      name: "Sea Moss Complex",
-      collections: ["Wellness"],
-      categories: ["Sea Moss"],
-      goals: ["Energy", "Immune Support"],
-      benefits: ["daily vitality"],
-      isBundle: false
-    },
-    {
-      sku: "ROC_BEAUTY",
-      name: "Beauty Glow Formula",
-      collections: ["Beauty"],
-      categories: ["Skin"],
-      goals: ["Glow"],
-      benefits: ["confidence"],
-      isBundle: false
-    },
-    {
-      sku: "ROC_BUNDLE",
-      name: "Wellness Energy Bundle",
-      collections: ["Wellness"],
-      categories: ["Bundles"],
-      goals: ["Energy"],
-      benefits: ["daily vitality"],
-      isBundle: true
-    }
-  ];
+  const deltas = extractCreativeDeltas(viralAd);
+  const rewritten = rewriteDeltasForBrand(
+    deltas,
+    "Elite clinical-luxury transformation voice"
+  );
 
-  const matches = matchProductsToAd(adProfile, products);
-  const selected = selectTopProductsForRendering(matches, 3);
-
-  console.log("Product Matches:", matches);
-  console.log("Selected Products:", selected);
-  console.log("Product Matching Engine Operational");
+  console.log("Extracted Deltas:", deltas);
+  console.log("Brand Rewritten Deltas:", rewritten);
+  console.log("Creative Delta Extractor Operational");
 }
 
 testSystem();
