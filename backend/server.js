@@ -4,6 +4,11 @@ const express = require('express');
 const path = require('path');
 const supabase = require('../utils/supabaseConnector');
 
+const {
+  fetchShopifyProducts,
+  fetchShopifyCollections
+} = require('../utils/shopifyLiveConnector');
+
 const app = express();
 const PORT = 3000;
 
@@ -24,7 +29,6 @@ app.get('/api/products', async (req, res) => {
     .order('profit_score', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.json(data);
 });
 
@@ -35,7 +39,6 @@ app.get('/api/renders', async (req, res) => {
     .order('render_grade', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.json(data);
 });
 
@@ -46,7 +49,6 @@ app.get('/api/campaigns', async (req, res) => {
     .order('profit_score', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.json(data);
 });
 
@@ -57,7 +59,6 @@ app.get('/api/trends', async (req, res) => {
     .order('viral_score', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.json(data);
 });
 
@@ -111,6 +112,28 @@ app.get('/api/dashboard-summary', async (req, res) => {
     vaultRouting: topRender?.vault_destination || 'Pending',
     nextPriority: 'Live Shopify Integration'
   });
+});
+
+app.get('/api/shopify/products', async (req, res) => {
+  try {
+    const products = await fetchShopifyProducts(20);
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/shopify/collections', async (req, res) => {
+  try {
+    const collections = await fetchShopifyCollections(20);
+    res.json(collections);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
 });
 
 app.listen(PORT, () => {
