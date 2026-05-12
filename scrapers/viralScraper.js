@@ -1,71 +1,68 @@
 require('dotenv').config();
 
-const { saveRender } = require('../utils/renderDatabaseEngine');
-const { saveCampaign } = require('../utils/campaignDatabaseEngine');
-const { saveReport } = require('../utils/reportDatabaseEngine');
-const { saveTrend } = require('../utils/trendDatabaseEngine');
+const {
+  calculateAuthenticityScore,
+  determineAuthenticityStatus,
+  detectCommonAIMistakes,
+  finalDeploymentGate
+} = require('../utils/humanAuthenticityEngine');
 
-async function testDatabaseLayer() {
-  console.log("EVICS Database Expansion Test Initialized...");
+const {
+  saveAuthenticityReview
+} = require('../utils/authenticityDatabaseEngine');
 
-  const renderResult = await saveRender({
-    render_name: "Sea Moss Morning Routine Render",
+async function testHAVE() {
+  console.log("HAVE Authenticity Verification Engine Initialized...");
+
+  const authenticityScore = calculateAuthenticityScore({
+    facialAuthenticity: 99,
+    handAccuracy: 98,
+    eyeRealism: 99,
+    motionPhysics: 99,
+    lightingRealism: 100,
+    textureRealism: 99,
+    behavioralRealism: 99,
+    environmentRealism: 100,
+    audioSync: 99,
+    textPrintRealism: 100
+  });
+
+  const issues = detectCommonAIMistakes({
+    deadEyes: false,
+    badHands: false,
+    waxSkin: false,
+    motionDrift: false,
+    lipSyncIssue: false,
+    badText: false,
+    shadowMismatch: false,
+    tooPerfect: false
+  });
+
+  const status = determineAuthenticityStatus(authenticityScore);
+
+  const gate = finalDeploymentGate(
+    authenticityScore,
+    94,
+    true
+  );
+
+  const saved = await saveAuthenticityReview({
+    render_name: "Sea Moss Human Authenticity Render",
     sku: "ROC_SEAMOSS",
-    product_name: "Sea Moss Complex",
-    platform: "TikTok",
+    authenticity_score: authenticityScore,
     render_grade: 94,
-    product_fit: 92,
-    brand_alignment: 95,
-    conversion_potential: 91,
-    viral_potential: 93,
-    status: "Approved",
-    vault_destination: "EVICS Render Folder - Best of the Best"
+    status,
+    issues,
+    final_gate_passed: gate.passed,
+    notes: gate.reason
   });
 
-  console.log("Render Save Result:", renderResult);
-
-  const campaignResult = await saveCampaign({
-    campaign_name: "Sea Moss Morning Routine Campaign",
-    sku: "ROC_SEAMOSS",
-    product_name: "Sea Moss Complex",
-    platform: "TikTok",
-    goal: "Sales",
-    budget: 500,
-    net_profit: 6200,
-    profit_score: 2174,
-    status: "Planned"
-  });
-
-  console.log("Campaign Save Result:", campaignResult);
-
-  const reportResult = await saveReport({
-    report_type: "weekly",
-    summary: "Sea Moss campaign shows strong profit, high momentum, and strong render quality.",
-    recommendations: [
-      "Scale Sea Moss carefully",
-      "Create three new UGC variations",
-      "Monitor fatigue after campaign launch"
-    ],
-    alerts: [
-      "Watch ad frequency",
-      "Review refund risk weekly"
-    ]
-  });
-
-  console.log("Report Save Result:", reportResult);
-
-  const trendResult = await saveTrend({
-    trend_name: "Sea Moss Morning Routine",
-    platform: "TikTok",
-    category: "Wellness",
-    viral_score: 92,
-    product_fit: 95,
-    recommendation: "Test immediately with Sea Moss Complex"
-  });
-
-  console.log("Trend Save Result:", trendResult);
-
-  console.log("EVICS DATABASE EXPANSION OPERATIONAL");
+  console.log("Authenticity Score:", authenticityScore);
+  console.log("Authenticity Status:", status);
+  console.log("AI Mistakes Detected:", issues);
+  console.log("Final Deployment Gate:", gate);
+  console.log("Database Save:", saved);
+  console.log("HAVE AUTHENTICITY LAYER OPERATIONAL");
 }
 
-testDatabaseLayer();
+testHAVE();
