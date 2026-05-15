@@ -1,68 +1,67 @@
 require('dotenv').config();
 
 const {
-  calculateAuthenticityScore,
-  determineAuthenticityStatus,
-  detectCommonAIMistakes,
-  finalDeploymentGate
-} = require('../utils/humanAuthenticityEngine');
+  calculateViralScore,
+  classifyViralAd,
+  extractWinningStructure,
+  determineViralAction
+} = require('../utils/viralIntelligenceEngine');
 
 const {
-  saveAuthenticityReview
-} = require('../utils/authenticityDatabaseEngine');
+  saveViralIntelligence
+} = require('../utils/viralIntelligenceDatabaseEngine');
 
-async function testHAVE() {
-  console.log("HAVE Authenticity Verification Engine Initialized...");
+async function testViralIntelligence() {
+  console.log('EVICS Viral Intelligence Agent Initialized...');
 
-  const authenticityScore = calculateAuthenticityScore({
-    facialAuthenticity: 99,
-    handAccuracy: 98,
-    eyeRealism: 99,
-    motionPhysics: 99,
-    lightingRealism: 100,
-    textureRealism: 99,
-    behavioralRealism: 99,
-    environmentRealism: 100,
-    audioSync: 99,
-    textPrintRealism: 100
+  const viralAd = {
+    sourcePlatform: 'TikTok',
+    sourceUrl: 'https://example.com/viral-sea-moss-ad',
+    category: 'Sea Moss Wellness',
+    views: 1800000,
+    shares: 22000,
+    comments: 7800,
+    velocity: 14,
+    hookStrength: 92,
+    productFit: 96,
+    conversionSignal: 88,
+    hook: 'Nobody talks about this morning wellness routine...',
+    problem: 'Low energy and poor daily vitality',
+    agitation: 'People are tired of feeling drained before noon',
+    solution: 'Sea Moss Complex daily routine',
+    proof: 'Visible lifestyle transformation and testimonial',
+    cta: 'Start your Genesis morning routine today',
+    visualPattern: 'UGC bathroom mirror + kitchen supplement routine',
+    pacing: 'Fast hook, quick proof, emotional close',
+    emotionalTrigger: 'daily vitality and confidence'
+  };
+
+  const viralScore = calculateViralScore(viralAd);
+  const category = classifyViralAd(viralAd);
+  const structure = extractWinningStructure(viralAd);
+  const action = determineViralAction(viralScore);
+
+  const saved = await saveViralIntelligence({
+    source_platform: viralAd.sourcePlatform,
+    source_url: viralAd.sourceUrl,
+    category,
+    viral_score: viralScore,
+    action,
+    hook: viralAd.hook,
+    visual_pattern: viralAd.visualPattern,
+    pacing: viralAd.pacing,
+    emotional_trigger: viralAd.emotionalTrigger,
+    product_fit: viralAd.productFit,
+    conversion_signal: viralAd.conversionSignal,
+    winning_structure: structure
   });
 
-  const issues = detectCommonAIMistakes({
-    deadEyes: false,
-    badHands: false,
-    waxSkin: false,
-    motionDrift: false,
-    lipSyncIssue: false,
-    badText: false,
-    shadowMismatch: false,
-    tooPerfect: false
-  });
-
-  const status = determineAuthenticityStatus(authenticityScore);
-
-  const gate = finalDeploymentGate(
-    authenticityScore,
-    94,
-    true
-  );
-
-  const saved = await saveAuthenticityReview({
-    render_name: "Sea Moss Human Authenticity Render",
-    sku: "ROC_SEAMOSS",
-    authenticity_score: authenticityScore,
-    render_grade: 94,
-    status,
-    issues,
-    final_gate_passed: gate.passed,
-    notes: gate.reason
-  });
-
-  console.log("Authenticity Score:", authenticityScore);
-  console.log("Authenticity Status:", status);
-  console.log("AI Mistakes Detected:", issues);
-  console.log("Final Deployment Gate:", gate);
-  console.log("Database Save:", saved);
-  console.log("HAVE AUTHENTICITY LAYER OPERATIONAL");
+  console.log('Viral Score:', viralScore);
+  console.log('Category:', category);
+  console.log('Winning Structure:', structure);
+  console.log('Recommended Action:', action);
+  console.log('Database Save:', saved);
+  console.log('EVICS VIRAL INTELLIGENCE AGENT OPERATIONAL');
 }
 
-testHAVE();
+testViralIntelligence();

@@ -8,6 +8,8 @@
     "test": "node scrapers/viralScraper.js"
   },
   "dependencies": {
+    "@shopify/shopify-api": "^13.0.0",
+    "@shopify/shopify-app-express": "^7.0.0",
     "@supabase/supabase-js": "^2.57.4",
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",

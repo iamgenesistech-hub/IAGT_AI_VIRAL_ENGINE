@@ -1,0 +1,22 @@
+{
+  "name": "iagt-backend",
+  "version": "1.0.0",
+  "description": "IAGT AI Viral Engine Backend",
+  "main": "server.js",
+  "private": true,
+  "dependencies": {
+    "@shopify/shopify-api": "^13.0.0",
+    "@shopify/shopify-app-express": "^7.0.0",
+    "@shopify/shopify-app-session-storage-memory": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

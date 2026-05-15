@@ -1,141 +1,56 @@
-require('dotenv').config();
+// backend/server.js
+require("dotenv").config();
 
-const express = require('express');
-const path = require('path');
-const supabase = require('../utils/supabaseConnector');
+console.log("FULL CLIENT ID:", process.env.SHOPIFY_CLIENT_ID);
+console.log("HOST:", process.env.HOST);
 
-const {
-  fetchShopifyProducts,
-  fetchShopifyCollections
-} = require('../utils/shopifyLiveConnector');
+const express = require("express");
+const cookieParser = require("cookie-parser");
+const shopify = require("./shopifyAuth");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(cookieParser());
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'EVICS Command Center Online',
-    timestamp: new Date().toISOString()
-  });
-});
+// ✅ Basic test routes
+app.get("/", (req, res) => res.send("✅ EVICS backend online"));
 
-app.get('/api/products', async (req, res) => {
-  const { data, error } = await supabase
-    .from('evics_products')
-    .select('*')
-    .order('profit_score', { ascending: false });
+app.get("/health", (req, res) =>
+  res.json({ ok: true, time: new Date().toISOString() })
+);
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
+// ✅ OAuth routes
+app.get(shopify.config.auth.path, shopify.auth.begin());
 
-app.get('/api/renders', async (req, res) => {
-  const { data, error } = await supabase
-    .from('evics_renders')
-    .select('*')
-    .order('render_grade', { ascending: false });
+app.get(
+  shopify.config.auth.callbackPath,
+  shopify.auth.callback(),
+  shopify.redirectToShopifyOrAppRoot()
+);
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.get('/api/campaigns', async (req, res) => {
-  const { data, error } = await supabase
-    .from('evics_campaigns')
-    .select('*')
-    .order('profit_score', { ascending: false });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.get('/api/trends', async (req, res) => {
-  const { data, error } = await supabase
-    .from('evics_trends')
-    .select('*')
-    .order('viral_score', { ascending: false });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.get('/api/dashboard-summary', async (req, res) => {
-  const { data: products, error: productError } = await supabase
-    .from('evics_products')
-    .select('*')
-    .order('profit_score', { ascending: false });
-
-  const { data: renders, error: renderError } = await supabase
-    .from('evics_renders')
-    .select('*')
-    .order('render_grade', { ascending: false });
-
-  const { data: campaigns, error: campaignError } = await supabase
-    .from('evics_campaigns')
-    .select('*')
-    .order('profit_score', { ascending: false });
-
-  const { data: trends, error: trendError } = await supabase
-    .from('evics_trends')
-    .select('*')
-    .order('viral_score', { ascending: false });
-
-  const error = productError || renderError || campaignError || trendError;
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  const topProduct = products?.[0] || null;
-  const topRender = renders?.[0] || null;
-  const topCampaign = campaigns?.[0] || null;
-  const topTrend = trends?.[0] || null;
-
-  const totalNetProfit = products?.reduce((sum, item) => {
-    return sum + Number(item.net_profit || 0);
-  }, 0);
-
-  res.json({
-    systemStatus: 'Operational',
-    databaseStatus: 'Supabase Connected',
-    totalNetProfit,
-    topSku: topProduct?.sku || 'N/A',
-    topProductName: topProduct?.product_name || 'N/A',
-    topRenderGrade: topRender?.render_grade || 0,
-    topRenderName: topRender?.render_name || 'N/A',
-    momentumScore: topProduct?.momentum_score || 0,
-    awarenessScore: topProduct?.awareness_score || 0,
-    topCampaign: topCampaign?.campaign_name || 'N/A',
-    topTrend: topTrend?.trend_name || 'N/A',
-    campaignAction: topCampaign?.status || 'Review',
-    vaultRouting: topRender?.vault_destination || 'Pending',
-    nextPriority: 'Live Shopify Integration'
-  });
-});
-
-app.get('/api/shopify/products', async (req, res) => {
+// ✅ Test Shopify API after auth
+app.get("/shop", shopify.validateAuthenticatedSession(), async (req, res) => {
   try {
-    const products = await fetchShopifyProducts(20);
-    res.json(products);
-  } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
-  }
-});
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Rest({ session });
+    const response = await client.get({ path: "shop" });
 
-app.get('/api/shopify/collections', async (req, res) => {
-  try {
-    const collections = await fetchShopifyCollections(20);
-    res.json(collections);
-  } catch (error) {
-    res.status(500).json({
-      error: error.message
+    res.json({
+      success: true,
+      shopName: response.body.shop?.name,
+      myshopifyDomain: response.body.shop?.myshopify_domain,
     });
+  } catch (e) {
+    res.status(500).json({ error: e.message || String(e) });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`EVICS Command Center running at http://localhost:${PORT}`);
+  console.log(`✅ Backend running at http://127.0.0.1:${PORT}`);
+  console.log(
+    `➡️ OAuth (ngrok): https://${process.env.HOST}/auth?shop=iamgenesistech.myshopify.com`
+  );
+  console.log(`➡️ Test (ngrok): https://${process.env.HOST}/shop`);
 });
