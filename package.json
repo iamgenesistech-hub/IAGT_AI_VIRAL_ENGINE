@@ -5,6 +5,7 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
+    "sync:shopify:admin": "node sync-shopify-products.js",
     "test": "node scrapers/viralScraper.js"
   },
   "dependencies": {
