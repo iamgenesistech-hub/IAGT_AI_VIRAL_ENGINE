@@ -5,10 +5,7 @@
   "main": "server.js",
   "private": true,
   "dependencies": {
-    "@shopify/shopify-api": "^13.0.0",
-    "@shopify/shopify-app-express": "^7.0.0",
-    "@shopify/shopify-app-session-storage-memory": "^6.0.0",
-    "cookie-parser": "^1.4.7",
+    "@supabase/supabase-js": "^2.49.4",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
   },
