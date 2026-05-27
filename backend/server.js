@@ -5,6 +5,14 @@ const express = require('express');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 
+// ── Agent Orchestration Layer ──────────────────────────────────────────────
+const Orchestrator = require('./agents/orchestrator');
+const TrendScoutTwin = require('./agents/trendScoutTwin');
+const ProductMatchTwin = require('./agents/productMatchTwin');
+const ScriptWriterTwin = require('./agents/scriptWriterTwin');
+const VisualDirectorTwin = require('./agents/visualDirectorTwin');
+const CopilotAssistant = require('./agents/copilotAssistant');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -403,6 +411,214 @@ app.post('/api/video/generate', async (req, res) => {
   }
 });
 
+// =========================================================================
+// AGENT ORCHESTRATION ENDPOINTS
+// =========================================================================
+
+// -------------------------
+// GET /api/agents/status — check health of all agents
+// -------------------------
+app.get('/api/agents/status', async (_req, res) => {
+  try {
+    const status = await Orchestrator.getAgentStatus();
+    noStore(res);
+    res.json(status);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/orchestrate/full-cycle — run the complete pipeline
+// -------------------------
+app.post('/api/agents/orchestrate/full-cycle', async (req, res) => {
+  try {
+    const {
+      platforms,
+      categories,
+      formats,
+      copilotRefine = true,
+      trendLimit = 10,
+    } = req.body || {};
+
+    const result = await Orchestrator.orchestrateFullCycle({
+      platforms,
+      categories,
+      formats,
+      copilotRefine,
+      trendLimit,
+    });
+
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/auto-generate — trigger self-directing pipeline
+// -------------------------
+app.post('/api/agents/auto-generate', async (req, res) => {
+  try {
+    const result = await Orchestrator.autoGenerate(req.body || {});
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/trend-scout/scan — manual trend scan
+// -------------------------
+app.post('/api/agents/trend-scout/scan', async (req, res) => {
+  try {
+    const { platforms, categories, limit = 20 } = req.body || {};
+    const result = await Orchestrator.orchestrateTrendScan({ platforms, categories, limit });
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/product-match/analyze — manual product matching
+// -------------------------
+app.post('/api/agents/product-match/analyze', async (req, res) => {
+  try {
+    const { trends, topN = 3 } = req.body || {};
+    const result = await Orchestrator.orchestrateProductMatch({ trends, topN });
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/script-writer/generate — manual script generation
+// -------------------------
+app.post('/api/agents/script-writer/generate', async (req, res) => {
+  try {
+    const {
+      hook,
+      product,
+      angle,
+      emotion,
+      formats,
+      variations = 2,
+    } = req.body || {};
+
+    if (!hook && !product) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one of hook or product is required.',
+      });
+    }
+
+    const result = await Orchestrator.orchestrateScriptGeneration({
+      hook,
+      product,
+      angle,
+      emotion,
+      formats,
+      variations,
+    });
+
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/visual-director/direct — manual visual direction
+// -------------------------
+app.post('/api/agents/visual-director/direct', async (req, res) => {
+  try {
+    const {
+      product,
+      hook,
+      emotion,
+      format,
+      platform,
+      angle,
+    } = req.body || {};
+
+    if (!product) {
+      return res.status(400).json({ success: false, error: 'product is required.' });
+    }
+
+    const result = await Orchestrator.orchestrateVisualDirection({
+      product,
+      hook,
+      emotion,
+      format,
+      platform,
+      angle,
+    });
+
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/copilot/suggest — get Copilot suggestions
+// -------------------------
+app.post('/api/agents/copilot/suggest', async (req, res) => {
+  try {
+    const { context = '', content = '', type = 'general' } = req.body || {};
+    const result = await CopilotAssistant.suggest({ context, content, type });
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/copilot/refine — refine selection with Copilot
+// -------------------------
+app.post('/api/agents/copilot/refine', async (req, res) => {
+  try {
+    const { selection, type = 'hook', context = {} } = req.body || {};
+
+    if (!selection) {
+      return res.status(400).json({ success: false, error: 'selection is required.' });
+    }
+
+    const result = await CopilotAssistant.refine({ selection, type, context });
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// POST /api/agents/copilot/explain — explain an AI decision
+// -------------------------
+app.post('/api/agents/copilot/explain', async (req, res) => {
+  try {
+    const { decision = '', data = {} } = req.body || {};
+    const result = await CopilotAssistant.explain({ decision, data });
+    noStore(res);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// =========================================================================
+// END AGENT ORCHESTRATION ENDPOINTS
+// =========================================================================
+
 // -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
@@ -434,18 +650,31 @@ app.get('/api/shopify/collections', async (_req, res) => {
 // -------------------------
 app.listen(PORT, () => {
   console.log(`✅ EVICS backend running at http://127.0.0.1:${PORT}`);
-  console.log(`➡️  Status:              http://127.0.0.1:${PORT}/status`);
-  console.log(`➡️  Products:            http://127.0.0.1:${PORT}/api/products`);
-  console.log(`➡️  Renders:             http://127.0.0.1:${PORT}/api/renders`);
-  console.log(`➡️  Campaigns:           http://127.0.0.1:${PORT}/api/campaigns`);
-  console.log(`➡️  Trends:              http://127.0.0.1:${PORT}/api/trends`);
-  console.log(`➡️  Dashboard summary:   http://127.0.0.1:${PORT}/api/dashboard-summary`);
-  console.log(`➡️  Shopify products:    http://127.0.0.1:${PORT}/api/shopify/products`);
-  console.log(`➡️  Shopify collections: http://127.0.0.1:${PORT}/api/shopify/collections`);
-  console.log(`➡️  Viral rescan:        POST http://127.0.0.1:${PORT}/api/viral/rescan`);
-  console.log(`➡️  Hook search:         POST http://127.0.0.1:${PORT}/api/hooks/search`);
-  console.log(`➡️  Creatives:           http://127.0.0.1:${PORT}/api/creatives`);
-  console.log(`➡️  Assembly drafts:     http://127.0.0.1:${PORT}/api/assembly/drafts`);
-  console.log(`➡️  AI suggestions:      POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
-  console.log(`➡️  Video generate:      POST http://127.0.0.1:${PORT}/api/video/generate`);
+  console.log(`➡️  Status:                      http://127.0.0.1:${PORT}/status`);
+  console.log(`➡️  Products:                    http://127.0.0.1:${PORT}/api/products`);
+  console.log(`➡️  Renders:                     http://127.0.0.1:${PORT}/api/renders`);
+  console.log(`➡️  Campaigns:                   http://127.0.0.1:${PORT}/api/campaigns`);
+  console.log(`➡️  Trends:                      http://127.0.0.1:${PORT}/api/trends`);
+  console.log(`➡️  Dashboard summary:           http://127.0.0.1:${PORT}/api/dashboard-summary`);
+  console.log(`➡️  Shopify products:            http://127.0.0.1:${PORT}/api/shopify/products`);
+  console.log(`➡️  Shopify collections:         http://127.0.0.1:${PORT}/api/shopify/collections`);
+  console.log(`➡️  Viral rescan:                POST http://127.0.0.1:${PORT}/api/viral/rescan`);
+  console.log(`➡️  Hook search:                 POST http://127.0.0.1:${PORT}/api/hooks/search`);
+  console.log(`➡️  Creatives:                   http://127.0.0.1:${PORT}/api/creatives`);
+  console.log(`➡️  Assembly drafts:             http://127.0.0.1:${PORT}/api/assembly/drafts`);
+  console.log(`➡️  AI suggestions:              POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
+  console.log(`➡️  Video generate:              POST http://127.0.0.1:${PORT}/api/video/generate`);
+  console.log('');
+  console.log('── AGENT ORCHESTRATION LAYER ─────────────────────────────────────────');
+  console.log(`➡️  Agent status:                GET  http://127.0.0.1:${PORT}/api/agents/status`);
+  console.log(`➡️  Auto-generate pipeline:      POST http://127.0.0.1:${PORT}/api/agents/auto-generate`);
+  console.log(`➡️  Full-cycle orchestration:    POST http://127.0.0.1:${PORT}/api/agents/orchestrate/full-cycle`);
+  console.log(`➡️  Trend Scout scan:            POST http://127.0.0.1:${PORT}/api/agents/trend-scout/scan`);
+  console.log(`➡️  Product Match analyze:       POST http://127.0.0.1:${PORT}/api/agents/product-match/analyze`);
+  console.log(`➡️  Script Writer generate:      POST http://127.0.0.1:${PORT}/api/agents/script-writer/generate`);
+  console.log(`➡️  Visual Director direct:      POST http://127.0.0.1:${PORT}/api/agents/visual-director/direct`);
+  console.log(`➡️  Copilot suggest:             POST http://127.0.0.1:${PORT}/api/agents/copilot/suggest`);
+  console.log(`➡️  Copilot refine:              POST http://127.0.0.1:${PORT}/api/agents/copilot/refine`);
+  console.log(`➡️  Copilot explain:             POST http://127.0.0.1:${PORT}/api/agents/copilot/explain`);
+  console.log('──────────────────────────────────────────────────────────────────────');
 });
