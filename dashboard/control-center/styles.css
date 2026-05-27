@@ -1533,3 +1533,253 @@ meter {
     grid-column: 1 / -1;
   }
 }
+
+/* ── Agent / Copilot Panel ── */
+.copilot-panel {
+  background: #f0f7f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.copilot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.copilot-head h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.copilot-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.copilot-section-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 10px 0 6px;
+}
+
+.copilot-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.copilot-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.copilot-card-head strong {
+  font-size: 13px;
+}
+
+.copilot-card p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.copilot-card small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.copilot-refinement-text {
+  font-style: italic;
+  color: var(--ink) !important;
+  font-weight: 500;
+}
+
+.copilot-apply-btn {
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.copilot-type-missing { border-left: 3px solid var(--coral); }
+.copilot-type-optimize { border-left: 3px solid var(--green); }
+.copilot-type-platform { border-left: 3px solid var(--blue); }
+.copilot-type-structure { border-left: 3px solid var(--gold); }
+.copilot-type-hook { border-left: 3px solid var(--green); }
+.copilot-type-cta { border-left: 3px solid var(--blue); }
+
+/* ── Auto-Generate Pipeline Section ── */
+.auto-generate-section {
+  margin: 0 0 24px;
+  padding: 20px 24px;
+}
+
+.pipeline-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+}
+
+.pipeline-step {
+  padding: 5px 12px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pipeline-step:has(✓) {
+  background: var(--mint);
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.auto-generate-result {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.auto-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.auto-result-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.auto-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.auto-result-item {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.auto-result-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.auto-result-item p {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.auto-result-script {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.auto-result-script p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.auto-result-actions {
+  padding-top: 8px;
+}
+
+/* ── Metric Generated Badge ── */
+.metric-generated-badge {
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: var(--mint);
+  color: var(--green);
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+/* ── Live Renders Panel ── */
+.render-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.render-row:last-child {
+  border-bottom: none;
+}
+
+.render-job-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.render-platform {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.render-pending-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.render-badge-rendering {
+  background: #e1e9f5;
+  color: var(--blue);
+}
+
+@media (max-width: 1120px) {
+  .auto-result-grid {
+    grid-template-columns: 1fr;
+  }
+}
