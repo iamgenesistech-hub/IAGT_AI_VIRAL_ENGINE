@@ -1,4 +1,5 @@
 const state = {
+  // Filters
   category: "All",
   platform: "All",
   queueMode: "Ready",
@@ -6,7 +7,44 @@ const state = {
   approvals: new Set(["cr-001", "cr-003"]),
   dataSource: "Demo",
   syncLevel: "demo",
-  syncMessage: "Add Supabase credentials in config.js to load live workspace data."
+  syncMessage: "Add Supabase credentials in config.js to load live workspace data.",
+
+  // Viral Ads Scan
+  scanAmount: 1284,
+  scanCount: 1284,
+  scanning: false,
+
+  // Winning Hooks
+  hookTarget: 100,
+  hookSearching: false,
+  hooksFound: 73,
+  showHooksList: false,
+  selectedHooks: new Set(),
+  hookAutoSelect: false,
+
+  // Product Matching
+  productsExpanded: false,
+  selectedProducts: new Set(),
+  creativeProductFilter: "All",
+
+  // Video Assembly Workspace
+  assemblyHookFilter: "All",
+  assemblyScriptFilter: "All",
+  assemblyProductFilter: "All",
+  videoDuration: "15s",
+  videoStyle: "UGC",
+  videoVoice: "Female",
+  videoBackground: "Music",
+  videoAspect: "9:16",
+  assemblyComponents: [],
+  videoDrafts: [],
+  renderStatus: null,
+  renderUrl: null,
+  renderProgress: 0,
+  showAssemblyWorkspace: true,
+  compareDrafts: false,
+  selectedDraftA: null,
+  selectedDraftB: null
 };
 
 let viralAds = [
@@ -107,9 +145,12 @@ let creatives = [
     product: "Sea Moss Mineral Gel",
     format: "UGC TikTok",
     hook: "Nobody tells you minerals can change your whole morning.",
+    script: "Open on bathroom counter. Hand picks up Sea Moss Gel. VO: 'Nobody tells you minerals can change your whole morning. I started this ritual 30 days ago...' Cut to morning routine. Product close-up. CTA: 'Start your mineral ritual today.'",
     asset: "9:16 video, subtitles, thumbnail",
     channel: "TikTok + Reels",
-    score: 94
+    score: 94,
+    approved: true,
+    rejectionReason: ""
   },
   {
     id: "cr-002",
@@ -117,9 +158,12 @@ let creatives = [
     product: "Genesis Glow Collagen",
     format: "Luxury routine",
     hook: "The glow routine that finally feels premium.",
+    script: "Slow pan across marble bathroom. Product placement. VO: 'The glow routine that finally feels premium. Collagen, ceramides, and ritual in one.' Lifestyle cut. Mirror reveal. CTA: 'Shop the glow stack.'",
     asset: "9:16 lifestyle edit, caption set",
     channel: "Instagram + Pinterest",
-    score: 89
+    score: 89,
+    approved: false,
+    rejectionReason: "Hook lacks urgency. Needs stronger emotional trigger before product reveal. Rewrite opening 3 seconds."
   },
   {
     id: "cr-003",
@@ -127,9 +171,12 @@ let creatives = [
     product: "NeuroRise Focus",
     format: "Founder desk UGC",
     hook: "I stopped treating my focus like a willpower problem.",
+    script: "Desk POV. Laptop, coffee, capsules. VO: 'I stopped treating my focus like a willpower problem. Turns out it was a nutrition gap.' Split screen: before/after productivity. CTA: 'Upgrade your focus stack.'",
     asset: "Script, HeyGen prompt, CTA variants",
     channel: "YouTube Shorts + X",
-    score: 87
+    score: 87,
+    approved: true,
+    rejectionReason: ""
   },
   {
     id: "cr-004",
@@ -137,10 +184,28 @@ let creatives = [
     product: "Apex Testosterone Support",
     format: "Gym commercial",
     hook: "Your training does not need more hype. It needs foundation.",
+    script: "Gym floor. Athlete mid-set. VO: 'Your training does not need more hype. It needs foundation.' Supplement pour. Performance cut. CTA: 'Build your foundation.'",
     asset: "Runway prompt, shot list",
     channel: "TikTok + Facebook",
-    score: 81
+    score: 81,
+    approved: false,
+    rejectionReason: "Visual pacing too slow for TikTok. Needs faster cuts in first 2 seconds. Facebook version approved pending edit."
   }
+];
+
+let winningHooks = [
+  { id: "h-001", text: "Nobody talks about this morning habit...", category: "Curiosity", platform: "TikTok", confidence: "High" },
+  { id: "h-002", text: "I felt flat until I fixed this one thing.", category: "Problem-Solution", platform: "Instagram", confidence: "High" },
+  { id: "h-003", text: "My 2 PM crash disappeared when I started doing this.", category: "Transformation", platform: "Facebook", confidence: "High" },
+  { id: "h-004", text: "This changed my skin in 7 days — no filter.", category: "Proof", platform: "Instagram", confidence: "High" },
+  { id: "h-005", text: "Wellness that looks as good as it feels.", category: "Aspirational", platform: "Pinterest", confidence: "Medium" },
+  { id: "h-006", text: "I stopped treating my focus like a willpower problem.", category: "Reframe", platform: "YouTube", confidence: "High" },
+  { id: "h-007", text: "Your training does not need more hype. It needs foundation.", category: "Authority", platform: "TikTok", confidence: "Medium" },
+  { id: "h-008", text: "Nobody tells you minerals can change your whole morning.", category: "Curiosity", platform: "TikTok", confidence: "High" },
+  { id: "h-009", text: "The glow routine that finally feels premium.", category: "Aspirational", platform: "Instagram", confidence: "Medium" },
+  { id: "h-010", text: "What if your energy problem was never about sleep?", category: "Reframe", platform: "YouTube", confidence: "High" },
+  { id: "h-011", text: "I tried every supplement. This is the only one I kept.", category: "Proof", platform: "TikTok", confidence: "High" },
+  { id: "h-012", text: "The morning ritual that changed my entire output.", category: "Transformation", platform: "Instagram", confidence: "Medium" }
 ];
 
 let workflow = [
@@ -284,10 +349,12 @@ function mapCreative(row) {
     product: row.product || "Unassigned product",
     format: row.format || "Creative",
     hook: row.hook || "",
+    script: row.script || "",
     asset: row.asset || "",
     channel: row.channel || "",
     score: Number(row.score || 0),
-    approved: Boolean(row.approved)
+    approved: Boolean(row.approved),
+    rejectionReason: row.rejection_reason || row.rejectionReason || ""
   };
 }
 
@@ -340,7 +407,34 @@ function filteredAds() {
 }
 
 function filteredCreatives() {
-  return creatives.filter((item) => state.queueMode === "All" || item.status === state.queueMode);
+  return creatives.filter((item) => {
+    const modeMatch = state.queueMode === "All" || item.status === state.queueMode;
+    const productMatch = state.creativeProductFilter === "All" || item.product === state.creativeProductFilter;
+    return modeMatch && productMatch;
+  });
+}
+
+function filteredHooks() {
+  return winningHooks.filter((h) => {
+    const catMatch = state.assemblyHookFilter === "All" || h.category === state.assemblyHookFilter;
+    return catMatch;
+  });
+}
+
+function filteredAssemblyScripts() {
+  return creatives.filter((c) => {
+    const match = state.assemblyScriptFilter === "All" || c.product === state.assemblyScriptFilter;
+    return match && c.script;
+  });
+}
+
+function filteredAssemblyProducts() {
+  const base = state.selectedProducts.size > 0
+    ? products.filter((p) => state.selectedProducts.has(p.name))
+    : products;
+  return base.filter((p) => {
+    return state.assemblyProductFilter === "All" || p.category === state.assemblyProductFilter;
+  });
 }
 
 function render() {
@@ -348,6 +442,11 @@ function render() {
   const ad = selectedAd();
   const categories = ["All", ...new Set(viralAds.map((item) => item.category))];
   const platforms = ["All", ...new Set(viralAds.map((item) => item.platform))];
+  const productNames = ["All", ...products.map((p) => p.name)];
+  const hookCategories = ["All", ...new Set(winningHooks.map((h) => h.category))];
+  const hookPlatforms = ["All", ...new Set(winningHooks.map((h) => h.platform))];
+  const productCategories = ["All", ...new Set(products.map((p) => p.category))];
+  const highConfidenceCount = winningHooks.filter((h) => h.confidence === "High").length;
 
   app.innerHTML = `
     <aside class="sidebar">
@@ -391,13 +490,90 @@ function render() {
         </div>
       </header>
 
+      <!-- ── METRICS GRID (interactive) ── -->
       <section class="metrics-grid">
-        ${metric("Viral ads scanned", "1,284", "+18% today")}
-        ${metric("Winning hooks found", "73", "12 high-confidence")}
-        ${metric("Creatives generated", "24", "8 ready to publish")}
+        <article class="metric metric-interactive">
+          <span>Viral ads scanned</span>
+          <strong id="scan-count-display">${state.scanCount.toLocaleString()}</strong>
+          <small>+18% today</small>
+          <div class="metric-controls">
+            <input type="number" id="scan-amount-input" class="metric-input" value="${state.scanAmount}" min="100" max="10000" step="100" />
+            <button class="metric-btn ${state.scanning ? "scanning" : ""}" id="rescan-btn" ${state.scanning ? "disabled" : ""}>
+              ${state.scanning ? `${icon("radar")} Scanning…` : `${icon("radar")} Rescan`}
+            </button>
+          </div>
+        </article>
+
+        <article class="metric metric-interactive">
+          <span>Winning hooks found</span>
+          <strong id="hooks-count-display">${state.hooksFound}</strong>
+          <small>${highConfidenceCount} high-confidence</small>
+          <div class="metric-controls">
+            <input type="number" id="hook-target-input" class="metric-input" value="${state.hookTarget}" min="10" max="500" step="10" placeholder="Target" />
+            <button class="metric-btn ${state.hookSearching ? "scanning" : ""}" id="hook-search-btn" ${state.hookSearching ? "disabled" : ""}>
+              ${state.hookSearching ? `${icon("radar")} Searching…` : `${icon("spark")} Find Hooks`}
+            </button>
+          </div>
+          <div class="metric-toggle-row">
+            <button class="toggle-link" id="toggle-hooks-list">${state.showHooksList ? "▲ Hide hooks" : "▼ Show all hooks"}</button>
+            <button class="toggle-link ${state.hookAutoSelect ? "active-link" : ""}" id="hook-auto-select">
+              ${state.hookAutoSelect ? "✓ AI Auto-Select ON" : "AI Auto-Select"}
+            </button>
+          </div>
+        </article>
+
+        <article class="metric metric-interactive">
+          <span>Creatives generated</span>
+          <strong>${creatives.length}</strong>
+          <small>${creatives.filter((c) => c.status === "Ready").length} ready to publish</small>
+          <div class="metric-controls">
+            <label class="metric-select-label">
+              <select data-select="creativeProductFilter" class="metric-select">
+                ${productNames.map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+        </article>
+
         ${metric("Projected ROAS signal", "3.7x", "based on patterns")}
       </section>
 
+      <!-- ── HOOKS LIST (expandable) ── -->
+      ${state.showHooksList ? `
+      <section class="hooks-list-section panel">
+        <div class="panel-head">
+          <div>
+            <h2>Winning Hooks Library</h2>
+            <p>${winningHooks.length} hooks found · ${highConfidenceCount} high-confidence · ${state.selectedHooks.size} selected</p>
+          </div>
+          <div class="filters">
+            <label><select data-select="assemblyHookFilter">
+              ${hookCategories.map((c) => `<option ${c === state.assemblyHookFilter ? "selected" : ""}>${c}</option>`).join("")}
+            </select></label>
+            <button class="ghost" id="select-all-hooks">Select All</button>
+            <button class="ghost" id="clear-hooks-selection">Clear</button>
+          </div>
+        </div>
+        <div class="hooks-outline">
+          ${filteredHooks().map((h) => `
+            <div class="hook-outline-row ${state.selectedHooks.has(h.id) ? "hook-selected" : ""}">
+              <input type="checkbox" class="hook-checkbox" data-hook-id="${h.id}" ${state.selectedHooks.has(h.id) ? "checked" : ""} />
+              <div class="hook-outline-body">
+                <span class="hook-outline-text">${h.text}</span>
+                <div class="hook-outline-meta">
+                  <span class="hook-tag">${h.category}</span>
+                  <span class="hook-tag">${h.platform}</span>
+                  <span class="hook-tag hook-confidence-${h.confidence.toLowerCase()}">${h.confidence} confidence</span>
+                </div>
+              </div>
+              <button class="copy-btn" data-copy="${h.text.replace(/"/g, "&quot;")}" title="Copy hook">Copy</button>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+      ` : ""}
+
+      <!-- ── VIRAL TRENDS MONITOR ── -->
       <section class="workspace-grid">
         <div class="panel monitor">
           <div class="panel-head">
@@ -445,6 +621,277 @@ function render() {
         </div>
       </section>
 
+      <!-- ── ELITE MANUAL VIDEO ASSEMBLY WORKSPACE ── -->
+      <section class="assembly-workspace">
+        <div class="assembly-header">
+          <div>
+            <h2>${icon("video")} Elite Manual Video Assembly Workspace</h2>
+            <p>Assemble videos from AI-generated components. Full edit controls, multi-platform rendering, draft comparison.</p>
+          </div>
+          <button class="ghost" id="toggle-assembly">${state.showAssemblyWorkspace ? "▲ Collapse" : "▼ Expand"}</button>
+        </div>
+
+        ${state.showAssemblyWorkspace ? `
+        <div class="assembly-body">
+
+          <!-- Component Libraries Row -->
+          <div class="assembly-libraries">
+
+            <!-- Hooks Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Hooks Library</h3>
+                <label><select data-select="assemblyHookFilter" class="lib-select">
+                  ${hookCategories.map((c) => `<option ${c === state.assemblyHookFilter ? "selected" : ""}>${c}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredHooks().map((h) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-text">${h.text}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${h.category}</span>
+                        <span class="hook-tag">${h.platform}</span>
+                        <span class="hook-tag hook-confidence-${h.confidence.toLowerCase()}">${h.confidence}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${h.text.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="hook" data-component-id="${h.id}" data-component-text="${h.text.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            <!-- Scripts Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Scripts Library</h3>
+                <label><select data-select="assemblyScriptFilter" class="lib-select">
+                  ${["All", ...products.map((p) => p.name)].map((n) => `<option ${n === state.assemblyScriptFilter ? "selected" : ""}>${n}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredAssemblyScripts().map((c) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-label">${c.product}</span>
+                      <span class="lib-text">${c.script}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${c.format}</span>
+                        <span class="hook-tag">${c.channel}</span>
+                        <span class="hook-tag hook-confidence-${c.status === "Ready" ? "high" : c.status === "Review" ? "medium" : "low"}">${c.status}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${c.script.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="script" data-component-id="${c.id}" data-component-text="${c.script.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            <!-- Products Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Products Library</h3>
+                <label><select data-select="assemblyProductFilter" class="lib-select">
+                  ${productCategories.map((c) => `<option ${c === state.assemblyProductFilter ? "selected" : ""}>${c}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredAssemblyProducts().map((p) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-label">${p.name}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${p.category}</span>
+                        <span class="hook-tag">${p.angle}</span>
+                        <span class="hook-tag hook-confidence-high">Score ${p.score}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${p.name.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="product" data-component-id="${p.name}" data-component-text="${p.name.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+          </div><!-- /assembly-libraries -->
+
+          <!-- Builder + Parameters Row -->
+          <div class="assembly-builder-row">
+
+            <!-- Video Parameters Panel -->
+            <div class="params-panel">
+              <h3>Video Parameters</h3>
+              <div class="params-grid">
+                <label class="param-label">Duration
+                  <select data-state-key="videoDuration">
+                    ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Style
+                  <select data-state-key="videoStyle">
+                    ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Voice
+                  <select data-state-key="videoVoice">
+                    ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Background
+                  <select data-state-key="videoBackground">
+                    ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Aspect Ratio
+                  <select data-state-key="videoAspect">
+                    ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <div class="params-summary">
+                <span>${state.videoDuration} · ${state.videoStyle} · ${state.videoVoice} voice · ${state.videoBackground} · ${state.videoAspect}</span>
+              </div>
+            </div>
+
+            <!-- Video Builder -->
+            <div class="builder-panel">
+              <div class="builder-head">
+                <h3>Video Builder</h3>
+                <div class="builder-actions">
+                  <button class="ghost" id="ai-suggestions-btn">${icon("spark")} AI Suggestions</button>
+                  <button class="ghost" id="save-draft-btn">${icon("check")} Save Draft</button>
+                </div>
+              </div>
+
+              <div class="drop-zone" id="builder-drop-zone">
+                ${state.assemblyComponents.length === 0
+                  ? `<div class="drop-zone-empty">Drag components here or click <strong>+ Add</strong> from the libraries above.<br/><small>Hook → Script → Product → CTA</small></div>`
+                  : state.assemblyComponents.map((comp, idx) => `
+                    <div class="builder-component" data-comp-idx="${idx}">
+                      <span class="comp-type-badge comp-type-${comp.type}">${comp.type}</span>
+                      <span class="comp-text">${comp.text}</span>
+                      <button class="comp-remove" data-remove-idx="${idx}">✕</button>
+                    </div>
+                  `).join("")
+                }
+              </div>
+
+              <!-- Real-time preview -->
+              ${state.assemblyComponents.length > 0 ? `
+              <div class="builder-preview">
+                <div class="preview-label">Structure Preview · ${state.videoAspect} · ${state.videoDuration}</div>
+                <div class="preview-body">
+                  ${state.assemblyComponents.map((comp, idx) => `
+                    <div class="preview-step">
+                      <b>${idx + 1}. ${comp.type.toUpperCase()}</b>
+                      <p>${comp.text.length > 120 ? comp.text.slice(0, 120) + "…" : comp.text}</p>
+                    </div>
+                  `).join("")}
+                  <div class="preview-params">
+                    Style: ${state.videoStyle} · Voice: ${state.videoVoice} · BG: ${state.videoBackground}
+                  </div>
+                </div>
+              </div>
+              ` : ""}
+
+              <!-- Send to Renderer -->
+              <div class="render-actions">
+                <button class="render-btn heygen" id="send-heygen" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to HeyGen
+                </button>
+                <button class="render-btn runway" id="send-runway" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to Runway
+                </button>
+                <button class="render-btn kling" id="send-kling" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to Kling
+                </button>
+              </div>
+            </div>
+
+          </div><!-- /assembly-builder-row -->
+
+          <!-- Rendering Status -->
+          ${state.renderStatus ? `
+          <div class="render-status-panel">
+            <div class="render-status-head">
+              <h3>Rendering Status</h3>
+              <span class="render-badge render-badge-${state.renderStatus.toLowerCase().replace(/\s/g, "-")}">${state.renderStatus}</span>
+            </div>
+            ${state.renderStatus === "Rendering" ? `
+              <div class="render-progress-bar"><div class="render-progress-fill" style="width:${state.renderProgress}%"></div></div>
+              <small>${state.renderProgress}% complete</small>
+            ` : ""}
+            ${state.renderUrl ? `
+              <div class="render-result">
+                <a href="${state.renderUrl}" target="_blank" class="render-url-link">${icon("video")} View Rendered Video</a>
+                <div class="render-result-actions">
+                  <button class="ghost" id="approve-render">✓ Approve &amp; Publish</button>
+                  <button class="ghost" id="reject-render">✕ Reject</button>
+                  <button class="ghost" id="regenerate-render">${icon("radar")} Re-generate</button>
+                </div>
+              </div>
+            ` : ""}
+          </div>
+          ` : ""}
+
+          <!-- Drafts & Compare -->
+          ${state.videoDrafts.length > 0 ? `
+          <div class="drafts-panel">
+            <div class="drafts-head">
+              <h3>Saved Drafts (${state.videoDrafts.length})</h3>
+              <button class="toggle-link" id="toggle-compare">${state.compareDrafts ? "▲ Close Compare" : "▼ Compare Versions"}</button>
+            </div>
+            <div class="drafts-list">
+              ${state.videoDrafts.map((draft, idx) => `
+                <div class="draft-row">
+                  <span class="draft-name">Draft ${idx + 1} — ${draft.style} · ${draft.duration} · ${draft.aspect}</span>
+                  <span class="draft-components">${draft.components.length} components</span>
+                  <div class="draft-actions">
+                    <button class="ghost" data-load-draft="${idx}">Load</button>
+                    <button class="ghost" data-delete-draft="${idx}">Delete</button>
+                    ${state.compareDrafts ? `
+                      <button class="ghost ${state.selectedDraftA === idx ? "active-link" : ""}" data-compare-a="${idx}">A</button>
+                      <button class="ghost ${state.selectedDraftB === idx ? "active-link" : ""}" data-compare-b="${idx}">B</button>
+                    ` : ""}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+            ${state.compareDrafts && state.selectedDraftA !== null && state.selectedDraftB !== null ? `
+            <div class="compare-view">
+              <div class="compare-col">
+                <div class="compare-label">Draft ${state.selectedDraftA + 1}</div>
+                ${state.videoDrafts[state.selectedDraftA].components.map((c, i) => `
+                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
+                `).join("")}
+                <div class="preview-params">${state.videoDrafts[state.selectedDraftA].style} · ${state.videoDrafts[state.selectedDraftA].voice} · ${state.videoDrafts[state.selectedDraftA].duration}</div>
+              </div>
+              <div class="compare-col">
+                <div class="compare-label">Draft ${state.selectedDraftB + 1}</div>
+                ${state.videoDrafts[state.selectedDraftB].components.map((c, i) => `
+                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
+                `).join("")}
+                <div class="preview-params">${state.videoDrafts[state.selectedDraftB].style} · ${state.videoDrafts[state.selectedDraftB].voice} · ${state.videoDrafts[state.selectedDraftB].duration}</div>
+              </div>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+
+        </div><!-- /assembly-body -->
+        ` : ""}
+      </section>
+
+      <!-- ── PRODUCT MATCHING ── -->
       <section class="workspace-grid secondary">
         <div class="panel">
           <div class="panel-head">
@@ -452,11 +899,24 @@ function render() {
               <h2>Product Matching</h2>
               <p>Pairs viral structures with IAGT products and positioning angles.</p>
             </div>
+            <div class="product-toggle-row">
+              <button class="ghost" id="toggle-products">
+                ${state.productsExpanded ? "▲ Hide Products" : "▼ Show All Products"}
+              </button>
+              ${state.productsExpanded && state.selectedProducts.size > 0 ? `
+                <button class="ghost" id="filter-by-selected-products">Filter Creatives by Selected</button>
+                <button class="toggle-link" id="clear-product-selection">Clear Selection</button>
+              ` : ""}
+            </div>
           </div>
+          ${state.productsExpanded ? `
           <div class="product-grid">
-            ${products.map((product) => `
-              <article>
+            ${products.map((product) => {
+              const isSelected = state.selectedProducts.has(product.name);
+              return `
+              <article class="${isSelected ? "product-selected" : ""}">
                 <div class="product-card-head">
+                  <input type="checkbox" class="product-checkbox" data-product-name="${product.name.replace(/"/g, "&quot;")}" ${isSelected ? "checked" : ""} />
                   ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="" />` : `<div class="product-thumb empty-thumb"></div>`}
                   <div>
                     <strong>${product.name}</strong>
@@ -467,8 +927,13 @@ function render() {
                 <p>${product.angle}</p>
                 <small class="product-source">${product.source === "shopify" ? "Shopify synced" : "Workspace product"}</small>
               </article>
-            `).join("")}
+            `}).join("")}
           </div>
+          ` : `
+          <div class="product-collapsed-summary">
+            ${products.map((p) => `<span class="product-pill ${state.selectedProducts.has(p.name) ? "product-pill-selected" : ""}">${p.name}</span>`).join("")}
+          </div>
+          `}
         </div>
 
         <div class="panel">
@@ -490,6 +955,7 @@ function render() {
         </div>
       </section>
 
+      <!-- ── AI CONTENT QUEUE ── -->
       <section class="queue-section">
         <div class="panel creative-panel">
           <div class="panel-head">
@@ -497,21 +963,33 @@ function render() {
               <h2>AI Content Queue</h2>
               <p>Original creative concepts inspired by winning structures, ready for HeyGen, Runway, Kling, Canva, and OpenAI workflows.</p>
             </div>
-            <div class="segmented">
-              ${["Ready", "Review", "Draft", "All"].map((mode) => `<button class="${state.queueMode === mode ? "active" : ""}" data-mode="${mode}">${mode}</button>`).join("")}
+            <div class="queue-controls">
+              <div class="segmented">
+                ${["Ready", "Review", "Draft", "All"].map((mode) => `<button class="${state.queueMode === mode ? "active" : ""}" data-mode="${mode}">${mode}</button>`).join("")}
+              </div>
+              <label class="metric-select-label">
+                <select data-select="creativeProductFilter" class="metric-select">
+                  ${productNames.map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
+                </select>
+              </label>
             </div>
           </div>
           <div class="creative-list">
             ${filteredCreatives().map((item) => `
               <article class="${state.approvals.has(item.id) ? "approved" : ""}">
                 <div class="creative-score">${item.score}</div>
-                <div>
+                <div class="creative-body">
                   <div class="creative-title">
                     <strong>${item.product}</strong>
-                    <span>${item.status}</span>
+                    <span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span>
                   </div>
                   <p>${item.hook}</p>
                   <small>${item.format} · ${item.asset} · ${item.channel}</small>
+                  ${item.rejectionReason ? `
+                    <div class="rejection-summary">
+                      <span class="rejection-label">⚠ Review note:</span> ${item.rejectionReason}
+                    </div>
+                  ` : ""}
                 </div>
                 <button class="icon-button" data-approve="${item.id}" title="Toggle approval">${icon("check")}</button>
               </article>
@@ -566,6 +1044,7 @@ function select(name, options, value) {
 }
 
 function bindEvents() {
+  // ── Ad selection ──
   document.querySelectorAll("[data-ad]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedAdId = button.dataset.ad;
@@ -573,15 +1052,27 @@ function bindEvents() {
     });
   });
 
+  // ── Generic selects (category, platform, queueMode filters + assembly filters) ──
   document.querySelectorAll("[data-select]").forEach((selectEl) => {
     selectEl.addEventListener("change", () => {
       state[selectEl.dataset.select] = selectEl.value;
-      const first = filteredAds()[0];
-      if (first) state.selectedAdId = first.id;
+      if (selectEl.dataset.select === "category" || selectEl.dataset.select === "platform") {
+        const first = filteredAds()[0];
+        if (first) state.selectedAdId = first.id;
+      }
       render();
     });
   });
 
+  // ── Video parameter selects ──
+  document.querySelectorAll("[data-state-key]").forEach((selectEl) => {
+    selectEl.addEventListener("change", () => {
+      state[selectEl.dataset.stateKey] = selectEl.value;
+      render();
+    });
+  });
+
+  // ── Queue mode tabs ──
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.queueMode = button.dataset.mode;
@@ -589,6 +1080,7 @@ function bindEvents() {
     });
   });
 
+  // ── Creative approval ──
   document.querySelectorAll("[data-approve]").forEach((button) => {
     button.addEventListener("click", async () => {
       const id = button.dataset.approve;
@@ -614,6 +1106,433 @@ function bindEvents() {
       }
     });
   });
+
+  // ── Rescan button ──
+  const rescanBtn = document.getElementById("rescan-btn");
+  const scanInput = document.getElementById("scan-amount-input");
+  if (scanInput) {
+    scanInput.addEventListener("change", () => {
+      state.scanAmount = Math.max(100, Math.min(10000, Number(scanInput.value) || 1284));
+    });
+  }
+  if (rescanBtn) {
+    rescanBtn.addEventListener("click", async () => {
+      state.scanAmount = Number(document.getElementById("scan-amount-input")?.value || state.scanAmount);
+      state.scanning = true;
+      render();
+      try {
+        const res = await fetch("/api/viral/rescan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: state.scanAmount })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.scanCount = data.count || state.scanAmount;
+        } else {
+          // Demo mode: simulate scan
+          await new Promise((r) => setTimeout(r, 1800));
+          state.scanCount = state.scanAmount;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1800));
+        state.scanCount = state.scanAmount;
+      }
+      state.scanning = false;
+      render();
+    });
+  }
+
+  // ── Hook search button ──
+  const hookSearchBtn = document.getElementById("hook-search-btn");
+  const hookTargetInput = document.getElementById("hook-target-input");
+  if (hookTargetInput) {
+    hookTargetInput.addEventListener("change", () => {
+      state.hookTarget = Math.max(10, Math.min(500, Number(hookTargetInput.value) || 100));
+    });
+  }
+  if (hookSearchBtn) {
+    hookSearchBtn.addEventListener("click", async () => {
+      state.hookTarget = Number(document.getElementById("hook-target-input")?.value || state.hookTarget);
+      state.hookSearching = true;
+      render();
+      try {
+        const res = await fetch("/api/hooks/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: state.hookTarget })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.hooksFound = data.found || state.hookTarget;
+          if (data.hooks && data.hooks.length) {
+            winningHooks.push(...data.hooks.map((h, i) => ({
+              id: `h-api-${i}`,
+              text: h.text || h,
+              category: h.category || "Discovered",
+              platform: h.platform || "Multi",
+              confidence: h.confidence || "Medium"
+            })));
+          }
+        } else {
+          await new Promise((r) => setTimeout(r, 2200));
+          state.hooksFound = state.hookTarget;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 2200));
+        state.hooksFound = state.hookTarget;
+      }
+      state.hookSearching = false;
+      render();
+    });
+  }
+
+  // ── Toggle hooks list ──
+  const toggleHooksList = document.getElementById("toggle-hooks-list");
+  if (toggleHooksList) {
+    toggleHooksList.addEventListener("click", () => {
+      state.showHooksList = !state.showHooksList;
+      render();
+    });
+  }
+
+  // ── Hook auto-select ──
+  const hookAutoSelectBtn = document.getElementById("hook-auto-select");
+  if (hookAutoSelectBtn) {
+    hookAutoSelectBtn.addEventListener("click", () => {
+      state.hookAutoSelect = !state.hookAutoSelect;
+      if (state.hookAutoSelect) {
+        // AI picks high-confidence hooks automatically
+        state.selectedHooks = new Set(winningHooks.filter((h) => h.confidence === "High").map((h) => h.id));
+      } else {
+        state.selectedHooks = new Set();
+      }
+      render();
+    });
+  }
+
+  // ── Hook checkboxes ──
+  document.querySelectorAll(".hook-checkbox").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.hookId;
+      if (cb.checked) state.selectedHooks.add(id);
+      else state.selectedHooks.delete(id);
+      render();
+    });
+  });
+
+  // ── Select all / clear hooks ──
+  const selectAllHooks = document.getElementById("select-all-hooks");
+  if (selectAllHooks) {
+    selectAllHooks.addEventListener("click", () => {
+      filteredHooks().forEach((h) => state.selectedHooks.add(h.id));
+      render();
+    });
+  }
+  const clearHooksSelection = document.getElementById("clear-hooks-selection");
+  if (clearHooksSelection) {
+    clearHooksSelection.addEventListener("click", () => {
+      state.selectedHooks = new Set();
+      render();
+    });
+  }
+
+  // ── Copy buttons ──
+  document.querySelectorAll(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = btn.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = orig; }, 1400);
+      }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = orig; }, 1400);
+      });
+    });
+  });
+
+  // ── Product toggle ──
+  const toggleProducts = document.getElementById("toggle-products");
+  if (toggleProducts) {
+    toggleProducts.addEventListener("click", () => {
+      state.productsExpanded = !state.productsExpanded;
+      render();
+    });
+  }
+
+  // ── Product checkboxes ──
+  document.querySelectorAll(".product-checkbox").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const name = cb.dataset.productName;
+      if (cb.checked) state.selectedProducts.add(name);
+      else state.selectedProducts.delete(name);
+      render();
+    });
+  });
+
+  // ── Filter creatives by selected products ──
+  const filterBySelectedProducts = document.getElementById("filter-by-selected-products");
+  if (filterBySelectedProducts) {
+    filterBySelectedProducts.addEventListener("click", () => {
+      // Set creative filter to first selected product (or All if multiple)
+      const selected = [...state.selectedProducts];
+      state.creativeProductFilter = selected.length === 1 ? selected[0] : "All";
+      render();
+    });
+  }
+
+  // ── Clear product selection ──
+  const clearProductSelection = document.getElementById("clear-product-selection");
+  if (clearProductSelection) {
+    clearProductSelection.addEventListener("click", () => {
+      state.selectedProducts = new Set();
+      state.creativeProductFilter = "All";
+      render();
+    });
+  }
+
+  // ── Assembly workspace toggle ──
+  const toggleAssembly = document.getElementById("toggle-assembly");
+  if (toggleAssembly) {
+    toggleAssembly.addEventListener("click", () => {
+      state.showAssemblyWorkspace = !state.showAssemblyWorkspace;
+      render();
+    });
+  }
+
+  // ── Add component to builder ──
+  document.querySelectorAll(".add-to-builder-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.assemblyComponents.push({
+        type: btn.dataset.componentType,
+        id: btn.dataset.componentId,
+        text: btn.dataset.componentText
+      });
+      render();
+    });
+  });
+
+  // ── Remove component from builder ──
+  document.querySelectorAll("[data-remove-idx]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.removeIdx);
+      state.assemblyComponents.splice(idx, 1);
+      render();
+    });
+  });
+
+  // ── AI Suggestions ──
+  const aiSuggestionsBtn = document.getElementById("ai-suggestions-btn");
+  if (aiSuggestionsBtn) {
+    aiSuggestionsBtn.addEventListener("click", async () => {
+      aiSuggestionsBtn.textContent = "Generating…";
+      aiSuggestionsBtn.disabled = true;
+      try {
+        const res = await fetch("/api/assembly/suggestions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            style: state.videoStyle,
+            duration: state.videoDuration,
+            aspect: state.videoAspect
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.components && data.components.length) {
+            state.assemblyComponents = data.components;
+            render();
+            return;
+          }
+        }
+      } catch { /* fall through to demo */ }
+      // Demo: auto-populate with a hook + script + product
+      const hook = winningHooks.find((h) => h.confidence === "High") || winningHooks[0];
+      const script = creatives.find((c) => c.status === "Ready") || creatives[0];
+      const product = products[0];
+      state.assemblyComponents = [
+        { type: "hook", id: hook.id, text: hook.text },
+        { type: "script", id: script.id, text: script.script },
+        { type: "product", id: product.name, text: product.name }
+      ];
+      render();
+    });
+  }
+
+  // ── Save Draft ──
+  const saveDraftBtn = document.getElementById("save-draft-btn");
+  if (saveDraftBtn) {
+    saveDraftBtn.addEventListener("click", async () => {
+      if (state.assemblyComponents.length === 0) return;
+      const draft = {
+        components: [...state.assemblyComponents],
+        duration: state.videoDuration,
+        style: state.videoStyle,
+        voice: state.videoVoice,
+        background: state.videoBackground,
+        aspect: state.videoAspect,
+        savedAt: new Date().toISOString()
+      };
+      state.videoDrafts.push(draft);
+      // Persist to Supabase if available
+      if (window.iagtSupabase && window.iagtSupabase.enabled) {
+        try {
+          await window.iagtSupabase.saveVideoDraft(draft);
+        } catch (e) { console.warn("Draft save to Supabase failed:", e); }
+      }
+      // Also try backend
+      try {
+        await fetch("/api/assembly/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draft)
+        });
+      } catch { /* offline ok */ }
+      render();
+    });
+  }
+
+  // ── Load Draft ──
+  document.querySelectorAll("[data-load-draft]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.loadDraft);
+      const draft = state.videoDrafts[idx];
+      if (!draft) return;
+      state.assemblyComponents = [...draft.components];
+      state.videoDuration = draft.duration;
+      state.videoStyle = draft.style;
+      state.videoVoice = draft.voice;
+      state.videoBackground = draft.background;
+      state.videoAspect = draft.aspect;
+      render();
+    });
+  });
+
+  // ── Delete Draft ──
+  document.querySelectorAll("[data-delete-draft]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.deleteDraft);
+      state.videoDrafts.splice(idx, 1);
+      if (state.selectedDraftA === idx) state.selectedDraftA = null;
+      if (state.selectedDraftB === idx) state.selectedDraftB = null;
+      render();
+    });
+  });
+
+  // ── Compare drafts ──
+  const toggleCompare = document.getElementById("toggle-compare");
+  if (toggleCompare) {
+    toggleCompare.addEventListener("click", () => {
+      state.compareDrafts = !state.compareDrafts;
+      if (!state.compareDrafts) { state.selectedDraftA = null; state.selectedDraftB = null; }
+      render();
+    });
+  }
+  document.querySelectorAll("[data-compare-a]").forEach((btn) => {
+    btn.addEventListener("click", () => { state.selectedDraftA = Number(btn.dataset.compareA); render(); });
+  });
+  document.querySelectorAll("[data-compare-b]").forEach((btn) => {
+    btn.addEventListener("click", () => { state.selectedDraftB = Number(btn.dataset.compareB); render(); });
+  });
+
+  // ── Send to renderer (HeyGen / Runway / Kling) ──
+  async function sendToRenderer(platform) {
+    if (state.assemblyComponents.length === 0) return;
+    state.renderStatus = "Rendering";
+    state.renderProgress = 0;
+    state.renderUrl = null;
+    render();
+
+    // Animate progress
+    const progressInterval = setInterval(() => {
+      if (state.renderProgress < 90) {
+        state.renderProgress += Math.floor(Math.random() * 12) + 3;
+        if (state.renderProgress > 90) state.renderProgress = 90;
+        const fill = document.querySelector(".render-progress-fill");
+        const label = document.querySelector(".render-status-panel small");
+        if (fill) fill.style.width = state.renderProgress + "%";
+        if (label) label.textContent = state.renderProgress + "% complete";
+      }
+    }, 600);
+
+    try {
+      const res = await fetch("/api/video/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform,
+          components: state.assemblyComponents,
+          duration: state.videoDuration,
+          style: state.videoStyle,
+          voice: state.videoVoice,
+          background: state.videoBackground,
+          aspect: state.videoAspect
+        })
+      });
+      clearInterval(progressInterval);
+      if (res.ok) {
+        const data = await res.json();
+        state.renderProgress = 100;
+        state.renderStatus = "Complete";
+        state.renderUrl = data.url || data.videoUrl || null;
+      } else {
+        state.renderStatus = "Failed";
+        state.renderProgress = 0;
+      }
+    } catch {
+      clearInterval(progressInterval);
+      // Demo mode: simulate completion
+      await new Promise((r) => setTimeout(r, 800));
+      state.renderProgress = 100;
+      state.renderStatus = "Complete (Demo)";
+      state.renderUrl = null;
+    }
+    render();
+  }
+
+  const sendHeyGen = document.getElementById("send-heygen");
+  if (sendHeyGen) sendHeyGen.addEventListener("click", () => sendToRenderer("heygen"));
+
+  const sendRunway = document.getElementById("send-runway");
+  if (sendRunway) sendRunway.addEventListener("click", () => sendToRenderer("runway"));
+
+  const sendKling = document.getElementById("send-kling");
+  if (sendKling) sendKling.addEventListener("click", () => sendToRenderer("kling"));
+
+  // ── Render result actions ──
+  const approveRender = document.getElementById("approve-render");
+  if (approveRender) {
+    approveRender.addEventListener("click", () => {
+      state.renderStatus = "Approved";
+      render();
+    });
+  }
+  const rejectRender = document.getElementById("reject-render");
+  if (rejectRender) {
+    rejectRender.addEventListener("click", () => {
+      state.renderStatus = "Rejected";
+      state.renderUrl = null;
+      render();
+    });
+  }
+  const regenerateRender = document.getElementById("regenerate-render");
+  if (regenerateRender) {
+    regenerateRender.addEventListener("click", () => {
+      state.renderStatus = null;
+      state.renderUrl = null;
+      state.renderProgress = 0;
+      render();
+    });
+  }
 }
 
 async function boot() {
