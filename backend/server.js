@@ -10,6 +10,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+const path = require('path');
+
+// Serve static files from dashboard/control-center
+app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
+
+// Root route — serve dashboard HTML
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
+});
+
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
 
 // -------------------------
