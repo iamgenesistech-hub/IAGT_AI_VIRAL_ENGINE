@@ -1533,3 +1533,488 @@ meter {
     grid-column: 1 / -1;
   }
 }
+
+/* ── Copilot Panel ── */
+.copilot-panel {
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  padding: 20px;
+}
+
+.copilot-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.copilot-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-header p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.copilot-body {
+  display: grid;
+  gap: 16px;
+}
+
+.copilot-actions-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.copilot-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.copilot-text-input {
+  flex: 1;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.copilot-text-input:focus {
+  outline: 2px solid var(--green);
+  outline-offset: -1px;
+}
+
+.copilot-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.copilot-loading {
+  padding: 12px 0;
+}
+
+.copilot-results {
+  border: 1px solid var(--line);
+  padding: 14px;
+  background: #fafbf9;
+}
+
+.copilot-results h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.copilot-suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.copilot-suggestion-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.copilot-suggestion-card.copilot-priority-high {
+  border-left: 3px solid var(--green);
+}
+
+.copilot-suggestion-card.copilot-priority-medium {
+  border-left: 3px solid var(--gold);
+}
+
+.copilot-suggestion-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-type-badge {
+  padding: 3px 8px;
+  background: #edf0eb;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.copilot-priority-badge {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.copilot-priority-high .copilot-priority-badge {
+  background: var(--mint);
+  color: var(--green);
+}
+
+.copilot-priority-medium .copilot-priority-badge {
+  background: #fef3e2;
+  color: #8a6200;
+}
+
+.copilot-suggestion-text {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--ink);
+}
+
+.copilot-rationale {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.copilot-refinements-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.copilot-refinement-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.copilot-refinement-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-lift-badge {
+  padding: 3px 8px;
+  background: var(--mint);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.copilot-refined-text {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--ink);
+}
+
+.copilot-explanation {
+  display: grid;
+  gap: 12px;
+}
+
+.copilot-explanation-summary {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 10px 12px;
+  background: #17201b;
+  color: #c3d0c8;
+}
+
+.copilot-factors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.copilot-factor {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.copilot-factor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.copilot-factor-score {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--green);
+}
+
+.copilot-factor-weight {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.copilot-factor-bar {
+  height: 6px;
+  background: var(--line);
+}
+
+.copilot-factor-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--gold));
+  transition: width 0.4s ease;
+}
+
+.copilot-factor small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.copilot-recommendation {
+  padding: 10px 12px;
+  background: var(--mint);
+  border-left: 3px solid var(--green);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ── Auto-Generate Section ── */
+.auto-generate-section {
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  padding: 20px;
+}
+
+.auto-generate-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.auto-generate-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-generate-header p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auto-generate-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Pipeline Steps ── */
+.pipeline-steps {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.pipeline-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--line);
+  background: white;
+  transition: background 0.2s;
+}
+
+.pipeline-step:last-child {
+  border-right: 0;
+}
+
+.pipeline-step-complete {
+  background: var(--panel-soft);
+}
+
+.pipeline-step-running {
+  background: #fef3e2;
+}
+
+.pipeline-step-pending {
+  background: white;
+  opacity: 0.6;
+}
+
+.pipeline-step-num {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.pipeline-step-complete .pipeline-step-num {
+  background: var(--green);
+  color: white;
+}
+
+.pipeline-step-running .pipeline-step-num {
+  background: var(--gold);
+  color: white;
+}
+
+.pipeline-step-pending .pipeline-step-num {
+  background: var(--line);
+  color: var(--muted);
+}
+
+.pipeline-step-body {
+  display: grid;
+  gap: 2px;
+}
+
+.pipeline-step-body strong {
+  font-size: 13px;
+}
+
+.pipeline-step-body small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pipeline-pending {
+  color: var(--muted) !important;
+}
+
+/* ── Auto-Generate Result ── */
+.auto-generate-result {
+  border: 1px solid rgba(31, 107, 75, 0.3);
+  background: var(--panel-soft);
+  padding: 14px;
+}
+
+.auto-generate-result-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.auto-generate-result-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  margin: 0;
+  color: var(--green);
+}
+
+.auto-generate-result-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auto-generate-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.auto-generate-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.auto-generate-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-generate-card strong {
+  font-size: 13px;
+}
+
+.auto-generate-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ── Metric Generated Badge ── */
+.metric-generated-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #17201b;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+/* ── Render Status Panel (extended) ── */
+.render-status-panel {
+  margin-top: 12px;
+}
+
+/* ── Responsive overrides for new panels ── */
+@media (max-width: 1120px) {
+  .copilot-actions-row {
+    grid-template-columns: 1fr;
+  }
+
+  .copilot-suggestions-grid,
+  .copilot-refinements-grid,
+  .copilot-factors-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pipeline-steps {
+    flex-direction: column;
+  }
+
+  .pipeline-step {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pipeline-step:last-child {
+    border-bottom: 0;
+  }
+
+  .auto-generate-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .auto-generate-header,
+  .copilot-header {
+    flex-direction: column;
+  }
+}
