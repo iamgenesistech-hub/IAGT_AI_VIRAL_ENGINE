@@ -1647,6 +1647,503 @@ meter {
   line-height: 1.4;
 }
 
+/* ── Media Gallery Section ── */
+.media-gallery-section {
+  margin-bottom: 14px;
+}
+
+.media-gallery-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.media-selection-count {
+  padding: 4px 10px;
+  background: #17201b;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── Media Status Dashboard ── */
+.media-status-dashboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.media-stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.media-stat-pill strong {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.media-stat-pill span {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.media-stat-pending  { border-color: rgba(185, 144, 75, 0.4); background: #fef3e2; }
+.media-stat-pending strong { color: #8a6200; }
+.media-stat-approved { border-color: rgba(31, 107, 75, 0.35); background: var(--mint); }
+.media-stat-approved strong { color: var(--green); }
+.media-stat-rejected { border-color: rgba(217, 111, 76, 0.35); background: #f9e3dc; }
+.media-stat-rejected strong { color: var(--coral); }
+.media-stat-discarded { border-color: rgba(108, 116, 111, 0.3); background: #f0f2ef; }
+.media-stat-discarded strong { color: var(--muted); }
+.media-stat-requeued { border-color: rgba(53, 95, 143, 0.35); background: #e1e9f5; }
+.media-stat-requeued strong { color: var(--blue); }
+
+/* ── Media Filter Tabs ── */
+.media-filter-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.media-filter-tab {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.media-filter-tab.active {
+  background: #17201b;
+  color: white;
+  border-color: #17201b;
+}
+
+.media-filter-tab:hover:not(.active) {
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+/* ── Media Card Overlay ── */
+.media-card-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 32, 27, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.media-card-thumb:hover .media-card-overlay {
+  opacity: 1;
+}
+
+.media-review-btn {
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.media-review-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Media Status Badge ── */
+.media-status-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.media-status-pending   { background: #fef3e2; color: #8a6200; }
+.media-status-approved  { background: var(--mint); color: var(--green); }
+.media-status-rejected  { background: #f9e3dc; color: var(--coral); }
+.media-status-discarded { background: #f0f2ef; color: var(--muted); }
+.media-status-requeued  { background: #e1e9f5; color: var(--blue); }
+.media-status-complete  { background: var(--mint); color: var(--green); }
+
+/* ── Media Card Checkbox ── */
+.media-card-checkbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--green);
+}
+
+/* ── Media Card Body extras ── */
+.media-platform-tag {
+  padding: 2px 7px;
+  background: #17201b;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.media-time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.media-card-script {
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.media-card-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.media-card-params span {
+  padding: 2px 6px;
+  background: #edf0eb;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.media-rejection-note {
+  padding: 5px 7px;
+  background: #fef3e2;
+  border-left: 2px solid var(--gold);
+  font-size: 11px;
+  color: #5a4000;
+  line-height: 1.4;
+}
+
+/* ── Media Loading ── */
+.media-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── Media Render Queue Bar ── */
+.media-render-queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #e1e9f5;
+  border: 1px solid rgba(53, 95, 143, 0.3);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.media-render-queue-bar svg {
+  flex-shrink: 0;
+}
+
+.media-queue-items {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+/* ── Media Review Overlay ── */
+.media-review-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 32, 27, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+
+/* ── Media Review Panel ── */
+.media-review-panel {
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  background: white;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(23, 32, 27, 0.35);
+}
+
+.media-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.media-review-header h2 {
+  margin: 0 0 6px;
+}
+
+.media-review-header .media-status-badge {
+  position: static;
+}
+
+/* ── Media Review Body ── */
+.media-review-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0;
+}
+
+/* ── Video Container ── */
+.media-video-container {
+  background: #17201b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.media-review-video-player {
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+}
+
+.media-video-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.media-video-placeholder span {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.media-video-placeholder small {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Media Review Details ── */
+.media-review-details {
+  padding: 20px 22px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+/* ── Metadata Grid ── */
+.media-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.media-metadata-grid > div {
+  display: grid;
+  gap: 2px;
+}
+
+.media-metadata-grid dt {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.media-metadata-grid dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ── Script Block ── */
+.media-script-block {
+  padding: 12px 14px;
+  background: #fafbf9;
+  border: 1px solid var(--line);
+}
+
+.media-script-block strong {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.media-script-block p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ── AI Suggestions Panel (review modal) ── */
+.media-ai-suggestions-panel {
+  padding: 12px 14px;
+  background: #17201b;
+  color: white;
+}
+
+.media-ai-suggestions-panel strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.media-ai-suggestions-panel ul {
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: grid;
+  gap: 5px;
+}
+
+.media-ai-suggestions-panel li {
+  font-size: 12px;
+  color: #c3d0c8;
+  line-height: 1.5;
+}
+
+/* ── Rejection Input ── */
+.media-rejection-input {
+  display: grid;
+  gap: 6px;
+}
+
+.media-rejection-input label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.media-rejection-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.media-rejection-textarea:focus {
+  outline: 2px solid var(--green);
+  outline-offset: -1px;
+}
+
+/* ── Review Action Buttons ── */
+.media-review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.media-review-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.media-review-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.media-approve-btn  { background: var(--green); }
+.media-reject-btn   { background: var(--coral); }
+.media-requeue-btn  { background: var(--blue); }
+.media-discard-btn  { background: var(--muted); }
+
+.media-approve-btn:hover:not(:disabled)  { background: #175c3e; }
+.media-reject-btn:hover:not(:disabled)   { background: #c05a38; }
+.media-requeue-btn:hover:not(:disabled)  { background: #2a4f7a; }
+.media-discard-btn:hover:not(:disabled)  { background: #4a5450; }
+
+.media-action-loading {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Media Gallery Responsive ── */
+@media (max-width: 1120px) {
+  .media-review-body {
+    grid-template-columns: 1fr;
+  }
+
+  .media-video-container {
+    min-height: 260px;
+  }
+
+  .media-metadata-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    MAIN NAVIGATION — Section tabs (top of main content area)
    ═══════════════════════════════════════════════════════════ */

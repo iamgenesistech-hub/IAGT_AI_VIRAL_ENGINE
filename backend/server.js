@@ -587,6 +587,226 @@ app.post('/api/agent/copilot', async (req, res) => {
 });
 
 // -------------------------
+// /api/media — Media Review & Approval Workspace
+// -------------------------
+
+// GET /api/media/stats — aggregate counts by approval status
+app.get('/api/media/stats', async (_req, res) => {
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('status');
+
+    if (error) throw new Error(error.message);
+
+    const rows = data || [];
+    const stats = {
+      total: rows.length,
+      pending: rows.filter((r) => !r.status || r.status === 'pending').length,
+      approved: rows.filter((r) => r.status === 'approved').length,
+      rejected: rows.filter((r) => r.status === 'rejected').length,
+      discarded: rows.filter((r) => r.status === 'discarded').length,
+      requeued: rows.filter((r) => r.status === 'requeued').length,
+      complete: rows.filter((r) => r.status === 'complete').length,
+    };
+
+    noStore(res);
+    res.json({ success: true, stats });
+  } catch (e) {
+    // Demo fallback
+    noStore(res);
+    res.json({
+      success: true,
+      stats: { total: 12, pending: 4, approved: 5, rejected: 2, discarded: 1, requeued: 0, complete: 5 },
+      demo: true
+    });
+  }
+});
+
+// GET /api/media/gallery — list all media videos with optional status filter
+app.get('/api/media/gallery', async (req, res) => {
+  try {
+    const { status, limit = 50 } = req.query;
+
+    let query = SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, count: (data || []).length, videos: data || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// GET /api/media/:id — get a single media video by id
+app.get('/api/media/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ success: false, error: 'Media not found.' });
+
+    noStore(res);
+    res.json({ success: true, video: data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/approve — approve a media video
+app.post('/api/media/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({ status: 'approved', approved_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, status: 'approved' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/reject — reject a media video with optional reason + AI suggestions
+app.post('/api/media/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, aiSuggestions } = req.body;
+
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({
+        status: 'rejected',
+        rejection_reason: reason || '',
+        ai_suggestions: aiSuggestions ? JSON.stringify(aiSuggestions) : null,
+        rejected_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, status: 'rejected', reason });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/discard — permanently discard a media video
+app.post('/api/media/:id/discard', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({ status: 'discarded', discarded_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, status: 'discarded' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/requeue — requeue a rejected video for re-render with improvements
+app.post('/api/media/:id/requeue', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { improvements } = req.body;
+
+    // Mark original as requeued
+    const { data: original, error: fetchErr } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    await SupabaseConnector
+      .from('evics_renders')
+      .update({ status: 'requeued', requeued_at: new Date().toISOString() })
+      .eq('id', id);
+
+    // Create a new render entry with improvements applied
+    const { data: newRender } = await SupabaseConnector
+      .from('evics_renders')
+      .insert([{
+        platform: original ? original.platform : 'requeue',
+        status: 'pending',
+        script: original ? original.script : '',
+        parameters: original ? original.parameters : null,
+        improvements: improvements ? JSON.stringify(improvements) : null,
+        parent_id: id,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+
+    noStore(res);
+    res.json({
+      success: true,
+      id,
+      status: 'requeued',
+      newRenderId: newRender ? newRender[0]?.id : null,
+      message: 'Video requeued for re-render with improvements.'
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/bulk — bulk approve, reject, or discard multiple videos
+app.post('/api/media/bulk', async (req, res) => {
+  try {
+    const { ids, action, reason } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'ids array is required.' });
+    }
+    if (!['approve', 'reject', 'discard'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action must be approve, reject, or discard.' });
+    }
+
+    const statusMap = { approve: 'approved', reject: 'rejected', discard: 'discarded' };
+    const update = { status: statusMap[action] };
+    if (action === 'reject' && reason) update.rejection_reason = reason;
+
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update(update)
+      .in('id', ids);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, updated: ids.length, action, status: statusMap[action] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
 // /api/media/types — list available media types
 // -------------------------
 app.get('/api/media/types', (_req, res) => {
@@ -782,4 +1002,11 @@ app.listen(PORT, () => {
   console.log(`➡️  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
   console.log(`➡️  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
   console.log(`➡️  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
+  console.log(`➡️  Media stats:         http://127.0.0.1:${PORT}/api/media/stats`);
+  console.log(`➡️  Media gallery:       http://127.0.0.1:${PORT}/api/media/gallery`);
+  console.log(`➡️  Media approve:       POST http://127.0.0.1:${PORT}/api/media/:id/approve`);
+  console.log(`➡️  Media reject:        POST http://127.0.0.1:${PORT}/api/media/:id/reject`);
+  console.log(`➡️  Media discard:       POST http://127.0.0.1:${PORT}/api/media/:id/discard`);
+  console.log(`➡️  Media requeue:       POST http://127.0.0.1:${PORT}/api/media/:id/requeue`);
+  console.log(`➡️  Media bulk:          POST http://127.0.0.1:${PORT}/api/media/bulk`);
 });
