@@ -587,6 +587,143 @@ app.post('/api/agent/copilot', async (req, res) => {
 });
 
 // -------------------------
+// /api/media/types — list available media types
+// -------------------------
+app.get('/api/media/types', (_req, res) => {
+  noStore(res);
+  res.json({
+    success: true,
+    types: [
+      { id: 'video',         label: 'Video' },
+      { id: 'print_ad',      label: 'Print Ad' },
+      { id: 'email',         label: 'Email Marketing' },
+      { id: 'social_post',   label: 'Social Post' },
+      { id: 'landing_page',  label: 'Landing Page' },
+      { id: 'ugc',           label: 'UGC' },
+      { id: 'banner',        label: 'Banner Ad' }
+    ]
+  });
+});
+
+// -------------------------
+// /api/media/apps — list available rendering apps
+// -------------------------
+app.get('/api/media/apps', (_req, res) => {
+  noStore(res);
+  res.json({
+    success: true,
+    apps: [
+      { id: 'heygen',   label: 'HeyGen' },
+      { id: 'runway',   label: 'Runway' },
+      { id: 'kling',    label: 'Kling' },
+      { id: 'internal', label: 'Internal' },
+      { id: 'manual',   label: 'Manual' },
+      { id: 'canva',    label: 'Canva' },
+      { id: 'openai',   label: 'OpenAI' }
+    ]
+  });
+});
+
+// -------------------------
+// /api/media/by-type/:type — get media filtered by type
+// -------------------------
+app.get('/api/media/by-type/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('media_type', type)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, type, count: (data || []).length, media: data || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/media/by-app/:app — get media filtered by rendering app
+// -------------------------
+app.get('/api/media/by-app/:app', async (req, res) => {
+  try {
+    const { app: appName } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('platform', appName)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, app: appName, count: (data || []).length, media: data || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/media/by-type/:type/by-app/:app — get media filtered by both type and app
+// -------------------------
+app.get('/api/media/by-type/:type/by-app/:app', async (req, res) => {
+  try {
+    const { type, app: appName } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('media_type', type)
+      .eq('platform', appName)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, type, app: appName, count: (data || []).length, media: data || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/media/:id/download — generate a download link for a media item
+// -------------------------
+app.post('/api/media/:id/download', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('id, video_url, platform, media_type, status')
+      .eq('id', id)
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ success: false, error: 'Media item not found.' });
+
+    const downloadUrl = data.video_url || null;
+
+    noStore(res);
+    res.json({
+      success: true,
+      id,
+      downloadUrl,
+      filename: `evics-media-${id}.mp4`,
+      message: downloadUrl
+        ? 'Download link generated.'
+        : 'No file URL available for this media item.'
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
 app.get('/api/shopify/products', async (_req, res) => {
@@ -639,4 +776,10 @@ app.listen(PORT, () => {
   console.log(`➡️  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
   console.log(`➡️  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);
   console.log(`➡️  Agent copilot:       POST http://127.0.0.1:${PORT}/api/agent/copilot`);
+  console.log(`➡️  Media types:         http://127.0.0.1:${PORT}/api/media/types`);
+  console.log(`➡️  Media apps:          http://127.0.0.1:${PORT}/api/media/apps`);
+  console.log(`➡️  Media by type:       http://127.0.0.1:${PORT}/api/media/by-type/:type`);
+  console.log(`➡️  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
+  console.log(`➡️  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
+  console.log(`➡️  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
 });
