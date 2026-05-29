@@ -66,7 +66,22 @@ const state = {
   copilotQuestion: "",
   copilotAnswer: null,
   copilotNextActions: [],
-  copilotLoading: false
+  copilotLoading: false,
+
+  // Viral Gallery
+  viralGalleryOpen: true,
+  viralVideos: [],
+  viralLoading: false,
+  viralFilterPlatform: "All",
+  viralFilterCategory: "All",
+  viralSelectedVideo: null,
+  viralAnalysis: null,
+  viralAnalysisLoading: false,
+  viralProductMatches: [],
+  viralProductMatchLoading: false,
+  viralCreativeBrief: null,
+  viralBriefLoading: false,
+  viralBriefSuccess: false
 };
 
 let viralAds = [
@@ -716,6 +731,459 @@ function renderMediaDetail(item) {
   `;
 }
 
+// ── Viral Gallery helpers ──
+
+async function loadViralGallery() {
+  state.viralLoading = true;
+  render();
+  try {
+    const params = new URLSearchParams();
+    if (state.viralFilterPlatform !== "All") params.set("platform", state.viralFilterPlatform);
+    if (state.viralFilterCategory !== "All") params.set("category", state.viralFilterCategory);
+    const res = await fetch(`/api/viral/gallery?${params.toString()}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.videos && data.videos.length) {
+        state.viralVideos = data.videos.map(mapViralVideo);
+      } else {
+        state.viralVideos = getFilteredDemoViralVideos();
+      }
+    } else {
+      state.viralVideos = getFilteredDemoViralVideos();
+    }
+  } catch {
+    state.viralVideos = getFilteredDemoViralVideos();
+  }
+  state.viralLoading = false;
+  render();
+}
+
+function getFilteredDemoViralVideos() {
+  return viralAds.filter((ad) => {
+    const pMatch = state.viralFilterPlatform === "All" || ad.platform === state.viralFilterPlatform;
+    const cMatch = state.viralFilterCategory === "All" || ad.category === state.viralFilterCategory;
+    return pMatch && cMatch;
+  });
+}
+
+function mapViralVideo(row) {
+  return {
+    id: row.id,
+    platform: row.platform || "Unknown",
+    category: row.category || "Uncategorized",
+    title: row.title || "Untitled viral video",
+    hook: row.hook || "",
+    views: Number(row.views || 0),
+    engagement: Number(row.engagement || 0),
+    velocity: Number(row.velocity || 0),
+    conversion: Number(row.conversion || 0),
+    cta: row.cta || "",
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    productMatch: row.product_match || "",
+    emotion: row.emotion || "",
+    structure: Array.isArray(row.structure) ? row.structure : [],
+    videoUrl: row.video_url || null,
+    thumbnailUrl: row.thumbnail_url || null,
+    source: row.source || "scraped"
+  };
+}
+
+async function generateViralAnalysis(videoId) {
+  state.viralAnalysisLoading = true;
+  state.viralAnalysis = null;
+  render();
+  try {
+    const res = await fetch(`/api/viral/${videoId}/analyze`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        state.viralAnalysis = data.analysis;
+        state.viralLoading = false;
+        state.viralAnalysisLoading = false;
+        render();
+        return;
+      }
+    }
+  } catch { /* fall through to demo */ }
+  // Demo analysis
+  const video = (state.viralVideos.length ? state.viralVideos : viralAds).find((v) => v.id === videoId) || viralAds[0];
+  state.viralAnalysis = {
+    id: videoId,
+    whatsWorking: [
+      { label: "Hook strength", score: Math.round(70 + (video.velocity || 80) * 0.2), note: `"${video.hook || "Pattern-matched hook"}" — strong curiosity trigger` },
+      { label: "Pacing", score: Math.round(65 + (video.engagement || 10) * 1.5), note: "Fast cuts in first 3 seconds drive retention above 70%" },
+      { label: "CTA clarity", score: Math.round(72 + (video.conversion || 75) * 0.1), note: `"${video.cta || "Benefit-led CTA"}" — direct and action-oriented` },
+      { label: "Visual style", score: Math.round(75 + (video.velocity || 80) * 0.12), note: "UGC-style authenticity signals high trust with target audience" }
+    ],
+    whatsWeak: [
+      { label: "Mid-video drop", note: "Engagement dips at 8–12s — needs a re-hook or pattern interrupt" },
+      { label: "Product reveal timing", note: "Product shown too early — move to 40% mark for better conversion" }
+    ],
+    formatBreakdown: {
+      hook: video.hook || "Pattern-matched curiosity hook",
+      pacing: video.platform === "TikTok" ? "Fast (1–2s cuts)" : video.platform === "YouTube" ? "Medium (3–5s cuts)" : "Medium-fast (2–3s cuts)",
+      cta: video.cta || "Benefit-led CTA",
+      platform: video.platform || "Multi-platform",
+      style: (video.tags || []).some((t) => ["ugc", "testimonial"].includes(t)) ? "UGC / Testimonial" : "Commercial",
+      duration: video.platform === "TikTok" ? "15–30s" : video.platform === "YouTube" ? "30–60s" : "15–45s",
+      emotion: video.emotion || "Curiosity, transformation, trust"
+    },
+    analysedAt: new Date().toISOString()
+  };
+  state.viralAnalysisLoading = false;
+  render();
+}
+
+function renderViralGallery() {
+  const displayVideos = state.viralVideos.length ? state.viralVideos : getFilteredDemoViralVideos();
+  const allPlatforms = ["All", ...new Set(viralAds.map((a) => a.platform))];
+  const allCategories = ["All", ...new Set(viralAds.map((a) => a.category))];
+
+  return `
+    <section class="viral-gallery-section panel">
+      <div class="viral-gallery-header">
+        <div class="viral-gallery-title-row">
+          <div>
+            <h2>${icon("video")} Viral Content Gallery</h2>
+            <p>${displayVideos.length} scraped viral videos · Filter by platform or category to find patterns</p>
+          </div>
+          <div class="viral-gallery-controls">
+            <label class="viral-filter-label">
+              <span>Platform</span>
+              <select id="viral-platform-filter" class="viral-filter-select">
+                ${allPlatforms.map((p) => `<option value="${p}" ${state.viralFilterPlatform === p ? "selected" : ""}>${p}</option>`).join("")}
+              </select>
+            </label>
+            <label class="viral-filter-label">
+              <span>Category</span>
+              <select id="viral-category-filter" class="viral-filter-select">
+                ${allCategories.map((c) => `<option value="${c}" ${state.viralFilterCategory === c ? "selected" : ""}>${c}</option>`).join("")}
+              </select>
+            </label>
+            <button class="ghost viral-refresh-btn" id="viral-gallery-refresh">
+              ${state.viralLoading ? `${icon("radar")} Loading…` : `${icon("radar")} Refresh`}
+            </button>
+            <button class="toggle-link" id="toggle-viral-gallery">
+              ${state.viralGalleryOpen ? "▲ Collapse" : "▼ Expand"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${state.viralGalleryOpen ? `
+      <div class="viral-gallery-body">
+        ${state.viralLoading ? `
+          <div class="viral-gallery-loading">
+            ${icon("radar")} Scanning viral content library…
+          </div>
+        ` : `
+        <div class="viral-gallery-workspace">
+          <!-- Video Grid -->
+          <div class="viral-video-grid">
+            ${displayVideos.length === 0
+              ? `<div class="viral-empty">No viral videos found for the selected filters.</div>`
+              : displayVideos.map((v) => renderViralVideoCard(v)).join("")
+            }
+          </div>
+
+          <!-- Analysis Panel -->
+          <div class="viral-analysis-panel ${state.viralSelectedVideo ? "viral-analysis-active" : ""}">
+            ${state.viralSelectedVideo
+              ? renderViralAnalysisPanel(state.viralSelectedVideo)
+              : `<div class="viral-analysis-empty">
+                   <div class="viral-analysis-empty-icon">${icon("spark")}</div>
+                   <p>Select a viral video to run AI analysis</p>
+                   <small>Understand what makes it work, find matching products, and create a brief</small>
+                 </div>`
+            }
+          </div>
+        </div>
+        `}
+      </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderViralVideoCard(video) {
+  const isSelected = state.viralSelectedVideo && state.viralSelectedVideo.id === video.id;
+  const platformColors = {
+    TikTok: "viral-platform-tiktok",
+    Instagram: "viral-platform-instagram",
+    YouTube: "viral-platform-youtube",
+    Facebook: "viral-platform-facebook",
+    Pinterest: "viral-platform-pinterest"
+  };
+  const platformClass = platformColors[video.platform] || "viral-platform-default";
+
+  return `
+    <button class="viral-video-card ${isSelected ? "viral-video-card-selected" : ""}" data-viral-video-id="${video.id}">
+      <div class="viral-card-thumb ${platformClass}">
+        ${video.thumbnailUrl
+          ? `<img src="${video.thumbnailUrl}" alt="${video.title}" />`
+          : `<div class="viral-thumb-placeholder">${icon("video")}</div>`
+        }
+        <div class="viral-card-badges">
+          <span class="viral-platform-badge">${video.platform}</span>
+          <span class="viral-velocity-badge">${video.velocity || Math.round(60 + Math.random() * 35)}</span>
+        </div>
+      </div>
+      <div class="viral-card-body">
+        <strong class="viral-card-title">${video.title}</strong>
+        <p class="viral-card-hook">"${video.hook}"</p>
+        <div class="viral-card-stats">
+          <span>${fmt(video.views)} views</span>
+          <span>${video.engagement}% ER</span>
+          <span class="viral-category-tag">${video.category}</span>
+        </div>
+        <div class="viral-card-tags">
+          ${(video.tags || []).slice(0, 3).map((t) => `<span class="viral-tag">${t}</span>`).join("")}
+        </div>
+      </div>
+    </button>
+  `;
+}
+
+function renderViralAnalysisPanel(video) {
+  const analysis = state.viralAnalysis && state.viralAnalysis.id === video.id ? state.viralAnalysis : null;
+
+  return `
+    <div class="viral-analysis-content">
+      <div class="viral-analysis-header">
+        <div>
+          <span class="viral-analysis-platform">${video.platform} · ${video.category}</span>
+          <h3 class="viral-analysis-title">${video.title}</h3>
+        </div>
+        <button class="viral-analysis-close" id="viral-analysis-close">✕</button>
+      </div>
+
+      <!-- Video preview -->
+      <div class="viral-preview-area">
+        ${video.videoUrl
+          ? `<video class="viral-video-player" src="${video.videoUrl}" controls></video>`
+          : `<div class="viral-preview-placeholder">
+               <div class="viral-preview-icon">${icon("video")}</div>
+               <p>${video.platform} · ${fmt(video.views)} views</p>
+             </div>`
+        }
+      </div>
+
+      <!-- Hook card -->
+      <div class="viral-hook-display">
+        <span class="viral-hook-label">Hook</span>
+        <strong>"${video.hook}"</strong>
+      </div>
+
+      <!-- Stats row -->
+      <div class="viral-stats-row">
+        <div class="viral-stat"><span>Views</span><strong>${fmt(video.views)}</strong></div>
+        <div class="viral-stat"><span>Engagement</span><strong>${video.engagement}%</strong></div>
+        <div class="viral-stat"><span>Velocity</span><strong>${video.velocity}</strong></div>
+        <div class="viral-stat"><span>Conversion</span><strong>${video.conversion}%</strong></div>
+      </div>
+
+      <!-- AI Analysis trigger -->
+      ${!analysis ? `
+      <div class="viral-analysis-trigger">
+        <button class="viral-analyze-btn ${state.viralAnalysisLoading ? "loading" : ""}" id="run-viral-analysis" data-video-id="${video.id}" ${state.viralAnalysisLoading ? "disabled" : ""}>
+          ${state.viralAnalysisLoading ? `${icon("radar")} Analysing…` : `${icon("spark")} Run AI Analysis`}
+        </button>
+      </div>
+      ` : `
+      <!-- What's Working -->
+      <div class="viral-section-block">
+        <h4 class="viral-block-title">${icon("check")} What's Working</h4>
+        <div class="viral-working-grid">
+          ${analysis.whatsWorking.map((item) => `
+            <div class="viral-working-item">
+              <div class="viral-working-header">
+                <span class="viral-working-label">${item.label}</span>
+                <span class="viral-working-score">${item.score}</span>
+              </div>
+              <div class="viral-score-bar"><div class="viral-score-fill" style="width:${item.score}%"></div></div>
+              <p class="viral-working-note">${item.note}</p>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- What to Improve -->
+      <div class="viral-section-block viral-weak-block">
+        <h4 class="viral-block-title">⚠ What to Improve</h4>
+        ${analysis.whatsWeak.map((item) => `
+          <div class="viral-weak-item">
+            <strong>${item.label}</strong>
+            <p>${item.note}</p>
+          </div>
+        `).join("")}
+      </div>
+
+      <!-- Format Breakdown -->
+      ${renderFormatBreakdown(analysis.formatBreakdown)}
+      `}
+
+      <!-- Product Matches -->
+      ${renderProductMatches(video)}
+
+      <!-- Brand Integration -->
+      ${renderBrandIntegration(video)}
+
+      <!-- Create Brief button -->
+      <div class="viral-brief-section">
+        <div class="viral-brief-header">
+          <h4>${icon("send")} Create Creative Brief</h4>
+          <p>Generate a ready-to-use brief inspired by this viral pattern</p>
+        </div>
+        ${state.viralCreativeBrief && state.viralCreativeBrief.videoId === video.id
+          ? renderCreativeBriefResult(state.viralCreativeBrief)
+          : `<button class="viral-brief-btn ${state.viralBriefLoading ? "loading" : ""}" id="create-viral-brief" data-video-id="${video.id}" ${state.viralBriefLoading ? "disabled" : ""}>
+               ${state.viralBriefLoading ? `${icon("radar")} Generating…` : `${icon("send")} Create Brief from This Video`}
+             </button>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderFormatBreakdown(fmt_data) {
+  if (!fmt_data) return "";
+  return `
+    <div class="viral-section-block">
+      <h4 class="viral-block-title">${icon("chart")} Format Breakdown</h4>
+      <div class="viral-format-grid">
+        <div class="viral-format-item">
+          <dt>Hook</dt>
+          <dd>${fmt_data.hook}</dd>
+        </div>
+        <div class="viral-format-item">
+          <dt>Pacing</dt>
+          <dd>${fmt_data.pacing}</dd>
+        </div>
+        <div class="viral-format-item">
+          <dt>CTA</dt>
+          <dd>${fmt_data.cta}</dd>
+        </div>
+        <div class="viral-format-item">
+          <dt>Platform</dt>
+          <dd>${fmt_data.platform}</dd>
+        </div>
+        <div class="viral-format-item">
+          <dt>Style</dt>
+          <dd>${fmt_data.style}</dd>
+        </div>
+        <div class="viral-format-item">
+          <dt>Duration</dt>
+          <dd>${fmt_data.duration}</dd>
+        </div>
+        <div class="viral-format-item viral-format-full">
+          <dt>Emotional pattern</dt>
+          <dd>${fmt_data.emotion}</dd>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderProductMatches(video) {
+  const matches = state.viralProductMatches && state.viralProductMatches.videoId === video.id
+    ? state.viralProductMatches.matches
+    : null;
+
+  // Demo matches derived from viralAds productMatch field
+  const demoMatches = products.map((p, i) => ({
+    name: p.name,
+    category: p.category,
+    score: p.score,
+    angle: p.angle,
+    matchScore: i === 0 ? 96 : Math.max(60, p.score - i * 4),
+    matchReason: p.category.toLowerCase() === (video.category || "").toLowerCase() ? "Category alignment" : "Audience overlap"
+  })).sort((a, b) => b.matchScore - a.matchScore).slice(0, 3);
+
+  const displayMatches = matches || demoMatches;
+
+  return `
+    <div class="viral-section-block">
+      <div class="viral-matches-header">
+        <h4 class="viral-block-title">${icon("filter")} Product Match Suggestions</h4>
+        <button class="viral-match-refresh-btn" id="refresh-product-matches" data-video-id="${video.id}">
+          ${state.viralProductMatchLoading ? "Matching…" : "↺ Refresh"}
+        </button>
+      </div>
+      <div class="viral-product-matches">
+        ${displayMatches.map((p) => `
+          <div class="viral-match-card">
+            <div class="viral-match-score-ring">${p.matchScore}</div>
+            <div class="viral-match-body">
+              <strong>${p.name}</strong>
+              <span>${p.category} · ${p.angle}</span>
+              <span class="viral-match-reason">${p.matchReason}</span>
+            </div>
+            <button class="viral-use-product-btn" data-product-name="${p.name.replace(/"/g, "&quot;")}">Use</button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderBrandIntegration(video) {
+  const ad = viralAds.find((a) => a.id === video.id) || video;
+  const structure = ad.structure && ad.structure.length ? ad.structure : ["Hook", "Problem", "Solution", "Product reveal", "CTA"];
+
+  return `
+    <div class="viral-section-block viral-brand-block">
+      <h4 class="viral-block-title">${icon("spark")} Brand Integration Recommendations</h4>
+      <div class="viral-brand-grid">
+        <div class="viral-brand-item">
+          <span class="viral-brand-label">Ad structure to replicate</span>
+          <div class="viral-brand-structure">
+            ${structure.map((step, i) => `
+              <div class="viral-brand-step">
+                <b>${i + 1}</b><span>${step}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="viral-brand-item">
+          <span class="viral-brand-label">Emotional triggers to use</span>
+          <p class="viral-brand-value">${ad.emotion || "Curiosity, transformation, trust"}</p>
+        </div>
+        <div class="viral-brand-item">
+          <span class="viral-brand-label">Visual style to match</span>
+          <p class="viral-brand-value">${(ad.tags || []).join(", ") || "UGC, authentic, fast-paced"}</p>
+        </div>
+        <div class="viral-brand-item">
+          <span class="viral-brand-label">CTA framework</span>
+          <p class="viral-brand-value">"${ad.cta || "Benefit-led action CTA"}"</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCreativeBriefResult(brief) {
+  return `
+    <div class="viral-brief-result">
+      <div class="viral-brief-result-header">
+        <span class="viral-brief-success-badge">${icon("check")} Brief Created</span>
+        <button class="toggle-link" id="dismiss-viral-brief">✕ Dismiss</button>
+      </div>
+      <div class="viral-brief-details">
+        <div class="viral-brief-row"><dt>Title</dt><dd>${brief.title}</dd></div>
+        <div class="viral-brief-row"><dt>Product</dt><dd>${brief.product}</dd></div>
+        <div class="viral-brief-row"><dt>Platform</dt><dd>${brief.targetPlatform} · ${brief.aspectRatio} · ${brief.duration}</dd></div>
+        <div class="viral-brief-row viral-brief-full"><dt>Hook</dt><dd>${brief.hook}</dd></div>
+        <div class="viral-brief-row viral-brief-full"><dt>Script</dt><dd>${brief.script}</dd></div>
+        <div class="viral-brief-row viral-brief-full"><dt>Visual notes</dt><dd>${brief.visualNotes}</dd></div>
+      </div>
+      <div class="viral-brief-actions">
+        <button class="ghost" id="copy-viral-brief" data-copy="${brief.script.replace(/"/g, "&quot;")}">Copy Script</button>
+        <button class="ghost" id="send-brief-to-assembly">Send to Video Assembly</button>
+      </div>
+    </div>
+  `;
+}
+
 // ── Section-specific content renderers ──
 function renderViralIntelligence() {
   const ad = selectedAd();
@@ -846,6 +1314,8 @@ function renderViralIntelligence() {
           <div class="tag-cloud">${ad.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
         </div>
       </section>
+
+      ${renderViralGallery()}
 
       ${renderMediaArea("viral-intelligence")}
     </div>
@@ -2300,6 +2770,233 @@ function bindEvents() {
       state.renderStatus = null;
       state.renderUrl = null;
       state.renderProgress = 0;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: toggle collapse ──
+  const toggleViralGallery = document.getElementById("toggle-viral-gallery");
+  if (toggleViralGallery) {
+    toggleViralGallery.addEventListener("click", () => {
+      state.viralGalleryOpen = !state.viralGalleryOpen;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: platform filter ──
+  const viralPlatformFilter = document.getElementById("viral-platform-filter");
+  if (viralPlatformFilter) {
+    viralPlatformFilter.addEventListener("change", () => {
+      state.viralFilterPlatform = viralPlatformFilter.value;
+      state.viralSelectedVideo = null;
+      state.viralAnalysis = null;
+      state.viralCreativeBrief = null;
+      loadViralGallery();
+    });
+  }
+
+  // ── Viral Gallery: category filter ──
+  const viralCategoryFilter = document.getElementById("viral-category-filter");
+  if (viralCategoryFilter) {
+    viralCategoryFilter.addEventListener("change", () => {
+      state.viralFilterCategory = viralCategoryFilter.value;
+      state.viralSelectedVideo = null;
+      state.viralAnalysis = null;
+      state.viralCreativeBrief = null;
+      loadViralGallery();
+    });
+  }
+
+  // ── Viral Gallery: refresh button ──
+  const viralGalleryRefresh = document.getElementById("viral-gallery-refresh");
+  if (viralGalleryRefresh) {
+    viralGalleryRefresh.addEventListener("click", () => {
+      state.viralSelectedVideo = null;
+      state.viralAnalysis = null;
+      state.viralCreativeBrief = null;
+      loadViralGallery();
+    });
+  }
+
+  // ── Viral Gallery: select video card ──
+  document.querySelectorAll("[data-viral-video-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.viralVideoId;
+      const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
+      const video = allVideos.find((v) => v.id === id);
+      if (!video) return;
+      if (state.viralSelectedVideo && state.viralSelectedVideo.id === id) {
+        // Deselect
+        state.viralSelectedVideo = null;
+        state.viralAnalysis = null;
+        state.viralCreativeBrief = null;
+      } else {
+        state.viralSelectedVideo = video;
+        state.viralAnalysis = null;
+        state.viralCreativeBrief = null;
+        state.viralProductMatches = [];
+      }
+      render();
+    });
+  });
+
+  // ── Viral Gallery: close analysis panel ──
+  const viralAnalysisClose = document.getElementById("viral-analysis-close");
+  if (viralAnalysisClose) {
+    viralAnalysisClose.addEventListener("click", () => {
+      state.viralSelectedVideo = null;
+      state.viralAnalysis = null;
+      state.viralCreativeBrief = null;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: run AI analysis ──
+  const runViralAnalysis = document.getElementById("run-viral-analysis");
+  if (runViralAnalysis) {
+    runViralAnalysis.addEventListener("click", () => {
+      const videoId = runViralAnalysis.dataset.videoId;
+      if (videoId) generateViralAnalysis(videoId);
+    });
+  }
+
+  // ── Viral Gallery: refresh product matches ──
+  const refreshProductMatches = document.getElementById("refresh-product-matches");
+  if (refreshProductMatches) {
+    refreshProductMatches.addEventListener("click", async () => {
+      const videoId = refreshProductMatches.dataset.videoId;
+      if (!videoId) return;
+      state.viralProductMatchLoading = true;
+      render();
+      try {
+        const res = await fetch(`/api/viral/${videoId}/match-products`, { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.matches) {
+            state.viralProductMatches = { videoId, matches: data.matches };
+          }
+        }
+      } catch { /* demo ok */ }
+      state.viralProductMatchLoading = false;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: use product (pre-select in product matching) ──
+  document.querySelectorAll(".viral-use-product-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.productName;
+      if (name) {
+        state.selectedProducts.add(name);
+        state.creativeProductFilter = name;
+        // Navigate to AI Reconstruction to see the product in context
+        state.currentSection = "ai-reconstruction";
+        render();
+      }
+    });
+  });
+
+  // ── Viral Gallery: create creative brief ──
+  const createViralBrief = document.getElementById("create-viral-brief");
+  if (createViralBrief) {
+    createViralBrief.addEventListener("click", async () => {
+      const videoId = createViralBrief.dataset.videoId;
+      if (!videoId) return;
+      state.viralBriefLoading = true;
+      state.viralCreativeBrief = null;
+      render();
+      try {
+        const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
+        const video = allVideos.find((v) => v.id === videoId);
+        const productName = video && video.productMatch ? video.productMatch : (products[0] ? products[0].name : "");
+        const res = await fetch(`/api/viral/${videoId}/create-brief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productName })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.brief) {
+            state.viralCreativeBrief = data.brief;
+            state.viralBriefLoading = false;
+            render();
+            return;
+          }
+        }
+      } catch { /* fall through to demo */ }
+      // Demo brief
+      const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
+      const video = allVideos.find((v) => v.id === videoId) || viralAds[0];
+      const product = (video && video.productMatch) || (products[0] ? products[0].name : "your product");
+      const platform = video.platform || "TikTok";
+      state.viralCreativeBrief = {
+        videoId,
+        product,
+        platform,
+        title: `${platform} Ad Brief — ${product}`,
+        hook: `Inspired by: "${video.hook || "Pattern-matched hook"}"`,
+        structure: video.structure || ["Hook", "Problem", "Solution", "CTA"],
+        script: `Open on [scene]. VO: "${video.hook || "Pattern-matched hook"}" — Cut to product. Show benefit. CTA: "${video.cta || "Shop now"}".`,
+        visualNotes: "Match the pacing and visual style of the source viral ad. Use authentic UGC-style framing. Product reveal at 40% mark.",
+        cta: video.cta || "Shop now",
+        targetPlatform: platform,
+        aspectRatio: platform === "YouTube" ? "16:9" : "9:16",
+        duration: platform === "YouTube" ? "30–60s" : "15–30s",
+        createdAt: new Date().toISOString()
+      };
+      state.viralBriefLoading = false;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: dismiss brief ──
+  const dismissViralBrief = document.getElementById("dismiss-viral-brief");
+  if (dismissViralBrief) {
+    dismissViralBrief.addEventListener("click", () => {
+      state.viralCreativeBrief = null;
+      render();
+    });
+  }
+
+  // ── Viral Gallery: copy brief script ──
+  const copyViralBrief = document.getElementById("copy-viral-brief");
+  if (copyViralBrief) {
+    copyViralBrief.addEventListener("click", () => {
+      const text = copyViralBrief.dataset.copy;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = copyViralBrief.textContent;
+        copyViralBrief.textContent = "Copied!";
+        setTimeout(() => { copyViralBrief.textContent = orig; }, 1400);
+      }).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        const orig = copyViralBrief.textContent;
+        copyViralBrief.textContent = "Copied!";
+        setTimeout(() => { copyViralBrief.textContent = orig; }, 1400);
+      });
+    });
+  }
+
+  // ── Viral Gallery: send brief to video assembly ──
+  const sendBriefToAssembly = document.getElementById("send-brief-to-assembly");
+  if (sendBriefToAssembly) {
+    sendBriefToAssembly.addEventListener("click", () => {
+      if (!state.viralCreativeBrief) return;
+      const brief = state.viralCreativeBrief;
+      // Pre-populate assembly workspace with brief components
+      state.assemblyComponents = [
+        { type: "hook", id: "brief-hook", text: brief.hook },
+        { type: "script", id: "brief-script", text: brief.script },
+        { type: "product", id: brief.product, text: brief.product }
+      ];
+      state.videoAspect = brief.aspectRatio || "9:16";
+      state.currentSection = "video-generation";
+      state.showAssemblyWorkspace = true;
       render();
     });
   }
