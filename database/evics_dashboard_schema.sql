@@ -151,6 +151,81 @@ create table if not exists public.shopify_sessions (
 
 create index if not exists shopify_sessions_shop_idx on public.shopify_sessions (shop);
 
+-- ─────────────────────────────────────────────────────────────
+-- PRODUCT VIRAL INTELLIGENCE TABLES
+-- ─────────────────────────────────────────────────────────────
+
+create table if not exists public.product_viral_memory (
+  id                  uuid primary key default gen_random_uuid(),
+  product_id          text not null unique,
+  product_name        text not null,
+  most_viral_ad_id    text,
+  viral_score         integer not null default 0 check (viral_score between 0 and 100),
+  hook                text not null default '',
+  pacing              text not null default '',
+  cta                 text not null default '',
+  visual_style        text not null default '',
+  emotional_triggers  text[] not null default '{}',
+  structure           text[] not null default '{}',
+  platform_breakdown  jsonb not null default '{}',
+  last_updated        timestamptz not null default now(),
+  reproduction_count  integer not null default 0,
+  performance_metrics jsonb not null default '{"avg_views":0,"avg_engagement":0,"avg_conversion":0}',
+  created_at          timestamptz not null default now()
+);
+
+create index if not exists product_viral_memory_product_id_idx  on public.product_viral_memory (product_id);
+create index if not exists product_viral_memory_viral_score_idx on public.product_viral_memory (viral_score desc);
+create index if not exists product_viral_memory_last_updated_idx on public.product_viral_memory (last_updated desc);
+
+create table if not exists public.product_viral_alternatives (
+  id                  uuid primary key default gen_random_uuid(),
+  product_id          text not null,
+  product_name        text not null,
+  platform            text not null,
+  source_url          text,
+  hook                text not null default '',
+  hook_score          integer not null default 0 check (hook_score between 0 and 100),
+  pacing              text not null default '',
+  pacing_score        integer not null default 0 check (pacing_score between 0 and 100),
+  cta                 text not null default '',
+  cta_score           integer not null default 0 check (cta_score between 0 and 100),
+  visual_style        text not null default '',
+  visual_style_score  integer not null default 0 check (visual_style_score between 0 and 100),
+  emotional_triggers  text[] not null default '{}',
+  structure           text[] not null default '{}',
+  duration            text not null default '15s',
+  aspect_ratio        text not null default '9:16',
+  overall_score       integer not null default 0 check (overall_score between 0 and 100),
+  found_at            timestamptz not null default now(),
+  created_at          timestamptz not null default now()
+);
+
+create index if not exists product_viral_alternatives_product_id_idx   on public.product_viral_alternatives (product_id);
+create index if not exists product_viral_alternatives_platform_idx      on public.product_viral_alternatives (platform);
+create index if not exists product_viral_alternatives_overall_score_idx on public.product_viral_alternatives (overall_score desc);
+
+create table if not exists public.product_viral_reproductions (
+  id                   uuid primary key default gen_random_uuid(),
+  product_id           text not null,
+  product_name         text not null,
+  creative_id          text references public.creatives (id) on delete set null,
+  platform             text not null,
+  hook_used            text not null default '',
+  structure_used       text[] not null default '{}',
+  viral_score_at_time  integer not null default 0,
+  notes                text,
+  performance_views    bigint,
+  performance_engagement numeric(5,2),
+  performance_conversion numeric(5,2),
+  reproduced_at        timestamptz not null default now(),
+  created_at           timestamptz not null default now()
+);
+
+create index if not exists product_viral_reproductions_product_id_idx   on public.product_viral_reproductions (product_id);
+create index if not exists product_viral_reproductions_reproduced_at_idx on public.product_viral_reproductions (reproduced_at desc);
+create index if not exists product_viral_reproductions_platform_idx      on public.product_viral_reproductions (platform);
+
 alter table public.viral_ads enable row level security;
 alter table public.products enable row level security;
 alter table public.creatives enable row level security;
@@ -201,4 +276,46 @@ using (true);
 create policy "dashboard read shopify collections"
 on public.shopify_collections for select
 to anon, authenticated
+using (true);
+
+-- ── Product Viral Intelligence RLS ──
+alter table public.product_viral_memory        enable row level security;
+alter table public.product_viral_alternatives  enable row level security;
+alter table public.product_viral_reproductions enable row level security;
+
+drop policy if exists "dashboard read product viral memory"        on public.product_viral_memory;
+drop policy if exists "dashboard write product viral memory"       on public.product_viral_memory;
+drop policy if exists "dashboard read product viral alternatives"  on public.product_viral_alternatives;
+drop policy if exists "dashboard write product viral alternatives" on public.product_viral_alternatives;
+drop policy if exists "dashboard read product viral reproductions" on public.product_viral_reproductions;
+drop policy if exists "dashboard write product viral reproductions" on public.product_viral_reproductions;
+
+create policy "dashboard read product viral memory"
+on public.product_viral_memory for select
+to anon, authenticated
+using (true);
+
+create policy "dashboard write product viral memory"
+on public.product_viral_memory for all
+to service_role
+using (true);
+
+create policy "dashboard read product viral alternatives"
+on public.product_viral_alternatives for select
+to anon, authenticated
+using (true);
+
+create policy "dashboard write product viral alternatives"
+on public.product_viral_alternatives for all
+to service_role
+using (true);
+
+create policy "dashboard read product viral reproductions"
+on public.product_viral_reproductions for select
+to anon, authenticated
+using (true);
+
+create policy "dashboard write product viral reproductions"
+on public.product_viral_reproductions for all
+to service_role
 using (true);
