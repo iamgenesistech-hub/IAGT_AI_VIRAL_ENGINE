@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 
@@ -9,6 +10,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Serve static files from dashboard/control-center
+app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
+
+// Root route — serve dashboard HTML
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
+});
 
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
 
@@ -404,6 +413,412 @@ app.post('/api/video/generate', async (req, res) => {
 });
 
 // -------------------------
+// /api/agents/trend-scout/scan — scan for viral trends
+// -------------------------
+app.post('/api/agents/trend-scout/scan', async (req, res) => {
+  try {
+    const { platform, category, limit } = req.body;
+    const scanLimit = Math.max(5, Math.min(50, Number(limit) || 10));
+
+    // Pull recent trends from Supabase
+    let query = SupabaseConnector
+      .from('evics_trends')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(scanLimit);
+
+    if (category) query = query.eq('category', category);
+    if (platform) query = query.eq('platform', platform);
+
+    const { data, error } = await query;
+    if (error) console.warn('Trend scout Supabase query failed:', error.message);
+
+    const trends = (data && data.length)
+      ? data
+      : [
+          { platform: platform || 'TikTok', category: category || 'Weight loss', hook: 'Nobody talks about this morning habit...', velocity: 92, engagement: 12.8 },
+          { platform: platform || 'Instagram', category: category || 'Beauty', hook: 'This changed my skin in 7 days...', velocity: 78, engagement: 10.4 },
+          { platform: platform || 'YouTube', category: category || 'Nootropics', hook: 'I felt flat until I fixed this...', velocity: 69, engagement: 9.1 }
+        ];
+
+    // Log scan to Supabase
+    await SupabaseConnector
+      .from('evics_trends')
+      .insert([{
+        title: `Trend Scout scan — ${platform || 'All'} / ${category || 'All'}`,
+        source: 'trend_scout_agent',
+        platform: platform || null,
+        category: category || null,
+        created_at: new Date().toISOString()
+      }])
+      .then(({ error: insertErr }) => {
+        if (insertErr) console.warn('Trend scout log insert failed:', insertErr.message);
+      });
+
+    noStore(res);
+    res.json({ success: true, count: trends.length, trends, agent: 'trend-scout', scannedAt: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/script-writer/generate — generate ad scripts
+// -------------------------
+app.post('/api/agents/script-writer/generate', async (req, res) => {
+  try {
+    const { product, hook, format, platform, tone } = req.body;
+
+    if (!product) {
+      return res.status(400).json({ success: false, error: 'product is required.' });
+    }
+
+    const resolvedHook = hook || 'Nobody talks about this morning habit...';
+    const resolvedFormat = format || 'UGC';
+    const resolvedPlatform = platform || 'TikTok';
+    const resolvedTone = tone || 'conversational';
+
+    const script = `Open on ${resolvedFormat === 'UGC' ? 'handheld camera, authentic setting' : 'clean product shot'}. ` +
+      `Hook: "${resolvedHook}" ` +
+      `VO: "I started using ${product} and everything changed. ` +
+      `Here's what nobody tells you about ${product.toLowerCase()}..." ` +
+      `Cut to product close-up. Benefit stack. ` +
+      `CTA: "Try ${product} today — link in bio."`;
+
+    // Log to Supabase
+    const { data: savedScript, error: insertErr } = await SupabaseConnector
+      .from('creatives')
+      .insert([{
+        product,
+        hook: resolvedHook,
+        script,
+        format: resolvedFormat,
+        channel: resolvedPlatform,
+        status: 'Draft',
+        score: 75,
+        approved: false,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+
+    if (insertErr) console.warn('Script writer log insert failed:', insertErr.message);
+
+    noStore(res);
+    res.json({
+      success: true,
+      script,
+      product,
+      hook: resolvedHook,
+      format: resolvedFormat,
+      platform: resolvedPlatform,
+      tone: resolvedTone,
+      savedId: savedScript ? savedScript[0]?.id : null,
+      agent: 'script-writer',
+      generatedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/product-match/analyze — match products to viral trends
+// -------------------------
+app.post('/api/agents/product-match/analyze', async (req, res) => {
+  try {
+    const { trendId, hook, category, platform } = req.body;
+
+    // Pull products from Supabase
+    const { data: productRows, error: productErr } = await SupabaseConnector
+      .from('evics_products')
+      .select('*')
+      .order('score', { ascending: false })
+      .limit(10);
+
+    if (productErr) console.warn('Product match Supabase query failed:', productErr.message);
+
+    const productPool = (productRows && productRows.length)
+      ? productRows
+      : [
+          { name: 'Sea Moss Mineral Gel', category: 'Sea moss', score: 96, angle: 'daily mineral ritual' },
+          { name: 'Metabolic Ignite', category: 'Weight loss', score: 91, angle: 'morning reset' },
+          { name: 'Genesis Glow Collagen', category: 'Beauty', score: 88, angle: 'skin confidence' },
+          { name: 'Apex Testosterone Support', category: 'Testosterone', score: 86, angle: 'training foundation' },
+          { name: 'NeuroRise Focus', category: 'Nootropics', score: 82, angle: 'clean productive energy' }
+        ];
+
+    // Score products against the trend context
+    const text = `${hook || ''} ${category || ''} ${platform || ''}`.toLowerCase();
+    const matches = productPool.map((p) => {
+      let relevance = p.score || 50;
+      const productText = `${p.name} ${p.category} ${p.angle}`.toLowerCase();
+      if (category && productText.includes(category.toLowerCase())) relevance = Math.min(100, relevance + 10);
+      if (text.includes(p.category ? p.category.toLowerCase() : '')) relevance = Math.min(100, relevance + 5);
+      return { ...p, relevance };
+    }).sort((a, b) => b.relevance - a.relevance);
+
+    noStore(res);
+    res.json({
+      success: true,
+      trendId: trendId || null,
+      hook: hook || null,
+      matches,
+      topMatch: matches[0] || null,
+      agent: 'product-match',
+      analyzedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/copilot/suggest — AI copilot creative suggestions
+// -------------------------
+app.post('/api/agents/copilot/suggest', async (req, res) => {
+  try {
+    const { context, product, platform, goal } = req.body;
+
+    const suggestions = [
+      {
+        type: 'hook',
+        text: `Nobody tells you what ${product || 'this supplement'} actually does to your morning.`,
+        confidence: 'High',
+        rationale: 'Curiosity-gap hook with personal relevance. Performs well on TikTok and Reels.'
+      },
+      {
+        type: 'structure',
+        text: 'Hook → Problem agitation (5s) → Product reveal (3s) → Proof/testimonial (7s) → CTA (3s)',
+        confidence: 'High',
+        rationale: 'Proven 18-second structure for supplement UGC. Matches top-performing viral patterns.'
+      },
+      {
+        type: 'cta',
+        text: `Start your ${product ? product.split(' ')[0] : 'wellness'} ritual today — link in bio.`,
+        confidence: 'Medium',
+        rationale: 'Ritual framing increases perceived value and repeat purchase intent.'
+      },
+      {
+        type: 'visual',
+        text: 'Open on bathroom counter at golden hour. Slow pan to product. Hand picks it up naturally.',
+        confidence: 'High',
+        rationale: 'Aspirational lifestyle setting with authentic UGC feel. High scroll-stop rate.'
+      }
+    ];
+
+    noStore(res);
+    res.json({
+      success: true,
+      suggestions,
+      context: context || null,
+      product: product || null,
+      platform: platform || 'TikTok',
+      goal: goal || 'conversion',
+      agent: 'copilot',
+      suggestedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/copilot/refine — refine an existing script or hook
+// -------------------------
+app.post('/api/agents/copilot/refine', async (req, res) => {
+  try {
+    const { content, type, instruction, platform } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required.' });
+    }
+
+    const resolvedType = type || 'script';
+    const resolvedInstruction = instruction || 'make it more urgent and emotionally compelling';
+
+    // Apply refinement heuristics
+    let refined = content;
+    const lowerInstruction = resolvedInstruction.toLowerCase();
+
+    if (lowerInstruction.includes('urgent') || lowerInstruction.includes('compelling')) {
+      refined = refined.replace(/\.$/, '!');
+      if (!refined.toLowerCase().includes('today') && !refined.toLowerCase().includes('now')) {
+        refined = refined + ' Act now — limited availability.';
+      }
+    }
+    if (lowerInstruction.includes('shorter') || lowerInstruction.includes('concise')) {
+      const sentences = refined.split(/[.!?]+/).filter(Boolean);
+      refined = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim() + '.';
+    }
+    if (lowerInstruction.includes('hook') || lowerInstruction.includes('opening')) {
+      refined = `Here's what nobody tells you: ${refined}`;
+    }
+
+    noStore(res);
+    res.json({
+      success: true,
+      original: content,
+      refined,
+      type: resolvedType,
+      instruction: resolvedInstruction,
+      platform: platform || null,
+      agent: 'copilot',
+      refinedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/copilot/explain — explain why a creative works
+// -------------------------
+app.post('/api/agents/copilot/explain', async (req, res) => {
+  try {
+    const { content, type, platform } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required.' });
+    }
+
+    const text = content.toLowerCase();
+    const insights = [];
+
+    // Pattern detection
+    if (text.includes('nobody') || text.includes('nobody tells')) {
+      insights.push({ pattern: 'Curiosity gap', strength: 'High', explanation: 'Opens an information gap the viewer must close. Drives watch time and shares.' });
+    }
+    if (text.includes('i felt') || text.includes('i started') || text.includes('i tried')) {
+      insights.push({ pattern: 'First-person proof', strength: 'High', explanation: 'Personal testimony increases trust and relatability. Reduces skepticism.' });
+    }
+    if (text.includes('changed') || text.includes('reset') || text.includes('transformed')) {
+      insights.push({ pattern: 'Transformation narrative', strength: 'High', explanation: 'Before/after framing is the highest-converting structure in supplement advertising.' });
+    }
+    if (text.includes('today') || text.includes('now') || text.includes('start')) {
+      insights.push({ pattern: 'Urgency trigger', strength: 'Medium', explanation: 'Time-bound language increases immediate action and reduces decision paralysis.' });
+    }
+    if (text.includes('ritual') || text.includes('routine') || text.includes('habit')) {
+      insights.push({ pattern: 'Habit framing', strength: 'Medium', explanation: 'Positions the product as part of an identity, not a one-time purchase. Boosts LTV.' });
+    }
+
+    if (insights.length === 0) {
+      insights.push({ pattern: 'Informational', strength: 'Medium', explanation: 'Clear and direct. Consider adding a curiosity gap or transformation narrative to increase engagement.' });
+    }
+
+    const overallScore = insights.reduce((sum, i) => sum + (i.strength === 'High' ? 30 : 15), 0);
+
+    noStore(res);
+    res.json({
+      success: true,
+      content,
+      type: type || 'script',
+      platform: platform || null,
+      insights,
+      overallScore: Math.min(100, overallScore),
+      summary: `${insights.length} pattern${insights.length !== 1 ? 's' : ''} detected. ${insights.filter((i) => i.strength === 'High').length} high-impact.`,
+      agent: 'copilot',
+      explainedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/agents/auto-generate — full pipeline: trend → match → script → save
+// -------------------------
+app.post('/api/agents/auto-generate', async (req, res) => {
+  try {
+    const { platform, category, format, count } = req.body;
+    const generateCount = Math.max(1, Math.min(10, Number(count) || 3));
+
+    // Step 1: Pull top trends
+    const { data: trendRows } = await SupabaseConnector
+      .from('evics_trends')
+      .select('hook, category, platform')
+      .not('hook', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(generateCount);
+
+    // Step 2: Pull top products
+    const { data: productRows } = await SupabaseConnector
+      .from('evics_products')
+      .select('name, category, angle')
+      .order('score', { ascending: false })
+      .limit(generateCount);
+
+    // Fallback demo data
+    const trendPool = (trendRows && trendRows.length) ? trendRows : [
+      { hook: 'Nobody talks about this morning habit...', category: 'Weight loss', platform: 'TikTok' },
+      { hook: 'This changed my skin in 7 days...', category: 'Beauty', platform: 'Instagram' },
+      { hook: 'I felt flat until I fixed this...', category: 'Testosterone', platform: 'YouTube' }
+    ];
+
+    const productPool = (productRows && productRows.length) ? productRows : [
+      { name: 'Sea Moss Mineral Gel', category: 'Sea moss', angle: 'daily mineral ritual' },
+      { name: 'Genesis Glow Collagen', category: 'Beauty', angle: 'skin confidence' },
+      { name: 'Apex Testosterone Support', category: 'Testosterone', angle: 'training foundation' }
+    ];
+
+    // Step 3: Generate scripts
+    const generated = [];
+    const resolvedFormat = format || 'UGC';
+
+    for (let i = 0; i < generateCount; i++) {
+      const trend = trendPool[i % trendPool.length];
+      const product = productPool[i % productPool.length];
+      const resolvedPlatform = platform || trend.platform || 'TikTok';
+
+      const script = `Open on ${resolvedFormat === 'UGC' ? 'handheld camera, authentic setting' : 'clean product shot'}. ` +
+        `Hook: "${trend.hook}" ` +
+        `VO: "I started using ${product.name} and everything changed. ` +
+        `The ${product.angle} ritual that nobody talks about." ` +
+        `Cut to product close-up. Benefit stack. ` +
+        `CTA: "Try ${product.name} today — link in bio."`;
+
+      // Save to Supabase
+      const { data: savedRow, error: insertErr } = await SupabaseConnector
+        .from('creatives')
+        .insert([{
+          product: product.name,
+          hook: trend.hook,
+          script,
+          format: resolvedFormat,
+          channel: resolvedPlatform,
+          status: 'Draft',
+          score: 70 + Math.floor(Math.random() * 20),
+          approved: false,
+          created_at: new Date().toISOString()
+        }])
+        .select();
+
+      if (insertErr) console.warn(`Auto-generate insert ${i} failed:`, insertErr.message);
+
+      generated.push({
+        id: savedRow ? savedRow[0]?.id : `auto-${i}`,
+        product: product.name,
+        hook: trend.hook,
+        script,
+        format: resolvedFormat,
+        platform: resolvedPlatform,
+        status: 'Draft'
+      });
+    }
+
+    noStore(res);
+    res.json({
+      success: true,
+      count: generated.length,
+      creatives: generated,
+      agent: 'auto-generate',
+      generatedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
 app.get('/api/shopify/products', async (_req, res) => {
@@ -434,6 +849,7 @@ app.get('/api/shopify/collections', async (_req, res) => {
 // -------------------------
 app.listen(PORT, () => {
   console.log(`✅ EVICS backend running at http://127.0.0.1:${PORT}`);
+  console.log(`➡️  Dashboard:           http://127.0.0.1:${PORT}/`);
   console.log(`➡️  Status:              http://127.0.0.1:${PORT}/status`);
   console.log(`➡️  Products:            http://127.0.0.1:${PORT}/api/products`);
   console.log(`➡️  Renders:             http://127.0.0.1:${PORT}/api/renders`);
@@ -448,4 +864,11 @@ app.listen(PORT, () => {
   console.log(`➡️  Assembly drafts:     http://127.0.0.1:${PORT}/api/assembly/drafts`);
   console.log(`➡️  AI suggestions:      POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
   console.log(`➡️  Video generate:      POST http://127.0.0.1:${PORT}/api/video/generate`);
+  console.log(`➡️  Trend Scout:         POST http://127.0.0.1:${PORT}/api/agents/trend-scout/scan`);
+  console.log(`➡️  Script Writer:       POST http://127.0.0.1:${PORT}/api/agents/script-writer/generate`);
+  console.log(`➡️  Product Match:       POST http://127.0.0.1:${PORT}/api/agents/product-match/analyze`);
+  console.log(`➡️  Copilot Suggest:     POST http://127.0.0.1:${PORT}/api/agents/copilot/suggest`);
+  console.log(`➡️  Copilot Refine:      POST http://127.0.0.1:${PORT}/api/agents/copilot/refine`);
+  console.log(`➡️  Copilot Explain:     POST http://127.0.0.1:${PORT}/api/agents/copilot/explain`);
+  console.log(`➡️  Auto Generate:       POST http://127.0.0.1:${PORT}/api/agents/auto-generate`);
 });
