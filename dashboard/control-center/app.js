@@ -44,7 +44,18 @@ const state = {
   showAssemblyWorkspace: true,
   compareDrafts: false,
   selectedDraftA: null,
-  selectedDraftB: null
+  selectedDraftB: null,
+
+  // Auto-generate
+  autoGenerating: false,
+  autoGenerateResult: null,
+
+  // Copilot
+  copilotOpen: false,
+  copilotQuestion: "",
+  copilotAnswer: null,
+  copilotNextActions: [],
+  copilotLoading: false
 };
 
 let viralAds = [
@@ -486,9 +497,46 @@ function render() {
             <span>${state.syncMessage}</span>
           </div>
           <button class="ghost">${icon("filter")} Connect Sources</button>
-          <button class="primary">${icon("spark")} Generate Today's Ads</button>
+          <button class="primary ${state.autoGenerating ? "generating" : ""}" id="generate-today-btn" ${state.autoGenerating ? "disabled" : ""}>
+            ${state.autoGenerating ? `${icon("radar")} Generating…` : `${icon("spark")} Generate Today's Ads`}
+          </button>
+          <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} Copilot</button>
         </div>
       </header>
+
+      ${state.autoGenerateResult ? `
+      <div class="auto-generate-banner">
+        ${icon("check")} ${state.autoGenerateResult}
+        <button class="toggle-link" id="dismiss-auto-generate">✕</button>
+      </div>
+      ` : ""}
+
+      ${state.copilotOpen ? `
+      <section class="copilot-panel panel">
+        <div class="panel-head compact">
+          <h2>${icon("spark")} AI Copilot</h2>
+          <button class="toggle-link" id="close-copilot">✕ Close</button>
+        </div>
+        <p class="copilot-desc">Ask the AI anything about your workspace — trends, creatives, products, or next steps.</p>
+        <div class="copilot-input-row">
+          <input type="text" id="copilot-input" class="copilot-input" placeholder="e.g. What should I focus on today?" value="${state.copilotQuestion.replace(/"/g, "&quot;")}" />
+          <button class="primary" id="copilot-ask-btn" ${state.copilotLoading ? "disabled" : ""}>
+            ${state.copilotLoading ? "Thinking…" : "Ask"}
+          </button>
+        </div>
+        ${state.copilotAnswer ? `
+        <div class="copilot-answer">
+          <div class="copilot-answer-text">${state.copilotAnswer}</div>
+          ${state.copilotNextActions.length > 0 ? `
+          <div class="copilot-next-actions">
+            <strong>Suggested next actions:</strong>
+            <ul>${state.copilotNextActions.map((a) => `<li>${a}</li>`).join("")}</ul>
+          </div>
+          ` : ""}
+        </div>
+        ` : ""}
+      </section>
+      ` : ""}
 
       <!-- ── METRICS GRID (interactive) ── -->
       <section class="metrics-grid">
@@ -1507,6 +1555,122 @@ function bindEvents() {
 
   const sendKling = document.getElementById("send-kling");
   if (sendKling) sendKling.addEventListener("click", () => sendToRenderer("kling"));
+
+  // ── Generate Today's Ads ──
+  const generateTodayBtn = document.getElementById("generate-today-btn");
+  if (generateTodayBtn) {
+    generateTodayBtn.addEventListener("click", async () => {
+      state.autoGenerating = true;
+      state.autoGenerateResult = null;
+      render();
+      try {
+        const res = await fetch("/api/agent/generate-ads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            products: products.slice(0, 5),
+            hooks: winningHooks.filter((h) => h.confidence === "High").slice(0, 5)
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.autoGenerateResult = data.message || `${data.generated || 0} ads queued for generation.`;
+        } else {
+          // Demo fallback
+          await new Promise((r) => setTimeout(r, 1500));
+          state.autoGenerateResult = `${products.length} ads queued for generation (demo mode).`;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        state.autoGenerateResult = `${products.length} ads queued for generation (demo mode).`;
+      }
+      state.autoGenerating = false;
+      render();
+    });
+  }
+
+  // ── Dismiss auto-generate banner ──
+  const dismissAutoGenerate = document.getElementById("dismiss-auto-generate");
+  if (dismissAutoGenerate) {
+    dismissAutoGenerate.addEventListener("click", () => {
+      state.autoGenerateResult = null;
+      render();
+    });
+  }
+
+  // ── Copilot toggle ──
+  const copilotToggleBtn = document.getElementById("copilot-toggle-btn");
+  if (copilotToggleBtn) {
+    copilotToggleBtn.addEventListener("click", () => {
+      state.copilotOpen = !state.copilotOpen;
+      render();
+    });
+  }
+
+  // ── Close copilot ──
+  const closeCopilot = document.getElementById("close-copilot");
+  if (closeCopilot) {
+    closeCopilot.addEventListener("click", () => {
+      state.copilotOpen = false;
+      render();
+    });
+  }
+
+  // ── Copilot ask ──
+  const copilotAskBtn = document.getElementById("copilot-ask-btn");
+  const copilotInput = document.getElementById("copilot-input");
+  if (copilotInput) {
+    copilotInput.addEventListener("input", () => {
+      state.copilotQuestion = copilotInput.value;
+    });
+    copilotInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !state.copilotLoading) {
+        copilotAskBtn && copilotAskBtn.click();
+      }
+    });
+  }
+  if (copilotAskBtn) {
+    copilotAskBtn.addEventListener("click", async () => {
+      const question = state.copilotQuestion.trim();
+      if (!question) return;
+      state.copilotLoading = true;
+      state.copilotAnswer = null;
+      state.copilotNextActions = [];
+      render();
+      try {
+        const res = await fetch("/api/agent/copilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question,
+            context: {
+              products: products.slice(0, 3).map((p) => p.name),
+              topHooks: winningHooks.slice(0, 3).map((h) => h.text),
+              creativeCount: creatives.length
+            }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.copilotAnswer = data.answer || "No answer returned.";
+          state.copilotNextActions = data.nextActions || [];
+        } else {
+          state.copilotAnswer = "Copilot is unavailable right now. Check your backend connection.";
+        }
+      } catch {
+        // Demo fallback
+        state.copilotAnswer = `Based on your workspace, focus on your top product with a curiosity-led hook. You have ${creatives.filter((c) => c.status === "Ready").length} creatives ready to publish.`;
+        state.copilotNextActions = [
+          "Run a viral rescan to refresh trend data",
+          "Review pending creatives in the AI Content Queue",
+          "Generate new ads using the top winning hooks",
+          "Check the publishing queue for today"
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
 
   // ── Render result actions ──
   const approveRender = document.getElementById("approve-render");

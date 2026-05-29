@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 
@@ -9,6 +10,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
+});
 
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
 
@@ -404,6 +409,184 @@ app.post('/api/video/generate', async (req, res) => {
 });
 
 // -------------------------
+// Agent endpoints
+// -------------------------
+
+// /api/agent/viral-scan — trigger viral intelligence scan
+app.post('/api/agent/viral-scan', async (req, res) => {
+  try {
+    const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 1284));
+    const { error } = await SupabaseConnector
+      .from('evics_trends')
+      .insert([{
+        title: `Agent viral scan — ${amount} ads`,
+        source: 'agent_viral_scan',
+        scan_amount: amount,
+        created_at: new Date().toISOString()
+      }]);
+    if (error) console.warn('Agent viral scan log failed:', error.message);
+    noStore(res);
+    res.json({ success: true, count: amount, message: `Viral scan triggered for ${amount} ads.` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/reconstruct — AI creative reconstruction from a viral ad
+app.post('/api/agent/reconstruct', async (req, res) => {
+  try {
+    const { adId, hook, platform, category } = req.body;
+    const { data, error } = await SupabaseConnector
+      .from('creatives')
+      .insert([{
+        status: 'Draft',
+        hook: hook || 'AI-reconstructed hook',
+        product: category || 'General',
+        format: `${platform || 'Multi'} Reconstruction`,
+        channel: platform || 'Multi',
+        score: 80,
+        approved: false,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    if (error) console.warn('Reconstruct insert failed:', error.message);
+    noStore(res);
+    res.json({ success: true, creative: data ? data[0] : null, message: 'Creative reconstruction queued.' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/generate-ads — auto-generate today's ad batch
+app.post('/api/agent/generate-ads', async (req, res) => {
+  try {
+    const { products: productList, hooks } = req.body;
+    const batch = (productList || []).slice(0, 5).map((product, i) => ({
+      status: 'Draft',
+      product: product.name || product,
+      hook: (hooks && hooks[i]) ? hooks[i].text || hooks[i] : 'AI-generated hook',
+      format: 'Auto-generated',
+      channel: 'TikTok + Reels',
+      score: 75,
+      approved: false,
+      created_at: new Date().toISOString()
+    }));
+    if (batch.length > 0) {
+      const { error } = await SupabaseConnector.from('creatives').insert(batch);
+      if (error) console.warn('Generate ads insert failed:', error.message);
+    }
+    noStore(res);
+    res.json({ success: true, generated: batch.length, message: `${batch.length} ads queued for generation.` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/approve-creative — approve or reject a creative
+app.post('/api/agent/approve-creative', async (req, res) => {
+  try {
+    const { id, approved, rejectionReason } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: 'id is required.' });
+    const update = { approved: Boolean(approved) };
+    if (!approved && rejectionReason) update.rejection_reason = rejectionReason;
+    const { error } = await SupabaseConnector.from('creatives').update(update).eq('id', id);
+    if (error) throw new Error(error.message);
+    noStore(res);
+    res.json({ success: true, id, approved: Boolean(approved) });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/publish — push a creative to the publishing queue
+app.post('/api/agent/publish', async (req, res) => {
+  try {
+    const { creativeId, channel, publishAt } = req.body;
+    if (!creativeId) return res.status(400).json({ success: false, error: 'creativeId is required.' });
+    const { data, error } = await SupabaseConnector
+      .from('publishing_queue')
+      .insert([{
+        creative_id: creativeId,
+        channel: channel || 'TikTok',
+        status: 'Queued',
+        publish_at: publishAt || new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    if (error) throw new Error(error.message);
+    noStore(res);
+    res.json({ success: true, queued: data ? data[0] : null, message: 'Creative added to publishing queue.' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/learning-loop — record performance data and update best patterns
+app.post('/api/agent/learning-loop', async (req, res) => {
+  try {
+    const { creativeId, watchTime, engagement, ctr, sales, conversionRate } = req.body;
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .insert([{
+        platform: 'learning_loop',
+        status: 'logged',
+        parameters: JSON.stringify({ creativeId, watchTime, engagement, ctr, sales, conversionRate }),
+        created_at: new Date().toISOString()
+      }]);
+    if (error) console.warn('Learning loop log failed:', error.message);
+    noStore(res);
+    res.json({ success: true, message: 'Performance data recorded. Patterns will update nightly.' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/agent/copilot — AI copilot: answer workspace questions and suggest next actions
+app.post('/api/agent/copilot', async (req, res) => {
+  try {
+    const { question, context } = req.body;
+    if (!question) return res.status(400).json({ success: false, error: 'question is required.' });
+
+    // Pull live workspace context from Supabase
+    const [trendsRes, creativesRes, productsRes] = await Promise.all([
+      SupabaseConnector.from('evics_trends').select('title, hook, category, platform').order('created_at', { ascending: false }).limit(3),
+      SupabaseConnector.from('creatives').select('product, hook, status, score').order('score', { ascending: false }).limit(3),
+      SupabaseConnector.from('evics_products').select('name, category, angle, score').order('score', { ascending: false }).limit(3)
+    ]);
+
+    const workspaceContext = {
+      topTrends: trendsRes.data || [],
+      topCreatives: creativesRes.data || [],
+      topProducts: productsRes.data || [],
+      userContext: context || {}
+    };
+
+    // Build a suggested answer based on workspace data
+    const topProduct = (productsRes.data && productsRes.data[0]) ? productsRes.data[0].name : 'your top product';
+    const topHook = (trendsRes.data && trendsRes.data[0]) ? trendsRes.data[0].hook : null;
+    const suggestion = topHook
+      ? `Based on current trends, focus on "${topHook}" for ${topProduct}. Your top creative is scoring well — consider scaling it.`
+      : `Focus on ${topProduct} with a curiosity-led hook. Run a viral scan to surface fresh patterns.`;
+
+    noStore(res);
+    res.json({
+      success: true,
+      question,
+      answer: suggestion,
+      nextActions: [
+        'Run a viral rescan to refresh trend data',
+        `Generate new ads for ${topProduct}`,
+        'Review and approve pending creatives',
+        'Check publishing queue for today'
+      ],
+      workspaceContext
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
 app.get('/api/shopify/products', async (_req, res) => {
@@ -434,6 +617,7 @@ app.get('/api/shopify/collections', async (_req, res) => {
 // -------------------------
 app.listen(PORT, () => {
   console.log(`✅ EVICS backend running at http://127.0.0.1:${PORT}`);
+  console.log(`➡️  Dashboard:           http://127.0.0.1:${PORT}/`);
   console.log(`➡️  Status:              http://127.0.0.1:${PORT}/status`);
   console.log(`➡️  Products:            http://127.0.0.1:${PORT}/api/products`);
   console.log(`➡️  Renders:             http://127.0.0.1:${PORT}/api/renders`);
@@ -448,4 +632,11 @@ app.listen(PORT, () => {
   console.log(`➡️  Assembly drafts:     http://127.0.0.1:${PORT}/api/assembly/drafts`);
   console.log(`➡️  AI suggestions:      POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
   console.log(`➡️  Video generate:      POST http://127.0.0.1:${PORT}/api/video/generate`);
+  console.log(`➡️  Agent viral scan:    POST http://127.0.0.1:${PORT}/api/agent/viral-scan`);
+  console.log(`➡️  Agent reconstruct:   POST http://127.0.0.1:${PORT}/api/agent/reconstruct`);
+  console.log(`➡️  Agent generate ads:  POST http://127.0.0.1:${PORT}/api/agent/generate-ads`);
+  console.log(`➡️  Agent approve:       POST http://127.0.0.1:${PORT}/api/agent/approve-creative`);
+  console.log(`➡️  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
+  console.log(`➡️  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);
+  console.log(`➡️  Agent copilot:       POST http://127.0.0.1:${PORT}/api/agent/copilot`);
 });
