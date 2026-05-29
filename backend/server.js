@@ -723,6 +723,491 @@ app.post('/api/media/:id/download', async (req, res) => {
   }
 });
 
+// =========================================================
+// API SERVICES MANAGEMENT — Configuration, Token Tracking,
+// Failover, Alerts
+// =========================================================
+
+// In-memory store for service configs (persisted to Supabase when available)
+const SERVICE_CONFIGS = {
+  // ── Video Rendering ──
+  heygen: {
+    id: 'heygen', name: 'HeyGen', category: 'video',
+    envKey: 'HEYGEN_API_KEY',
+    enabled: true, isPrimary: true,
+    backups: ['runway', 'kling'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'minutes',     costPerUnit: 0.10 },
+      pro:        { limit: 1000,      unit: 'minutes',     costPerUnit: 0.05 },
+      enterprise: { limit: Infinity,  unit: 'minutes',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  runway: {
+    id: 'runway', name: 'Runway', category: 'video',
+    envKey: 'RUNWAY_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['heygen', 'kling'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 5,         unit: 'generations', costPerUnit: 0.10 },
+      pro:        { limit: 100,       unit: 'generations', costPerUnit: 0.05 },
+      enterprise: { limit: Infinity,  unit: 'generations', costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  kling: {
+    id: 'kling', name: 'Kling', category: 'video',
+    envKey: 'KLING_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['heygen', 'runway'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 10,        unit: 'generations', costPerUnit: 0.08 },
+      pro:        { limit: 100,       unit: 'generations', costPerUnit: 0.04 },
+      enterprise: { limit: Infinity,  unit: 'generations', costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  // ── Image Generation ──
+  canva: {
+    id: 'canva', name: 'Canva', category: 'image',
+    envKey: 'CANVA_API_KEY',
+    enabled: true, isPrimary: true,
+    backups: ['openai'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 50,        unit: 'designs',     costPerUnit: 0.05 },
+      pro:        { limit: 500,       unit: 'designs',     costPerUnit: 0.02 },
+      enterprise: { limit: Infinity,  unit: 'designs',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  openai: {
+    id: 'openai', name: 'OpenAI (DALL-E + GPT-4)', category: 'ai',
+    envKey: 'OPENAI_API_KEY',
+    enabled: true, isPrimary: true,
+    backups: ['anthropic', 'gemini'],
+    plan: 'payg',
+    plans: {
+      payg:       { limit: Infinity,  unit: 'tokens',      costPerUnit: 0.00003 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  // ── Social Publishing ──
+  tiktok: {
+    id: 'tiktok', name: 'TikTok API', category: 'social',
+    envKey: 'TIKTOK_API_KEY',
+    enabled: true, isPrimary: true,
+    backups: ['instagram', 'youtube', 'facebook', 'pinterest'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'posts',       costPerUnit: 0.01 },
+      pro:        { limit: 1000,      unit: 'posts',       costPerUnit: 0.005 },
+      enterprise: { limit: Infinity,  unit: 'posts',       costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  instagram: {
+    id: 'instagram', name: 'Instagram API', category: 'social',
+    envKey: 'INSTAGRAM_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['tiktok', 'youtube', 'facebook', 'pinterest'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'posts',       costPerUnit: 0.01 },
+      pro:        { limit: 1000,      unit: 'posts',       costPerUnit: 0.005 },
+      enterprise: { limit: Infinity,  unit: 'posts',       costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  youtube: {
+    id: 'youtube', name: 'YouTube API', category: 'social',
+    envKey: 'YOUTUBE_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['tiktok', 'instagram', 'facebook', 'pinterest'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'uploads',     costPerUnit: 0.01 },
+      pro:        { limit: 1000,      unit: 'uploads',     costPerUnit: 0.005 },
+      enterprise: { limit: Infinity,  unit: 'uploads',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  facebook: {
+    id: 'facebook', name: 'Facebook API', category: 'social',
+    envKey: 'FACEBOOK_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['tiktok', 'instagram', 'youtube', 'pinterest'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'posts',       costPerUnit: 0.01 },
+      pro:        { limit: 1000,      unit: 'posts',       costPerUnit: 0.005 },
+      enterprise: { limit: Infinity,  unit: 'posts',       costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  pinterest: {
+    id: 'pinterest', name: 'Pinterest API', category: 'social',
+    envKey: 'PINTEREST_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['tiktok', 'instagram', 'youtube', 'facebook'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 50,        unit: 'pins',        costPerUnit: 0.02 },
+      pro:        { limit: 500,       unit: 'pins',        costPerUnit: 0.01 },
+      enterprise: { limit: Infinity,  unit: 'pins',        costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  // ── AI / LLM ──
+  anthropic: {
+    id: 'anthropic', name: 'Anthropic Claude', category: 'ai',
+    envKey: 'ANTHROPIC_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['openai', 'gemini'],
+    plan: 'payg',
+    plans: {
+      payg:       { limit: Infinity,  unit: 'tokens',      costPerUnit: 0.000008 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  gemini: {
+    id: 'gemini', name: 'Google Gemini', category: 'ai',
+    envKey: 'GOOGLE_API_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['openai', 'anthropic'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 60,        unit: 'req/min',     costPerUnit: 0 },
+      pro:        { limit: 1000,      unit: 'req/min',     costPerUnit: 0.0000025 },
+      enterprise: { limit: Infinity,  unit: 'req/min',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  // ── Analytics ──
+  shopify_analytics: {
+    id: 'shopify_analytics', name: 'Shopify API', category: 'analytics',
+    envKey: 'SHOPIFY_API_KEY',
+    enabled: true, isPrimary: true,
+    backups: ['google_analytics'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 100,       unit: 'req/min',     costPerUnit: 0 },
+      pro:        { limit: 1000,      unit: 'req/min',     costPerUnit: 0.001 },
+      enterprise: { limit: Infinity,  unit: 'req/min',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  },
+  google_analytics: {
+    id: 'google_analytics', name: 'Google Analytics', category: 'analytics',
+    envKey: 'GOOGLE_ANALYTICS_KEY',
+    enabled: true, isPrimary: false,
+    backups: ['shopify_analytics'],
+    plan: 'free',
+    plans: {
+      free:       { limit: 10000000,  unit: 'hits/mo',     costPerUnit: 0 },
+      pro:        { limit: 100000000, unit: 'hits/mo',     costPerUnit: 0.0000001 },
+      enterprise: { limit: Infinity,  unit: 'hits/mo',     costPerUnit: 0 }
+    },
+    tokensUsed: 0, tokensAdded: 0,
+    resetDay: 1, lastReset: new Date().toISOString()
+  }
+};
+
+// Failover state
+const failoverState = {
+  autoFailover: true,
+  activeOverrides: {},   // serviceId → forced backup id
+  failoverLog: []
+};
+
+// Alerts store
+const alertsStore = [];
+
+// Helper: compute token usage stats for a service
+function getTokenStats(svc) {
+  const planDef = svc.plans[svc.plan] || Object.values(svc.plans)[0];
+  const limit = planDef.limit === Infinity ? null : planDef.limit;
+  const used = svc.tokensUsed;
+  const remaining = limit !== null ? Math.max(0, limit - used) : null;
+  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const cost = used * planDef.costPerUnit;
+  const hasKey = Boolean(process.env[svc.envKey]);
+
+  // Days until reset
+  const now = new Date();
+  const resetDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() >= svc.resetDay ? 1 : 0), svc.resetDay);
+  const daysUntilReset = Math.ceil((resetDate - now) / (1000 * 60 * 60 * 24));
+
+  return {
+    id: svc.id,
+    name: svc.name,
+    category: svc.category,
+    enabled: svc.enabled,
+    isPrimary: svc.isPrimary,
+    backups: svc.backups,
+    plan: svc.plan,
+    plans: svc.plans,
+    hasKey,
+    limit,
+    used,
+    remaining,
+    pct,
+    unit: planDef.unit,
+    costPerUnit: planDef.costPerUnit,
+    estimatedCost: Math.round(cost * 100) / 100,
+    daysUntilReset,
+    status: !svc.enabled ? 'disabled'
+      : !hasKey ? 'no-key'
+      : pct >= 95 ? 'critical'
+      : pct >= 80 ? 'warning'
+      : 'healthy'
+  };
+}
+
+// Helper: check thresholds and generate alerts
+function checkAlerts() {
+  Object.values(SERVICE_CONFIGS).forEach((svc) => {
+    const stats = getTokenStats(svc);
+    if (stats.limit === null) return; // unlimited plans skip
+    if (stats.pct >= 95) {
+      const existing = alertsStore.find((a) => a.serviceId === svc.id && a.level === 'critical' && !a.acknowledged);
+      if (!existing) {
+        alertsStore.push({
+          id: `alert-${Date.now()}-${svc.id}`,
+          serviceId: svc.id,
+          serviceName: svc.name,
+          level: 'critical',
+          message: `${svc.name} is at ${stats.pct}% token usage (${stats.used}/${stats.limit} ${stats.unit}). Auto-failover may activate.`,
+          timestamp: new Date().toISOString(),
+          acknowledged: false
+        });
+      }
+    } else if (stats.pct >= 80) {
+      const existing = alertsStore.find((a) => a.serviceId === svc.id && a.level === 'warning' && !a.acknowledged);
+      if (!existing) {
+        alertsStore.push({
+          id: `alert-${Date.now()}-${svc.id}`,
+          serviceId: svc.id,
+          serviceName: svc.name,
+          level: 'warning',
+          message: `${svc.name} is at ${stats.pct}% token usage (${stats.used}/${stats.limit} ${stats.unit}). Consider adding credits or switching to backup.`,
+          timestamp: new Date().toISOString(),
+          acknowledged: false
+        });
+      }
+    }
+  });
+}
+
+// Helper: resolve active service for a category (respects failover)
+function resolveActiveService(category) {
+  const services = Object.values(SERVICE_CONFIGS).filter((s) => s.category === category);
+  const primary = services.find((s) => s.isPrimary && s.enabled);
+  if (!primary) return services.find((s) => s.enabled) || null;
+
+  const stats = getTokenStats(primary);
+  if (failoverState.autoFailover && (stats.pct >= 95 || !stats.hasKey)) {
+    // Find first available backup
+    for (const backupId of primary.backups) {
+      const backup = SERVICE_CONFIGS[backupId];
+      if (backup && backup.enabled) {
+        const bStats = getTokenStats(backup);
+        if (bStats.pct < 95) {
+          failoverState.failoverLog.push({
+            timestamp: new Date().toISOString(),
+            from: primary.id,
+            to: backupId,
+            reason: stats.pct >= 95 ? 'Token limit reached' : 'No API key configured'
+          });
+          return backup;
+        }
+      }
+    }
+  }
+  return primary;
+}
+
+// ── GET /api/services/config ──
+app.get('/api/services/config', (_req, res) => {
+  noStore(res);
+  const configs = Object.values(SERVICE_CONFIGS).map((svc) => ({
+    ...getTokenStats(svc),
+    resetDay: svc.resetDay,
+    lastReset: svc.lastReset
+  }));
+  res.json({ success: true, count: configs.length, services: configs });
+});
+
+// ── GET /api/services/:serviceId/status ──
+app.get('/api/services/:serviceId/status', (req, res) => {
+  noStore(res);
+  const svc = SERVICE_CONFIGS[req.params.serviceId];
+  if (!svc) return res.status(404).json({ success: false, error: 'Service not found.' });
+  checkAlerts();
+  res.json({ success: true, service: getTokenStats(svc) });
+});
+
+// ── POST /api/services/:serviceId/update-config ──
+app.post('/api/services/:serviceId/update-config', (req, res) => {
+  const svc = SERVICE_CONFIGS[req.params.serviceId];
+  if (!svc) return res.status(404).json({ success: false, error: 'Service not found.' });
+
+  const { enabled, isPrimary, plan, apiKey } = req.body;
+
+  if (typeof enabled === 'boolean') svc.enabled = enabled;
+  if (typeof isPrimary === 'boolean') {
+    // If setting as primary, demote others in same category
+    if (isPrimary) {
+      Object.values(SERVICE_CONFIGS).forEach((s) => {
+        if (s.category === svc.category && s.id !== svc.id) s.isPrimary = false;
+      });
+    }
+    svc.isPrimary = isPrimary;
+  }
+  if (plan && svc.plans[plan]) svc.plan = plan;
+  if (apiKey) {
+    // Store in process.env at runtime (not persisted to disk — use .env for persistence)
+    process.env[svc.envKey] = apiKey;
+  }
+
+  noStore(res);
+  res.json({ success: true, service: getTokenStats(svc), message: `${svc.name} configuration updated.` });
+});
+
+// ── GET /api/services/token-usage ──
+app.get('/api/services/token-usage', (_req, res) => {
+  noStore(res);
+  checkAlerts();
+  const usage = Object.values(SERVICE_CONFIGS).map((svc) => getTokenStats(svc));
+  res.json({ success: true, usage });
+});
+
+// ── POST /api/services/:serviceId/add-credits ──
+app.post('/api/services/:serviceId/add-credits', (req, res) => {
+  const svc = SERVICE_CONFIGS[req.params.serviceId];
+  if (!svc) return res.status(404).json({ success: false, error: 'Service not found.' });
+
+  const amount = Math.max(1, Number(req.body.amount) || 0);
+  svc.tokensAdded += amount;
+  svc.tokensUsed = Math.max(0, svc.tokensUsed - amount);
+
+  // Acknowledge any resolved alerts
+  alertsStore.forEach((a) => {
+    if (a.serviceId === svc.id) a.acknowledged = true;
+  });
+
+  noStore(res);
+  res.json({
+    success: true,
+    service: getTokenStats(svc),
+    message: `${amount} ${Object.values(svc.plans)[0].unit} added to ${svc.name}.`
+  });
+});
+
+// ── GET /api/services/failover-status ──
+app.get('/api/services/failover-status', (_req, res) => {
+  noStore(res);
+  const categories = [...new Set(Object.values(SERVICE_CONFIGS).map((s) => s.category))];
+  const activeServices = {};
+  categories.forEach((cat) => {
+    const active = resolveActiveService(cat);
+    if (active) activeServices[cat] = getTokenStats(active);
+  });
+  res.json({
+    success: true,
+    autoFailover: failoverState.autoFailover,
+    activeOverrides: failoverState.activeOverrides,
+    activeServices,
+    failoverLog: failoverState.failoverLog.slice(-20)
+  });
+});
+
+// ── POST /api/services/failover/toggle ──
+app.post('/api/services/failover/toggle', (req, res) => {
+  const { enabled } = req.body;
+  failoverState.autoFailover = typeof enabled === 'boolean' ? enabled : !failoverState.autoFailover;
+  noStore(res);
+  res.json({
+    success: true,
+    autoFailover: failoverState.autoFailover,
+    message: `Auto-failover ${failoverState.autoFailover ? 'enabled' : 'disabled'}.`
+  });
+});
+
+// ── POST /api/services/failover/switch ──
+app.post('/api/services/failover/switch', (req, res) => {
+  const { fromServiceId, toServiceId } = req.body;
+  if (!fromServiceId || !toServiceId) {
+    return res.status(400).json({ success: false, error: 'fromServiceId and toServiceId are required.' });
+  }
+  const from = SERVICE_CONFIGS[fromServiceId];
+  const to   = SERVICE_CONFIGS[toServiceId];
+  if (!from || !to) return res.status(404).json({ success: false, error: 'One or both services not found.' });
+
+  failoverState.activeOverrides[from.category] = toServiceId;
+  failoverState.failoverLog.push({
+    timestamp: new Date().toISOString(),
+    from: fromServiceId,
+    to: toServiceId,
+    reason: 'Manual switch'
+  });
+
+  noStore(res);
+  res.json({
+    success: true,
+    message: `Manually switched from ${from.name} to ${to.name}.`,
+    activeService: getTokenStats(to)
+  });
+});
+
+// ── GET /api/services/alerts ──
+app.get('/api/services/alerts', (_req, res) => {
+  noStore(res);
+  checkAlerts();
+  const unread = alertsStore.filter((a) => !a.acknowledged);
+  res.json({ success: true, count: unread.length, alerts: alertsStore.slice(-50) });
+});
+
+// ── POST /api/services/alerts/acknowledge ──
+app.post('/api/services/alerts/acknowledge', (req, res) => {
+  const { alertId, all } = req.body;
+  if (all) {
+    alertsStore.forEach((a) => { a.acknowledged = true; });
+  } else if (alertId) {
+    const alert = alertsStore.find((a) => a.id === alertId);
+    if (alert) alert.acknowledged = true;
+  }
+  noStore(res);
+  res.json({ success: true, message: 'Alert(s) acknowledged.' });
+});
+
+// ── POST /api/services/:serviceId/consume-tokens (internal helper) ──
+app.post('/api/services/:serviceId/consume-tokens', (req, res) => {
+  const svc = SERVICE_CONFIGS[req.params.serviceId];
+  if (!svc) return res.status(404).json({ success: false, error: 'Service not found.' });
+  const amount = Math.max(0, Number(req.body.amount) || 1);
+  svc.tokensUsed += amount;
+  checkAlerts();
+  noStore(res);
+  res.json({ success: true, service: getTokenStats(svc) });
+});
+
 // -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
@@ -782,4 +1267,14 @@ app.listen(PORT, () => {
   console.log(`➡️  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
   console.log(`➡️  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
   console.log(`➡️  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
+  console.log(`➡️  Services config:     http://127.0.0.1:${PORT}/api/services/config`);
+  console.log(`➡️  Services token use:  http://127.0.0.1:${PORT}/api/services/token-usage`);
+  console.log(`➡️  Service status:      http://127.0.0.1:${PORT}/api/services/:id/status`);
+  console.log(`➡️  Update service:      POST http://127.0.0.1:${PORT}/api/services/:id/update-config`);
+  console.log(`➡️  Add credits:         POST http://127.0.0.1:${PORT}/api/services/:id/add-credits`);
+  console.log(`➡️  Failover status:     http://127.0.0.1:${PORT}/api/services/failover-status`);
+  console.log(`➡️  Failover toggle:     POST http://127.0.0.1:${PORT}/api/services/failover/toggle`);
+  console.log(`➡️  Failover switch:     POST http://127.0.0.1:${PORT}/api/services/failover/switch`);
+  console.log(`➡️  Alerts:              http://127.0.0.1:${PORT}/api/services/alerts`);
+  console.log(`➡️  Ack alerts:          POST http://127.0.0.1:${PORT}/api/services/alerts/acknowledge`);
 });
