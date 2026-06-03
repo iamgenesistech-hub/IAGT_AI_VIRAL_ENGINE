@@ -39,15 +39,15 @@ function normalizeDimension(config = {}) {
   return { width: 1920, height: 1080 };
 }
 
-function normalizeStatusPayload(payload = {}) {
+function normalizeHeyGenStatus(payload = {}, fallbackVideoId = null) {
   const data = payload.data || payload;
   const status = data.status || payload.status || 'unknown';
   return {
-    video_id: data.id || data.video_id || payload.video_id || null,
+    video_id: data.id || data.video_id || payload.video_id || fallbackVideoId,
     status,
     video_url: data.video_url || data.video_url_caption || null,
     thumbnail_url: data.thumbnail_url || null,
-    duration: data.duration || null,
+    duration: data.duration === undefined || data.duration === null ? null : data.duration,
     error: data.error || payload.error || null,
     raw: payload
   };
@@ -63,20 +63,23 @@ async function parseJsonResponse(response) {
   }
 }
 
-async function heygenFetch(path, options = {}, attempt = 1) {
+function getHeyGenApiKey() {
   const apiKey = process.env.HEYGEN_API_KEY;
   if (!apiKey) {
     const error = new Error('HEYGEN_API_KEY is not configured.');
     error.code = 'HEYGEN_API_KEY_MISSING';
     throw error;
   }
+  return apiKey;
+}
 
+async function heygenFetch(path, options = {}, attempt = 1) {
   const response = await fetch(HEYGEN_API_BASE + path, {
     ...options,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      'X-Api-Key': apiKey,
+      'X-Api-Key': getHeyGenApiKey(),
       ...(options.headers || {})
     }
   });
@@ -106,13 +109,12 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
   if (!voice_id) throw new Error('voice_id is required.');
 
   const idempotencyKey = createIdempotencyKey({ script: cleanScript, avatar_id, voice_id, config });
-  const avatarStyle = config.avatar_style || config.avatarStyle || 'normal';
   const payload = {
     video_inputs: [{
       character: {
         type: 'avatar',
         avatar_id,
-        avatar_style: avatarStyle
+        avatar_style: config.avatar_style || config.avatarStyle || 'normal'
       },
       voice: {
         type: 'text',
@@ -126,16 +128,16 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
     test: Boolean(config.test)
   };
 
-  const data = await heygenFetch('/v2/video/generate', {
+  const response = await heygenFetch('/v2/video/generate', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(payload)
   });
 
-  const videoId = data?.data?.video_id || data?.video_id || null;
+  const videoId = response?.data?.video_id || response?.video_id || null;
   if (!videoId) {
     const error = new Error('HeyGen accepted the request but did not return data.video_id.');
-    error.payload = data;
+    error.payload = response;
     throw error;
   }
 
@@ -145,24 +147,16 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
     video_url: null,
     thumbnail_url: null,
     duration: null,
+    error: null,
     idempotency_key: idempotencyKey,
-    raw: data
+    raw: response
   };
 }
 
 async function getHeyGenVideoStatus(videoId) {
   if (!videoId) throw new Error('video_id is required.');
-  const payload = await heygenFetch('/v1/video_status.get?video_id=' + encodeURIComponent(videoId), { method: 'GET' });
-  const normalized = normalizeStatusPayload(payload);
-  return {
-    video_id: normalized.video_id || videoId,
-    status: normalized.status,
-    video_url: normalized.video_url,
-    thumbnail_url: normalized.thumbnail_url,
-    duration: normalized.duration,
-    error: normalized.error,
-    raw: normalized.raw
-  };
+  const response = await heygenFetch('/v1/video_status.get?video_id=' + encodeURIComponent(videoId), { method: 'GET' });
+  return normalizeHeyGenStatus(response, videoId);
 }
 
 async function pollHeyGenVideo({ video_id, timeoutMs = DEFAULT_TIMEOUT_MS, initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS, maxBackoffMs = DEFAULT_MAX_BACKOFF_MS }) {
