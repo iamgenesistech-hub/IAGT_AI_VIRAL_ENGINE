@@ -8,7 +8,7 @@ const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
-const { renderInternalVideo } = require('./internalVideoRenderer');
+const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
 
 const app = express();
 const PORT = process.env.PORT || 4175;
@@ -434,173 +434,140 @@ app.post('/api/assembly/suggestions', async (req, res) => {
 });
 
 // -------------------------
-// /api/video/generate — send to HeyGen / Runway / Kling
+// /api/video/generate — submit HeyGen render and track status
 // -------------------------
 app.post('/api/video/generate', async (req, res) => {
   try {
-    const { platform, components, duration, style, voice, background, aspect } = req.body;
+    const body = req.body || {};
+    const script = String(body.script || (Array.isArray(body.components) ? body.components.map((c) => c && c.text).filter(Boolean).join('\\n\\n') : '')).trim();
+    const config = body.config || {};
+    const shouldWait = body.wait_for_completion === true || body.waitForCompletion === true;
 
-    if (!platform || !components || !components.length) {
-      return res.status(400).json({ success: false, error: 'platform and components are required.' });
+    if (!script) {
+      return res.status(400).json({ success: false, error: 'script is required.' });
+    }
+    if (!avatar_id) {
+      return res.status(400).json({ success: false, error: 'avatar_id/avatar is required.' });
+    }
+    if (!voice_id) {
+      return res.status(400).json({ success: false, error: 'voice_id/voice is required.' });
     }
 
-    const script = components.map((c) => c.text).join('\n\n');
-    const platformKey = (platform || '').toLowerCase();
+    const renderConfig = {
+      ...config,
+      aspect: body.aspect || config.aspect || config.aspect_ratio,
+      dimension: body.dimension || config.dimension,
+      background: body.background || config.background,
+      caption: body.caption ?? config.caption,
+      test: body.test ?? config.test,
+      idempotency_key: body.idempotency_key || body.idempotencyKey || config.idempotency_key || config.idempotencyKey
+    };
 
-    let videoUrl = null;
-    let jobId = null;
-    let renderSource = platformKey;
-    let providerAttempted = false;
-    let providerError = null;
-    let providerResponseSummary = null;
+    const startResult = await startHeyGenRender({ script, avatar_id, voice_id, config: renderConfig });
+    const now = new Date().toISOString();
+    const draftPayload = {
+      video_id: startResult.video_id,
+      script_text: script,
+      avatar_id,
+      voice_id,
+      status: 'rendering',
+      video_url: null,
+      thumbnail_url: null,
+      duration: null,
+      error_message: null,
+      idempotency_key: startResult.idempotency_key,
+      created_at: now,
+      updated_at: now
+    };
 
-    if (platformKey === 'heygen') {
-      const heygenKey = process.env.HEYGEN_API_KEY;
-      if (heygenKey) {
-        providerAttempted = true;
-        try {
-          const allowedAvatarStyles = new Set(['circle', 'closeUp', 'full', 'normal', 'voiceOnly']);
-          const heygenAvatarStyle = allowedAvatarStyles.has(process.env.HEYGEN_AVATAR_STYLE)
-            ? process.env.HEYGEN_AVATAR_STYLE
-            : 'normal';
-          const payload = {
-            video_inputs: [{
-              character: { type: 'avatar', avatar_id: process.env.HEYGEN_AVATAR_ID || 'default', avatar_style: heygenAvatarStyle },
-              voice: { type: 'text', input_text: script, voice_id: process.env.HEYGEN_VOICE_ID || (voice === 'Male' ? 'en-US-GuyNeural' : 'en-US-JennyNeural') },
-              background: { type: 'color', value: '#ffffff' }
-            }],
-            dimension: aspect === '9:16' ? { width: 1080, height: 1920 } : aspect === '1:1' ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 },
-            aspect_ratio: aspect || '9:16'
-          };
-          const heygenRes = await fetch('https://api.heygen.com/v2/video/generate', {
-            method: 'POST',
-            headers: { 'X-Api-Key': heygenKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const heygenText = await heygenRes.text();
-          let heygenData = null;
-          try {
-            heygenData = heygenText ? JSON.parse(heygenText) : null;
-          } catch (_) {
-            heygenData = { raw: heygenText.slice(0, 500) };
-          }
-          if (heygenRes.ok) {
-            jobId = heygenData?.data?.video_id;
-            videoUrl = heygenData?.data?.video_url || null;
-            providerResponseSummary = {
-              provider: 'heygen',
-              status: heygenRes.status,
-              topLevelKeys: heygenData && typeof heygenData === 'object' ? Object.keys(heygenData) : [],
-              dataKeys: heygenData?.data && typeof heygenData.data === 'object' ? Object.keys(heygenData.data) : [],
-              videoId: heygenData?.data?.video_id || null,
-              hasVideoUrl: Boolean(heygenData?.data?.video_url)
-            };
-            if (!jobId && !videoUrl) {
-              providerError = {
-                provider: 'heygen',
-                status: 'missing_video_reference',
-                message: 'HeyGen accepted the request but did not return data.video_id or data.video_url.',
-                responseSummary: providerResponseSummary
-              };
-            }
-          } else {
-            providerError = {
-              provider: 'heygen',
-              status: heygenRes.status,
-              message: heygenData?.message || heygenData?.error || heygenData?.raw || 'HeyGen request failed'
-            };
-          }
-        } catch (error) {
-          providerError = { provider: 'heygen', status: 'request_failed', message: error.message };
-        }
-      } else {
-        providerError = { provider: 'heygen', status: 'missing_key', message: 'HEYGEN_API_KEY is not configured.' };
-      }
-    } else if (platformKey === 'runway') {
-      const runwayKey = process.env.RUNWAY_API_KEY;
-      if (runwayKey) {
-        const runwayRes = await fetch('https://api.runwayml.com/v1/image_to_video', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${runwayKey}`, 'Content-Type': 'application/json', 'X-Runway-Version': '2024-11-06' },
-          body: JSON.stringify({
-            promptText: script,
-            model: 'gen3a_turbo',
-            duration: parseInt(duration) || 10,
-            ratio: aspect === '9:16' ? '768:1280' : aspect === '1:1' ? '1280:1280' : '1280:768'
-          })
-        });
-        if (runwayRes.ok) {
-          const runwayData = await runwayRes.json();
-          jobId = runwayData.id;
-          videoUrl = runwayData.output ? runwayData.output[0] : null;
-        }
-      }
-    } else if (platformKey === 'kling') {
-      const klingKey = process.env.KLING_API_KEY;
-      if (klingKey) {
-        const klingRes = await fetch('https://api.klingai.com/v1/videos/text2video', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${klingKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model_name: 'kling-v1',
-            prompt: script,
-            duration: parseInt(duration) || 10,
-            aspect_ratio: aspect || '9:16',
-            mode: 'std'
-          })
-        });
-        if (klingRes.ok) {
-          const klingData = await klingRes.json();
-          jobId = klingData.data?.task_id;
-          videoUrl = klingData.data?.video_url || null;
-        }
-      }
+    const { data: draftRows, error: draftError } = await SupabaseConnector
+      .from('video_assembly_drafts')
+      .upsert([draftPayload], { onConflict: 'idempotency_key' })
+      .select();
+
+    if (draftError) throw new Error(draftError.message);
+
+    let result = startResult;
+    if (shouldWait) {
+      const completed = await pollHeyGenVideo({ video_id: startResult.video_id });
+      const status = completed.status === 'completed' ? 'completed' : completed.status === 'failed' ? 'failed' : 'rendering';
+      const errorMessage = completed.error ? (completed.error.message || completed.error.detail || JSON.stringify(completed.error)) : null;
+      const { data: updatedRows, error: updateError } = await SupabaseConnector
+        .from('video_assembly_drafts')
+        .update({
+          status,
+          video_url: completed.video_url || null,
+          thumbnail_url: completed.thumbnail_url || null,
+          duration: completed.duration || null,
+          error_message: errorMessage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('video_id', startResult.video_id)
+        .select();
+      if (updateError) throw new Error(updateError.message);
+      result = { ...completed, draft: updatedRows ? updatedRows[0] : null };
     }
-
-    if (!videoUrl && !jobId) {
-      try {
-        const internalRender = await renderInternalVideo({ components, duration, style, aspect });
-        videoUrl = internalRender.url;
-        jobId = internalRender.filename;
-      } catch (error) {
-        videoUrl = '/generated/evics-sea-moss-proof-render.mp4';
-        jobId = `internal-proof-fallback-${Date.now()}`;
-      }
-      renderSource = 'internal';
-    }
-
-    const renderLog = await insertRenderRecord({
-      platform: renderSource,
-      job_id: jobId,
-      video_url: videoUrl,
-      status: renderSource === 'heygen' && jobId && !videoUrl ? 'submitted' : 'complete',
-      script,
-      parameters: { duration, style, voice, background, aspect },
-      media_type: 'video',
-      source: 'evics-video-generate'
-    });
-    const renderRow = renderLog.data;
-    const renderLogError = renderLog.error;
 
     noStore(res);
-    res.json({
+    return res.status(202).json({
       success: true,
-      platform: renderSource,
-      jobId,
-      url: videoUrl,
-      status: renderSource === 'heygen' && jobId && !videoUrl ? 'submitted' : 'complete',
-      renderId: renderRow ? renderRow[0]?.id : null,
-      renderLogError,
-      renderLogColumns: renderLog.columnsUsed,
-      providerAttempted,
-      providerError,
-      providerResponseSummary,
-      message: renderSource === 'internal'
-        ? 'EVICS internal proof video generated with audio.'
-        : `Video generated on ${platform}.`
+      provider: 'heygen',
+      video_id: result.video_id || startResult.video_id,
+      status: result.status || 'rendering',
+      video_url: result.video_url || null,
+      thumbnail_url: result.thumbnail_url || null,
+      duration: result.duration || null,
+      idempotency_key: startResult.idempotency_key,
+      draft: result.draft || (draftRows ? draftRows[0] : null),
+      status_url: '/api/video/status/' + (result.video_id || startResult.video_id)
     });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message || String(e) });
+    const statusCode = e.code === 'HEYGEN_API_KEY_MISSING' ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    return res.status(statusCode).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+app.get('/api/video/status/:videoId', async (req, res) => {
+  try {
+    const videoId = req.params.videoId;
+    if (!videoId) {
+      return res.status(400).json({ success: false, error: 'videoId is required.' });
+    }
+
+    const statusResult = await getHeyGenVideoStatus(videoId);
+    const normalizedStatus = statusResult.status === 'completed' ? 'completed' : statusResult.status === 'failed' ? 'failed' : 'rendering';
+    const errorMessage = statusResult.error ? (statusResult.error.message || statusResult.error.detail || JSON.stringify(statusResult.error)) : null;
+
+    const { data: updatedRows, error: updateError } = await SupabaseConnector
+      .from('video_assembly_drafts')
+      .update({
+        status: normalizedStatus,
+        video_url: statusResult.video_url || null,
+        thumbnail_url: statusResult.thumbnail_url || null,
+        duration: statusResult.duration || null,
+        error_message: errorMessage,
+        updated_at: new Date().toISOString()
+      })
+      .eq('video_id', videoId)
+      .select();
+
+    if (updateError) throw new Error(updateError.message);
+
+    noStore(res);
+    return res.json({
+      success: true,
+      provider: 'heygen',
+      video_id: videoId,
+      status: normalizedStatus,
+      video_url: statusResult.video_url || null,
+      thumbnail_url: statusResult.thumbnail_url || null,
+      duration: statusResult.duration || null,
+      error_message: errorMessage,
+      draft: updatedRows ? updatedRows[0] : null
+    });
+  } catch (e) {
+    const statusCode = e.code === 'HEYGEN_API_KEY_MISSING' ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    return res.status(statusCode).json({ success: false, error: e.message || String(e) });
   }
 });
 
