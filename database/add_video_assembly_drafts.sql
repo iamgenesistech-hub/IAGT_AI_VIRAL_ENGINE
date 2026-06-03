@@ -1,5 +1,5 @@
 -- Creates persistent tracking for HeyGen video assembly/render jobs.
--- Includes legacy draft columns because existing /api/assembly/drafts also writes to this table.
+-- Legacy draft columns are included because existing /api/assembly/drafts also writes to this table.
 CREATE TABLE IF NOT EXISTS video_assembly_drafts (
   id BIGSERIAL PRIMARY KEY,
   video_id TEXT UNIQUE,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS video_assembly_drafts (
   status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'rendering', 'completed', 'failed')),
   video_url TEXT,
   thumbnail_url TEXT,
-  duration TEXT,
+  duration NUMERIC,
   error_message TEXT,
   idempotency_key TEXT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -439,9 +439,11 @@ app.post('/api/assembly/suggestions', async (req, res) => {
 app.post('/api/video/generate', async (req, res) => {
   try {
     const body = req.body || {};
-    const script = String(body.script || (Array.isArray(body.components) ? body.components.map((c) => c && c.text).filter(Boolean).join('\\n\\n') : '')).trim();
+    const script = String(body.script || (Array.isArray(body.components) ? body.components.map((component) => component && component.text).filter(Boolean).join('\n\n') : '')).trim();
+    const avatar_id = body.avatar_id || body.avatar || body.heygenAvatarId || process.env.HEYGEN_AVATAR_ID;
+    const voice_id = body.voice_id || body.voice || body.heygenVoiceId || process.env.HEYGEN_VOICE_ID;
     const config = body.config || {};
-    const shouldWait = body.wait_for_completion === true || body.waitForCompletion === true;
+    const waitForCompletion = body.wait_for_completion === true || body.waitForCompletion === true;
 
     if (!script) {
       return res.status(400).json({ success: false, error: 'script is required.' });
@@ -488,14 +490,14 @@ app.post('/api/video/generate', async (req, res) => {
     if (draftError) throw new Error(draftError.message);
 
     let result = startResult;
-    if (shouldWait) {
+    if (waitForCompletion) {
       const completed = await pollHeyGenVideo({ video_id: startResult.video_id });
-      const status = completed.status === 'completed' ? 'completed' : completed.status === 'failed' ? 'failed' : 'rendering';
+      const normalizedStatus = completed.status === 'completed' ? 'completed' : completed.status === 'failed' ? 'failed' : 'rendering';
       const errorMessage = completed.error ? (completed.error.message || completed.error.detail || JSON.stringify(completed.error)) : null;
       const { data: updatedRows, error: updateError } = await SupabaseConnector
         .from('video_assembly_drafts')
         .update({
-          status,
+          status: normalizedStatus,
           video_url: completed.video_url || null,
           thumbnail_url: completed.thumbnail_url || null,
           duration: completed.duration || null,
@@ -505,7 +507,7 @@ app.post('/api/video/generate', async (req, res) => {
         .eq('video_id', startResult.video_id)
         .select();
       if (updateError) throw new Error(updateError.message);
-      result = { ...completed, draft: updatedRows ? updatedRows[0] : null };
+      result = { ...completed, status: normalizedStatus, draft: updatedRows ? updatedRows[0] : null };
     }
 
     noStore(res);
