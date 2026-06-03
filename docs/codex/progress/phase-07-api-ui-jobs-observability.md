@@ -2,7 +2,7 @@
 
 ## Summary
 - Added EVICS + EVIE health, contracts, ranking, prompt forge, action flow, wisdom, evidence index, and Copilot orchestration APIs.
-- Existing dashboard and Live Ops remain available at localhost:4173.
+- Existing dashboard and Live Ops remain available at localhost:4175.
 - Existing scanner job controls remain preserved.
 
 ## Files Changed
