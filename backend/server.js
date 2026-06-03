@@ -14,6 +14,18 @@ const app = express();
 const PORT = process.env.PORT || 4175;
 
 app.use(express.json());
+
+// Serve config.js dynamically with server environment variables to prevent race conditions on the dashboard
+app.get('/config.js', (_req, res) => {
+  res.type('application/javascript');
+  res.send(`
+window.IAGT_CONFIG = {
+  supabaseUrl: "${process.env.SUPABASE_URL || ''}",
+  supabaseAnonKey: "${process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''}"
+};
+  `);
+});
+
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
 app.use('/generated', express.static(path.join(__dirname, '../generated')));
 app.use('/evidence', express.static(path.join(__dirname, '../evidence')));

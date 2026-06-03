@@ -7,10 +7,12 @@ function requirePackage(name) {
   try {
     return require(name);
   } catch (error) {
-    const bridgeNodeModules =
-      process.env.NODE_PATH ||
-      'C:\\Users\\rolan\\Documents\\Codex\\2026-05-29\\can-you-access-my-github-for\\IAGT_AI_VIRAL_ENGINE-git\\node_modules';
-    return createRequire(path.join(bridgeNodeModules, 'package.json'))(name);
+    try {
+      const parentNodeModules = path.join(__dirname, '../node_modules');
+      return createRequire(path.join(parentNodeModules, 'package.json'))(name);
+    } catch (e) {
+      throw new Error(`Failed to resolve package "${name}": ${error.message}`);
+    }
   }
 }
 

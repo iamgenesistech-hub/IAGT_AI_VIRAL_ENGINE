@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { shopifyApp } = require('@shopify/shopify-app-express');
-const SupabaseSessionStorage = require('./SupabaseSessionStorage');
+const SupabaseSessionStorage = require('./supabaseSessionStorage');
 
 if (!process.env.SHOPIFY_CLIENT_ID) {
   throw new Error('Missing SHOPIFY_CLIENT_ID');

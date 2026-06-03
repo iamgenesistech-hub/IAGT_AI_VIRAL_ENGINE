@@ -8,7 +8,7 @@
     "visualStyle": 80,
     "overall": 80
   },
-  "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
+  "dataDir": "./data/evics-evie",
   "wisdomVersion": 173,
   "promptVersionCount": 86,
   "learningCount": 86,
