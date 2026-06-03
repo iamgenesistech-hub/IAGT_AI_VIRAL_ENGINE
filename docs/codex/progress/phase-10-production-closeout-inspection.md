@@ -6,7 +6,7 @@
 - Current code paths inspected: Shopify diagnostics/reconnect/callback, Supabase render persistence, EVICS + EVIE shared core, mocked render flow, and closeout validation script.
 
 ## Already Working
-- EVICS boots locally on port 4173.
+- EVICS boots locally on port 4175.
 - EVICS scanner controls, Live Ops UI, and proof video path are present.
 - EVIE faceless intelligence, ranking, prompt forge, action flow, and wisdom memory are operational.
 - Copilot routes through `/api/copilot/orchestrate` and remains the parent responder.
