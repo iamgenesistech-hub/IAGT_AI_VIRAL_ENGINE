@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const llmProvider = require('../utils/llmProvider');
 
 const ROOT = path.join(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data', 'evics-evie');
@@ -185,10 +186,10 @@ function writeWisdom(wisdom) {
   return next;
 }
 
-function buildPrompt(ranking, directive = {}) {
+function buildTemplatePrompt(ranking, directive = {}) {
   const prompt = {
     id: canonicalId('prompt', { rankingId: ranking.id, directive }),
-    version: `prompt-${Date.now()}`,
+    version: 'prompt-' + Date.now(),
     rankingId: ranking.id,
     system: 'EVICS_EVIE_SHARED_PROMPT_FORGE',
     mode: ranking.format.faceless ? 'faceless' : 'creator-led',
@@ -197,52 +198,144 @@ function buildPrompt(ranking, directive = {}) {
     formatId: ranking.format.id,
     qualityGates: QUALITY_GATES,
     text: [
-      `Create a ${ranking.format.visualStyle} ad for ${ranking.product.name}.`,
-      `Hook pattern: ${ranking.format.hookPattern}`,
-      `Pacing: ${ranking.format.pacingPattern}`,
-      `CTA: ${ranking.format.ctaPattern}`,
-      `Compliance: ${ranking.product.complianceNotes.join('; ')}`,
-      `Operator directive: ${directive.operatorCommand || 'build review-ready creative'}`
+      'Create a ' + ranking.format.visualStyle + ' ad for ' + ranking.product.name + '.',
+      'Hook pattern: ' + ranking.format.hookPattern,
+      'Pacing: ' + ranking.format.pacingPattern,
+      'CTA: ' + ranking.format.ctaPattern,
+      'Compliance: ' + ranking.product.complianceNotes.join('; '),
+      'Operator directive: ' + (directive.operatorCommand || 'build review-ready creative')
     ].join('\n'),
-    createdAt: nowIso()
+    createdAt: nowIso(),
+    source: 'template'
   };
   const wisdom = readWisdom();
-  wisdom.promptVersions.push({
-    id: prompt.id,
-    version: prompt.version,
-    rankingId: ranking.id,
-    createdAt: prompt.createdAt
-  });
+  wisdom.promptVersions.push({ id: prompt.id, version: prompt.version, rankingId: ranking.id, createdAt: prompt.createdAt, source: prompt.source });
   writeWisdom(wisdom);
   return prompt;
 }
 
-function buildScript(prompt, ranking) {
+async function buildPrompt(ranking, directive = {}) {
+  let feedback = null;
+  let lastPrompt = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const llmOutput = await llmProvider.generatePrompt({ ranking, directive, feedback });
+      const prompt = {
+        id: canonicalId('prompt', { rankingId: ranking.id, directive, source: 'llm', attempt }),
+        version: 'prompt-llm-' + Date.now() + '-' + (attempt + 1),
+        rankingId: ranking.id,
+        system: 'EVICS_EVIE_OPENAI_PROMPT_FORGE',
+        mode: ranking.format.faceless ? 'faceless' : 'creator-led',
+        productId: ranking.product.id,
+        creatorId: ranking.creator.id,
+        formatId: ranking.format.id,
+        qualityGates: QUALITY_GATES,
+        text: String(llmOutput.text || '').trim(),
+        creativeAngle: llmOutput.creative_angle || llmOutput.creativeAngle || null,
+        hook: llmOutput.hook || null,
+        visualStyle: llmOutput.visual_style || ranking.format.visualStyle,
+        pacing: llmOutput.pacing || ranking.format.pacingPattern,
+        cta: llmOutput.cta || ranking.format.ctaPattern,
+        complianceNotes: llmOutput.compliance_notes || ranking.product.complianceNotes,
+        llm: llmOutput.llm,
+        createdAt: nowIso(),
+        source: 'llm'
+      };
+      lastPrompt = prompt;
+      if (prompt.text.length >= 80 && prompt.text.includes(ranking.product.name)) {
+        const wisdom = readWisdom();
+        wisdom.promptVersions.push({ id: prompt.id, version: prompt.version, rankingId: ranking.id, createdAt: prompt.createdAt, source: prompt.source, llm: prompt.llm });
+        writeWisdom(wisdom);
+        return prompt;
+      }
+      feedback = 'Prompt must be at least 80 characters and explicitly include the product name.';
+    } catch (error) {
+      feedback = error.message;
+      console.warn('[EVICS Evie] LLM prompt generation failed, retrying if possible:', error.message);
+    }
+  }
+  console.warn('[EVICS Evie] Falling back to template prompt generation after LLM failure or invalid output.');
+  const prompt = buildTemplatePrompt(ranking, directive);
+  prompt.warning = 'LLM prompt generation failed; template fallback used.';
+  if (lastPrompt && lastPrompt.llm) prompt.lastLlmAttempt = lastPrompt.llm;
+  return prompt;
+}
+
+function buildTemplateScript(prompt, ranking) {
   const hook = ranking.format.faceless
-    ? `No face. Just the ${ranking.product.category.toLowerCase()} ritual I keep repeating.`
+    ? 'No face. Just the ' + ranking.product.category.toLowerCase() + ' ritual I keep repeating.'
     : ranking.format.hookPattern.replace('[specific support angle]', ranking.product.benefits[0]);
   const scenes = [
-    { id: canonicalId('scene', `${prompt.id}:hook`), type: 'hook', text: hook, seconds: '0-2' },
-    { id: canonicalId('scene', `${prompt.id}:proof`), type: 'proof', text: `Show ${ranking.product.name} as a practical daily ritual.`, seconds: '2-6' },
-    { id: canonicalId('scene', `${prompt.id}:reason`), type: 'reason', text: ranking.reasonSummary.join(' '), seconds: '6-8' },
-    { id: canonicalId('scene', `${prompt.id}:cta`), type: 'cta', text: ranking.format.ctaPattern, seconds: '8-10' }
+    { id: canonicalId('scene', prompt.id + ':hook'), type: 'hook', text: hook, seconds: '0-2' },
+    { id: canonicalId('scene', prompt.id + ':proof'), type: 'proof', text: 'Show ' + ranking.product.name + ' as a practical daily ritual.', seconds: '2-6' },
+    { id: canonicalId('scene', prompt.id + ':benefit'), type: 'benefit', text: ranking.product.benefits.join(' • '), seconds: '6-12' },
+    { id: canonicalId('scene', prompt.id + ':cta'), type: 'cta', text: ranking.format.ctaPattern, seconds: '12-15' }
   ];
   return {
-    id: canonicalId('script', { promptId: prompt.id, scenes }),
+    id: canonicalId('script', prompt.id),
     promptId: prompt.id,
     rankingId: ranking.id,
-    hook,
     scenes,
-    qualityScores: {
-      hookStrength: 86,
-      pacing: 82,
-      ctaClarity: 84,
-      visualStyle: ranking.format.faceless ? 88 : 86,
-      overall: 86
-    },
-    status: 'script-ready',
-    createdAt: nowIso()
+    voiceover: scenes.map(scene => scene.text).join(' '),
+    captions: scenes.map(scene => scene.text.slice(0, 80)),
+    quality: evaluateQuality(ranking),
+    compliance: evaluateCompliance(ranking),
+    createdAt: nowIso(),
+    source: 'template'
   };
+}
+
+async function buildScript(prompt, ranking) {
+  let feedback = null;
+  let lastScript = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const llmOutput = await llmProvider.generateScript({ prompt, ranking, feedback });
+      const rawScenes = Array.isArray(llmOutput.scenes) && llmOutput.scenes.length > 0
+        ? llmOutput.scenes
+        : [
+            { type: 'hook', text: llmOutput.hook || prompt.hook || prompt.text, seconds: '0-2' },
+            { type: 'body', text: llmOutput.voiceover || prompt.text, seconds: '2-12' },
+            { type: 'cta', text: llmOutput.cta || ranking.format.ctaPattern, seconds: '12-15' }
+          ];
+      const scenes = rawScenes.map((scene, index) => ({
+        id: canonicalId('scene', prompt.id + ':llm:' + attempt + ':' + index),
+        type: scene.type || (index === 0 ? 'hook' : 'body'),
+        text: String(scene.text || '').trim(),
+        seconds: scene.seconds || scene.timing || null
+      })).filter(scene => scene.text);
+      const script = {
+        id: canonicalId('script', { promptId: prompt.id, source: 'llm', attempt }),
+        promptId: prompt.id,
+        rankingId: ranking.id,
+        scenes,
+        voiceover: String(llmOutput.voiceover || scenes.map(scene => scene.text).join(' ')).trim(),
+        captions: Array.isArray(llmOutput.captions) && llmOutput.captions.length > 0 ? llmOutput.captions : scenes.map(scene => scene.text.slice(0, 80)),
+        cta: llmOutput.cta || ranking.format.ctaPattern,
+        quality: evaluateQuality(ranking),
+        compliance: evaluateCompliance(ranking),
+        llm: llmOutput.llm,
+        createdAt: nowIso(),
+        source: 'llm'
+      };
+      lastScript = script;
+      const failures = [];
+      if (!script.voiceover || script.voiceover.length < 80) failures.push('voiceover is too short');
+      if (script.scenes.length < 3) failures.push('script needs at least 3 timed scenes');
+      if (script.quality.overall < QUALITY_GATES.overall) failures.push('quality gate overall ' + script.quality.overall + ' < ' + QUALITY_GATES.overall);
+      if (!script.compliance.passed) failures.push('compliance gate failed: ' + script.compliance.flags.join(', '));
+      if (failures.length === 0) return script;
+      feedback = failures.join('; ');
+    } catch (error) {
+      feedback = error.message;
+      console.warn('[EVICS Evie] LLM script generation failed, retrying if possible:', error.message);
+    }
+  }
+  console.warn('[EVICS Evie] Falling back to template script generation after LLM failure or invalid output.');
+  const script = buildTemplateScript(prompt, ranking);
+  script.warning = 'LLM script generation failed or failed gates; template fallback used.';
+  if (lastScript && lastScript.llm) script.lastLlmAttempt = lastScript.llm;
+  return script;
 }
 
 function evaluateQuality(script) {
@@ -317,7 +410,7 @@ function appendCopilotLog(entry) {
   fs.appendFileSync(ORCHESTRATION_LOG, `${JSON.stringify({ ...entry, at: nowIso() })}\n`);
 }
 
-function runActionFlow(input = {}) {
+async function runActionFlow(input = {}) {
   const rankings = rankCandidates(input);
   const selected = input.faceless === true
     ? rankings.find((ranking) => ranking.format.faceless) || rankings[0]
@@ -399,6 +492,81 @@ function copilotOrchestrate(input = {}) {
     childAgents
   });
   return response;
+}
+
+function systemHealth() {
+  const wisdom = readWisdom();
+  return {
+    ok: true,
+    architecture: 'EVICS_EVIE_SHARED',
+    qualityGates: QUALITY_GATES,
+    dataDir: DATA_DIR,
+    wisdomVersion: wisdom.version,
+    promptVersionCount: wisdom.promptVersions.length,
+    learningCount: wisdom.learnings.length,
+    mockRenderAvailable: fs.existsSync(path.join(ROOT, 'generated', 'evics-sea-moss-proof-render.mp4')),
+    liveHeygenConfigured: Boolean(process.env.HEYGEN_API_KEY),
+    timestamp: nowIso()
+  };
+}
+
+module.exports = {
+  QUALITY_GATES,
+  DEFAULT_WEIGHTS,
+  canonicalId,
+  seedCatalog,
+  rankCandidates,
+  buildTemplatePrompt,
+  buildPrompt,
+  buildTemplateScript,
+  buildScript,
+  createRenderJob,
+  runActionFlow,
+  copilotOrchestrate,
+  systemHealth,
+  readWisdom
+};async function copilotOrchestrate(command = {}) {
+  const wisdom = readWisdom();
+  try {
+    const llmResponse = await llmProvider.generateCopilotResponse({
+      operatorCommand: command.operatorCommand || command.command || command.message || '',
+      context: command,
+      wisdom
+    });
+    const entry = {
+      id: canonicalId('copilot', { command, at: nowIso() }),
+      command,
+      response: llmResponse.response || 'I reviewed the current EVICS context and prepared next actions.',
+      actions: llmResponse.actions || ['review_rankings', 'generate_prompt', 'validate_compliance'],
+      riskFlags: llmResponse.risk_flags || [],
+      confidence: llmResponse.confidence || 'medium',
+      llm: llmResponse.llm,
+      createdAt: nowIso(),
+      source: 'llm'
+    };
+    ensureDataDir();
+    const log = fs.existsSync(ORCHESTRATION_LOG) ? JSON.parse(fs.readFileSync(ORCHESTRATION_LOG, 'utf8')) : [];
+    log.push(entry);
+    fs.writeFileSync(ORCHESTRATION_LOG, JSON.stringify(log.slice(-100), null, 2));
+    return entry;
+  } catch (error) {
+    console.warn('[EVICS Evie] LLM copilot failed, falling back to deterministic response:', error.message);
+    const entry = {
+      id: canonicalId('copilot', { command, at: nowIso() }),
+      command,
+      response: 'I reviewed the current EVICS context. Rank candidates, generate the strongest prompt/script pair, then validate quality and compliance before render handoff.',
+      actions: ['review_rankings', 'generate_prompt', 'validate_compliance'],
+      wisdomVersion: wisdom.version,
+      warning: 'LLM copilot failed; deterministic fallback used.',
+      createdAt: nowIso(),
+      source: 'template'
+    };
+    ensureDataDir();
+    const log = fs.existsSync(ORCHESTRATION_LOG) ? JSON.parse(fs.readFileSync(ORCHESTRATION_LOG, 'utf8')) : [];
+    log.push(entry);
+    fs.writeFileSync(ORCHESTRATION_LOG, JSON.stringify(log.slice(-100), null, 2));
+    return entry;
+  }
 }
 
 function systemHealth() {
