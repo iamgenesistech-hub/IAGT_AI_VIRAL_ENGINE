@@ -62,12 +62,12 @@ function registerEvicsEvieRoutes(app) {
     });
   });
 
-  app.post('/api/evics-evie/prompt-forge', (req, res) => {
+  app.post('/api/evics-evie/prompt-forge', async (req, res) => {
     noStore(res);
     const rankings = rankCandidates(req.body || {});
     const selected = req.body?.faceless ? rankings.find((ranking) => ranking.format.faceless) || rankings[0] : rankings[0];
-    const prompt = buildPrompt(selected, { operatorCommand: req.body?.command });
-    const script = buildScript(prompt, selected);
+    const prompt = await buildPrompt(selected, { operatorCommand: req.body?.command });
+    const script = await buildScript(prompt, selected);
     res.json({
       success: true,
       ranking: selected,
@@ -76,9 +76,9 @@ function registerEvicsEvieRoutes(app) {
     });
   });
 
-  app.post('/api/evics-evie/action-flow', (req, res) => {
+  app.post('/api/evics-evie/action-flow', async (req, res) => {
     noStore(res);
-    const flow = runActionFlow(req.body || {});
+    const flow = await runActionFlow(req.body || {});
     res.status(flow.renderJob.status === 'blocked' ? 409 : 200).json({
       success: flow.renderJob.status !== 'blocked',
       flow
