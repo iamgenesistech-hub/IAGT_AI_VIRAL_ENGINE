@@ -11,7 +11,7 @@ const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { renderInternalVideo } = require('./internalVideoRenderer');
 
 const app = express();
-const PORT = process.env.PORT || 4173;
+const PORT = process.env.PORT || 4175;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));

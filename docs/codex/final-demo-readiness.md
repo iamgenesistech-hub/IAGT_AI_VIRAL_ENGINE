@@ -1,7 +1,7 @@
 # Final Demo Readiness
 
 ## Ready Locally
-- EVICS boots on localhost:4173.
+- EVICS boots on localhost:4175.
 - Shared EVICS + EVIE APIs are available.
 - Ranking, faceless selection, prompt forge, script generation, mocked render, compliance checks, Copilot orchestration, and wisdom memory run locally.
 - Playable MP4 evidence exists at /generated/evics-sea-moss-proof-render.mp4.

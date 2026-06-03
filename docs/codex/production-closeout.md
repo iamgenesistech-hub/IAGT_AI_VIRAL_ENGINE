@@ -85,7 +85,7 @@
 - HeyGen: no `HEYGEN_API_KEY` is loaded. The provider cannot be called without the account credential.
 
 ## 12. Recommended Next Operator Step
-- Open `http://localhost:4173/shopify/reconnect`, approve the app for `iamgenesistech.myshopify.com`, add `HEYGEN_API_KEY`, then rerun `npm test`.
+- Open `http://localhost:4175/shopify/reconnect`, approve the app for `iamgenesistech.myshopify.com`, add `HEYGEN_API_KEY`, then rerun `npm test`.
 
 ## GO / NO-GO Decision
 - Copilot routes: yes.

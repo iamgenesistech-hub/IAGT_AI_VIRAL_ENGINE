@@ -148,7 +148,7 @@ async function run() {
     matrix.push(fail('local-system-health', error));
   }
 
-  const base = process.env.EVICS_BASE_URL || 'http://localhost:4173';
+  const base = process.env.EVICS_BASE_URL || 'http://localhost:4175';
   try {
     const { response, body } = await httpJson(`${base}/api/evics-evie/health`);
     if (!response.ok || !body.ok) throw new Error(`Health endpoint failed: ${response.status}`);
