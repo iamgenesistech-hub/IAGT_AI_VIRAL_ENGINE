@@ -1,10 +1,37 @@
-require('dotenv').config();
+const path = require('path');
+const { createRequire } = require('module');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
 
-const { createClient } = require('@supabase/supabase-js');
+function requirePackage(name) {
+  try {
+    return require(name);
+  } catch (error) {
+    const bridgeNodeModules =
+      process.env.NODE_PATH ||
+      'C:\\Users\\rolan\\Documents\\Codex\\2026-05-29\\can-you-access-my-github-for\\IAGT_AI_VIRAL_ENGINE-git\\node_modules';
+    return createRequire(path.join(bridgeNodeModules, 'package.json'))(name);
+  }
+}
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const { createClient } = requirePackage('@supabase/supabase-js');
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_KEY ||
+  process.env.evics_supabase_key;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY.');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  }
+});
 
 module.exports = supabase;
