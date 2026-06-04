@@ -467,11 +467,14 @@ app.post('/api/video/generate', async (req, res) => {
       return res.status(400).json({ success: false, error: 'voice_id/voice is required.' });
     }
 
+    const requestedBackground = body.background || config.background;
     const renderConfig = {
       ...config,
       aspect: body.aspect || config.aspect || config.aspect_ratio,
       dimension: body.dimension || config.dimension,
-      background: body.background || config.background,
+      background: requestedBackground && typeof requestedBackground === 'object'
+        ? requestedBackground
+        : { type: 'color', value: '#ffffff' },
       caption: body.caption ?? config.caption,
       test: body.test ?? config.test,
       idempotency_key: body.idempotency_key || body.idempotencyKey || config.idempotency_key || config.idempotencyKey
@@ -582,6 +585,50 @@ app.get('/api/video/status/:videoId', async (req, res) => {
   } catch (e) {
     const statusCode = e.code === 'HEYGEN_API_KEY_MISSING' ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
     return res.status(statusCode).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// -------------------------
+// /api/video/callback — record completed render callbacks with direct video URLs
+// -------------------------
+app.post('/api/video/callback', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const videoId = body.video_id || body.videoId || body.id;
+    const videoUrl = body.video_url || body.videoUrl || body.url;
+    const thumbnailUrl = body.thumbnail_url || body.thumbnailUrl || null;
+    const duration = body.duration === undefined ? null : body.duration;
+
+    if (!videoId) return res.status(400).json({ success: false, error: 'video_id is required.' });
+    if (!videoUrl) return res.status(400).json({ success: false, error: 'video_url/url is required.' });
+
+    const { data, error } = await SupabaseConnector
+      .from('video_assembly_drafts')
+      .update({
+        status: 'completed',
+        video_url: videoUrl,
+        thumbnail_url: thumbnailUrl,
+        duration,
+        error_message: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('video_id', videoId)
+      .select();
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({
+      success: true,
+      video_id: videoId,
+      status: 'completed',
+      video_url: videoUrl,
+      thumbnail_url: thumbnailUrl,
+      duration,
+      draft: data ? data[0] : null
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
   }
 });
 
