@@ -111,9 +111,26 @@ const state = {
   autoGenerateResult: null,
   autoGeneratePipelineSteps: [],
 
-  // Render polling
-  renderPollingActive: false,
-  liveRenders: []
+  // Copilot
+  copilotOpen: false,
+  copilotQuestion: "",
+  copilotAnswer: null,
+  copilotNextActions: [],
+  copilotLoading: false,
+
+  // ── Product Viral Intelligence ──
+  productViralMemories: [],
+  selectedProductViral: null,
+  viralTemplateOpen: false,
+  viralTemplateLoading: false,
+  reproductionInProgress: false,
+  reproductionResult: null,
+  lastScanDate: null,
+  nextScanScheduled: null,
+  viralScanInProgress: false,
+  viralFindInProgress: false,
+  viralMemoriesLoading: false,
+  viralScheduleResult: null
 };
 
 window.state = state;
@@ -277,6 +294,90 @@ let winningHooks = [
   { id: "h-010", text: "What if your energy problem was never about sleep?", category: "Reframe", platform: "YouTube", confidence: "High" },
   { id: "h-011", text: "I tried every supplement. This is the only one I kept.", category: "Proof", platform: "TikTok", confidence: "High" },
   { id: "h-012", text: "The morning ritual that changed my entire output.", category: "Transformation", platform: "Instagram", confidence: "Medium" }
+];
+
+// ── Demo product viral memories ──
+let demoProductViralMemories = [
+  {
+    product_id: "sea-moss-mineral-gel",
+    product_name: "Sea Moss Mineral Gel",
+    most_viral_ad_id: "ad-001",
+    viral_score: 94,
+    hook: "Nobody tells you minerals can change your whole morning.",
+    pacing: "Fast cuts (0–2s hook, 2–5s mineral gap, 5–12s morning ritual, 12–15s CTA)",
+    cta: "Start your mineral ritual",
+    visual_style: "UGC testimonial",
+    emotional_triggers: ["curiosity", "wellness", "ritual"],
+    structure: ["Hook", "Mineral gap", "Morning ritual", "Product close-up", "CTA"],
+    platform_breakdown: { TikTok: 48, Instagram: 28, YouTube: 14, Facebook: 10 },
+    last_updated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    reproduction_count: 7,
+    performance_metrics: { avg_views: 1240000, avg_engagement: 11.4, avg_conversion: 3.2 }
+  },
+  {
+    product_id: "metabolic-ignite",
+    product_name: "Metabolic Ignite",
+    most_viral_ad_id: "ad-001",
+    viral_score: 91,
+    hook: "I lost the bloat in 7 days doing this one thing every morning…",
+    pacing: "Fast cuts (0–2s hook, 2–6s before state, 6–12s discovery, 12–15s CTA)",
+    cta: "Start your reset today",
+    visual_style: "UGC testimonial",
+    emotional_triggers: ["hope", "transformation", "urgency"],
+    structure: ["Hook", "Before state", "Discovery moment", "Product ritual", "CTA"],
+    platform_breakdown: { TikTok: 52, Instagram: 26, Facebook: 14, YouTube: 8 },
+    last_updated: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    reproduction_count: 12,
+    performance_metrics: { avg_views: 2100000, avg_engagement: 13.1, avg_conversion: 4.1 }
+  },
+  {
+    product_id: "genesis-glow-collagen",
+    product_name: "Genesis Glow Collagen",
+    most_viral_ad_id: "ad-002",
+    viral_score: 88,
+    hook: "This changed my skin in 7 days — no filter, no edits.",
+    pacing: "Slow luxury cuts (0–3s hook, 3–8s mirror proof, 8–13s routine, 13–15s CTA)",
+    cta: "Shop the glow stack",
+    visual_style: "Luxury lifestyle routine",
+    emotional_triggers: ["aspiration", "confidence", "trust"],
+    structure: ["Hook", "Mirror proof", "Ingredient flash", "Routine", "CTA"],
+    platform_breakdown: { Instagram: 44, Pinterest: 28, TikTok: 18, YouTube: 10 },
+    last_updated: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    reproduction_count: 5,
+    performance_metrics: { avg_views: 980000, avg_engagement: 9.8, avg_conversion: 2.9 }
+  },
+  {
+    product_id: "apex-testosterone-support",
+    product_name: "Apex Testosterone Support",
+    most_viral_ad_id: "ad-003",
+    viral_score: 86,
+    hook: "Your training does not need more hype. It needs foundation.",
+    pacing: "Gym-paced cuts (0–2s hook, 2–7s low-energy problem, 7–12s workout proof, 12–15s CTA)",
+    cta: "Build your foundation",
+    visual_style: "Gym UGC commercial",
+    emotional_triggers: ["discipline", "strength", "control"],
+    structure: ["Hook", "Low-energy problem", "Workout proof", "Product reveal", "CTA"],
+    platform_breakdown: { TikTok: 40, YouTube: 30, Facebook: 20, Instagram: 10 },
+    last_updated: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    reproduction_count: 4,
+    performance_metrics: { avg_views: 760000, avg_engagement: 8.9, avg_conversion: 2.6 }
+  },
+  {
+    product_id: "neurorise-focus",
+    product_name: "NeuroRise Focus",
+    most_viral_ad_id: "ad-004",
+    viral_score: 82,
+    hook: "My 2 PM crash disappeared when I started doing this…",
+    pacing: "Desk-paced cuts (0–2s hook, 2–6s daily pain, 6–11s ingredient cue, 11–15s CTA)",
+    cta: "Upgrade your focus stack",
+    visual_style: "Founder desk UGC",
+    emotional_triggers: ["clarity", "ambition", "momentum"],
+    structure: ["Hook", "Daily pain", "Ingredient cue", "Focus result", "CTA"],
+    platform_breakdown: { YouTube: 38, TikTok: 32, Facebook: 20, Instagram: 10 },
+    last_updated: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+    reproduction_count: 3,
+    performance_metrics: { avg_views: 540000, avg_engagement: 8.2, avg_conversion: 2.4 }
+  }
 ];
 
 let workflow = [
@@ -480,7 +581,10 @@ function icon(name) {
     chart: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/>',
     gear: '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M4 12h2m12 0h2M12 4v2m0 12v2m5.66-13.66-1.42 1.42M7.76 16.24l-1.42 1.42m0-11.32 1.42 1.42m8.48 8.48 1.42 1.42"/>',
     check: '<path d="m20 6-11 11-5-5"/>',
-    filter: '<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>'
+    filter: '<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>',
+    memory: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/><path d="M12 8v4l3 3"/>',
+    copy:   '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    play:   '<polygon points="5 3 19 12 5 21 5 3"/>'
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
 }
@@ -600,13 +704,13 @@ function statusBadgeClass(status) {
 
 // ── Section definitions ──
 const SECTIONS = [
-  { id: "viral-intelligence", icon: "radar", label: "Viral Intelligence",  desc: "Trend scanning, hook discovery, viral pattern analysis" },
-  { id: "ai-reconstruction",  icon: "spark", label: "AI Reconstruction",   desc: "AI-powered creative reconstruction from viral ads" },
-  { id: "video-generation",   icon: "video", label: "Video Generation",    desc: "Video rendering via HeyGen, Runway, and Kling" },
-  { id: "media-output",       icon: "video", label: "Media Output",        desc: "Playback, QA, render routing, and publishing control" },
-  { id: "distribution",       icon: "send",  label: "Distribution",        desc: "Publishing queue and channel management" },
-  { id: "analytics",          icon: "chart", label: "Analytics",           desc: "Performance metrics and learning loop" },
-  { id: "twin-automation",    icon: "gear",  label: "Twin Automation",     desc: "Agent orchestration and auto-generate pipeline" }
+  { id: "viral-intelligence",       icon: "radar",  label: "Viral Intelligence",       desc: "Trend scanning, hook discovery, viral pattern analysis" },
+  { id: "product-viral-intel",      icon: "spark",  label: "Product Viral Intel",      desc: "Per-product viral memory, templates, and one-click reproduction" },
+  { id: "ai-reconstruction",        icon: "spark",  label: "AI Reconstruction",        desc: "AI-powered creative reconstruction from viral ads" },
+  { id: "video-generation",         icon: "video",  label: "Video Generation",         desc: "Video rendering via HeyGen, Runway, and Kling" },
+  { id: "distribution",             icon: "send",   label: "Distribution",             desc: "Publishing queue and channel management" },
+  { id: "analytics",                icon: "chart",  label: "Analytics",                desc: "Performance metrics and learning loop" },
+  { id: "twin-automation",          icon: "gear",   label: "Twin Automation",          desc: "Agent orchestration and auto-generate pipeline" }
 ];
 
 // ── Media viewing area (shared across sections) ──
@@ -1790,18 +1894,299 @@ function renderTwinAutomation() {
   `;
 }
 
+// ─────────────────────────────────────────────────────────────
+// PRODUCT VIRAL INTELLIGENCE — render functions
+// ─────────────────────────────────────────────────────────────
+
+function viralScoreClass(score) {
+  if (score >= 85) return "viral-score-high";
+  if (score >= 70) return "viral-score-mid";
+  return "viral-score-low";
+}
+
+function fmtRelativeTime(isoString) {
+  if (!isoString) return "Never";
+  const diff = Date.now() - new Date(isoString).getTime();
+  const h = Math.floor(diff / 3600000);
+  if (h < 1) return "Just now";
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function renderProductViralMemoryCard(mem) {
+  const isSelected = state.selectedProductViral && state.selectedProductViral.product_id === mem.product_id;
+  const topPlatform = Object.entries(mem.platform_breakdown || {}).sort((a, b) => b[1] - a[1])[0];
+  return `
+    <button class="pvi-product-card ${isSelected ? "pvi-product-card-selected" : ""}" data-pvi-product="${mem.product_id}">
+      <div class="pvi-card-header">
+        <div class="pvi-card-name">${mem.product_name}</div>
+        <div class="pvi-viral-score ${viralScoreClass(mem.viral_score)}">${mem.viral_score}</div>
+      </div>
+      <div class="pvi-card-hook">"${mem.hook}"</div>
+      <div class="pvi-card-meta">
+        <span class="pvi-tag">${mem.visual_style}</span>
+        ${topPlatform ? `<span class="pvi-tag pvi-tag-platform">${topPlatform[0]} ${topPlatform[1]}%</span>` : ""}
+        <span class="pvi-tag pvi-tag-repro">${icon("memory")} ${mem.reproduction_count} reproductions</span>
+      </div>
+      <div class="pvi-card-footer">
+        <span class="pvi-updated">Updated ${fmtRelativeTime(mem.last_updated)}</span>
+        <span class="pvi-perf">${mem.performance_metrics && mem.performance_metrics.avg_views > 0 ? fmt(mem.performance_metrics.avg_views) + " avg views" : "No data yet"}</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderProductViralMemoryDetail(mem) {
+  if (!mem) return `<div class="pvi-detail-empty"><p>Select a product to view its viral memory.</p></div>`;
+
+  const platformEntries = Object.entries(mem.platform_breakdown || {}).sort((a, b) => b[1] - a[1]);
+  const isLoading = state.viralTemplateLoading;
+  const isReproducing = state.reproductionInProgress;
+
+  return `
+    <div class="pvi-detail-content">
+      <div class="pvi-detail-header">
+        <div>
+          <div class="pvi-detail-product-name">${mem.product_name}</div>
+          <div class="pvi-detail-subtitle">Viral Memory · Score <strong>${mem.viral_score}</strong> · ${mem.reproduction_count} reproductions</div>
+        </div>
+        <div class="pvi-detail-header-actions">
+          <button class="pvi-btn-secondary" id="pvi-find-ads-btn" data-pvi-product="${mem.product_id}" ${state.viralFindInProgress ? "disabled" : ""}>
+            ${state.viralFindInProgress ? `${icon("radar")} Searching…` : `${icon("radar")} Find More Ads`}
+          </button>
+          <button class="pvi-btn-primary" id="pvi-reproduce-btn" data-pvi-product="${mem.product_id}" ${isReproducing ? "disabled" : ""}>
+            ${isReproducing ? `${icon("radar")} Reproducing…` : `${icon("play")} Reproduce`}
+          </button>
+        </div>
+      </div>
+
+      <!-- Hook -->
+      <div class="pvi-section">
+        <div class="pvi-section-label">Best Hook</div>
+        <div class="pvi-hook-display">
+          <span class="pvi-hook-text">"${mem.hook}"</span>
+          <button class="copy-btn" data-copy="${mem.hook.replace(/"/g, "&quot;")}">Copy</button>
+        </div>
+      </div>
+
+      <!-- Format Breakdown -->
+      <div class="pvi-format-grid">
+        <div class="pvi-format-item">
+          <div class="pvi-format-label">Visual Style</div>
+          <div class="pvi-format-value">${mem.visual_style}</div>
+        </div>
+        <div class="pvi-format-item">
+          <div class="pvi-format-label">CTA</div>
+          <div class="pvi-format-value">"${mem.cta}"</div>
+        </div>
+        <div class="pvi-format-item pvi-format-full">
+          <div class="pvi-format-label">Pacing Pattern</div>
+          <div class="pvi-format-value">${mem.pacing}</div>
+        </div>
+      </div>
+
+      <!-- Emotional Triggers -->
+      <div class="pvi-section">
+        <div class="pvi-section-label">Emotional Triggers</div>
+        <div class="pvi-trigger-cloud">
+          ${(mem.emotional_triggers || []).map((t) => `<span class="pvi-trigger-tag">${t}</span>`).join("")}
+        </div>
+      </div>
+
+      <!-- Ad Structure -->
+      <div class="pvi-section">
+        <div class="pvi-section-label">Ad Structure</div>
+        <div class="pvi-structure-steps">
+          ${(mem.structure || []).map((step, i) => `
+            <div class="pvi-structure-step">
+              <div class="pvi-step-num">${i + 1}</div>
+              <div class="pvi-step-label">${step}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Platform Breakdown -->
+      <div class="pvi-section">
+        <div class="pvi-section-label">Platform Breakdown</div>
+        <div class="pvi-platform-bars">
+          ${platformEntries.map(([platform, pct]) => `
+            <div class="pvi-platform-bar-row">
+              <span class="pvi-platform-name">${platform}</span>
+              <div class="pvi-platform-bar-track">
+                <div class="pvi-platform-bar-fill" style="width:${pct}%"></div>
+              </div>
+              <span class="pvi-platform-pct">${pct}%</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Performance Metrics -->
+      ${mem.performance_metrics && mem.performance_metrics.avg_views > 0 ? `
+      <div class="pvi-section">
+        <div class="pvi-section-label">Reproduction Performance</div>
+        <div class="pvi-perf-grid">
+          <div class="pvi-perf-item">
+            <div class="pvi-perf-value">${fmt(mem.performance_metrics.avg_views)}</div>
+            <div class="pvi-perf-label">Avg Views</div>
+          </div>
+          <div class="pvi-perf-item">
+            <div class="pvi-perf-value">${mem.performance_metrics.avg_engagement}%</div>
+            <div class="pvi-perf-label">Avg Engagement</div>
+          </div>
+          <div class="pvi-perf-item">
+            <div class="pvi-perf-value">${mem.performance_metrics.avg_conversion}%</div>
+            <div class="pvi-perf-label">Avg Conversion</div>
+          </div>
+        </div>
+      </div>
+      ` : ""}
+
+      <!-- Script Generator -->
+      <div class="pvi-section pvi-script-section">
+        <div class="pvi-section-label">${icon("spark")} Production-Ready Script</div>
+        <div class="pvi-script-box">
+          <div class="pvi-script-line"><strong>HOOK:</strong> "${mem.hook}"</div>
+          ${(mem.structure || []).map((step, i) => `<div class="pvi-script-line"><strong>${i + 1}. ${step.toUpperCase()}:</strong> [Director: ${step} scene for ${mem.product_name}]</div>`).join("")}
+          <div class="pvi-script-line"><strong>CTA:</strong> "${mem.cta}"</div>
+          <div class="pvi-script-meta">Style: ${mem.visual_style} · Pacing: ${mem.pacing.split("(")[0].trim()}</div>
+        </div>
+        <div class="pvi-script-actions">
+          <button class="copy-btn" data-copy="HOOK: &quot;${mem.hook.replace(/"/g, "&quot;")}&quot;&#10;${(mem.structure || []).map((s, i) => `${i + 1}. ${s.toUpperCase()}: [${s} scene for ${mem.product_name}]`).join("&#10;")}&#10;CTA: &quot;${mem.cta.replace(/"/g, "&quot;")}&quot;">Copy Script</button>
+        </div>
+      </div>
+
+      <!-- Visual Director Notes -->
+      <div class="pvi-section">
+        <div class="pvi-section-label">Visual Director Notes</div>
+        <div class="pvi-director-notes">
+          Use <strong>${mem.visual_style}</strong> style. Emotional tone: <strong>${(mem.emotional_triggers || []).join(", ")}</strong>. ${mem.pacing}. Top platform: <strong>${platformEntries[0] ? platformEntries[0][0] : "TikTok"}</strong>.
+        </div>
+      </div>
+
+      ${state.reproductionResult ? `
+      <div class="pvi-reproduction-banner">
+        ${icon("check")} ${state.reproductionResult}
+        <button class="toggle-link" id="pvi-dismiss-result">✕</button>
+      </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderProductViralIntel() {
+  const memories = state.productViralMemories.length > 0
+    ? state.productViralMemories
+    : demoProductViralMemories;
+
+  const selected = state.selectedProductViral
+    || (memories.length > 0 ? memories[0] : null);
+
+  const avgScore = memories.length > 0
+    ? Math.round(memories.reduce((s, m) => s + m.viral_score, 0) / memories.length)
+    : 0;
+
+  const totalRepros = memories.reduce((s, m) => s + (m.reproduction_count || 0), 0);
+
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>Product Viral Intelligence</h2>
+        <p>Per-product viral memory system. Know the most viral ad structure for every product, find viral patterns for non-viral products, and reproduce proven formats in one click.</p>
+      </div>
+
+      <!-- Metrics -->
+      <section class="metrics-grid">
+        <article class="metric">
+          <span>Products tracked</span>
+          <strong>${memories.length}</strong>
+          <small>with viral memory</small>
+        </article>
+        <article class="metric">
+          <span>Avg viral score</span>
+          <strong>${avgScore}</strong>
+          <small>across all products</small>
+        </article>
+        <article class="metric">
+          <span>Total reproductions</span>
+          <strong>${totalRepros}</strong>
+          <small>templates reproduced</small>
+        </article>
+        <article class="metric metric-interactive">
+          <span>Daily scan</span>
+          <strong>${state.lastScanDate ? fmtRelativeTime(state.lastScanDate) : "Not run"}</strong>
+          <small>${state.nextScanScheduled ? "Next: " + new Date(state.nextScanScheduled).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Schedule below"}</small>
+          <div class="metric-controls">
+            <button class="metric-btn ${state.viralScanInProgress ? "scanning" : ""}" id="pvi-scan-btn" ${state.viralScanInProgress ? "disabled" : ""}>
+              ${state.viralScanInProgress ? `${icon("radar")} Scanning…` : `${icon("radar")} Scan Now`}
+            </button>
+            <button class="metric-btn" id="pvi-schedule-btn" style="background:var(--gold)">
+              ${icon("memory")} Schedule
+            </button>
+          </div>
+          ${state.viralScheduleResult ? `<div class="pvi-schedule-result">${state.viralScheduleResult}</div>` : ""}
+        </article>
+      </section>
+
+      <!-- Main workspace: product list + detail -->
+      <section class="pvi-workspace">
+        <!-- Product List -->
+        <div class="pvi-product-list">
+          <div class="pvi-list-header">
+            <h3>Products &amp; Viral Memory</h3>
+            <span class="pvi-list-count">${memories.length} products</span>
+          </div>
+          <div class="pvi-product-cards">
+            ${memories.map((mem) => renderProductViralMemoryCard(mem)).join("")}
+          </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div class="pvi-detail-panel">
+          ${renderProductViralMemoryDetail(selected)}
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="panel pvi-how-it-works">
+        <div class="panel-head compact">
+          <h2>How Product Viral Intelligence Works</h2>
+        </div>
+        <div class="pvi-steps-row">
+          ${[
+            ["1", "Daily Scan", "Every morning at 6 AM, the system scans for the most viral ad for each product in your store."],
+            ["2", "Memory Storage", "Best hook, pacing, CTA, visual style, emotional triggers, and structure are stored per product."],
+            ["3", "Cross-Internet Search", "For products with low viral history, the system searches TikTok, Instagram, YouTube, Facebook, and Pinterest for viral patterns."],
+            ["4", "One-Click Reproduce", "Click Reproduce to instantly generate a production-ready creative from the best viral structure."],
+            ["5", "Performance Tracking", "Every reproduction is tracked. The system learns which structures perform best and updates memory nightly."]
+          ].map(([num, title, desc]) => `
+            <div class="pvi-how-step">
+              <div class="pvi-how-num">${num}</div>
+              <div class="pvi-how-body">
+                <strong>${title}</strong>
+                <p>${desc}</p>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function render() {
   const app = document.getElementById("app");
 
   // Determine which section content to render
   const sectionRenderers = {
-    "viral-intelligence": renderViralIntelligence,
-    "ai-reconstruction":  renderAiReconstruction,
-    "video-generation":   renderVideoGeneration,
-    "media-output":       window.renderMediaOutputCenter || (() => "<div class=\"panel\">Media Output Center is loading.</div>"),
-    "distribution":       renderDistribution,
-    "analytics":          renderAnalytics,
-    "twin-automation":    renderTwinAutomation
+    "viral-intelligence":  renderViralIntelligence,
+    "product-viral-intel": renderProductViralIntel,
+    "ai-reconstruction":   renderAiReconstruction,
+    "video-generation":    renderVideoGeneration,
+    "distribution":        renderDistribution,
+    "analytics":           renderAnalytics,
+    "twin-automation":     renderTwinAutomation
   };
   const sectionContent = (sectionRenderers[state.currentSection] || renderViralIntelligence)();
 
@@ -2191,6 +2576,206 @@ function bindEvents() {
       render();
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // PRODUCT VIRAL INTELLIGENCE — event bindings
+  // ─────────────────────────────────────────────────────────────
+
+  // ── Product card selection ──
+  document.querySelectorAll("[data-pvi-product]").forEach((btn) => {
+    if (btn.classList.contains("pvi-product-card")) {
+      btn.addEventListener("click", () => {
+        const productId = btn.dataset.pviProduct;
+        const memories = state.productViralMemories.length > 0
+          ? state.productViralMemories
+          : demoProductViralMemories;
+        const mem = memories.find((m) => m.product_id === productId);
+        if (mem) {
+          state.selectedProductViral = mem;
+          state.reproductionResult = null;
+          render();
+        }
+      });
+    }
+  });
+
+  // ── Scan Now button ──
+  const pviScanBtn = document.getElementById("pvi-scan-btn");
+  if (pviScanBtn) {
+    pviScanBtn.addEventListener("click", async () => {
+      state.viralScanInProgress = true;
+      render();
+      try {
+        const res = await fetch("/api/viral/scan-by-product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.lastScanDate = new Date().toISOString();
+          state.nextScanScheduled = data.nextScan || null;
+          if (data.results && data.results.length) {
+            state.productViralMemories = data.results.map((r, i) => ({
+              product_id: r.product,
+              product_name: r.product,
+              viral_score: r.viralScore,
+              hook: r.hook,
+              pacing: "Fast cuts (0–2s hook, 2–5s problem, 5–12s proof, 12–15s CTA)",
+              cta: "Try it risk-free today",
+              visual_style: "UGC testimonial",
+              emotional_triggers: ["curiosity", "transformation", "trust"],
+              structure: ["Hook", "Problem", "Proof", "Product reveal", "CTA"],
+              platform_breakdown: { TikTok: 45, Instagram: 30, YouTube: 15, Facebook: 10 },
+              last_updated: new Date().toISOString(),
+              reproduction_count: 0,
+              performance_metrics: { avg_views: 0, avg_engagement: 0, avg_conversion: 0 }
+            }));
+          }
+        } else {
+          // Demo fallback: simulate scan
+          await new Promise((r) => setTimeout(r, 2000));
+          state.lastScanDate = new Date().toISOString();
+          state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 2000));
+        state.lastScanDate = new Date().toISOString();
+        state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      }
+      state.viralScanInProgress = false;
+      render();
+    });
+  }
+
+  // ── Schedule button ──
+  const pviScheduleBtn = document.getElementById("pvi-schedule-btn");
+  if (pviScheduleBtn) {
+    pviScheduleBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/viral/schedule-daily-scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hour: 6, minute: 0 })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.nextScanScheduled = data.nextRun;
+          state.viralScheduleResult = `✓ ${data.message}`;
+        } else {
+          state.viralScheduleResult = "✓ Daily scan scheduled for 6:00 AM (demo mode).";
+          state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        }
+      } catch {
+        state.viralScheduleResult = "✓ Daily scan scheduled for 6:00 AM (demo mode).";
+        state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      }
+      render();
+      setTimeout(() => { state.viralScheduleResult = null; render(); }, 4000);
+    });
+  }
+
+  // ── Find More Ads button ──
+  const pviFindAdsBtn = document.getElementById("pvi-find-ads-btn");
+  if (pviFindAdsBtn) {
+    pviFindAdsBtn.addEventListener("click", async () => {
+      const productId = pviFindAdsBtn.dataset.pviProduct;
+      const memories = state.productViralMemories.length > 0
+        ? state.productViralMemories
+        : demoProductViralMemories;
+      const mem = memories.find((m) => m.product_id === productId);
+      if (!mem) return;
+
+      state.viralFindInProgress = true;
+      render();
+      try {
+        const res = await fetch("/api/viral/find-product-viral-ads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: mem.product_id,
+            productName: mem.product_name,
+            category: mem.visual_style
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.reproductionResult = `✓ Found ${data.alternativesFound} viral ad templates across ${(data.platformsSearched || []).length} platforms.`;
+        } else {
+          await new Promise((r) => setTimeout(r, 1500));
+          state.reproductionResult = `✓ Found 5 viral ad templates across TikTok, Instagram, YouTube, Facebook, Pinterest (demo mode).`;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        state.reproductionResult = `✓ Found 5 viral ad templates across TikTok, Instagram, YouTube, Facebook, Pinterest (demo mode).`;
+      }
+      state.viralFindInProgress = false;
+      render();
+    });
+  }
+
+  // ── Reproduce button ──
+  const pviReproduceBtn = document.getElementById("pvi-reproduce-btn");
+  if (pviReproduceBtn) {
+    pviReproduceBtn.addEventListener("click", async () => {
+      const productId = pviReproduceBtn.dataset.pviProduct;
+      const memories = state.productViralMemories.length > 0
+        ? state.productViralMemories
+        : demoProductViralMemories;
+      const mem = memories.find((m) => m.product_id === productId);
+      if (!mem) return;
+
+      state.reproductionInProgress = true;
+      state.reproductionResult = null;
+      render();
+      try {
+        const res = await fetch(`/api/viral/product/${encodeURIComponent(productId)}/reproduce`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platform: "TikTok" })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.reproductionResult = `✓ ${data.message}`;
+          // Increment local reproduction count
+          mem.reproduction_count = (mem.reproduction_count || 0) + 1;
+        } else {
+          await new Promise((r) => setTimeout(r, 1200));
+          state.reproductionResult = `✓ Viral template reproduced for ${mem.product_name}. Creative added to AI Content Queue (demo mode).`;
+          mem.reproduction_count = (mem.reproduction_count || 0) + 1;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1200));
+        state.reproductionResult = `✓ Viral template reproduced for ${mem.product_name}. Creative added to AI Content Queue (demo mode).`;
+        mem.reproduction_count = (mem.reproduction_count || 0) + 1;
+      }
+      state.reproductionInProgress = false;
+      render();
+    });
+  }
+
+  // ── Dismiss reproduction result ──
+  const pviDismissResult = document.getElementById("pvi-dismiss-result");
+  if (pviDismissResult) {
+    pviDismissResult.addEventListener("click", () => {
+      state.reproductionResult = null;
+      render();
+    });
+  }
+
+  // ── Load all memories from API on section entry ──
+  if (state.currentSection === "product-viral-intel" && !state.viralMemoriesLoading && state.productViralMemories.length === 0) {
+    state.viralMemoriesLoading = true;
+    fetch("/api/viral/products/all-memories")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data && data.memories && data.memories.length > 0) {
+          state.productViralMemories = data.memories;
+          render();
+        }
+      })
+      .catch(() => { /* demo mode */ })
+      .finally(() => { state.viralMemoriesLoading = false; });
+  }
 
   // ── Agent controls (Twin Automation section) ──
   const agentViralScanBtn = document.getElementById("agent-viral-scan-btn");
