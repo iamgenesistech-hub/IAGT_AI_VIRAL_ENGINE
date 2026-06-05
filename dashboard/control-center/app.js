@@ -118,19 +118,22 @@ const state = {
   copilotNextActions: [],
   copilotLoading: false,
 
-  // ── Product Viral Intelligence ──
-  productViralMemories: [],
-  selectedProductViral: null,
-  viralTemplateOpen: false,
-  viralTemplateLoading: false,
-  reproductionInProgress: false,
-  reproductionResult: null,
-  lastScanDate: null,
-  nextScanScheduled: null,
-  viralScanInProgress: false,
-  viralFindInProgress: false,
-  viralMemoriesLoading: false,
-  viralScheduleResult: null
+  // API Management
+  servicesConfig: [],
+  servicesLoading: false,
+  selectedServiceId: null,
+  serviceEditMode: false,
+  serviceApiKeyInput: "",
+  serviceApiKeyVisible: false,
+  failoverMode: true,
+  failoverLog: [],
+  failoverStatus: {},
+  alerts: [],
+  alertsUnread: 0,
+  tokenUsageData: [],
+  addCreditsAmount: 100,
+  serviceActionStatus: null,
+  apiMgmtTab: "overview"  // overview | config | failover | alerts
 };
 
 window.state = state;
@@ -581,10 +584,11 @@ function icon(name) {
     chart: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/>',
     gear: '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M4 12h2m12 0h2M12 4v2m0 12v2m5.66-13.66-1.42 1.42M7.76 16.24l-1.42 1.42m0-11.32 1.42 1.42m8.48 8.48 1.42 1.42"/>',
     check: '<path d="m20 6-11 11-5-5"/>',
-    filter: '<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>',
-    memory: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/><path d="M12 8v4l3 3"/>',
-    copy:   '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-    play:   '<polygon points="5 3 19 12 5 21 5 3"/>'
+    filter:  '<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>',
+    shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+    key:     '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+    bell:    '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+    swap:    '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
 }
@@ -704,13 +708,13 @@ function statusBadgeClass(status) {
 
 // ── Section definitions ──
 const SECTIONS = [
-  { id: "viral-intelligence",       icon: "radar",  label: "Viral Intelligence",       desc: "Trend scanning, hook discovery, viral pattern analysis" },
-  { id: "product-viral-intel",      icon: "spark",  label: "Product Viral Intel",      desc: "Per-product viral memory, templates, and one-click reproduction" },
-  { id: "ai-reconstruction",        icon: "spark",  label: "AI Reconstruction",        desc: "AI-powered creative reconstruction from viral ads" },
-  { id: "video-generation",         icon: "video",  label: "Video Generation",         desc: "Video rendering via HeyGen, Runway, and Kling" },
-  { id: "distribution",             icon: "send",   label: "Distribution",             desc: "Publishing queue and channel management" },
-  { id: "analytics",                icon: "chart",  label: "Analytics",                desc: "Performance metrics and learning loop" },
-  { id: "twin-automation",          icon: "gear",   label: "Twin Automation",          desc: "Agent orchestration and auto-generate pipeline" }
+  { id: "viral-intelligence", icon: "radar",  label: "Viral Intelligence",  desc: "Trend scanning, hook discovery, viral pattern analysis" },
+  { id: "ai-reconstruction",  icon: "spark",  label: "AI Reconstruction",   desc: "AI-powered creative reconstruction from viral ads" },
+  { id: "video-generation",   icon: "video",  label: "Video Generation",    desc: "Video rendering via HeyGen, Runway, and Kling" },
+  { id: "distribution",       icon: "send",   label: "Distribution",        desc: "Publishing queue and channel management" },
+  { id: "analytics",          icon: "chart",  label: "Analytics",           desc: "Performance metrics and learning loop" },
+  { id: "twin-automation",    icon: "gear",   label: "Twin Automation",     desc: "Agent orchestration and auto-generate pipeline" },
+  { id: "api-management",     icon: "shield", label: "API Management",      desc: "API keys, token tracking, failover, and alerts" }
 ];
 
 // ── Media viewing area (shared across sections) ──
@@ -1894,285 +1898,624 @@ function renderTwinAutomation() {
   `;
 }
 
-// ─────────────────────────────────────────────────────────────
-// PRODUCT VIRAL INTELLIGENCE — render functions
-// ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// API MANAGEMENT SECTION
+// ═══════════════════════════════════════════════════════════
 
-function viralScoreClass(score) {
-  if (score >= 85) return "viral-score-high";
-  if (score >= 70) return "viral-score-mid";
-  return "viral-score-low";
+const CATEGORY_LABELS = {
+  video:     "Video Rendering",
+  image:     "Image Generation",
+  social:    "Social Publishing",
+  ai:        "AI / LLM",
+  analytics: "Analytics"
+};
+
+const CATEGORY_ICONS = {
+  video:     "video",
+  image:     "spark",
+  social:    "send",
+  ai:        "gear",
+  analytics: "chart"
+};
+
+function serviceStatusBadge(status) {
+  const map = {
+    healthy:  { cls: "svc-status-healthy",   label: "Healthy" },
+    warning:  { cls: "svc-status-warning",   label: "Warning" },
+    critical: { cls: "svc-status-critical",  label: "Critical" },
+    disabled: { cls: "svc-status-disabled",  label: "Disabled" },
+    "no-key": { cls: "svc-status-nokey",     label: "No API Key" }
+  };
+  const s = map[status] || { cls: "", label: status };
+  return `<span class="svc-status-badge ${s.cls}">${s.label}</span>`;
 }
 
-function fmtRelativeTime(isoString) {
-  if (!isoString) return "Never";
-  const diff = Date.now() - new Date(isoString).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return "Just now";
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+function tokenBar(pct, status) {
+  const cls = status === "critical" ? "token-bar-critical"
+    : status === "warning" ? "token-bar-warning"
+    : "token-bar-healthy";
+  return `<div class="token-bar-track"><div class="token-bar-fill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>`;
 }
 
-function renderProductViralMemoryCard(mem) {
-  const isSelected = state.selectedProductViral && state.selectedProductViral.product_id === mem.product_id;
-  const topPlatform = Object.entries(mem.platform_breakdown || {}).sort((a, b) => b[1] - a[1])[0];
-  return `
-    <button class="pvi-product-card ${isSelected ? "pvi-product-card-selected" : ""}" data-pvi-product="${mem.product_id}">
-      <div class="pvi-card-header">
-        <div class="pvi-card-name">${mem.product_name}</div>
-        <div class="pvi-viral-score ${viralScoreClass(mem.viral_score)}">${mem.viral_score}</div>
-      </div>
-      <div class="pvi-card-hook">"${mem.hook}"</div>
-      <div class="pvi-card-meta">
-        <span class="pvi-tag">${mem.visual_style}</span>
-        ${topPlatform ? `<span class="pvi-tag pvi-tag-platform">${topPlatform[0]} ${topPlatform[1]}%</span>` : ""}
-        <span class="pvi-tag pvi-tag-repro">${icon("memory")} ${mem.reproduction_count} reproductions</span>
-      </div>
-      <div class="pvi-card-footer">
-        <span class="pvi-updated">Updated ${fmtRelativeTime(mem.last_updated)}</span>
-        <span class="pvi-perf">${mem.performance_metrics && mem.performance_metrics.avg_views > 0 ? fmt(mem.performance_metrics.avg_views) + " avg views" : "No data yet"}</span>
-      </div>
-    </button>
-  `;
-}
-
-function renderProductViralMemoryDetail(mem) {
-  if (!mem) return `<div class="pvi-detail-empty"><p>Select a product to view its viral memory.</p></div>`;
-
-  const platformEntries = Object.entries(mem.platform_breakdown || {}).sort((a, b) => b[1] - a[1]);
-  const isLoading = state.viralTemplateLoading;
-  const isReproducing = state.reproductionInProgress;
-
-  return `
-    <div class="pvi-detail-content">
-      <div class="pvi-detail-header">
-        <div>
-          <div class="pvi-detail-product-name">${mem.product_name}</div>
-          <div class="pvi-detail-subtitle">Viral Memory · Score <strong>${mem.viral_score}</strong> · ${mem.reproduction_count} reproductions</div>
-        </div>
-        <div class="pvi-detail-header-actions">
-          <button class="pvi-btn-secondary" id="pvi-find-ads-btn" data-pvi-product="${mem.product_id}" ${state.viralFindInProgress ? "disabled" : ""}>
-            ${state.viralFindInProgress ? `${icon("radar")} Searching…` : `${icon("radar")} Find More Ads`}
-          </button>
-          <button class="pvi-btn-primary" id="pvi-reproduce-btn" data-pvi-product="${mem.product_id}" ${isReproducing ? "disabled" : ""}>
-            ${isReproducing ? `${icon("radar")} Reproducing…` : `${icon("play")} Reproduce`}
-          </button>
-        </div>
-      </div>
-
-      <!-- Hook -->
-      <div class="pvi-section">
-        <div class="pvi-section-label">Best Hook</div>
-        <div class="pvi-hook-display">
-          <span class="pvi-hook-text">"${mem.hook}"</span>
-          <button class="copy-btn" data-copy="${mem.hook.replace(/"/g, "&quot;")}">Copy</button>
-        </div>
-      </div>
-
-      <!-- Format Breakdown -->
-      <div class="pvi-format-grid">
-        <div class="pvi-format-item">
-          <div class="pvi-format-label">Visual Style</div>
-          <div class="pvi-format-value">${mem.visual_style}</div>
-        </div>
-        <div class="pvi-format-item">
-          <div class="pvi-format-label">CTA</div>
-          <div class="pvi-format-value">"${mem.cta}"</div>
-        </div>
-        <div class="pvi-format-item pvi-format-full">
-          <div class="pvi-format-label">Pacing Pattern</div>
-          <div class="pvi-format-value">${mem.pacing}</div>
-        </div>
-      </div>
-
-      <!-- Emotional Triggers -->
-      <div class="pvi-section">
-        <div class="pvi-section-label">Emotional Triggers</div>
-        <div class="pvi-trigger-cloud">
-          ${(mem.emotional_triggers || []).map((t) => `<span class="pvi-trigger-tag">${t}</span>`).join("")}
-        </div>
-      </div>
-
-      <!-- Ad Structure -->
-      <div class="pvi-section">
-        <div class="pvi-section-label">Ad Structure</div>
-        <div class="pvi-structure-steps">
-          ${(mem.structure || []).map((step, i) => `
-            <div class="pvi-structure-step">
-              <div class="pvi-step-num">${i + 1}</div>
-              <div class="pvi-step-label">${step}</div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-
-      <!-- Platform Breakdown -->
-      <div class="pvi-section">
-        <div class="pvi-section-label">Platform Breakdown</div>
-        <div class="pvi-platform-bars">
-          ${platformEntries.map(([platform, pct]) => `
-            <div class="pvi-platform-bar-row">
-              <span class="pvi-platform-name">${platform}</span>
-              <div class="pvi-platform-bar-track">
-                <div class="pvi-platform-bar-fill" style="width:${pct}%"></div>
-              </div>
-              <span class="pvi-platform-pct">${pct}%</span>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-
-      <!-- Performance Metrics -->
-      ${mem.performance_metrics && mem.performance_metrics.avg_views > 0 ? `
-      <div class="pvi-section">
-        <div class="pvi-section-label">Reproduction Performance</div>
-        <div class="pvi-perf-grid">
-          <div class="pvi-perf-item">
-            <div class="pvi-perf-value">${fmt(mem.performance_metrics.avg_views)}</div>
-            <div class="pvi-perf-label">Avg Views</div>
-          </div>
-          <div class="pvi-perf-item">
-            <div class="pvi-perf-value">${mem.performance_metrics.avg_engagement}%</div>
-            <div class="pvi-perf-label">Avg Engagement</div>
-          </div>
-          <div class="pvi-perf-item">
-            <div class="pvi-perf-value">${mem.performance_metrics.avg_conversion}%</div>
-            <div class="pvi-perf-label">Avg Conversion</div>
-          </div>
-        </div>
-      </div>
-      ` : ""}
-
-      <!-- Script Generator -->
-      <div class="pvi-section pvi-script-section">
-        <div class="pvi-section-label">${icon("spark")} Production-Ready Script</div>
-        <div class="pvi-script-box">
-          <div class="pvi-script-line"><strong>HOOK:</strong> "${mem.hook}"</div>
-          ${(mem.structure || []).map((step, i) => `<div class="pvi-script-line"><strong>${i + 1}. ${step.toUpperCase()}:</strong> [Director: ${step} scene for ${mem.product_name}]</div>`).join("")}
-          <div class="pvi-script-line"><strong>CTA:</strong> "${mem.cta}"</div>
-          <div class="pvi-script-meta">Style: ${mem.visual_style} · Pacing: ${mem.pacing.split("(")[0].trim()}</div>
-        </div>
-        <div class="pvi-script-actions">
-          <button class="copy-btn" data-copy="HOOK: &quot;${mem.hook.replace(/"/g, "&quot;")}&quot;&#10;${(mem.structure || []).map((s, i) => `${i + 1}. ${s.toUpperCase()}: [${s} scene for ${mem.product_name}]`).join("&#10;")}&#10;CTA: &quot;${mem.cta.replace(/"/g, "&quot;")}&quot;">Copy Script</button>
-        </div>
-      </div>
-
-      <!-- Visual Director Notes -->
-      <div class="pvi-section">
-        <div class="pvi-section-label">Visual Director Notes</div>
-        <div class="pvi-director-notes">
-          Use <strong>${mem.visual_style}</strong> style. Emotional tone: <strong>${(mem.emotional_triggers || []).join(", ")}</strong>. ${mem.pacing}. Top platform: <strong>${platformEntries[0] ? platformEntries[0][0] : "TikTok"}</strong>.
-        </div>
-      </div>
-
-      ${state.reproductionResult ? `
-      <div class="pvi-reproduction-banner">
-        ${icon("check")} ${state.reproductionResult}
-        <button class="toggle-link" id="pvi-dismiss-result">✕</button>
-      </div>
-      ` : ""}
-    </div>
-  `;
-}
-
-function renderProductViralIntel() {
-  const memories = state.productViralMemories.length > 0
-    ? state.productViralMemories
-    : demoProductViralMemories;
-
-  const selected = state.selectedProductViral
-    || (memories.length > 0 ? memories[0] : null);
-
-  const avgScore = memories.length > 0
-    ? Math.round(memories.reduce((s, m) => s + m.viral_score, 0) / memories.length)
-    : 0;
-
-  const totalRepros = memories.reduce((s, m) => s + (m.reproduction_count || 0), 0);
+function renderApiManagement() {
+  const services = state.servicesConfig;
+  const categories = Object.keys(CATEGORY_LABELS);
+  const unread = state.alerts.filter((a) => !a.acknowledged).length;
+  const selectedSvc = services.find((s) => s.id === state.selectedServiceId) || null;
 
   return `
     <div class="section-content">
       <div class="section-intro">
-        <h2>Product Viral Intelligence</h2>
-        <p>Per-product viral memory system. Know the most viral ad structure for every product, find viral patterns for non-viral products, and reproduce proven formats in one click.</p>
+        <h2>${icon("shield")} API Management</h2>
+        <p>Configure all external APIs, track token usage in real-time, manage auto-failover, and receive low-credit alerts.</p>
       </div>
 
-      <!-- Metrics -->
+      <!-- Summary metrics -->
       <section class="metrics-grid">
         <article class="metric">
-          <span>Products tracked</span>
-          <strong>${memories.length}</strong>
-          <small>with viral memory</small>
+          <span>Total APIs</span>
+          <strong>${services.length || 14}</strong>
+          <small>${services.filter((s) => s.enabled).length || 14} enabled</small>
         </article>
         <article class="metric">
-          <span>Avg viral score</span>
-          <strong>${avgScore}</strong>
-          <small>across all products</small>
+          <span>APIs with Keys</span>
+          <strong>${services.filter((s) => s.hasKey).length}</strong>
+          <small>${services.filter((s) => !s.hasKey && s.enabled).length} missing keys</small>
+        </article>
+        <article class="metric ${unread > 0 ? "metric-alert" : ""}">
+          <span>${icon("bell")} Alerts</span>
+          <strong>${unread}</strong>
+          <small>${unread > 0 ? "action required" : "all clear"}</small>
         </article>
         <article class="metric">
-          <span>Total reproductions</span>
-          <strong>${totalRepros}</strong>
-          <small>templates reproduced</small>
-        </article>
-        <article class="metric metric-interactive">
-          <span>Daily scan</span>
-          <strong>${state.lastScanDate ? fmtRelativeTime(state.lastScanDate) : "Not run"}</strong>
-          <small>${state.nextScanScheduled ? "Next: " + new Date(state.nextScanScheduled).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Schedule below"}</small>
-          <div class="metric-controls">
-            <button class="metric-btn ${state.viralScanInProgress ? "scanning" : ""}" id="pvi-scan-btn" ${state.viralScanInProgress ? "disabled" : ""}>
-              ${state.viralScanInProgress ? `${icon("radar")} Scanning…` : `${icon("radar")} Scan Now`}
-            </button>
-            <button class="metric-btn" id="pvi-schedule-btn" style="background:var(--gold)">
-              ${icon("memory")} Schedule
-            </button>
-          </div>
-          ${state.viralScheduleResult ? `<div class="pvi-schedule-result">${state.viralScheduleResult}</div>` : ""}
+          <span>Auto-Failover</span>
+          <strong>${state.failoverMode ? "ON" : "OFF"}</strong>
+          <small>${state.failoverMode ? "active protection" : "manual mode"}</small>
         </article>
       </section>
 
-      <!-- Main workspace: product list + detail -->
-      <section class="pvi-workspace">
-        <!-- Product List -->
-        <div class="pvi-product-list">
-          <div class="pvi-list-header">
-            <h3>Products &amp; Viral Memory</h3>
-            <span class="pvi-list-count">${memories.length} products</span>
-          </div>
-          <div class="pvi-product-cards">
-            ${memories.map((mem) => renderProductViralMemoryCard(mem)).join("")}
-          </div>
-        </div>
+      <!-- Tab navigation -->
+      <div class="api-mgmt-tabs">
+        ${[
+          { id: "overview",  label: `${icon("chart")} Overview` },
+          { id: "config",    label: `${icon("key")} API Keys & Config` },
+          { id: "failover",  label: `${icon("swap")} Failover` },
+          { id: "alerts",    label: `${icon("bell")} Alerts${unread > 0 ? ` <span class="alert-badge">${unread}</span>` : ""}` }
+        ].map((t) => `
+          <button class="api-tab-btn ${state.apiMgmtTab === t.id ? "api-tab-active" : ""}" data-api-tab="${t.id}">
+            ${t.label}
+          </button>
+        `).join("")}
+      </div>
 
-        <!-- Detail Panel -->
-        <div class="pvi-detail-panel">
-          ${renderProductViralMemoryDetail(selected)}
-        </div>
-      </section>
+      <!-- ── TAB: OVERVIEW ── -->
+      ${state.apiMgmtTab === "overview" ? `
+      <div class="api-overview">
+        ${state.servicesLoading ? `<div class="api-loading">${icon("radar")} Loading service data…</div>` : ""}
+        ${categories.map((cat) => {
+          const catServices = services.filter((s) => s.category === cat);
+          if (!catServices.length) return "";
+          return `
+            <div class="api-category-block">
+              <div class="api-category-header">
+                ${icon(CATEGORY_ICONS[cat])}
+                <h3>${CATEGORY_LABELS[cat]}</h3>
+                <span>${catServices.length} service${catServices.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div class="api-service-grid">
+                ${catServices.map((svc) => `
+                  <div class="api-service-card ${svc.id === state.selectedServiceId ? "api-service-selected" : ""} api-service-${svc.status}" data-select-service="${svc.id}">
+                    <div class="api-service-card-head">
+                      <div class="api-service-name-row">
+                        <strong>${svc.name}</strong>
+                        ${svc.isPrimary ? `<span class="svc-primary-badge">Primary</span>` : `<span class="svc-backup-badge">Backup</span>`}
+                      </div>
+                      ${serviceStatusBadge(svc.status)}
+                    </div>
 
-      <!-- How it works -->
-      <section class="panel pvi-how-it-works">
-        <div class="panel-head compact">
-          <h2>How Product Viral Intelligence Works</h2>
-        </div>
-        <div class="pvi-steps-row">
-          ${[
-            ["1", "Daily Scan", "Every morning at 6 AM, the system scans for the most viral ad for each product in your store."],
-            ["2", "Memory Storage", "Best hook, pacing, CTA, visual style, emotional triggers, and structure are stored per product."],
-            ["3", "Cross-Internet Search", "For products with low viral history, the system searches TikTok, Instagram, YouTube, Facebook, and Pinterest for viral patterns."],
-            ["4", "One-Click Reproduce", "Click Reproduce to instantly generate a production-ready creative from the best viral structure."],
-            ["5", "Performance Tracking", "Every reproduction is tracked. The system learns which structures perform best and updates memory nightly."]
-          ].map(([num, title, desc]) => `
-            <div class="pvi-how-step">
-              <div class="pvi-how-num">${num}</div>
-              <div class="pvi-how-body">
-                <strong>${title}</strong>
-                <p>${desc}</p>
+                    <!-- Token usage bar -->
+                    ${svc.limit !== null ? `
+                    <div class="api-token-section">
+                      <div class="api-token-row">
+                        <span>${svc.used.toLocaleString()} / ${svc.limit.toLocaleString()} ${svc.unit}</span>
+                        <span>${svc.pct}%</span>
+                      </div>
+                      ${tokenBar(svc.pct, svc.status)}
+                      <div class="api-token-meta">
+                        <span>Remaining: <b>${(svc.remaining || 0).toLocaleString()}</b></span>
+                        <span>Resets in <b>${svc.daysUntilReset}d</b></span>
+                        <span>Est. cost: <b>${svc.estimatedCost}</b></span>
+                      </div>
+                    </div>
+                    ` : `
+                    <div class="api-token-section">
+                      <div class="api-token-row"><span>Unlimited / pay-as-you-go</span><span>${svc.used.toLocaleString()} ${svc.unit} used</span></div>
+                      <div class="api-token-meta"><span>Est. cost: <b>${svc.estimatedCost}</b></span></div>
+                    </div>
+                    `}
+
+                    <div class="api-service-card-footer">
+                      <span class="api-plan-tag">${svc.plan.toUpperCase()}</span>
+                      <span class="api-key-tag ${svc.hasKey ? "api-key-set" : "api-key-missing"}">${svc.hasKey ? "✓ Key set" : "⚠ No key"}</span>
+                      <div class="api-card-actions">
+                        <button class="api-card-btn" data-select-service="${svc.id}" data-open-config="true">Configure</button>
+                        ${svc.limit !== null ? `<button class="api-card-btn api-card-btn-credits" data-add-credits="${svc.id}">+ Credits</button>` : ""}
+                      </div>
+                    </div>
+                  </div>
+                `).join("")}
               </div>
             </div>
-          `).join("")}
+          `;
+        }).join("")}
+
+        ${services.length === 0 ? `
+        <div class="api-empty-state">
+          <div class="api-empty-icon">${icon("shield")}</div>
+          <p>Loading API configurations…</p>
+          <button class="ghost" id="load-services-btn">${icon("radar")} Load Services</button>
         </div>
-      </section>
+        ` : ""}
+      </div>
+      ` : ""}
+
+      <!-- ── TAB: CONFIG ── -->
+      ${state.apiMgmtTab === "config" ? `
+      <div class="api-config-layout">
+        <!-- Service list sidebar -->
+        <div class="api-config-sidebar">
+          <div class="api-config-sidebar-head">
+            <h3>Services</h3>
+          </div>
+          ${categories.map((cat) => {
+            const catServices = services.filter((s) => s.category === cat);
+            if (!catServices.length) return "";
+            return `
+              <div class="api-config-group">
+                <div class="api-config-group-label">${CATEGORY_LABELS[cat]}</div>
+                ${catServices.map((svc) => `
+                  <button class="api-config-list-item ${svc.id === state.selectedServiceId ? "api-config-list-active" : ""}" data-select-service="${svc.id}" data-open-config="true">
+                    <span class="api-config-list-dot api-dot-${svc.status}"></span>
+                    <span class="api-config-list-name">${svc.name}</span>
+                    ${svc.isPrimary ? `<span class="svc-primary-badge-sm">P</span>` : ""}
+                  </button>
+                `).join("")}
+              </div>
+            `;
+          }).join("")}
+        </div>
+
+        <!-- Config detail panel -->
+        <div class="api-config-detail">
+          ${selectedSvc ? `
+          <div class="api-config-form">
+            <div class="api-config-form-head">
+              <div>
+                <h3>${selectedSvc.name}</h3>
+                <p>${CATEGORY_LABELS[selectedSvc.category]} · ${selectedSvc.isPrimary ? "Primary service" : "Backup service"}</p>
+              </div>
+              ${serviceStatusBadge(selectedSvc.status)}
+            </div>
+
+            <!-- Enable/Disable toggle -->
+            <div class="api-config-row">
+              <label class="api-config-label">Service Status</label>
+              <div class="api-toggle-row">
+                <label class="api-toggle">
+                  <input type="checkbox" class="api-toggle-input" id="svc-enabled-toggle" ${selectedSvc.enabled ? "checked" : ""} />
+                  <span class="api-toggle-slider"></span>
+                </label>
+                <span>${selectedSvc.enabled ? "Enabled" : "Disabled"}</span>
+              </div>
+            </div>
+
+            <!-- Primary toggle -->
+            <div class="api-config-row">
+              <label class="api-config-label">Set as Primary</label>
+              <div class="api-toggle-row">
+                <label class="api-toggle">
+                  <input type="checkbox" class="api-toggle-input" id="svc-primary-toggle" ${selectedSvc.isPrimary ? "checked" : ""} />
+                  <span class="api-toggle-slider"></span>
+                </label>
+                <span>${selectedSvc.isPrimary ? "Primary service" : "Backup service"}</span>
+              </div>
+            </div>
+
+            <!-- Plan selector -->
+            <div class="api-config-row">
+              <label class="api-config-label">Plan Tier</label>
+              <select id="svc-plan-select" class="api-config-select">
+                ${Object.keys(selectedSvc.plans).map((p) => `
+                  <option value="${p}" ${selectedSvc.plan === p ? "selected" : ""}>${p.charAt(0).toUpperCase() + p.slice(1)} — ${selectedSvc.plans[p].limit === null || selectedSvc.plans[p].limit === Infinity ? "Unlimited" : selectedSvc.plans[p].limit.toLocaleString()} ${selectedSvc.plans[p].unit} @ ${selectedSvc.plans[p].costPerUnit}/${selectedSvc.plans[p].unit.split("/")[0]}</option>
+                `).join("")}
+              </select>
+            </div>
+
+            <!-- API Key input -->
+            <div class="api-config-row">
+              <label class="api-config-label">${icon("key")} API Key</label>
+              <div class="api-key-input-row">
+                <input
+                  type="${state.serviceApiKeyVisible ? "text" : "password"}"
+                  id="svc-api-key-input"
+                  class="api-key-input"
+                  placeholder="${selectedSvc.hasKey ? "••••••••••••••••••••••••••••••••" : "Paste your API key here…"}"
+                  value="${state.serviceApiKeyInput.replace(/"/g, "&quot;")}"
+                />
+                <button class="api-key-toggle-btn" id="toggle-key-visibility">
+                  ${state.serviceApiKeyVisible ? "Hide" : "Show"}
+                </button>
+              </div>
+              <small class="api-key-hint">
+                ${selectedSvc.hasKey
+                  ? `✓ Key is configured (env: ${selectedSvc.id.toUpperCase().replace(/-/g, "_")}_API_KEY). Paste a new key to update.`
+                  : `⚠ No key set. Add your key to .env as ${selectedSvc.id.toUpperCase().replace(/-/g, "_")}_API_KEY or paste it here.`
+                }
+              </small>
+            </div>
+
+            <!-- Token usage -->
+            ${selectedSvc.limit !== null ? `
+            <div class="api-config-row">
+              <label class="api-config-label">Token Usage</label>
+              <div class="api-token-detail">
+                <div class="api-token-stats-grid">
+                  <div><span>Used</span><strong>${selectedSvc.used.toLocaleString()}</strong></div>
+                  <div><span>Limit</span><strong>${selectedSvc.limit.toLocaleString()}</strong></div>
+                  <div><span>Remaining</span><strong>${(selectedSvc.remaining || 0).toLocaleString()}</strong></div>
+                  <div><span>Usage</span><strong>${selectedSvc.pct}%</strong></div>
+                  <div><span>Est. Cost</span><strong>${selectedSvc.estimatedCost}</strong></div>
+                  <div><span>Resets In</span><strong>${selectedSvc.daysUntilReset}d</strong></div>
+                </div>
+                ${tokenBar(selectedSvc.pct, selectedSvc.status)}
+                <div class="api-add-credits-row">
+                  <input type="number" id="credits-amount-input" class="api-credits-input" value="${state.addCreditsAmount}" min="1" max="100000" />
+                  <button class="api-credits-btn" id="add-credits-btn" data-service-id="${selectedSvc.id}">
+                    + Add ${state.addCreditsAmount} ${selectedSvc.unit}
+                  </button>
+                </div>
+              </div>
+            </div>
+            ` : `
+            <div class="api-config-row">
+              <label class="api-config-label">Token Usage</label>
+              <div class="api-token-detail">
+                <p>Pay-as-you-go — ${selectedSvc.used.toLocaleString()} ${selectedSvc.unit} used · Est. cost: ${selectedSvc.estimatedCost}</p>
+              </div>
+            </div>
+            `}
+
+            <!-- Backup services -->
+            <div class="api-config-row">
+              <label class="api-config-label">Backup Services</label>
+              <div class="api-backups-list">
+                ${(selectedSvc.backups || []).map((bid, i) => {
+                  const bsvc = services.find((s) => s.id === bid);
+                  return bsvc ? `
+                    <div class="api-backup-item">
+                      <span class="api-backup-priority">#${i + 1}</span>
+                      <span>${bsvc.name}</span>
+                      ${serviceStatusBadge(bsvc.status)}
+                      <button class="api-card-btn" data-failover-to="${bsvc.id}" data-failover-from="${selectedSvc.id}">Switch Now</button>
+                    </div>
+                  ` : "";
+                }).join("")}
+                ${!selectedSvc.backups || selectedSvc.backups.length === 0 ? `<p class="api-no-backups">No backup services configured.</p>` : ""}
+              </div>
+            </div>
+
+            <!-- Save button -->
+            <div class="api-config-actions">
+              <button class="primary" id="save-service-config-btn" data-service-id="${selectedSvc.id}">
+                ${icon("check")} Save Configuration
+              </button>
+              ${state.serviceActionStatus ? `
+              <span class="api-action-feedback ${state.serviceActionStatus.type}">${state.serviceActionStatus.message}</span>
+              ` : ""}
+            </div>
+          </div>
+          ` : `
+          <div class="api-config-empty">
+            ${icon("key")}
+            <p>Select a service from the list to configure its API key, plan, and settings.</p>
+          </div>
+          `}
+        </div>
+      </div>
+      ` : ""}
+
+      <!-- ── TAB: FAILOVER ── -->
+      ${state.apiMgmtTab === "failover" ? `
+      <div class="api-failover-section">
+        <!-- Auto-failover master toggle -->
+        <div class="panel api-failover-panel">
+          <div class="panel-head">
+            <div>
+              <h2>${icon("swap")} Auto-Failover System</h2>
+              <p>When a primary service runs low on tokens or fails, the system automatically switches to the next available backup.</p>
+            </div>
+            <div class="api-toggle-row">
+              <label class="api-toggle api-toggle-lg">
+                <input type="checkbox" class="api-toggle-input" id="auto-failover-toggle" ${state.failoverMode ? "checked" : ""} />
+                <span class="api-toggle-slider"></span>
+              </label>
+              <strong>${state.failoverMode ? "Auto-Failover ON" : "Auto-Failover OFF"}</strong>
+            </div>
+          </div>
+
+          <!-- Thresholds info -->
+          <div class="api-threshold-grid">
+            <div class="api-threshold-card api-threshold-warning">
+              <strong>80% Usage</strong>
+              <p>Warning notification sent. Consider adding credits or preparing backup.</p>
+            </div>
+            <div class="api-threshold-card api-threshold-critical">
+              <strong>95% Usage</strong>
+              <p>Critical alert. Auto-failover activates if enabled. Backup service takes over.</p>
+            </div>
+            <div class="api-threshold-card api-threshold-info">
+              <strong>100% Usage</strong>
+              <p>Service paused. All requests routed to backup until credits are added.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active service status per category -->
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Active Services by Category</h2>
+            <button class="ghost" id="refresh-failover-btn">${icon("radar")} Refresh</button>
+          </div>
+          <div class="api-active-services-grid">
+            ${Object.entries(state.failoverStatus).map(([cat, svc]) => `
+              <div class="api-active-service-card">
+                <div class="api-active-service-head">
+                  ${icon(CATEGORY_ICONS[cat] || "gear")}
+                  <span>${CATEGORY_LABELS[cat] || cat}</span>
+                </div>
+                <strong>${svc.name}</strong>
+                ${serviceStatusBadge(svc.status)}
+                ${svc.limit !== null ? `
+                  ${tokenBar(svc.pct, svc.status)}
+                  <small>${svc.pct}% used · ${svc.daysUntilReset}d until reset</small>
+                ` : `<small>Unlimited / pay-as-you-go</small>`}
+              </div>
+            `).join("")}
+            ${Object.keys(state.failoverStatus).length === 0 ? `
+              <div class="api-empty-state">
+                <p>Loading failover status…</p>
+                <button class="ghost" id="refresh-failover-btn">${icon("radar")} Load Status</button>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+
+        <!-- Manual failover controls -->
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Manual Service Switch</h2>
+          </div>
+          <div class="api-manual-switch-grid">
+            ${categories.map((cat) => {
+              const catServices = services.filter((s) => s.category === cat);
+              if (catServices.length < 2) return "";
+              const primary = catServices.find((s) => s.isPrimary) || catServices[0];
+              const backups = catServices.filter((s) => !s.isPrimary);
+              return `
+                <div class="api-manual-switch-card">
+                  <div class="api-manual-switch-head">
+                    ${icon(CATEGORY_ICONS[cat])}
+                    <strong>${CATEGORY_LABELS[cat]}</strong>
+                  </div>
+                  <div class="api-manual-switch-body">
+                    <div class="api-switch-from">
+                      <span>From:</span>
+                      <strong>${primary.name}</strong>
+                      ${serviceStatusBadge(primary.status)}
+                    </div>
+                    <div class="api-switch-arrow">${icon("swap")}</div>
+                    <div class="api-switch-to">
+                      <span>To:</span>
+                      <select class="api-config-select api-switch-select" data-switch-from="${primary.id}">
+                        ${backups.map((b) => `<option value="${b.id}">${b.name} (${b.status})</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  <button class="api-card-btn api-switch-btn" data-switch-from="${primary.id}">
+                    ${icon("swap")} Switch Now
+                  </button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+
+        <!-- Failover log -->
+        ${state.failoverLog.length > 0 ? `
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Failover Log</h2>
+            <span>${state.failoverLog.length} events</span>
+          </div>
+          <div class="api-failover-log">
+            ${state.failoverLog.slice().reverse().map((entry) => `
+              <div class="api-log-entry">
+                <span class="api-log-time">${new Date(entry.timestamp).toLocaleString()}</span>
+                <span class="api-log-event">
+                  Switched from <strong>${entry.from}</strong> → <strong>${entry.to}</strong>
+                </span>
+                <span class="api-log-reason">${entry.reason}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        ` : ""}
+      </div>
+      ` : ""}
+
+      <!-- ── TAB: ALERTS ── -->
+      ${state.apiMgmtTab === "alerts" ? `
+      <div class="api-alerts-section">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>${icon("bell")} Alerts & Notifications</h2>
+              <p>${unread} unread · ${state.alerts.length} total</p>
+            </div>
+            <div class="api-alerts-actions">
+              <button class="ghost" id="refresh-alerts-btn">${icon("radar")} Refresh</button>
+              ${unread > 0 ? `<button class="ghost" id="ack-all-alerts-btn">${icon("check")} Mark All Read</button>` : ""}
+            </div>
+          </div>
+
+          ${state.alerts.length === 0 ? `
+          <div class="api-alerts-empty">
+            ${icon("check")}
+            <p>No alerts. All services are operating normally.</p>
+          </div>
+          ` : `
+          <div class="api-alerts-list">
+            ${state.alerts.slice().reverse().map((alert) => `
+              <div class="api-alert-item api-alert-${alert.level} ${alert.acknowledged ? "api-alert-read" : ""}">
+                <div class="api-alert-icon">
+                  ${alert.level === "critical" ? "🔴" : alert.level === "warning" ? "🟡" : "🔵"}
+                </div>
+                <div class="api-alert-body">
+                  <div class="api-alert-head">
+                    <strong>${alert.serviceName}</strong>
+                    <span class="api-alert-level api-alert-level-${alert.level}">${alert.level.toUpperCase()}</span>
+                    <span class="api-alert-time">${new Date(alert.timestamp).toLocaleString()}</span>
+                  </div>
+                  <p>${alert.message}</p>
+                  <div class="api-alert-actions">
+                    ${!alert.acknowledged ? `
+                      <button class="api-card-btn" data-ack-alert="${alert.id}">Mark Read</button>
+                    ` : `<span class="api-alert-acked">✓ Acknowledged</span>`}
+                    <button class="api-card-btn" data-select-service="${alert.serviceId}" data-open-config="true" data-switch-tab="config">
+                      Configure Service
+                    </button>
+                    ${alert.level === "critical" || alert.level === "warning" ? `
+                      <button class="api-card-btn api-card-btn-credits" data-add-credits="${alert.serviceId}">
+                        + Add Credits
+                      </button>
+                    ` : ""}
+                  </div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          `}
+        </div>
+
+        <!-- Usage summary for all services -->
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Monthly Usage Summary</h2>
+          </div>
+          <div class="api-usage-summary">
+            ${services.filter((s) => s.limit !== null).map((svc) => `
+              <div class="api-usage-row">
+                <span class="api-usage-name">${svc.name}</span>
+                <div class="api-usage-bar-wrap">
+                  ${tokenBar(svc.pct, svc.status)}
+                </div>
+                <span class="api-usage-pct ${svc.status === "critical" ? "text-critical" : svc.status === "warning" ? "text-warning" : ""}">${svc.pct}%</span>
+                <span class="api-usage-detail">${svc.used.toLocaleString()} / ${svc.limit.toLocaleString()} ${svc.unit}</span>
+                <span class="api-usage-cost">${svc.estimatedCost}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+      ` : ""}
+
+      ${state.serviceActionStatus && state.apiMgmtTab !== "config" ? `
+      <div class="api-global-feedback api-action-feedback ${state.serviceActionStatus.type}">
+        ${state.serviceActionStatus.message}
+        <button class="api-feedback-close" id="dismiss-service-action">✕</button>
+      </div>
+      ` : ""}
     </div>
   `;
+}
+
+// ── API Management data loaders ──
+async function loadServicesConfig() {
+  state.servicesLoading = true;
+  render();
+  try {
+    const [configRes, alertsRes, failoverRes] = await Promise.all([
+      fetch("/api/services/config"),
+      fetch("/api/services/alerts"),
+      fetch("/api/services/failover-status")
+    ]);
+    if (configRes.ok) {
+      const data = await configRes.json();
+      state.servicesConfig = data.services || [];
+    }
+    if (alertsRes.ok) {
+      const data = await alertsRes.json();
+      state.alerts = data.alerts || [];
+      state.alertsUnread = data.count || 0;
+    }
+    if (failoverRes.ok) {
+      const data = await failoverRes.json();
+      state.failoverMode = data.autoFailover;
+      state.failoverLog = data.failoverLog || [];
+      state.failoverStatus = data.activeServices || {};
+    }
+  } catch (e) {
+    console.warn("Services API unavailable — using demo data.", e);
+    // Populate with demo data so the UI is still useful
+    state.servicesConfig = buildDemoServices();
+    state.failoverStatus = buildDemoFailoverStatus(state.servicesConfig);
+  }
+  state.servicesLoading = false;
+  render();
+}
+
+function buildDemoServices() {
+  const defs = [
+    { id: "heygen",           name: "HeyGen",                  category: "video",     isPrimary: true,  plan: "free",  limit: 100,       used: 23,  unit: "minutes",     costPerUnit: 0.10, backups: ["runway","kling"],                              hasKey: false },
+    { id: "runway",           name: "Runway",                  category: "video",     isPrimary: false, plan: "free",  limit: 5,         used: 1,   unit: "generations", costPerUnit: 0.10, backups: ["heygen","kling"],                              hasKey: false },
+    { id: "kling",            name: "Kling",                   category: "video",     isPrimary: false, plan: "free",  limit: 10,        used: 0,   unit: "generations", costPerUnit: 0.08, backups: ["heygen","runway"],                             hasKey: false },
+    { id: "canva",            name: "Canva",                   category: "image",     isPrimary: true,  plan: "free",  limit: 50,        used: 12,  unit: "designs",     costPerUnit: 0.05, backups: ["openai"],                                     hasKey: false },
+    { id: "openai",           name: "OpenAI (DALL-E + GPT-4)", category: "ai",        isPrimary: true,  plan: "payg",  limit: null,      used: 4200, unit: "tokens",     costPerUnit: 0.00003, backups: ["anthropic","gemini"],                      hasKey: false },
+    { id: "tiktok",           name: "TikTok API",              category: "social",    isPrimary: true,  plan: "free",  limit: 100,       used: 8,   unit: "posts",       costPerUnit: 0.01, backups: ["instagram","youtube","facebook","pinterest"],  hasKey: false },
+    { id: "instagram",        name: "Instagram API",           category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 5,   unit: "posts",       costPerUnit: 0.01, backups: ["tiktok","youtube","facebook","pinterest"],     hasKey: false },
+    { id: "youtube",          name: "YouTube API",             category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 3,   unit: "uploads",     costPerUnit: 0.01, backups: ["tiktok","instagram","facebook","pinterest"],   hasKey: false },
+    { id: "facebook",         name: "Facebook API",            category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 2,   unit: "posts",       costPerUnit: 0.01, backups: ["tiktok","instagram","youtube","pinterest"],    hasKey: false },
+    { id: "pinterest",        name: "Pinterest API",           category: "social",    isPrimary: false, plan: "free",  limit: 50,        used: 1,   unit: "pins",        costPerUnit: 0.02, backups: ["tiktok","instagram","youtube","facebook"],     hasKey: false },
+    { id: "anthropic",        name: "Anthropic Claude",        category: "ai",        isPrimary: false, plan: "payg",  limit: null,      used: 1800, unit: "tokens",     costPerUnit: 0.000008, backups: ["openai","gemini"],                         hasKey: false },
+    { id: "gemini",           name: "Google Gemini",           category: "ai",        isPrimary: false, plan: "free",  limit: 60,        used: 14,  unit: "req/min",     costPerUnit: 0,    backups: ["openai","anthropic"],                          hasKey: false },
+    { id: "shopify_analytics",name: "Shopify API",             category: "analytics", isPrimary: true,  plan: "free",  limit: 100,       used: 42,  unit: "req/min",     costPerUnit: 0,    backups: ["google_analytics"],                           hasKey: false },
+    { id: "google_analytics", name: "Google Analytics",        category: "analytics", isPrimary: false, plan: "free",  limit: 10000000,  used: 0,   unit: "hits/mo",     costPerUnit: 0,    backups: ["shopify_analytics"],                          hasKey: false }
+  ];
+  return defs.map((d) => {
+    const pct = d.limit ? Math.min(100, Math.round((d.used / d.limit) * 100)) : 0;
+    const remaining = d.limit !== null ? Math.max(0, d.limit - d.used) : null;
+    const status = !d.enabled ? "disabled" : !d.hasKey ? "no-key" : pct >= 95 ? "critical" : pct >= 80 ? "warning" : "healthy";
+    return {
+      ...d,
+      enabled: true,
+      pct,
+      remaining,
+      estimatedCost: Math.round(d.used * d.costPerUnit * 100) / 100,
+      daysUntilReset: 14,
+      status,
+      plans: {}
+    };
+  });
+}
+
+function buildDemoFailoverStatus(services) {
+  const cats = ["video", "image", "social", "ai", "analytics"];
+  const result = {};
+  cats.forEach((cat) => {
+    const primary = services.find((s) => s.category === cat && s.isPrimary);
+    if (primary) result[cat] = primary;
+  });
+  return result;
 }
 
 function render() {
@@ -2180,13 +2523,13 @@ function render() {
 
   // Determine which section content to render
   const sectionRenderers = {
-    "viral-intelligence":  renderViralIntelligence,
-    "product-viral-intel": renderProductViralIntel,
-    "ai-reconstruction":   renderAiReconstruction,
-    "video-generation":    renderVideoGeneration,
-    "distribution":        renderDistribution,
-    "analytics":           renderAnalytics,
-    "twin-automation":     renderTwinAutomation
+    "viral-intelligence": renderViralIntelligence,
+    "ai-reconstruction":  renderAiReconstruction,
+    "video-generation":   renderVideoGeneration,
+    "distribution":       renderDistribution,
+    "analytics":          renderAnalytics,
+    "twin-automation":    renderTwinAutomation,
+    "api-management":     renderApiManagement
   };
   const sectionContent = (sectionRenderers[state.currentSection] || renderViralIntelligence)();
 
@@ -3580,6 +3923,333 @@ function bindEvents() {
     });
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // API MANAGEMENT EVENT BINDINGS
+  // ═══════════════════════════════════════════════════════════
+
+  // ── Tab navigation ──
+  document.querySelectorAll("[data-api-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.apiMgmtTab = btn.dataset.apiTab;
+      state.serviceActionStatus = null;
+      render();
+    });
+  });
+
+  // ── Load services button (empty state) ──
+  const loadServicesBtn = document.getElementById("load-services-btn");
+  if (loadServicesBtn) {
+    loadServicesBtn.addEventListener("click", () => loadServicesConfig());
+  }
+
+  // ── Select service (overview cards + config sidebar) ──
+  document.querySelectorAll("[data-select-service]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.selectService;
+      state.selectedServiceId = id;
+      state.serviceApiKeyInput = "";
+      state.serviceApiKeyVisible = false;
+      state.serviceActionStatus = null;
+      if (el.dataset.openConfig === "true") {
+        state.apiMgmtTab = "config";
+      }
+      if (el.dataset.switchTab) {
+        state.apiMgmtTab = el.dataset.switchTab;
+      }
+      render();
+    });
+  });
+
+  // ── Toggle API key visibility ──
+  const toggleKeyVisibility = document.getElementById("toggle-key-visibility");
+  if (toggleKeyVisibility) {
+    toggleKeyVisibility.addEventListener("click", () => {
+      state.serviceApiKeyVisible = !state.serviceApiKeyVisible;
+      render();
+    });
+  }
+
+  // ── API key input ──
+  const svcApiKeyInput = document.getElementById("svc-api-key-input");
+  if (svcApiKeyInput) {
+    svcApiKeyInput.addEventListener("input", () => {
+      state.serviceApiKeyInput = svcApiKeyInput.value;
+    });
+  }
+
+  // ── Credits amount input ──
+  const creditsAmountInput = document.getElementById("credits-amount-input");
+  if (creditsAmountInput) {
+    creditsAmountInput.addEventListener("input", () => {
+      state.addCreditsAmount = Math.max(1, Number(creditsAmountInput.value) || 100);
+    });
+  }
+
+  // ── Save service config ──
+  const saveServiceConfigBtn = document.getElementById("save-service-config-btn");
+  if (saveServiceConfigBtn) {
+    saveServiceConfigBtn.addEventListener("click", async () => {
+      const serviceId = saveServiceConfigBtn.dataset.serviceId;
+      if (!serviceId) return;
+
+      const enabledToggle  = document.getElementById("svc-enabled-toggle");
+      const primaryToggle  = document.getElementById("svc-primary-toggle");
+      const planSelect     = document.getElementById("svc-plan-select");
+      const apiKeyInput    = document.getElementById("svc-api-key-input");
+
+      const payload = {
+        enabled:   enabledToggle  ? enabledToggle.checked  : undefined,
+        isPrimary: primaryToggle  ? primaryToggle.checked  : undefined,
+        plan:      planSelect     ? planSelect.value        : undefined,
+        apiKey:    apiKeyInput && apiKeyInput.value.trim() ? apiKeyInput.value.trim() : undefined
+      };
+
+      saveServiceConfigBtn.textContent = "Saving…";
+      saveServiceConfigBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/services/${serviceId}/update-config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Update local state
+          const idx = state.servicesConfig.findIndex((s) => s.id === serviceId);
+          if (idx !== -1 && data.service) state.servicesConfig[idx] = { ...state.servicesConfig[idx], ...data.service };
+          state.serviceActionStatus = { type: "success", message: `✓ ${data.message || "Configuration saved."}` };
+          state.serviceApiKeyInput = "";
+        } else {
+          state.serviceActionStatus = { type: "warning", message: "⚠ Save failed. Check backend connection." };
+        }
+      } catch {
+        // Demo mode: update local state directly
+        const idx = state.servicesConfig.findIndex((s) => s.id === serviceId);
+        if (idx !== -1) {
+          if (enabledToggle)  state.servicesConfig[idx].enabled   = enabledToggle.checked;
+          if (primaryToggle)  state.servicesConfig[idx].isPrimary = primaryToggle.checked;
+          if (planSelect)     state.servicesConfig[idx].plan      = planSelect.value;
+          if (apiKeyInput && apiKeyInput.value.trim()) {
+            state.servicesConfig[idx].hasKey = true;
+            state.servicesConfig[idx].status = "healthy";
+          }
+        }
+        state.serviceActionStatus = { type: "success", message: "✓ Configuration saved (demo mode)." };
+        state.serviceApiKeyInput = "";
+      }
+      setTimeout(() => { state.serviceActionStatus = null; render(); }, 3000);
+      render();
+    });
+  }
+
+  // ── Add credits buttons (overview cards + config form) ──
+  document.querySelectorAll("[data-add-credits]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const serviceId = btn.dataset.addCredits;
+      const amount = state.addCreditsAmount || 100;
+      btn.textContent = "Adding…";
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/services/${serviceId}/add-credits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const idx = state.servicesConfig.findIndex((s) => s.id === serviceId);
+          if (idx !== -1 && data.service) state.servicesConfig[idx] = { ...state.servicesConfig[idx], ...data.service };
+          state.serviceActionStatus = { type: "success", message: `✓ ${data.message}` };
+        } else {
+          state.serviceActionStatus = { type: "warning", message: "⚠ Could not add credits. Check backend." };
+        }
+      } catch {
+        // Demo mode
+        const idx = state.servicesConfig.findIndex((s) => s.id === serviceId);
+        if (idx !== -1) {
+          state.servicesConfig[idx].used = Math.max(0, (state.servicesConfig[idx].used || 0) - amount);
+          const svc = state.servicesConfig[idx];
+          if (svc.limit) {
+            svc.pct = Math.min(100, Math.round((svc.used / svc.limit) * 100));
+            svc.remaining = Math.max(0, svc.limit - svc.used);
+            svc.status = svc.pct >= 95 ? "critical" : svc.pct >= 80 ? "warning" : "healthy";
+          }
+        }
+        state.serviceActionStatus = { type: "success", message: `✓ ${amount} credits added (demo mode).` };
+      }
+      setTimeout(() => { state.serviceActionStatus = null; render(); }, 3000);
+      render();
+    });
+  });
+
+  // ── Auto-failover toggle ──
+  const autoFailoverToggle = document.getElementById("auto-failover-toggle");
+  if (autoFailoverToggle) {
+    autoFailoverToggle.addEventListener("change", async () => {
+      const enabled = autoFailoverToggle.checked;
+      try {
+        const res = await fetch("/api/services/failover/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.failoverMode = data.autoFailover;
+        } else {
+          state.failoverMode = enabled;
+        }
+      } catch {
+        state.failoverMode = enabled;
+      }
+      render();
+    });
+  }
+
+  // ── Refresh failover status ──
+  const refreshFailoverBtn = document.getElementById("refresh-failover-btn");
+  if (refreshFailoverBtn) {
+    refreshFailoverBtn.addEventListener("click", async () => {
+      refreshFailoverBtn.textContent = "Refreshing…";
+      refreshFailoverBtn.disabled = true;
+      try {
+        const res = await fetch("/api/services/failover-status");
+        if (res.ok) {
+          const data = await res.json();
+          state.failoverMode = data.autoFailover;
+          state.failoverLog = data.failoverLog || [];
+          state.failoverStatus = data.activeServices || {};
+        }
+      } catch {
+        state.failoverStatus = buildDemoFailoverStatus(state.servicesConfig);
+      }
+      render();
+    });
+  }
+
+  // ── Manual service switch buttons ──
+  document.querySelectorAll(".api-switch-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const fromId = btn.dataset.switchFrom;
+      const selectEl = document.querySelector(`.api-switch-select[data-switch-from="${fromId}"]`);
+      const toId = selectEl ? selectEl.value : null;
+      if (!fromId || !toId) return;
+
+      btn.textContent = "Switching…";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/services/failover/switch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromServiceId: fromId, toServiceId: toId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.serviceActionStatus = { type: "success", message: `✓ ${data.message}` };
+          // Update failover log
+          state.failoverLog.push({ timestamp: new Date().toISOString(), from: fromId, to: toId, reason: "Manual switch" });
+        } else {
+          state.serviceActionStatus = { type: "warning", message: "⚠ Switch failed." };
+        }
+      } catch {
+        state.serviceActionStatus = { type: "success", message: `✓ Switched to ${toId} (demo mode).` };
+        state.failoverLog.push({ timestamp: new Date().toISOString(), from: fromId, to: toId, reason: "Manual switch (demo)" });
+      }
+      setTimeout(() => { state.serviceActionStatus = null; render(); }, 3000);
+      render();
+    });
+  });
+
+  // ── Failover-to buttons (from config backup list) ──
+  document.querySelectorAll("[data-failover-to]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const fromId = btn.dataset.failoverFrom;
+      const toId   = btn.dataset.failoverTo;
+      btn.textContent = "Switching…";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/services/failover/switch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromServiceId: fromId, toServiceId: toId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.serviceActionStatus = { type: "success", message: `✓ ${data.message}` };
+        } else {
+          state.serviceActionStatus = { type: "warning", message: "⚠ Switch failed." };
+        }
+      } catch {
+        state.serviceActionStatus = { type: "success", message: `✓ Switched to ${toId} (demo mode).` };
+      }
+      setTimeout(() => { state.serviceActionStatus = null; render(); }, 3000);
+      render();
+    });
+  });
+
+  // ── Refresh alerts ──
+  const refreshAlertsBtn = document.getElementById("refresh-alerts-btn");
+  if (refreshAlertsBtn) {
+    refreshAlertsBtn.addEventListener("click", async () => {
+      refreshAlertsBtn.textContent = "Refreshing…";
+      refreshAlertsBtn.disabled = true;
+      try {
+        const res = await fetch("/api/services/alerts");
+        if (res.ok) {
+          const data = await res.json();
+          state.alerts = data.alerts || [];
+          state.alertsUnread = data.count || 0;
+        }
+      } catch { /* demo ok */ }
+      render();
+    });
+  }
+
+  // ── Acknowledge all alerts ──
+  const ackAllAlertsBtn = document.getElementById("ack-all-alerts-btn");
+  if (ackAllAlertsBtn) {
+    ackAllAlertsBtn.addEventListener("click", async () => {
+      try {
+        await fetch("/api/services/alerts/acknowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true })
+        });
+      } catch { /* demo ok */ }
+      state.alerts.forEach((a) => { a.acknowledged = true; });
+      state.alertsUnread = 0;
+      render();
+    });
+  }
+
+  // ── Acknowledge individual alert ──
+  document.querySelectorAll("[data-ack-alert]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const alertId = btn.dataset.ackAlert;
+      try {
+        await fetch("/api/services/alerts/acknowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ alertId })
+        });
+      } catch { /* demo ok */ }
+      const alert = state.alerts.find((a) => a.id === alertId);
+      if (alert) alert.acknowledged = true;
+      state.alertsUnread = state.alerts.filter((a) => !a.acknowledged).length;
+      render();
+    });
+  });
+
+  // ── Dismiss global service action feedback ──
+  const dismissServiceAction = document.getElementById("dismiss-service-action");
+  if (dismissServiceAction) {
+    dismissServiceAction.addEventListener("click", () => {
+      state.serviceActionStatus = null;
+      render();
+    });
+  }
+
   // ── Render result actions ──
   const approveRender = document.getElementById("approve-render");
   if (approveRender) {
@@ -3849,9 +4519,11 @@ async function boot() {
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
-  if (window.loadMediaOutputs) {
-    await window.loadMediaOutputs();
-  }
+  // Pre-load API service configs in background
+  loadServicesConfig().catch(() => {
+    state.servicesConfig = buildDemoServices();
+    state.failoverStatus = buildDemoFailoverStatus(state.servicesConfig);
+  });
   render();
 }
 
