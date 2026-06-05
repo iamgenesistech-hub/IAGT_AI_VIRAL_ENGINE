@@ -38,21 +38,32 @@ const state = {
   selectedProducts: new Set(),
   creativeProductFilter: "All",
 
-  // Video Assembly Workspace
-  assemblyHookFilter: "All",
-  assemblyScriptFilter: "All",
-  assemblyProductFilter: "All",
+  // Video Generation Pipeline
+  scriptInput: "",
+  submittedScript: "",
+  uploadedScriptName: "",
+  inputStatus: "idle",
+  inputMessage: "Paste a script or upload a text file, then submit it to unlock generation.",
   videoDuration: "15s",
   videoStyle: "UGC",
   videoVoice: "Female",
   videoBackground: "Music",
   videoAspect: "9:16",
-  assemblyComponents: [],
-  videoDrafts: [],
-  renderStatus: null,
+  renderStatus: "idle",
+  renderMessage: "Waiting for submitted input.",
   renderUrl: null,
   renderProgress: 0,
-  showAssemblyWorkspace: true,
+  renderVideoId: null,
+  renderStatusUrl: null,
+  exportMessage: "Generate a completed video before exporting.",
+
+  // Legacy assembly data retained for non-video sections that still read shared creative state
+  assemblyHookFilter: "All",
+  assemblyScriptFilter: "All",
+  assemblyProductFilter: "All",
+  assemblyComponents: [],
+  videoDrafts: [],
+  showAssemblyWorkspace: false,
   compareDrafts: false,
   selectedDraftA: null,
   selectedDraftB: null,
@@ -402,6 +413,26 @@ function fmt(num) {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${Math.round(num / 1000)}K`;
   return String(num);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function renderStatusLabel(status) {
+  const labels = {
+    idle: "Idle",
+    ready: "Input Ready",
+    processing: "Processing",
+    complete: "Complete",
+    failed: "Failed"
+  };
+  return labels[status] || status;
 }
 
 function icon(name) {
@@ -940,267 +971,108 @@ function renderAiReconstruction() {
 }
 
 function renderVideoGeneration() {
-  const hookCategories    = ["All", ...new Set(winningHooks.map((h) => h.category))];
-  const productCategories = ["All", ...new Set(products.map((p) => p.category))];
+  const hasInput = Boolean(state.submittedScript.trim());
+  const isProcessing = state.renderStatus === "processing";
+  const canGenerate = hasInput && !isProcessing;
+  const canExport = Boolean(state.renderUrl) && state.renderStatus === "complete";
 
   return `
-    <div class="section-content">
+    <div class="section-content video-pipeline-content">
       <div class="section-intro">
-        <h2>Video Generation</h2>
-        <p>Assemble and render videos using HeyGen, Runway, and Kling. Build from hooks, scripts, and products in the component library.</p>
+        <h2>Video Generation Pipeline</h2>
+        <p>A single linear workflow: submit a real script, generate one video render, preview the completed video, then export the same output.</p>
       </div>
 
-      <!-- Assembly Workspace -->
-      <section class="assembly-workspace">
-        <div class="assembly-header">
-          <div>
-            <h2>${icon("video")} Elite Manual Video Assembly Workspace</h2>
-            <p>Assemble videos from AI-generated components. Full edit controls, multi-platform rendering, draft comparison.</p>
+      <section class="video-pipeline">
+        <article class="pipeline-card input-layer">
+          <div class="pipeline-step-label">1 · INPUT LAYER</div>
+          <h3>Submit Script Input</h3>
+          <p>Paste a production script or upload a .txt file. Submitting locks the exact script used by the render request.</p>
+          <label class="script-input-label" for="script-input">Video script</label>
+          <textarea id="script-input" class="script-input" rows="9" placeholder="Paste the final script that should be rendered into video...">${escapeHtml(state.scriptInput)}</textarea>
+          <div class="file-input-row">
+            <label class="file-picker" for="script-file-input">Upload .txt Script</label>
+            <input id="script-file-input" type="file" accept=".txt,text/plain" />
+            <span>${state.uploadedScriptName ? escapeHtml(state.uploadedScriptName) : "No file selected"}</span>
           </div>
-          <button class="ghost" id="toggle-assembly">${state.showAssemblyWorkspace ? "▲ Collapse" : "▼ Expand"}</button>
-        </div>
+          <button class="primary pipeline-action" id="submit-video-input" ${state.scriptInput.trim() ? "" : "disabled"}>Use Script</button>
+          <div class="pipeline-feedback ${state.inputStatus}">${escapeHtml(state.inputMessage)}</div>
+        </article>
 
-        ${state.showAssemblyWorkspace ? `
-        <div class="assembly-body">
-          <div class="assembly-libraries">
-            <!-- Hooks Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Hooks Library</h3>
-                <label><select data-select="assemblyHookFilter" class="lib-select">
-                  ${hookCategories.map((c) => `<option ${c === state.assemblyHookFilter ? "selected" : ""}>${c}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredHooks().map((h) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-text">${h.text}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${h.category}</span>
-                        <span class="hook-tag">${h.platform}</span>
-                        <span class="hook-tag hook-confidence-${h.confidence.toLowerCase()}">${h.confidence}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${h.text.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="hook" data-component-id="${h.id}" data-component-text="${h.text.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-
-            <!-- Scripts Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Scripts Library</h3>
-                <label><select data-select="assemblyScriptFilter" class="lib-select">
-                  ${["All", ...products.map((p) => p.name)].map((n) => `<option ${n === state.assemblyScriptFilter ? "selected" : ""}>${n}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredAssemblyScripts().map((c) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-label">${c.product}</span>
-                      <span class="lib-text">${c.script}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${c.format}</span>
-                        <span class="hook-tag">${c.channel}</span>
-                        <span class="hook-tag hook-confidence-${c.status === "Ready" ? "high" : c.status === "Review" ? "medium" : "low"}">${c.status}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${c.script.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="script" data-component-id="${c.id}" data-component-text="${c.script.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-
-            <!-- Products Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Products Library</h3>
-                <label><select data-select="assemblyProductFilter" class="lib-select">
-                  ${productCategories.map((c) => `<option ${c === state.assemblyProductFilter ? "selected" : ""}>${c}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredAssemblyProducts().map((p) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-label">${p.name}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${p.category}</span>
-                        <span class="hook-tag">${p.angle}</span>
-                        <span class="hook-tag hook-confidence-high">Score ${p.score}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${p.name.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="product" data-component-id="${p.name}" data-component-text="${p.name.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
+        <article class="pipeline-card generation-layer">
+          <div class="pipeline-step-label">2 · PROCESSING / GENERATION LAYER</div>
+          <h3>Generate Video</h3>
+          <p>One render action sends the submitted script to the backend HeyGen integration. Status is polled until completion or failure.</p>
+          <div class="params-grid pipeline-params">
+            <label class="param-label">Duration
+              <select data-state-key="videoDuration" ${isProcessing ? "disabled" : ""}>
+                ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Style
+              <select data-state-key="videoStyle" ${isProcessing ? "disabled" : ""}>
+                ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Voice
+              <select data-state-key="videoVoice" ${isProcessing ? "disabled" : ""}>
+                ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Background
+              <select data-state-key="videoBackground" ${isProcessing ? "disabled" : ""}>
+                ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Aspect Ratio
+              <select data-state-key="videoAspect" ${isProcessing ? "disabled" : ""}>
+                ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
           </div>
-
-          <!-- Builder + Parameters Row -->
-          <div class="assembly-builder-row">
-            <div class="params-panel">
-              <h3>Video Parameters</h3>
-              <div class="params-grid">
-                <label class="param-label">Duration
-                  <select data-state-key="videoDuration">
-                    ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Style
-                  <select data-state-key="videoStyle">
-                    ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Voice
-                  <select data-state-key="videoVoice">
-                    ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Background
-                  <select data-state-key="videoBackground">
-                    ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Aspect Ratio
-                  <select data-state-key="videoAspect">
-                    ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-              </div>
-              <div class="params-summary">
-                <span>${state.videoDuration} · ${state.videoStyle} · ${state.videoVoice} voice · ${state.videoBackground} · ${state.videoAspect}</span>
-              </div>
+          <button class="primary pipeline-action generate-video-action" id="generate-video-btn" ${canGenerate ? "" : "disabled"}>
+            ${isProcessing ? `${icon("radar")} Generating Video…` : `${icon("video")} Generate Video`}
+          </button>
+          <div class="render-status-card ${state.renderStatus}">
+            <div>
+              <span>Status</span>
+              <strong>${renderStatusLabel(state.renderStatus)}</strong>
             </div>
-
-            <div class="builder-panel">
-              <div class="builder-head">
-                <h3>Video Builder</h3>
-                <div class="builder-actions">
-                  <button class="ghost" id="ai-suggestions-btn">${icon("spark")} AI Suggestions</button>
-                  <button class="ghost" id="save-draft-btn">${icon("check")} Save Draft</button>
-                </div>
-              </div>
-              <div class="drop-zone" id="builder-drop-zone">
-                ${state.assemblyComponents.length === 0
-                  ? `<div class="drop-zone-empty">Drag components here or click <strong>+ Add</strong> from the libraries above.<br/><small>Hook → Script → Product → CTA</small></div>`
-                  : state.assemblyComponents.map((comp, idx) => `
-                    <div class="builder-component" data-comp-idx="${idx}">
-                      <span class="comp-type-badge comp-type-${comp.type}">${comp.type}</span>
-                      <span class="comp-text">${comp.text}</span>
-                      <button class="comp-remove" data-remove-idx="${idx}">✕</button>
-                    </div>
-                  `).join("")
-                }
-              </div>
-              ${state.assemblyComponents.length > 0 ? `
-              <div class="builder-preview">
-                <div class="preview-label">Structure Preview · ${state.videoAspect} · ${state.videoDuration}</div>
-                <div class="preview-body">
-                  ${state.assemblyComponents.map((comp, idx) => `
-                    <div class="preview-step">
-                      <b>${idx + 1}. ${comp.type.toUpperCase()}</b>
-                      <p>${comp.text.length > 120 ? comp.text.slice(0, 120) + "…" : comp.text}</p>
-                    </div>
-                  `).join("")}
-                  <div class="preview-params">
-                    Style: ${state.videoStyle} · Voice: ${state.videoVoice} · BG: ${state.videoBackground}
-                  </div>
-                </div>
-              </div>
-              ` : ""}
-              <div class="render-actions">
-                <button class="render-btn heygen" id="send-heygen" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>${icon("video")} Send to HeyGen</button>
-                <button class="render-btn runway" id="send-runway" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>${icon("video")} Send to Runway</button>
-                <button class="render-btn kling"  id="send-kling"  ${state.assemblyComponents.length === 0 ? "disabled" : ""}>${icon("video")} Send to Kling</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rendering Status -->
-          ${state.renderStatus ? `
-          <div class="render-status-panel">
-            <div class="render-status-head">
-              <h3>Rendering Status</h3>
-              <span class="render-badge render-badge-${state.renderStatus.toLowerCase().replace(/\s/g, "-")}">${state.renderStatus}</span>
-            </div>
-            ${state.renderStatus === "Rendering" ? `
+            <p>${escapeHtml(state.renderMessage)}</p>
+            ${state.renderVideoId ? `<small>Render ID: ${escapeHtml(state.renderVideoId)}</small>` : ""}
+            ${isProcessing ? `
               <div class="render-progress-bar"><div class="render-progress-fill" style="width:${state.renderProgress}%"></div></div>
               <small>${state.renderProgress}% complete</small>
             ` : ""}
-            ${state.renderUrl ? `
-              <div class="render-result">
-                <a href="${state.renderUrl}" target="_blank" class="render-url-link">${icon("video")} View Rendered Video</a>
-                <div class="render-result-actions">
-                  <button class="ghost" id="approve-render">✓ Approve &amp; Publish</button>
-                  <button class="ghost" id="reject-render">✕ Reject</button>
-                  <button class="ghost" id="regenerate-render">${icon("radar")} Re-generate</button>
-                </div>
-              </div>
-            ` : ""}
           </div>
-          ` : ""}
+        </article>
 
-          <!-- Drafts & Compare -->
-          ${state.videoDrafts.length > 0 ? `
-          <div class="drafts-panel">
-            <div class="drafts-head">
-              <h3>Saved Drafts (${state.videoDrafts.length})</h3>
-              <button class="toggle-link" id="toggle-compare">${state.compareDrafts ? "▲ Close Compare" : "▼ Compare Versions"}</button>
+        <article class="pipeline-card output-layer">
+          <div class="pipeline-step-label">3 · OUTPUT / PREVIEW LAYER</div>
+          <h3>Preview Completed Video</h3>
+          ${state.renderUrl ? `
+            <video class="pipeline-video-player" src="${escapeHtml(state.renderUrl)}" controls preload="metadata"></video>
+            <a class="render-url-link" href="${escapeHtml(state.renderUrl)}" target="_blank" rel="noopener">Open direct video URL</a>
+          ` : `
+            <div class="empty-output-state">
+              <strong>No completed video output.</strong>
+              <span>Submit input and generate a render. Playback appears only after the backend returns a direct video URL.</span>
             </div>
-            <div class="drafts-list">
-              ${state.videoDrafts.map((draft, idx) => `
-                <div class="draft-row">
-                  <span class="draft-name">Draft ${idx + 1} — ${draft.style} · ${draft.duration} · ${draft.aspect}</span>
-                  <span class="draft-components">${draft.components.length} components</span>
-                  <div class="draft-actions">
-                    <button class="ghost" data-load-draft="${idx}">Load</button>
-                    <button class="ghost" data-delete-draft="${idx}">Delete</button>
-                    ${state.compareDrafts ? `
-                      <button class="ghost ${state.selectedDraftA === idx ? "active-link" : ""}" data-compare-a="${idx}">A</button>
-                      <button class="ghost ${state.selectedDraftB === idx ? "active-link" : ""}" data-compare-b="${idx}">B</button>
-                    ` : ""}
-                  </div>
-                </div>
-              `).join("")}
-            </div>
-            ${state.compareDrafts && state.selectedDraftA !== null && state.selectedDraftB !== null ? `
-            <div class="compare-view">
-              <div class="compare-col">
-                <div class="compare-label">Draft ${state.selectedDraftA + 1}</div>
-                ${state.videoDrafts[state.selectedDraftA].components.map((c, i) => `
-                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
-                `).join("")}
-                <div class="preview-params">${state.videoDrafts[state.selectedDraftA].style} · ${state.videoDrafts[state.selectedDraftA].voice} · ${state.videoDrafts[state.selectedDraftA].duration}</div>
-              </div>
-              <div class="compare-col">
-                <div class="compare-label">Draft ${state.selectedDraftB + 1}</div>
-                ${state.videoDrafts[state.selectedDraftB].components.map((c, i) => `
-                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
-                `).join("")}
-                <div class="preview-params">${state.videoDrafts[state.selectedDraftB].style} · ${state.videoDrafts[state.selectedDraftB].voice} · ${state.videoDrafts[state.selectedDraftB].duration}</div>
-              </div>
-            </div>
-            ` : ""}
-          </div>
-          ` : ""}
-        </div>
-        ` : ""}
+          `}
+        </article>
+
+        <article class="pipeline-card export-layer">
+          <div class="pipeline-step-label">4 · EXPORT LAYER</div>
+          <h3>Download Output</h3>
+          <p>Exports the exact video URL returned by the completed render. Download is disabled until a real output exists.</p>
+          ${canExport ? `
+            <a class="primary pipeline-action export-download" href="${escapeHtml(state.renderUrl)}" download="iagt-generated-video.mp4">Download Video</a>
+          ` : `
+            <button class="primary pipeline-action" disabled>Download Video</button>
+          `}
+          <div class="pipeline-feedback ${canExport ? "ready" : "idle"}">${escapeHtml(canExport ? "Video is ready to download." : state.exportMessage)}</div>
+        </article>
       </section>
-
-      ${renderMediaArea("video-generation")}
     </div>
   `;
 }
@@ -1458,7 +1330,6 @@ function render() {
             <b>${state.dataSource}</b>
             <span>${state.syncMessage}</span>
           </div>
-          <button class="ghost">${icon("filter")} Connect Sources</button>
           <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} Copilot</button>
         </div>
       </header>
@@ -1517,6 +1388,106 @@ function select(name, options, value) {
   return `<label><select data-select="${name}">${options.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
 }
 
+let renderPollTimeout = null;
+
+function mapBackendRenderStatus(status) {
+  if (status === "completed" || status === "complete") return "complete";
+  if (status === "failed") return "failed";
+  return "processing";
+}
+
+async function pollRenderStatus(statusUrl) {
+  if (!statusUrl) return;
+
+  try {
+    const response = await fetch(statusUrl, { headers: { Accept: "application/json" } });
+    const data = await response.json();
+    const nextStatus = mapBackendRenderStatus(data.status);
+
+    state.renderStatus = nextStatus;
+    state.renderProgress = nextStatus === "complete" ? 100 : Math.min(95, Math.max(state.renderProgress + 10, 35));
+    state.renderUrl = data.video_url || data.videoUrl || state.renderUrl || null;
+    state.renderMessage = nextStatus === "complete"
+      ? "Render complete. A direct video URL is available for playback and export."
+      : nextStatus === "failed"
+        ? (data.error_message || data.error || "Render failed before a playable video URL was returned.")
+        : "Render is still processing. Checking backend status again.";
+    state.exportMessage = state.renderUrl ? "Video is ready to download." : "Generate a completed video before exporting.";
+
+    render();
+
+    if (nextStatus === "processing") {
+      renderPollTimeout = setTimeout(() => pollRenderStatus(statusUrl), 10000);
+    }
+  } catch (error) {
+    state.renderStatus = "failed";
+    state.renderProgress = 0;
+    state.renderMessage = error.message || "Unable to read render status from the backend.";
+    state.exportMessage = "Generate a completed video before exporting.";
+    render();
+  }
+}
+
+async function generateVideoFromSubmittedScript() {
+  if (!state.submittedScript.trim() || state.renderStatus === "processing") return;
+
+  if (renderPollTimeout) {
+    clearTimeout(renderPollTimeout);
+    renderPollTimeout = null;
+  }
+
+  state.renderStatus = "processing";
+  state.renderMessage = "Render submitted to backend. Waiting for provider status.";
+  state.renderProgress = 15;
+  state.renderUrl = null;
+  state.renderVideoId = null;
+  state.renderStatusUrl = null;
+  state.exportMessage = "Generate a completed video before exporting.";
+  render();
+
+  try {
+    const response = await fetch("/api/video/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        script: state.submittedScript,
+        duration: state.videoDuration,
+        style: state.videoStyle,
+        background: state.videoBackground,
+        aspect: state.videoAspect,
+        config: { display_voice: state.videoVoice }
+      })
+    });
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.error || "Video generation request failed.");
+    }
+
+    state.renderVideoId = data.video_id || null;
+    state.renderStatusUrl = data.status_url || null;
+    state.renderUrl = data.video_url || data.videoUrl || null;
+    state.renderStatus = mapBackendRenderStatus(data.status);
+    state.renderProgress = state.renderStatus === "complete" ? 100 : 30;
+    state.renderMessage = state.renderStatus === "complete"
+      ? "Render complete. A direct video URL is available for playback and export."
+      : "Render accepted. Polling backend until a direct video URL is returned.";
+
+    render();
+
+    if (state.renderStatus === "processing" && state.renderStatusUrl) {
+      renderPollTimeout = setTimeout(() => pollRenderStatus(state.renderStatusUrl), 10000);
+    }
+  } catch (error) {
+    state.renderStatus = "failed";
+    state.renderProgress = 0;
+    state.renderMessage = error.message || "Video generation failed.";
+    state.renderUrl = null;
+    state.exportMessage = "Generate a completed video before exporting.";
+    render();
+  }
+}
+
 function bindEvents() {
   // ── Navigation: sidebar nav buttons ──
   document.querySelectorAll("[data-section]").forEach((btn) => {
@@ -1528,6 +1499,69 @@ function bindEvents() {
       render();
     });
   });
+
+  // ── Video pipeline input layer ──
+  const scriptInput = document.getElementById("script-input");
+  if (scriptInput) {
+    scriptInput.addEventListener("input", () => {
+      state.scriptInput = scriptInput.value;
+      if (state.inputStatus !== "ready") {
+        state.inputStatus = state.scriptInput.trim() ? "idle" : "idle";
+        state.inputMessage = state.scriptInput.trim()
+          ? "Script entered. Submit it to use this input for generation."
+          : "Paste a script or upload a text file, then submit it to unlock generation.";
+      }
+    });
+  }
+
+  const scriptFileInput = document.getElementById("script-file-input");
+  if (scriptFileInput) {
+    scriptFileInput.addEventListener("change", async () => {
+      const file = scriptFileInput.files && scriptFileInput.files[0];
+      if (!file) return;
+      if (file.type && file.type !== "text/plain" && !file.name.toLowerCase().endsWith(".txt")) {
+        state.inputStatus = "failed";
+        state.inputMessage = "Only plain text script files are accepted.";
+        state.uploadedScriptName = "";
+        render();
+        return;
+      }
+      const text = await file.text();
+      state.scriptInput = text;
+      state.uploadedScriptName = file.name;
+      state.inputStatus = "idle";
+      state.inputMessage = "Script file loaded. Submit it to use this input for generation.";
+      render();
+    });
+  }
+
+  const submitVideoInput = document.getElementById("submit-video-input");
+  if (submitVideoInput) {
+    submitVideoInput.addEventListener("click", () => {
+      const script = state.scriptInput.trim();
+      if (!script) return;
+      state.submittedScript = script;
+      state.inputStatus = "ready";
+      state.inputMessage = `Submitted ${script.length.toLocaleString()} characters for video generation.`;
+      state.renderStatus = "ready";
+      state.renderMessage = "Input ready. Generate Video will send this script to the backend renderer.";
+      state.renderProgress = 0;
+      state.renderUrl = null;
+      state.renderVideoId = null;
+      state.renderStatusUrl = null;
+      state.exportMessage = "Generate a completed video before exporting.";
+      if (renderPollTimeout) {
+        clearTimeout(renderPollTimeout);
+        renderPollTimeout = null;
+      }
+      render();
+    });
+  }
+
+  const generateVideoBtn = document.getElementById("generate-video-btn");
+  if (generateVideoBtn) {
+    generateVideoBtn.addEventListener("click", generateVideoFromSubmittedScript);
+  }
 
   // ── Media type filter ──
   const mediaTypeFilter = document.getElementById("media-type-filter");
