@@ -69,6 +69,8 @@ const state = {
   copilotLoading: false
 };
 
+window.state = state;
+
 let viralAds = [
   {
     id: "ad-001",
@@ -534,6 +536,7 @@ const SECTIONS = [
   { id: "viral-intelligence", icon: "radar", label: "Viral Intelligence",  desc: "Trend scanning, hook discovery, viral pattern analysis" },
   { id: "ai-reconstruction",  icon: "spark", label: "AI Reconstruction",   desc: "AI-powered creative reconstruction from viral ads" },
   { id: "video-generation",   icon: "video", label: "Video Generation",    desc: "Video rendering via HeyGen, Runway, and Kling" },
+  { id: "media-output",       icon: "video", label: "Media Output",        desc: "Playback, QA, render routing, and publishing control" },
   { id: "distribution",       icon: "send",  label: "Distribution",        desc: "Publishing queue and channel management" },
   { id: "analytics",          icon: "chart", label: "Analytics",           desc: "Performance metrics and learning loop" },
   { id: "twin-automation",    icon: "gear",  label: "Twin Automation",     desc: "Agent orchestration and auto-generate pipeline" }
@@ -1414,6 +1417,7 @@ function render() {
     "viral-intelligence": renderViralIntelligence,
     "ai-reconstruction":  renderAiReconstruction,
     "video-generation":   renderVideoGeneration,
+    "media-output":       window.renderMediaOutputCenter || (() => "<div class=\"panel\">Media Output Center is loading.</div>"),
     "distribution":       renderDistribution,
     "analytics":          renderAnalytics,
     "twin-automation":    renderTwinAutomation
@@ -1500,6 +1504,9 @@ function render() {
   `;
 
   bindEvents();
+  if (state.currentSection === "media-output" && window.bindMediaOutputCenter) {
+    window.bindMediaOutputCenter();
+  }
 }
 
 function metric(label, value, delta) {
@@ -2309,6 +2316,9 @@ async function boot() {
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
+  if (window.loadMediaOutputs) {
+    await window.loadMediaOutputs();
+  }
   render();
 }
 

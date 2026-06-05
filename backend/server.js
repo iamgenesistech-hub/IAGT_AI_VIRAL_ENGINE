@@ -8,6 +8,7 @@ const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
+const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
 const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
 
 const app = express();
@@ -179,6 +180,7 @@ app.get('/api/production-closeout/status', async (_req, res) => {
 
 registerEvicsRecoveryRoutes(app, SupabaseConnector);
 registerEvicsEvieRoutes(app);
+registerMediaOutputRoutes(app, SupabaseConnector);
 
 // -------------------------
 // /api/products — evics_products table
