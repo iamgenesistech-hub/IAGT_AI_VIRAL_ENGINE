@@ -4,6 +4,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require('express');
+const path = require('path');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
@@ -16,21 +17,10 @@ const PORT = process.env.PORT || 4175;
 
 app.use(express.json());
 
-// Serve config.js dynamically with server environment variables to prevent race conditions on the dashboard
-app.get('/config.js', (_req, res) => {
-  res.type('application/javascript');
-  res.send(`
-window.IAGT_CONFIG = {
-  supabaseUrl: "${process.env.SUPABASE_URL || ''}",
-  supabaseAnonKey: "${process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''}"
-};
-  `);
-});
-
+// Serve static files from dashboard/control-center
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
-app.use('/generated', express.static(path.join(__dirname, '../generated')));
-app.use('/evidence', express.static(path.join(__dirname, '../evidence')));
-app.use('/docs', express.static(path.join(__dirname, '../docs')));
+
+// Root route — serve dashboard HTML
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
