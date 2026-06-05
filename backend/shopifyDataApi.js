@@ -1,5 +1,5 @@
 // backend/shopifyDataApi.js
-const supabase = require("../utils/supabaseConnector");
+const supabase = require("../utils/SupabaseConnector");
 
 async function getSyncedProducts(limit = 100) {
   const { data, error } = await supabase
