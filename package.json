@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node backend/server.js",
     "sync:shopify:admin": "node sync-shopify-products.js",
-    "test": "node scrapers/viralScraper.js"
+    "check": "node --check backend/server.js && node --check backend/sharedEvicsEvieCore.js && node --check backend/evicsEvieRoutes.js && node --check tests/evics-evie-validation.js",
+    "test": "node tests/evics-evie-validation.js",
+    "test:legacy-scraper": "node scrapers/viralScraper.js"
   },
   "dependencies": {
     "@shopify/shopify-api": "^13.0.0",
@@ -15,6 +17,7 @@
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.0",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "openai": "^4.104.0"
   }
 }
