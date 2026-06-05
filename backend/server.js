@@ -995,6 +995,366 @@ app.post('/api/agent/copilot', async (req, res) => {
 // /api/media — Media Review & Approval Workspace
 // -------------------------
 
+// GET /api/media/stats — approval workflow stats
+app.get('/api/media/stats', async (_req, res) => {
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('approval_status');
+
+    if (error) throw new Error(error.message);
+
+    const rows = data || [];
+    const stats = {
+      total: rows.length,
+      approved: rows.filter((r) => r.approval_status === 'approved').length,
+      pending: rows.filter((r) => !r.approval_status || r.approval_status === 'pending').length,
+      rerender: rows.filter((r) => r.approval_status === 'needs_rerender').length,
+      discarded: rows.filter((r) => r.approval_status === 'discarded').length,
+    };
+
+    noStore(res);
+    res.json({ success: true, stats });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// GET /api/media/gallery — list all rendered videos with status
+app.get('/api/media/gallery', async (_req, res) => {
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) throw new Error(error.message);
+
+    const videos = (data || []).map((row) => ({
+      id: row.id,
+      platform: row.platform || 'Unknown',
+      jobId: row.job_id || null,
+      videoUrl: row.video_url || null,
+      thumbnailUrl: row.thumbnail_url || null,
+      status: row.status || 'pending',
+      approvalStatus: row.approval_status || 'pending',
+      script: row.script || '',
+      parameters: (() => { try { return JSON.parse(row.parameters || '{}'); } catch { return {}; } })(),
+      rejectionReason: row.rejection_reason || '',
+      aiSuggestions: (() => { try { return JSON.parse(row.ai_suggestions || 'null'); } catch { return null; } })(),
+      iterationCount: row.iteration_count || 0,
+      qualityScore: row.quality_score || null,
+      product: row.product || null,
+      hook: row.hook || null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at || row.created_at,
+    }));
+
+    noStore(res);
+    res.json({ success: true, count: videos.length, videos });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// GET /api/media/:id — single video details
+app.get('/api/media/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ success: false, error: 'Video not found.' });
+
+    const video = {
+      id: data.id,
+      platform: data.platform || 'Unknown',
+      jobId: data.job_id || null,
+      videoUrl: data.video_url || null,
+      thumbnailUrl: data.thumbnail_url || null,
+      status: data.status || 'pending',
+      approvalStatus: data.approval_status || 'pending',
+      script: data.script || '',
+      parameters: (() => { try { return JSON.parse(data.parameters || '{}'); } catch { return {}; } })(),
+      rejectionReason: data.rejection_reason || '',
+      aiSuggestions: (() => { try { return JSON.parse(data.ai_suggestions || 'null'); } catch { return null; } })(),
+      iterationCount: data.iteration_count || 0,
+      qualityScore: data.quality_score || null,
+      product: data.product || null,
+      hook: data.hook || null,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at || data.created_at,
+    };
+
+    noStore(res);
+    res.json({ success: true, video });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/approve — mark as approved
+app.post('/api/media/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({
+        approval_status: 'approved',
+        rejection_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, approvalStatus: 'approved' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/reject — mark for re-render with reason
+app.post('/api/media/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Pull current record to get context for AI suggestions
+    const { data: existing } = await SupabaseConnector
+      .from('evics_renders')
+      .select('platform, script, parameters, iteration_count, product, hook')
+      .eq('id', id)
+      .single();
+
+    const iterationCount = (existing?.iteration_count || 0) + 1;
+
+    // Build AI suggestions using copilot-style analysis
+    const params = (() => { try { return JSON.parse(existing?.parameters || '{}'); } catch { return {}; } })();
+    const suggestions = buildRerenderSuggestions({
+      platform: existing?.platform,
+      script: existing?.script,
+      product: existing?.product,
+      hook: existing?.hook,
+      reason,
+      params,
+      iterationCount,
+    });
+
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({
+        approval_status: 'needs_rerender',
+        rejection_reason: reason || '',
+        ai_suggestions: JSON.stringify(suggestions),
+        iteration_count: iterationCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, approvalStatus: 'needs_rerender', suggestions, iterationCount });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/discard — mark as discarded
+app.post('/api/media/:id/discard', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({
+        approval_status: 'discarded',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, id, approvalStatus: 'discarded' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/:id/requeue — add back to render queue with AI improvements
+app.post('/api/media/:id/requeue', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: existing, error: fetchErr } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!existing) return res.status(404).json({ success: false, error: 'Video not found.' });
+
+    const iterationCount = existing.iteration_count || 0;
+    if (iterationCount >= 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Maximum re-render attempts (3) reached. Please discard or manually revise.',
+      });
+    }
+
+    const aiSuggestions = (() => { try { return JSON.parse(existing.ai_suggestions || 'null'); } catch { return null; } })();
+    const params = (() => { try { return JSON.parse(existing.parameters || '{}'); } catch { return {}; } })();
+
+    // Build improved script incorporating AI suggestions
+    const improvedScript = aiSuggestions
+      ? `[Re-render ${iterationCount + 1} — AI Improvements Applied]\n${aiSuggestions.improvements.map((s) => `• ${s}`).join('\n')}\n\n${existing.script || ''}`
+      : existing.script || '';
+
+    // Insert new render job with improvements
+    const { data: newRender, error: insertErr } = await SupabaseConnector
+      .from('evics_renders')
+      .insert([{
+        platform: existing.platform,
+        job_id: null,
+        video_url: null,
+        status: 'queued',
+        approval_status: 'pending',
+        script: improvedScript,
+        parameters: existing.parameters,
+        product: existing.product,
+        hook: existing.hook,
+        iteration_count: iterationCount + 1,
+        parent_render_id: id,
+        rejection_reason: null,
+        ai_suggestions: null,
+        created_at: new Date().toISOString(),
+      }])
+      .select();
+
+    if (insertErr) throw new Error(insertErr.message);
+
+    // Mark original as superseded
+    await SupabaseConnector
+      .from('evics_renders')
+      .update({ approval_status: 'superseded', updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    noStore(res);
+    res.json({
+      success: true,
+      originalId: id,
+      newRenderId: newRender ? newRender[0]?.id : null,
+      iterationCount: iterationCount + 1,
+      message: `Re-render queued (attempt ${iterationCount + 1} of 3). AI improvements applied.`,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media/bulk — bulk approve / discard / requeue
+app.post('/api/media/bulk', async (req, res) => {
+  try {
+    const { ids, action } = req.body;
+    if (!ids || !Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ success: false, error: 'ids array is required.' });
+    }
+    if (!['approve', 'discard'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action must be approve or discard.' });
+    }
+
+    const approvalStatus = action === 'approve' ? 'approved' : 'discarded';
+    const { error } = await SupabaseConnector
+      .from('evics_renders')
+      .update({ approval_status: approvalStatus, updated_at: new Date().toISOString() })
+      .in('id', ids);
+
+    if (error) throw new Error(error.message);
+
+    noStore(res);
+    res.json({ success: true, updated: ids.length, approvalStatus });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// Helper: generate AI re-render suggestions based on video metadata
+function buildRerenderSuggestions({ platform, script, product, hook, reason, params, iterationCount }) {
+  const improvements = [];
+  const reasonLower = (reason || '').toLowerCase();
+  const scriptLower = (script || '').toLowerCase();
+
+  // Hook analysis
+  if (reasonLower.includes('hook') || reasonLower.includes('opening') || !hook) {
+    improvements.push('Rewrite the opening hook with a stronger curiosity or problem-agitation pattern');
+    improvements.push('Lead with a bold claim or surprising statistic in the first 2 seconds');
+  }
+
+  // Pacing analysis
+  if (reasonLower.includes('pac') || reasonLower.includes('slow') || reasonLower.includes('cut')) {
+    improvements.push('Increase visual cut frequency — aim for a new scene every 1.5–2 seconds');
+    improvements.push('Add dynamic text overlays to maintain viewer attention through the middle section');
+  }
+
+  // Product placement
+  if (reasonLower.includes('product') || reasonLower.includes('placement')) {
+    improvements.push('Move product reveal earlier — show it within the first 4 seconds');
+    improvements.push('Add a close-up product shot with benefit callout text');
+  }
+
+  // CTA
+  if (reasonLower.includes('cta') || reasonLower.includes('call') || reasonLower.includes('action')) {
+    improvements.push('Strengthen the CTA with urgency language (e.g. "Start today", "Limited offer")');
+    improvements.push('Add a visual CTA overlay in the final 3 seconds');
+  }
+
+  // Platform-specific
+  if ((platform || '').toLowerCase() === 'tiktok') {
+    improvements.push('Ensure first frame is visually striking — TikTok scroll-stop requires immediate visual impact');
+  } else if ((platform || '').toLowerCase() === 'instagram') {
+    improvements.push('Optimize for silent viewing — ensure all key messages appear as text overlays');
+  }
+
+  // Script length
+  if (scriptLower.length > 600) {
+    improvements.push('Trim script to under 150 words — shorter scripts perform better on short-form platforms');
+  }
+
+  // Fallback
+  if (improvements.length === 0) {
+    improvements.push('Refresh the hook with a new emotional angle');
+    improvements.push('Test a different visual style (UGC vs. polished commercial)');
+    improvements.push('Adjust pacing and add pattern interrupts every 3 seconds');
+  }
+
+  const expectedImprovement = Math.min(15 + iterationCount * 5, 30);
+
+  return {
+    improvements: improvements.slice(0, 5),
+    expectedQualityGain: `+${expectedImprovement}% estimated quality improvement`,
+    focusArea: reasonLower.includes('hook') ? 'Hook & Opening'
+      : reasonLower.includes('pac') ? 'Pacing & Editing'
+      : reasonLower.includes('product') ? 'Product Placement'
+      : reasonLower.includes('cta') ? 'Call to Action'
+      : 'Overall Creative Quality',
+    iterationNote: iterationCount >= 2
+      ? 'Final re-render attempt. Consider a full creative overhaul if this does not meet standards.'
+      : `Attempt ${iterationCount} of 3. AI improvements applied based on rejection feedback.`,
+  };
+}
+
+// -------------------------
+// /api/shopify/products — live Shopify product list
+// -------------------------
+
 // GET /api/media/stats — aggregate counts by approval status
 app.get('/api/media/stats', async (_req, res) => {
   try {
@@ -1742,14 +2102,8 @@ app.listen(PORT, () => {
   console.log(`➡️  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
   console.log(`➡️  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);
   console.log(`➡️  Agent copilot:       POST http://127.0.0.1:${PORT}/api/agent/copilot`);
-  console.log(`➡️  Media types:         http://127.0.0.1:${PORT}/api/media/types`);
-  console.log(`➡️  Media apps:          http://127.0.0.1:${PORT}/api/media/apps`);
-  console.log(`➡️  Media by type:       http://127.0.0.1:${PORT}/api/media/by-type/:type`);
-  console.log(`➡️  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
-  console.log(`➡️  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
-  console.log(`➡️  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
-  console.log(`➡️  Media stats:         http://127.0.0.1:${PORT}/api/media/stats`);
   console.log(`➡️  Media gallery:       http://127.0.0.1:${PORT}/api/media/gallery`);
+  console.log(`➡️  Media stats:         http://127.0.0.1:${PORT}/api/media/stats`);
   console.log(`➡️  Media approve:       POST http://127.0.0.1:${PORT}/api/media/:id/approve`);
   console.log(`➡️  Media reject:        POST http://127.0.0.1:${PORT}/api/media/:id/reject`);
   console.log(`➡️  Media discard:       POST http://127.0.0.1:${PORT}/api/media/:id/discard`);
