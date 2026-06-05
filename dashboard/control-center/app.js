@@ -1,3 +1,26 @@
+const API_BASE = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+  ? window.location.origin
+  : "https://exemplary-communication-production-aab5.up.railway.app";
+
+async function agentFetch(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function agentGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 const state = {
   // ── Navigation ──
   currentSection: "viral-intelligence",
@@ -32,19 +55,24 @@ const state = {
   showHooksList: false,
   selectedHooks: new Set(),
   hookAutoSelect: false,
+  hookSearchKeyword: "",
+
+  // Creatives / Script Writer
+  generatingCreative: false,
+  lastGeneratedCreative: null,
 
   // Product Matching
   productsExpanded: false,
   selectedProducts: new Set(),
   creativeProductFilter: "All",
+  matchingProducts: false,
+  productMatchResults: null,
 
-  // Video Generation Pipeline
-  scriptInput: "",
-  submittedScript: "",
-  uploadedScriptName: "",
-  inputStatus: "idle",
-  inputMessage: "Paste a script or upload a text file, then submit it to unlock generation.",
-  videoDuration: "15s",
+  // Video Assembly Workspace
+  assemblyHookFilter: "All",
+  assemblyScriptFilter: "All",
+  assemblyProductFilter: "All",
+  videoDuration: "30s",
   videoStyle: "UGC",
   videoVoice: "Female",
   videoBackground: "Music",
@@ -52,6 +80,8 @@ const state = {
   renderStatus: "idle",
   renderMessage: "Waiting for submitted input.",
   renderUrl: null,
+  renderJobId: null,
+  renderRenderId: null,
   renderProgress: 0,
   renderVideoId: null,
   renderStatusUrl: null,
@@ -68,16 +98,22 @@ const state = {
   selectedDraftA: null,
   selectedDraftB: null,
 
-  // Auto-generate
-  autoGenerating: false,
-  autoGenerateResult: null,
-
   // Copilot
-  copilotOpen: false,
-  copilotQuestion: "",
-  copilotAnswer: null,
-  copilotNextActions: [],
-  copilotLoading: false
+  copilotSuggestions: null,
+  copilotRefinements: null,
+  copilotExplanations: null,
+  copilotLoading: false,
+  showCopilotPanel: false,
+
+  // Auto-Generate Pipeline
+  autoGenerating: false,
+  autoGenerateStep: null,
+  autoGenerateResult: null,
+  autoGeneratePipelineSteps: [],
+
+  // Render polling
+  renderPollingActive: false,
+  liveRenders: []
 };
 
 window.state = state;
@@ -788,6 +824,9 @@ function renderViralIntelligence() {
               ${state.hookSearching ? `${icon("radar")} Searching…` : `${icon("spark")} Find Hooks`}
             </button>
           </div>
+          <div class="metric-controls" style="margin-top:6px">
+            <input type="text" id="hook-keyword-input" class="metric-input" value="${state.hookSearchKeyword}" placeholder="Target search keyword…" style="flex:1" />
+          </div>
           <div class="metric-toggle-row">
             <button class="toggle-link" id="toggle-hooks-list">${state.showHooksList ? "▲ Hide hooks" : "▼ Show all hooks"}</button>
             <button class="toggle-link ${state.hookAutoSelect ? "active-link" : ""}" id="hook-auto-select">
@@ -795,7 +834,28 @@ function renderViralIntelligence() {
             </button>
           </div>
         </article>
-        ${metric("Avg engagement rate", "10.2%", "across scanned ads")}
+
+        <article class="metric metric-interactive">
+          <span>Creatives generated</span>
+          <strong>${creatives.length}</strong>
+          <small>${creatives.filter((c) => c.status === "Ready").length} ready to publish</small>
+          <div class="metric-controls">
+            <label class="metric-select-label">
+              <select data-select="creativeProductFilter" class="metric-select">
+                ${productNames.map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
+              </select>
+            </label>
+            <button class="metric-btn ${state.generatingCreative ? "scanning" : ""}" id="generate-creative-btn" ${state.generatingCreative ? "disabled" : ""}>
+              ${state.generatingCreative ? `${icon("spark")} Generating…` : `${icon("spark")} Generate`}
+            </button>
+          </div>
+          ${state.lastGeneratedCreative ? `
+          <div class="metric-generated-badge">
+            ✓ Generated: <strong>${state.lastGeneratedCreative.product}</strong> · Score ${state.lastGeneratedCreative.score}
+          </div>
+          ` : ""}
+        </article>
+
         ${metric("Projected ROAS signal", "3.7x", "based on patterns")}
       </section>
 
@@ -881,18 +941,389 @@ function renderViralIntelligence() {
         </div>
       </section>
 
-      ${renderMediaArea("viral-intelligence")}
-    </div>
-  `;
-}
+      <!-- ── ELITE MANUAL VIDEO ASSEMBLY WORKSPACE ── -->
+      <section class="assembly-workspace">
+        <div class="assembly-header">
+          <div>
+            <h2>${icon("video")} Elite Manual Video Assembly Workspace</h2>
+            <p>Assemble videos from AI-generated components. Full edit controls, multi-platform rendering, draft comparison.</p>
+          </div>
+          <button class="ghost" id="toggle-assembly">${state.showAssemblyWorkspace ? "▲ Collapse" : "▼ Expand"}</button>
+        </div>
 
-function renderAiReconstruction() {
-  return `
-    <div class="section-content">
-      <div class="section-intro">
-        <h2>AI Reconstruction</h2>
-        <p>AI-powered creative reconstruction from viral ads. Deconstruct winning structures and rebuild them for your products.</p>
-      </div>
+        ${state.showAssemblyWorkspace ? `
+        <div class="assembly-body">
+
+          <!-- Component Libraries Row -->
+          <div class="assembly-libraries">
+
+            <!-- Hooks Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Hooks Library</h3>
+                <label><select data-select="assemblyHookFilter" class="lib-select">
+                  ${hookCategories.map((c) => `<option ${c === state.assemblyHookFilter ? "selected" : ""}>${c}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredHooks().map((h) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-text">${h.text}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${h.category}</span>
+                        <span class="hook-tag">${h.platform}</span>
+                        <span class="hook-tag hook-confidence-${h.confidence.toLowerCase()}">${h.confidence}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${h.text.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="hook" data-component-id="${h.id}" data-component-text="${h.text.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            <!-- Scripts Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Scripts Library</h3>
+                <label><select data-select="assemblyScriptFilter" class="lib-select">
+                  ${["All", ...products.map((p) => p.name)].map((n) => `<option ${n === state.assemblyScriptFilter ? "selected" : ""}>${n}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredAssemblyScripts().map((c) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-label">${c.product}</span>
+                      <span class="lib-text">${c.script}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${c.format}</span>
+                        <span class="hook-tag">${c.channel}</span>
+                        <span class="hook-tag hook-confidence-${c.status === "Ready" ? "high" : c.status === "Review" ? "medium" : "low"}">${c.status}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${c.script.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="script" data-component-id="${c.id}" data-component-text="${c.script.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            <!-- Products Library -->
+            <div class="library-panel">
+              <div class="library-head">
+                <h3>Products Library</h3>
+                <label><select data-select="assemblyProductFilter" class="lib-select">
+                  ${productCategories.map((c) => `<option ${c === state.assemblyProductFilter ? "selected" : ""}>${c}</option>`).join("")}
+                </select></label>
+              </div>
+              <div class="library-list">
+                ${filteredAssemblyProducts().map((p) => `
+                  <div class="library-item">
+                    <div class="library-item-body">
+                      <span class="lib-label">${p.name}</span>
+                      <div class="lib-meta">
+                        <span class="hook-tag">${p.category}</span>
+                        <span class="hook-tag">${p.angle}</span>
+                        <span class="hook-tag hook-confidence-high">Score ${p.score}</span>
+                      </div>
+                    </div>
+                    <div class="lib-actions">
+                      <button class="copy-btn" data-copy="${p.name.replace(/"/g, "&quot;")}">Copy</button>
+                      <button class="add-to-builder-btn" data-component-type="product" data-component-id="${p.name}" data-component-text="${p.name.replace(/"/g, "&quot;")}">+ Add</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+          </div><!-- /assembly-libraries -->
+
+          <!-- Builder + Parameters Row -->
+          <div class="assembly-builder-row">
+
+            <!-- Video Parameters Panel -->
+            <div class="params-panel">
+              <h3>Video Parameters</h3>
+              <div class="params-grid">
+                <label class="param-label">Duration
+                  <select data-state-key="videoDuration">
+                    ${["15s","20s","30s","45s","60s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Style
+                  <select data-state-key="videoStyle">
+                    ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Voice
+                  <select data-state-key="videoVoice">
+                    ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Background
+                  <select data-state-key="videoBackground">
+                    ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="param-label">Aspect Ratio
+                  <select data-state-key="videoAspect">
+                    ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <div class="params-summary">
+                <span>${state.videoDuration} · ${state.videoStyle} · ${state.videoVoice} voice · ${state.videoBackground} · ${state.videoAspect}</span>
+              </div>
+            </div>
+
+            <!-- Video Builder -->
+            <div class="builder-panel">
+              <div class="builder-head">
+                <h3>Video Builder</h3>
+                <div class="builder-actions">
+                  <button class="ghost" id="ai-suggestions-btn">${state.copilotLoading ? `${icon("radar")} Loading…` : `${icon("spark")} AI Suggestions`}</button>
+                  <button class="ghost" id="refine-hook-btn">${icon("spark")} Refine Hook</button>
+                  <button class="ghost" id="explain-decision-btn">${icon("gear")} Explain</button>
+                  <button class="ghost" id="save-draft-btn">${icon("check")} Save Draft</button>
+                </div>
+              </div>
+
+              <!-- Copilot Panel -->
+              ${state.showCopilotPanel ? `
+              <div class="copilot-panel">
+                <div class="copilot-head">
+                  <h4>${icon("spark")} AI Copilot</h4>
+                  <button class="toggle-link" id="close-copilot-btn">✕ Close</button>
+                </div>
+                ${state.copilotLoading ? `<div class="copilot-loading">${icon("radar")} Thinking…</div>` : ""}
+                ${state.copilotSuggestions && state.copilotSuggestions.length ? `
+                  <div class="copilot-section-label">Suggestions</div>
+                  ${state.copilotSuggestions.map((s) => `
+                    <div class="copilot-card copilot-type-${s.type || "general"}">
+                      <div class="copilot-card-head">
+                        <strong>${s.title}</strong>
+                        <span class="hook-tag hook-confidence-${(s.confidence || "medium").toLowerCase()}">${s.confidence || "Medium"}</span>
+                      </div>
+                      <p>${s.body}</p>
+                    </div>
+                  `).join("")}
+                ` : ""}
+                ${state.copilotRefinements && state.copilotRefinements.length ? `
+                  <div class="copilot-section-label">Hook Refinements</div>
+                  ${state.copilotRefinements.map((r) => `
+                    <div class="copilot-card">
+                      <div class="copilot-card-head">
+                        <strong>${r.version}</strong>
+                        <span class="hook-tag hook-confidence-high">Score ${r.score}</span>
+                      </div>
+                      <p class="copilot-refinement-text">"${r.text}"</p>
+                      <small>${r.rationale}</small>
+                      <button class="ghost copilot-apply-btn" data-apply-refinement="${r.text.replace(/"/g, "&quot;")}">↑ Apply to Builder</button>
+                    </div>
+                  `).join("")}
+                ` : ""}
+                ${state.copilotExplanations && state.copilotExplanations.length ? `
+                  <div class="copilot-section-label">Decision Explanations</div>
+                  ${state.copilotExplanations.map((e) => `
+                    <div class="copilot-card">
+                      <div class="copilot-card-head">
+                        <strong>${e.component}</strong>
+                        <span class="hook-tag hook-confidence-${(e.impact || "medium").toLowerCase() === "high" ? "high" : (e.impact || "medium").toLowerCase() === "medium" ? "medium" : "low"}">${e.impact || "Medium"} impact</span>
+                      </div>
+                      <p>${e.reasoning}</p>
+                    </div>
+                  `).join("")}
+                ` : ""}
+              </div>
+              ` : ""}
+            
+
+              <div class="drop-zone" id="builder-drop-zone">
+                ${state.assemblyComponents.length === 0
+                  ? `<div class="drop-zone-empty">Drag components here or click <strong>+ Add</strong> from the libraries above.<br/><small>Hook → Script → Product → CTA</small></div>`
+                  : state.assemblyComponents.map((comp, idx) => `
+                    <div class="builder-component" data-comp-idx="${idx}">
+                      <span class="comp-type-badge comp-type-${comp.type}">${comp.type}</span>
+                      <span class="comp-text">${comp.text}</span>
+                      <button class="comp-remove" data-remove-idx="${idx}">✕</button>
+                    </div>
+                  `).join("")
+                }
+              </div>
+
+              <!-- Real-time preview -->
+              ${state.assemblyComponents.length > 0 ? `
+              <div class="builder-preview">
+                <div class="preview-label">Structure Preview · ${state.videoAspect} · ${state.videoDuration}</div>
+                <div class="preview-body">
+                  ${state.assemblyComponents.map((comp, idx) => `
+                    <div class="preview-step">
+                      <b>${idx + 1}. ${comp.type.toUpperCase()}</b>
+                      <p>${comp.text.length > 120 ? comp.text.slice(0, 120) + "…" : comp.text}</p>
+                    </div>
+                  `).join("")}
+                  <div class="preview-params">
+                    Style: ${state.videoStyle} · Voice: ${state.videoVoice} · BG: ${state.videoBackground}
+                  </div>
+                </div>
+              </div>
+              ` : ""}
+
+              <!-- Send to Renderer -->
+              <div class="render-actions">
+                <button class="render-btn heygen" id="send-heygen" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to HeyGen
+                </button>
+                <button class="render-btn runway" id="send-runway" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to Runway
+                </button>
+                <button class="render-btn kling" id="send-kling" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
+                  ${icon("video")} Send to Kling
+                </button>
+              </div>
+            </div>
+
+          </div><!-- /assembly-builder-row -->
+
+          <!-- Rendering Status -->
+          ${state.renderStatus ? `
+          <div class="render-status-panel">
+            <div class="render-status-head">
+              <h3>Rendering Status</h3>
+              <span class="render-badge render-badge-${state.renderStatus.toLowerCase().replace(/\s/g, "-")}">${state.renderStatus}</span>
+            </div>
+            ${state.renderStatus === "Rendering" ? `
+              <div class="render-progress-bar"><div class="render-progress-fill" style="width:${state.renderProgress}%"></div></div>
+              <small>${state.renderProgress}% complete</small>
+            ` : ""}
+            ${state.renderUrl ? `
+              <div class="render-result">
+                <a href="${state.renderUrl}" target="_blank" class="render-url-link">${icon("video")} View Rendered Video</a>
+                <div class="render-result-actions">
+                  <button class="ghost" id="approve-render">✓ Approve &amp; Publish</button>
+                  <button class="ghost" id="reject-render">✕ Reject</button>
+                  <button class="ghost" id="regenerate-render">${icon("radar")} Re-generate</button>
+                </div>
+              </div>
+            ` : ""}
+          </div>
+          ` : ""}
+
+          <!-- Live Renders Status Panel (always visible, auto-refreshes) -->
+          <div class="render-status-panel" style="margin-top:12px">
+            <div class="render-status-head">
+              <h3>Rendering Status</h3>
+              <div style="display:flex;gap:8px;align-items:center">
+                ${state.renderPollingActive ? `<span class="render-badge render-badge-rendering">● Polling</span>` : ""}
+                <span class="render-badge render-badge-${state.liveRenders.length > 0 ? "complete" : "pending"}">${state.liveRenders.length} jobs</span>
+              </div>
+            </div>
+            <div id="live-renders-panel">
+              ${renderLiveRendersHTML()}
+            </div>
+          </div>
+
+          <!-- Drafts & Compare -->
+          ${state.videoDrafts.length > 0 ? `
+          <div class="drafts-panel">
+            <div class="drafts-head">
+              <h3>Saved Drafts (${state.videoDrafts.length})</h3>
+              <button class="toggle-link" id="toggle-compare">${state.compareDrafts ? "▲ Close Compare" : "▼ Compare Versions"}</button>
+            </div>
+            <div class="drafts-list">
+              ${state.videoDrafts.map((draft, idx) => `
+                <div class="draft-row">
+                  <span class="draft-name">Draft ${idx + 1} — ${draft.style} · ${draft.duration} · ${draft.aspect}</span>
+                  <span class="draft-components">${draft.components.length} components</span>
+                  <div class="draft-actions">
+                    <button class="ghost" data-load-draft="${idx}">Load</button>
+                    <button class="ghost" data-delete-draft="${idx}">Delete</button>
+                    ${state.compareDrafts ? `
+                      <button class="ghost ${state.selectedDraftA === idx ? "active-link" : ""}" data-compare-a="${idx}">A</button>
+                      <button class="ghost ${state.selectedDraftB === idx ? "active-link" : ""}" data-compare-b="${idx}">B</button>
+                    ` : ""}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+            ${state.compareDrafts && state.selectedDraftA !== null && state.selectedDraftB !== null ? `
+            <div class="compare-view">
+              <div class="compare-col">
+                <div class="compare-label">Draft ${state.selectedDraftA + 1}</div>
+                ${state.videoDrafts[state.selectedDraftA].components.map((c, i) => `
+                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
+                `).join("")}
+                <div class="preview-params">${state.videoDrafts[state.selectedDraftA].style} · ${state.videoDrafts[state.selectedDraftA].voice} · ${state.videoDrafts[state.selectedDraftA].duration}</div>
+              </div>
+              <div class="compare-col">
+                <div class="compare-label">Draft ${state.selectedDraftB + 1}</div>
+                ${state.videoDrafts[state.selectedDraftB].components.map((c, i) => `
+                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
+                `).join("")}
+                <div class="preview-params">${state.videoDrafts[state.selectedDraftB].style} · ${state.videoDrafts[state.selectedDraftB].voice} · ${state.videoDrafts[state.selectedDraftB].duration}</div>
+              </div>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+
+        </div><!-- /assembly-body -->
+        ` : ""}
+      </section>
+
+      <!-- ── PRODUCT MATCHING ── -->
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Product Matching</h2>
+              <p>Pairs viral structures with IAGT products and positioning angles.</p>
+            </div>
+            <div class="product-toggle-row">
+              <button class="metric-btn ${state.matchingProducts ? "scanning" : ""}" id="match-products-btn" ${state.matchingProducts ? "disabled" : ""}>
+                ${state.matchingProducts ? `${icon("radar")} Matching…` : `${icon("spark")} Match Products`}
+              </button>
+              <button class="ghost" id="toggle-products">
+                ${state.productsExpanded ? "▲ Hide Products" : "▼ Show All Products"}
+              </button>
+              ${state.productsExpanded && state.selectedProducts.size > 0 ? `
+                <button class="ghost" id="filter-by-selected-products">Filter Creatives by Selected</button>
+                <button class="toggle-link" id="clear-product-selection">Clear Selection</button>
+              ` : ""}
+            </div>
+          </div>
+          ${state.productsExpanded ? `
+          <div class="product-grid">
+            ${products.map((product) => {
+              const isSelected = state.selectedProducts.has(product.name);
+              return `
+              <article class="${isSelected ? "product-selected" : ""}">
+                <div class="product-card-head">
+                  <input type="checkbox" class="product-checkbox" data-product-name="${product.name.replace(/"/g, "&quot;")}" ${isSelected ? "checked" : ""} />
+                  ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="" />` : `<div class="product-thumb empty-thumb"></div>`}
+                  <div>
+                    <strong>${product.name}</strong>
+                    <span>${product.category}</span>
+                  </div>
+                </div>
+                <meter min="0" max="100" value="${product.score}"></meter>
+                <p>${product.angle}</p>
+                <small class="product-source">${product.source === "shopify" ? "Shopify synced" : "Workspace product"}</small>
+              </article>
+            `}).join("")}
+          </div>
+          ` : `
+          <div class="product-collapsed-summary">
+            ${products.map((p) => `<span class="product-pill ${state.selectedProducts.has(p.name) ? "product-pill-selected" : ""}">${p.name}</span>`).join("")}
+          </div>
+          `}
+        </div>
 
       <section class="metrics-grid">
         ${metric("Reconstructions today", creatives.length.toString(), "from viral patterns")}
@@ -965,8 +1396,86 @@ function renderAiReconstruction() {
         </div>
       </section>
 
-      ${renderMediaArea("ai-reconstruction")}
-    </div>
+      <!-- ── AUTO-GENERATE PIPELINE ── -->
+      <section class="auto-generate-section panel">
+        <div class="panel-head">
+          <div>
+            <h2>${icon("spark")} Auto-Generate Pipeline</h2>
+            <p>Run the full AI pipeline: Trend Scout → Product Match → Script Writer → Visual Director → Ready to render.</p>
+          </div>
+          <button class="primary ${state.autoGenerating ? "scanning" : ""}" id="auto-generate-btn" ${state.autoGenerating ? "disabled" : ""}>
+            ${state.autoGenerating ? `${icon("radar")} Running Pipeline…` : `${icon("spark")} Auto-Generate Everything`}
+          </button>
+        </div>
+
+        ${state.autoGenerating || state.autoGeneratePipelineSteps.length > 0 ? `
+        <div class="pipeline-steps" id="auto-generate-pipeline">
+          ${state.autoGeneratePipelineSteps.map((s) => `<span class="pipeline-step">${s}</span>`).join("")}
+        </div>
+        ` : ""}
+
+        ${state.autoGenerateResult ? `
+        <div class="auto-generate-result">
+          <div class="auto-result-head">
+            <h3>Top Recommendation</h3>
+            <span class="hook-tag hook-confidence-high">Quality Score ${state.autoGenerateResult.qualityScore}</span>
+          </div>
+          <div class="auto-result-grid">
+            <div class="auto-result-item">
+              <span class="auto-result-label">Hook</span>
+              <p>"${state.autoGenerateResult.hook}"</p>
+              <div class="lib-meta">
+                <span class="hook-tag">${state.autoGenerateResult.hookPlatform}</span>
+                <span class="hook-tag hook-confidence-${(state.autoGenerateResult.hookConfidence || "high").toLowerCase()}">${state.autoGenerateResult.hookConfidence} confidence</span>
+              </div>
+            </div>
+            <div class="auto-result-item">
+              <span class="auto-result-label">Product</span>
+              <p>${state.autoGenerateResult.product}</p>
+              <div class="lib-meta">
+                <span class="hook-tag hook-confidence-high">Score ${state.autoGenerateResult.productScore}</span>
+                <span class="hook-tag">${state.autoGenerateResult.productAngle}</span>
+              </div>
+            </div>
+            <div class="auto-result-item">
+              <span class="auto-result-label">Format</span>
+              <p>${state.autoGenerateResult.format} · ${state.autoGenerateResult.duration} · ${state.autoGenerateResult.aspect}</p>
+              <div class="lib-meta">
+                <span class="hook-tag">${state.autoGenerateResult.platform}</span>
+              </div>
+            </div>
+          </div>
+          <div class="auto-result-script">
+            <span class="auto-result-label">Generated Script</span>
+            <p>${state.autoGenerateResult.script}</p>
+          </div>
+          <div class="auto-result-actions">
+            <span class="auto-result-label">Send to Platform</span>
+            <div class="render-actions" style="margin-top:8px">
+              <button class="render-btn heygen" data-auto-send="heygen">${icon("video")} Send to HeyGen</button>
+              <button class="render-btn runway" data-auto-send="runway">${icon("video")} Send to Runway</button>
+              <button class="render-btn kling" data-auto-send="kling">${icon("video")} Send to Kling</button>
+            </div>
+          </div>
+        </div>
+        ` : ""}
+      </section>
+
+      <section class="analytics-band">
+        <div>
+          <h2>Learning Loop</h2>
+          <p>The system tracks watch time, engagement, click-through rate, sales, and conversion rate, then updates the best hooks, visuals, products, and formats nightly.</p>
+        </div>
+        <div class="bars">
+          ${[
+            ["Hook strength", 91],
+            ["Visual pacing", 84],
+            ["CTA clarity", 78],
+            ["Product fit", 88]
+          ].map(([label, val]) => `<div><span>${label}</span><b>${val}%</b><i style="--w:${val}%"></i></div>`).join("")}
+        </div>
+      </section>
+    </main>
   `;
 }
 
@@ -1802,7 +2311,7 @@ function bindEvents() {
     });
   });
 
-  // ── Rescan button ──
+  // ── Rescan button → POST /api/agents/trend-scout/scan ──
   const rescanBtn = document.getElementById("rescan-btn");
   const scanInput = document.getElementById("scan-amount-input");
   if (scanInput) {
@@ -1816,29 +2325,61 @@ function bindEvents() {
       state.scanning = true;
       render();
       try {
-        const res = await fetch("/api/viral/rescan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: state.scanAmount })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          state.scanCount = data.count || state.scanAmount;
-        } else {
-          // Demo mode: simulate scan
+        const data = await agentFetch("/api/agents/trend-scout/scan", { limit: state.scanAmount });
+        state.scanCount = data.count || state.scanAmount;
+        // Merge any returned trends into viralAds display
+        if (data.trends && data.trends.length) {
+          const newAds = data.trends
+            .filter((t) => t.hook)
+            .map((t, i) => ({
+              id: `scan-${Date.now()}-${i}`,
+              platform: t.platform || "TikTok",
+              category: t.category || "Wellness",
+              title: t.hook.slice(0, 50),
+              hook: t.hook,
+              views: t.views || 0,
+              engagement: t.engagement || 0,
+              velocity: t.velocity || 0,
+              conversion: 0,
+              cta: "",
+              tags: [],
+              productMatch: "",
+              emotion: "",
+              structure: []
+            }));
+          if (newAds.length) {
+            viralAds = [...newAds, ...viralAds].slice(0, 50);
+            state.selectedAdId = viralAds[0].id;
+          }
+        }
+        state.syncLevel = "connected";
+        state.syncMessage = `Trend Scout scanned ${state.scanCount.toLocaleString()} ads.`;
+      } catch (err) {
+        // Fallback: try legacy endpoint
+        try {
+          const res = await fetch(`${API_BASE}/api/viral/rescan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: state.scanAmount })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            state.scanCount = data.count || state.scanAmount;
+          } else {
+            await new Promise((r) => setTimeout(r, 1800));
+            state.scanCount = state.scanAmount;
+          }
+        } catch {
           await new Promise((r) => setTimeout(r, 1800));
           state.scanCount = state.scanAmount;
         }
-      } catch {
-        await new Promise((r) => setTimeout(r, 1800));
-        state.scanCount = state.scanAmount;
       }
       state.scanning = false;
       render();
     });
   }
 
-  // ── Hook search button ──
+  // ── Hook search button → POST /api/agents/trend-scout/scan (hooks mode) ──
   const hookSearchBtn = document.getElementById("hook-search-btn");
   const hookTargetInput = document.getElementById("hook-target-input");
   if (hookTargetInput) {
@@ -1852,30 +2393,58 @@ function bindEvents() {
       state.hookSearching = true;
       render();
       try {
-        const res = await fetch("/api/hooks/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ target: state.hookTarget })
+        // Primary: Trend Scout agent
+        const data = await agentFetch("/api/agents/trend-scout/scan", {
+          limit: state.hookTarget,
+          keyword: state.hookSearchKeyword || undefined
         });
-        if (res.ok) {
-          const data = await res.json();
-          state.hooksFound = data.found || state.hookTarget;
-          if (data.hooks && data.hooks.length) {
-            winningHooks.push(...data.hooks.map((h, i) => ({
-              id: `h-api-${i}`,
-              text: h.text || h,
-              category: h.category || "Discovered",
-              platform: h.platform || "Multi",
-              confidence: h.confidence || "Medium"
-            })));
+        state.hooksFound = data.count || state.hookTarget;
+        if (data.trends && data.trends.length) {
+          const newHooks = data.trends
+            .filter((t) => t.hook)
+            .map((t, i) => ({
+              id: `h-agent-${Date.now()}-${i}`,
+              text: t.hook,
+              category: t.category || "Discovered",
+              platform: t.platform || "Multi",
+              confidence: t.confidence || "Medium"
+            }));
+          // Deduplicate by text
+          const existingTexts = new Set(winningHooks.map((h) => h.text));
+          const unique = newHooks.filter((h) => !existingTexts.has(h.text));
+          if (unique.length) winningHooks.push(...unique);
+        }
+        state.syncLevel = "connected";
+        state.syncMessage = `Found ${state.hooksFound} hooks via Trend Scout.`;
+        state.showHooksList = true;
+      } catch {
+        // Fallback: legacy hooks/search endpoint
+        try {
+          const res = await fetch(`${API_BASE}/api/hooks/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target: state.hookTarget })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            state.hooksFound = data.found || state.hookTarget;
+            if (data.hooks && data.hooks.length) {
+              winningHooks.push(...data.hooks.map((h, i) => ({
+                id: `h-api-${Date.now()}-${i}`,
+                text: h.text || h,
+                category: h.category || "Discovered",
+                platform: h.platform || "Multi",
+                confidence: h.confidence || "Medium"
+              })));
+            }
+          } else {
+            await new Promise((r) => setTimeout(r, 2200));
+            state.hooksFound = state.hookTarget;
           }
-        } else {
+        } catch {
           await new Promise((r) => setTimeout(r, 2200));
           state.hooksFound = state.hookTarget;
         }
-      } catch {
-        await new Promise((r) => setTimeout(r, 2200));
-        state.hooksFound = state.hookTarget;
       }
       state.hookSearching = false;
       render();
@@ -2025,43 +2594,143 @@ function bindEvents() {
     });
   });
 
-  // ── AI Suggestions ──
+  // ── AI Suggestions → POST /api/agents/copilot/suggest ──
   const aiSuggestionsBtn = document.getElementById("ai-suggestions-btn");
   if (aiSuggestionsBtn) {
     aiSuggestionsBtn.addEventListener("click", async () => {
-      aiSuggestionsBtn.textContent = "Generating…";
-      aiSuggestionsBtn.disabled = true;
+      state.copilotLoading = true;
+      state.showCopilotPanel = true;
+      state.copilotSuggestions = null;
+      render();
       try {
-        const res = await fetch("/api/assembly/suggestions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            style: state.videoStyle,
-            duration: state.videoDuration,
-            aspect: state.videoAspect
-          })
+        const data = await agentFetch("/api/agents/copilot/suggest", {
+          components: state.assemblyComponents,
+          style: state.videoStyle,
+          duration: state.videoDuration,
+          aspect: state.videoAspect,
+          platform: state.assemblyComponents.length > 0 ? "TikTok" : undefined
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.components && data.components.length) {
-            state.assemblyComponents = data.components;
-            render();
-            return;
+        state.copilotSuggestions = data.suggestions || [];
+        state.syncLevel = "connected";
+        state.syncMessage = `Copilot generated ${state.copilotSuggestions.length} suggestions.`;
+      } catch {
+        // Fallback: try legacy assembly/suggestions for component auto-fill
+        try {
+          const res = await fetch(`${API_BASE}/api/assembly/suggestions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ style: state.videoStyle, duration: state.videoDuration, aspect: state.videoAspect })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.components && data.components.length) {
+              state.assemblyComponents = data.components;
+            }
           }
-        }
-      } catch { /* fall through to demo */ }
-      // Demo: auto-populate with a hook + script + product
-      const hook = winningHooks.find((h) => h.confidence === "High") || winningHooks[0];
-      const script = creatives.find((c) => c.status === "Ready") || creatives[0];
-      const product = products[0];
-      state.assemblyComponents = [
-        { type: "hook", id: hook.id, text: hook.text },
-        { type: "script", id: script.id, text: script.script },
-        { type: "product", id: product.name, text: product.name }
-      ];
+        } catch { /* ignore */ }
+        // Demo suggestions
+        state.copilotSuggestions = [
+          { type: "structure", title: "Start with a pattern interrupt", body: "Open with a bold statement or unexpected visual in the first 2 seconds to stop the scroll.", confidence: "High" },
+          { type: "hook", title: "Use curiosity-gap hooks", body: "Hooks that withhold information outperform direct claims by 2.3x on TikTok.", confidence: "High" },
+          { type: "cta", title: "Soft CTA performs better for supplements", body: "Use 'Link in bio' or 'Try it free' instead of 'Buy now' — reduces friction.", confidence: "Medium" }
+        ];
+      }
+      state.copilotLoading = false;
       render();
     });
   }
+
+  // ── Refine Hook → POST /api/agents/copilot/refine ──
+  const refineHookBtn = document.getElementById("refine-hook-btn");
+  if (refineHookBtn) {
+    refineHookBtn.addEventListener("click", async () => {
+      const hookComp = state.assemblyComponents.find((c) => c.type === "hook");
+      const hookText = hookComp ? hookComp.text : (winningHooks.find((h) => state.selectedHooks.has(h.id)) || winningHooks[0])?.text;
+      if (!hookText) {
+        state.copilotSuggestions = [{ type: "error", title: "No hook selected", body: "Add a hook component to the builder or select a hook from the library first.", confidence: "N/A" }];
+        state.showCopilotPanel = true;
+        render();
+        return;
+      }
+      state.copilotLoading = true;
+      state.showCopilotPanel = true;
+      state.copilotRefinements = null;
+      render();
+      try {
+        const data = await agentFetch("/api/agents/copilot/refine", {
+          hook: hookText,
+          style: state.videoStyle,
+          platform: "TikTok"
+        });
+        state.copilotRefinements = data.refinements || [];
+        state.syncLevel = "connected";
+        state.syncMessage = `Copilot refined hook into ${state.copilotRefinements.length} versions.`;
+      } catch {
+        state.copilotRefinements = [
+          { version: "Curiosity gap", text: `Nobody tells you: ${hookText}`, rationale: "Curiosity-gap framing increases watch time.", score: 91 },
+          { version: "Problem-first", text: `If you're struggling with your health, ${hookText}`, rationale: "Leading with the problem creates emotional resonance.", score: 87 }
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
+  // ── Explain Decision → POST /api/agents/copilot/explain ──
+  const explainDecisionBtn = document.getElementById("explain-decision-btn");
+  if (explainDecisionBtn) {
+    explainDecisionBtn.addEventListener("click", async () => {
+      state.copilotLoading = true;
+      state.showCopilotPanel = true;
+      state.copilotExplanations = null;
+      render();
+      try {
+        const data = await agentFetch("/api/agents/copilot/explain", {
+          components: state.assemblyComponents,
+          style: state.videoStyle,
+          duration: state.videoDuration,
+          aspect: state.videoAspect
+        });
+        state.copilotExplanations = data.explanations || [];
+        state.syncLevel = "connected";
+        state.syncMessage = "Copilot explained all component decisions.";
+      } catch {
+        state.copilotExplanations = [
+          { component: "Builder", reasoning: "Add components to the builder to get a full decision explanation.", impact: "N/A" }
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
+  // ── Close Copilot Panel ──
+  const closeCopilotBtn = document.getElementById("close-copilot-btn");
+  if (closeCopilotBtn) {
+    closeCopilotBtn.addEventListener("click", () => {
+      state.showCopilotPanel = false;
+      state.copilotSuggestions = null;
+      state.copilotRefinements = null;
+      state.copilotExplanations = null;
+      render();
+    });
+  }
+
+  // ── Apply Refinement to Builder ──
+  document.querySelectorAll("[data-apply-refinement]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = btn.dataset.applyRefinement;
+      const idx = state.assemblyComponents.findIndex((c) => c.type === "hook");
+      if (idx >= 0) {
+        state.assemblyComponents[idx] = { ...state.assemblyComponents[idx], text };
+      } else {
+        state.assemblyComponents.unshift({ type: "hook", id: `refined-${Date.now()}`, text });
+      }
+      state.showCopilotPanel = false;
+      state.copilotRefinements = null;
+      render();
+    });
+  });
 
   // ── Save Draft ──
   const saveDraftBtn = document.getElementById("save-draft-btn");
@@ -2086,7 +2755,7 @@ function bindEvents() {
       }
       // Also try backend
       try {
-        await fetch("/api/assembly/drafts", {
+        await fetch(`${API_BASE}/api/assembly/drafts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(draft)
@@ -2160,7 +2829,7 @@ function bindEvents() {
     }, 600);
 
     try {
-      const res = await fetch("/api/video/generate", {
+      const res = await fetch(`${API_BASE}/api/video/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2177,8 +2846,15 @@ function bindEvents() {
       if (res.ok) {
         const data = await res.json();
         state.renderProgress = 100;
-        state.renderStatus = "Complete";
+        state.renderStatus = data.status === "complete" ? "Complete" : "Pending";
         state.renderUrl = data.url || data.videoUrl || null;
+        state.renderJobId = data.jobId || null;
+        state.renderRenderId = data.renderId || null;
+        if (state.renderStatus === "Pending" && !state.renderPollingActive) {
+          startRenderPolling();
+        }
+        state.syncLevel = "connected";
+        state.syncMessage = data.message || `${platform} job submitted.`;
       } else {
         state.renderStatus = "Failed";
         state.renderProgress = 0;
@@ -2344,6 +3020,244 @@ function bindEvents() {
       render();
     });
   }
+
+  // ── Generate Creatives → POST /api/agents/script-writer/generate ──
+  const generateCreativeBtn = document.getElementById("generate-creative-btn");
+  if (generateCreativeBtn) {
+    generateCreativeBtn.addEventListener("click", async () => {
+      state.generatingCreative = true;
+      state.lastGeneratedCreative = null;
+      render();
+      try {
+        const selectedHookObj = winningHooks.find((h) => state.selectedHooks.has(h.id)) || winningHooks[0];
+        const selectedProductName = state.selectedProducts.size > 0
+          ? [...state.selectedProducts][0]
+          : (products[0] ? products[0].name : "");
+        const data = await agentFetch("/api/agents/script-writer/generate", {
+          hook: selectedHookObj ? selectedHookObj.text : "",
+          product: selectedProductName,
+          style: state.videoStyle,
+          duration: state.videoDuration,
+          platform: "TikTok"
+        });
+        if (data.creative) {
+          state.lastGeneratedCreative = data.creative;
+          creatives.unshift(data.creative);
+          state.syncLevel = "connected";
+          state.syncMessage = `Script Writer generated creative for ${data.creative.product}.`;
+        }
+      } catch {
+        // Demo fallback
+        const hook = winningHooks.find((h) => state.selectedHooks.has(h.id)) || winningHooks[0];
+        const product = products.find((p) => state.selectedProducts.has(p.name)) || products[0];
+        const demo = {
+          id: `gen-demo-${Date.now()}`,
+          status: "Draft",
+          product: product ? product.name : "Product",
+          format: `${state.videoStyle} TikTok`,
+          hook: hook ? hook.text : "Hook text here",
+          script: `Open on authentic setting. Hook: "${hook ? hook.text : "Hook"}". VO: "I've been using ${product ? product.name : "this product"} for 30 days..." CTA: "Try it today — link in bio."`,
+          asset: `${state.videoDuration} video, subtitles`,
+          channel: "TikTok",
+          score: 85,
+          approved: false,
+          rejectionReason: ""
+        };
+        state.lastGeneratedCreative = demo;
+        creatives.unshift(demo);
+      }
+      state.generatingCreative = false;
+      render();
+    });
+  }
+
+  // ── Match Products → POST /api/agents/product-match/analyze ──
+  const matchProductsBtn = document.getElementById("match-products-btn");
+  if (matchProductsBtn) {
+    matchProductsBtn.addEventListener("click", async () => {
+      state.matchingProducts = true;
+      state.productMatchResults = null;
+      render();
+      try {
+        const selectedHookObj = winningHooks.find((h) => state.selectedHooks.has(h.id)) || winningHooks[0];
+        const data = await agentFetch("/api/agents/product-match/analyze", {
+          hook: selectedHookObj ? selectedHookObj.text : "",
+          platform: state.platform !== "All" ? state.platform : "TikTok",
+          category: state.category !== "All" ? state.category : undefined
+        });
+        if (data.products && data.products.length) {
+          state.productMatchResults = data.products;
+          // Merge into products array
+          const existingNames = new Set(products.map((p) => p.name));
+          const newProds = data.products.filter((p) => !existingNames.has(p.name));
+          if (newProds.length) products.push(...newProds);
+          state.productsExpanded = true;
+          state.syncLevel = "connected";
+          state.syncMessage = `Product Match found ${data.products.length} matched products.`;
+        }
+      } catch {
+        // Demo: just expand existing products
+        state.productsExpanded = true;
+      }
+      state.matchingProducts = false;
+      render();
+    });
+  }
+
+  // ── Auto-Generate Everything → POST /api/agents/auto-generate ──
+  const autoGenerateBtn = document.getElementById("auto-generate-btn");
+  if (autoGenerateBtn) {
+    autoGenerateBtn.addEventListener("click", async () => {
+      state.autoGenerating = true;
+      state.autoGenerateResult = null;
+      state.autoGeneratePipelineSteps = ["Scanning…"];
+      render();
+
+      const pipelineSteps = ["Scanning", "Matching", "Scripting", "Directing", "Ready"];
+      let stepIdx = 0;
+
+      const stepInterval = setInterval(() => {
+        stepIdx++;
+        if (stepIdx < pipelineSteps.length) {
+          state.autoGeneratePipelineSteps = pipelineSteps.slice(0, stepIdx + 1).map((s, i) => i < stepIdx ? `✓ ${s}` : `${s}…`);
+          const el = document.getElementById("auto-generate-pipeline");
+          if (el) el.innerHTML = state.autoGeneratePipelineSteps.map((s) => `<span class="pipeline-step">${s}</span>`).join("");
+        }
+      }, 900);
+
+      try {
+        const data = await agentFetch("/api/agents/auto-generate", {});
+        clearInterval(stepInterval);
+        state.autoGeneratePipelineSteps = pipelineSteps.map((s) => `✓ ${s}`);
+        if (data.recommendation) {
+          state.autoGenerateResult = data.recommendation;
+          // Auto-populate builder with recommendation
+          state.assemblyComponents = data.recommendation.components || [];
+          state.videoDuration = data.recommendation.duration || "30s";
+          state.videoStyle = data.recommendation.format || "UGC";
+          state.videoAspect = data.recommendation.aspect || "9:16";
+          state.syncLevel = "connected";
+          state.syncMessage = `Auto-Generate complete. Quality score: ${data.recommendation.qualityScore}.`;
+        }
+      } catch {
+        clearInterval(stepInterval);
+        state.autoGeneratePipelineSteps = pipelineSteps.map((s) => `✓ ${s}`);
+        // Demo fallback
+        const hook = winningHooks.find((h) => h.confidence === "High") || winningHooks[0];
+        const product = products[0];
+        const script = creatives.find((c) => c.status === "Ready") || creatives[0];
+        state.autoGenerateResult = {
+          hook: hook ? hook.text : "Nobody talks about this morning habit...",
+          hookPlatform: "TikTok",
+          hookConfidence: "High",
+          product: product ? product.name : "Sea Moss Mineral Gel",
+          productScore: product ? product.score : 96,
+          productAngle: product ? product.angle : "daily mineral ritual",
+          script: script ? script.script : "Open on authentic setting...",
+          platform: "TikTok",
+          format: "UGC",
+          duration: "30s",
+          aspect: "9:16",
+          qualityScore: 92,
+          components: [
+            { type: "hook", id: hook ? hook.id : "h-001", text: hook ? hook.text : "Nobody talks about this morning habit..." },
+            { type: "script", id: script ? script.id : "cr-001", text: script ? script.script : "Open on authentic setting..." },
+            { type: "product", id: product ? product.name : "Sea Moss Mineral Gel", text: product ? product.name : "Sea Moss Mineral Gel" }
+          ]
+        };
+        state.assemblyComponents = state.autoGenerateResult.components;
+        state.videoDuration = "30s";
+        state.videoStyle = "UGC";
+        state.videoAspect = "9:16";
+      }
+      state.autoGenerating = false;
+      render();
+    });
+  }
+
+  // ── Auto-Generate Send to Platform ──
+  document.querySelectorAll("[data-auto-send]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const platform = btn.dataset.autoSend;
+      if (state.autoGenerateResult && state.autoGenerateResult.components) {
+        state.assemblyComponents = state.autoGenerateResult.components;
+        state.videoDuration = state.autoGenerateResult.duration || "30s";
+        state.videoStyle = state.autoGenerateResult.format || "UGC";
+        state.videoAspect = state.autoGenerateResult.aspect || "9:16";
+      }
+      sendToRenderer(platform);
+    });
+  });
+
+  // ── Hook search keyword input ──
+  const hookKeywordInput = document.getElementById("hook-keyword-input");
+  if (hookKeywordInput) {
+    hookKeywordInput.addEventListener("input", () => {
+      state.hookSearchKeyword = hookKeywordInput.value;
+    });
+  }
+}
+
+// ── Render polling: poll /api/renders every 5s when a job is pending ──
+let renderPollTimer = null;
+
+function startRenderPolling() {
+  if (renderPollTimer) return;
+  state.renderPollingActive = true;
+  renderPollTimer = setInterval(async () => {
+    try {
+      const data = await agentGet("/api/renders");
+      if (data.renders && data.renders.length) {
+        state.liveRenders = data.renders.slice(0, 10);
+        // Check if our current job completed
+        if (state.renderJobId || state.renderRenderId) {
+          const match = data.renders.find(
+            (r) => r.job_id === state.renderJobId || r.id === state.renderRenderId
+          );
+          if (match) {
+            if (match.status === "complete" || match.video_url) {
+              state.renderStatus = "Complete";
+              state.renderProgress = 100;
+              state.renderUrl = match.video_url || null;
+              stopRenderPolling();
+              render();
+              return;
+            } else if (match.status === "failed") {
+              state.renderStatus = "Failed";
+              stopRenderPolling();
+              render();
+              return;
+            }
+          }
+        }
+        // Update live renders panel without full re-render
+        const panel = document.getElementById("live-renders-panel");
+        if (panel) {
+          panel.innerHTML = renderLiveRendersHTML();
+        }
+      }
+    } catch { /* ignore polling errors */ }
+  }, 5000);
+}
+
+function stopRenderPolling() {
+  if (renderPollTimer) {
+    clearInterval(renderPollTimer);
+    renderPollTimer = null;
+  }
+  state.renderPollingActive = false;
+}
+
+function renderLiveRendersHTML() {
+  if (!state.liveRenders.length) return "<p class=\"empty\">No renders yet.</p>";
+  return state.liveRenders.map((r) => `
+    <div class="render-row">
+      <span class="render-job-id">${r.job_id || r.id || "—"}</span>
+      <span class="render-badge render-badge-${(r.status || "pending").toLowerCase().replace(/\\s/g, "-")}">${r.status || "pending"}</span>
+      <span class="render-platform">${r.platform || "—"}</span>
+      ${r.video_url ? `<a href="${r.video_url}" target="_blank" class="render-url-link">▶ View</a>` : "<span class=\"render-pending-label\">Processing…</span>"}
+    </div>
+  `).join("");
 }
 
 async function boot() {
