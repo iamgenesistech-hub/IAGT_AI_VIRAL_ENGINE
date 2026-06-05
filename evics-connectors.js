@@ -58,14 +58,14 @@ async function syncShopifyCollections() {
   };
 }
 
-async function getSyncedProducts(limit = 100) {
+async function getSyncedProducts(limit = 300) {
   if (!hasSupabaseServerConfig()) return [];
   return selectSupabase(
     `shopify_products?select=*&order=synced_at.desc&limit=${encodeURIComponent(limit)}`
   );
 }
 
-async function getSyncedCollections(limit = 100) {
+async function getSyncedCollections(limit = 300) {
   if (!hasSupabaseServerConfig()) return [];
   return selectSupabase(
     `shopify_collections?select=*&order=synced_at.desc&limit=${encodeURIComponent(limit)}`
