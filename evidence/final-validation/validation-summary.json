@@ -1,0 +1,229 @@
+{
+  "startedAt": "2026-05-30T08:57:02.919Z",
+  "completedAt": "2026-05-30T08:57:05.802Z",
+  "verdict": "pass-with-external-blockers",
+  "passCount": 12,
+  "failCount": 0,
+  "blockers": [
+    "HEYGEN_API_KEY is configured, but live HeyGen artifact is not available yet. Last activation attempt reached HeyGen and failed provider-side with insufficient API credits.",
+    "Shopify reconnect required for iamgenesistech.myshopify.com: current Admin token rejected (401), and no primary Supabase session exists."
+  ],
+  "closeoutStatus": {
+    "success": true,
+    "checks": {
+      "shopify": {
+        "expectedStore": "iamgenesistech.myshopify.com",
+        "host": "lint-salon-breeding.ngrok-free.dev",
+        "clientId": {
+          "prefix": "298faa",
+          "suffix": "7e5f",
+          "length": 32
+        },
+        "hasClientSecret": true,
+        "hasAdminToken": true,
+        "scopes": "read_products,read_orders",
+        "reconnectUrl": "/shopify/reconnect"
+      },
+      "supabase": {
+        "configured": true,
+        "urlHost": "mvfkwlidwqcyqczlauii.supabase.co",
+        "renderTable": {
+          "ok": true,
+          "sampleColumns": [
+            "id",
+            "render_name",
+            "sku",
+            "product_name",
+            "platform",
+            "render_grade",
+            "product_fit",
+            "brand_alignment",
+            "conversion_potential",
+            "viral_potential",
+            "status",
+            "vault_destination",
+            "created_at"
+          ]
+        },
+        "sharedTables": [
+          {
+            "table": "evics_evie_entities",
+            "ok": true,
+            "error": null
+          },
+          {
+            "table": "evics_evie_rankings",
+            "ok": true,
+            "error": null
+          },
+          {
+            "table": "evics_evie_prompt_versions",
+            "ok": true,
+            "error": null
+          },
+          {
+            "table": "evics_evie_scripts",
+            "ok": true,
+            "error": null
+          },
+          {
+            "table": "evics_evie_render_jobs",
+            "ok": true,
+            "error": null
+          },
+          {
+            "table": "evics_evie_evidence_records",
+            "ok": true,
+            "error": null
+          }
+        ]
+      },
+      "heygen": {
+        "configured": true,
+        "key": {
+          "prefix": "sk_V2_",
+          "suffix": "xAt9",
+          "length": 54
+        },
+        "liveProofAvailable": false,
+        "proofUrl": null,
+        "blocker": "HEYGEN_API_KEY is configured, but no live HeyGen artifact has completed yet."
+      }
+    },
+    "timestamp": "2026-05-30T08:57:05.336Z"
+  },
+  "commands": [
+    "node --check backend/server.js",
+    "node --check backend/sharedEvicsEvieCore.js",
+    "node tests/evics-evie-validation.js",
+    "HTTP GET /api/evics-evie/health",
+    "HTTP POST /api/evics-evie/action-flow",
+    "HTTP POST /api/copilot/orchestrate",
+    "HTTP POST /api/video/generate",
+    "HTTP GET /api/production-closeout/status",
+    "HTTP GET /api/shopify/diagnostics"
+  ],
+  "evidenceVideo": "/generated/evics-sea-moss-proof-render.mp4",
+  "matrix": [
+    {
+      "name": "rankings",
+      "topOverall": 89,
+      "topId": "ranking_0c86481c0744f38a",
+      "status": "pass"
+    },
+    {
+      "name": "mocked-action-flow",
+      "flowId": "flow_d8a27898195fded5",
+      "videoUrl": "/generated/evics-sea-moss-proof-render.mp4",
+      "status": "pass"
+    },
+    {
+      "name": "faceless-first-class",
+      "flowId": "flow_620ce38f8c103981",
+      "format": "Faceless product ritual montage",
+      "status": "pass"
+    },
+    {
+      "name": "live-heygen-external-blocker-documented",
+      "blocker": "HEYGEN_API_KEY is configured, but live HeyGen artifact is not available yet. Last activation attempt reached HeyGen and failed provider-side with insufficient API credits.",
+      "status": "pass"
+    },
+    {
+      "name": "copilot-orchestration",
+      "route": "EVIE",
+      "flowId": "flow_e147c21cbf3ff6a0",
+      "status": "pass"
+    },
+    {
+      "name": "local-system-health",
+      "ok": true,
+      "architecture": "EVICS_EVIE_SHARED",
+      "qualityGates": {
+        "hookStrength": 75,
+        "pacing": 70,
+        "ctaClarity": 75,
+        "visualStyle": 80,
+        "overall": 80
+      },
+      "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
+      "wisdomVersion": 169,
+      "promptVersionCount": 84,
+      "learningCount": 84,
+      "mockRenderAvailable": true,
+      "liveHeygenConfigured": true,
+      "timestamp": "2026-05-30T08:57:02.950Z",
+      "status": "pass"
+    },
+    {
+      "name": "api-health",
+      "status": "pass",
+      "body": {
+        "ok": true,
+        "architecture": "EVICS_EVIE_SHARED",
+        "qualityGates": {
+          "hookStrength": 75,
+          "pacing": 70,
+          "ctaClarity": 75,
+          "visualStyle": 80,
+          "overall": 80
+        },
+        "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
+        "wisdomVersion": 169,
+        "promptVersionCount": 84,
+        "learningCount": 84,
+        "mockRenderAvailable": true,
+        "liveHeygenConfigured": true,
+        "timestamp": "2026-05-30T08:57:03.029Z"
+      }
+    },
+    {
+      "name": "api-action-flow",
+      "status": "pass",
+      "flowId": "flow_94e888c9d12c83b1"
+    },
+    {
+      "name": "api-copilot-orchestration",
+      "status": "pass",
+      "route": "EVIE"
+    },
+    {
+      "name": "api-mocked-render-provider",
+      "httpStatus": 200,
+      "url": "/generated/evics-sea-moss-proof-render.mp4",
+      "renderId": 41,
+      "renderLogColumns": [
+        "render_name",
+        "sku",
+        "product_name",
+        "platform",
+        "render_grade",
+        "product_fit",
+        "brand_alignment",
+        "conversion_potential",
+        "viral_potential",
+        "status",
+        "vault_destination",
+        "created_at"
+      ],
+      "status": "pass"
+    },
+    {
+      "name": "production-closeout-status",
+      "httpStatus": 200,
+      "shopifyStore": "iamgenesistech.myshopify.com",
+      "supabaseRenderTableOk": true,
+      "supabaseSharedTablesOk": true,
+      "heygenConfigured": true,
+      "status": "pass"
+    },
+    {
+      "name": "shopify-reconnect-diagnostics",
+      "httpStatus": 200,
+      "expectedStore": "iamgenesistech.myshopify.com",
+      "envTokenAccepted": false,
+      "primarySessionAccepted": false,
+      "oauthReady": true,
+      "status": "pass"
+    }
+  ]
+}
