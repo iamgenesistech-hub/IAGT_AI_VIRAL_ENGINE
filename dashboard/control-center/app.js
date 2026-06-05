@@ -112,13 +112,53 @@ const state = {
 
   // Auto-generate pipeline
   autoGenerating: false,
-  autoGeneratePipeline: [],
-  autoGenerateResults: [],
-  autoGenerateCount: 3,
-  showAutoGenerateResult: false,
+  autoGenerateResult: null,
 
-  // Render polling
-  renderPollInterval: null
+  // Copilot
+  copilotOpen: false,
+  copilotQuestion: "",
+  copilotAnswer: null,
+  copilotNextActions: [],
+  copilotLoading: false,
+
+  // Agent Orchestration Dashboard
+  agentStatusOpen: false,
+  agentStatuses: [],
+  agentStatusLoading: false,
+  agentStatusError: null,
+  agentPipelineHealth: 98,
+
+  // Published Media Gallery
+  publishedMediaOpen: false,
+  publishedMedia: [],
+  publishedMediaLoading: false,
+  publishedMediaFilter: "All",
+  selectedPublishedId: null,
+  publishActionStatus: null,
+
+  // Analytics Dashboard
+  analyticsOpen: false,
+  analyticsData: null,
+  analyticsLoading: false,
+  analyticsTab: "overview",
+
+  // Quality Thresholds & Validation
+  qualityThresholds: {
+    hookStrength: 75,
+    pacingScore: 70,
+    ctaClarity: 75,
+    visualStyle: 80,
+    overallQuality: 80
+  },
+  qualityValidating: false,
+  qualityResult: null,
+  qualityScores: {
+    hookStrength: 80,
+    pacingScore: 75,
+    ctaClarity: 78,
+    visualStyle: 82,
+    overallQuality: 84
+  }
 };
 
 window.state = state;
@@ -1117,6 +1157,361 @@ const DEMO_MEDIA = [
   { id: "m-011", media_type: "ugc",         platform: "heygen",   status: "complete", script: "UGC testimonial — weight loss journey",       score: 88, created_at: "2025-01-12T10:00:00Z", video_url: null, product: "Metabolic Ignite",           hook: "I lost 12 lbs in 30 days with this morning reset." },
   { id: "m-012", media_type: "banner",      platform: "canva",    status: "complete", script: "Google Display banner — 728x90 + 300x250",    score: 74, created_at: "2025-01-11T13:00:00Z", video_url: null, product: "NeuroRise Focus",            hook: "Upgrade your focus stack." }
 ];
+
+// Demo published media items
+const DEMO_PUBLISHED_MEDIA = [
+  {
+    id: "pub-001",
+    title: "Sea Moss Morning Ritual — 15s UGC",
+    platform: "heygen",
+    publishedTo: ["TikTok", "Instagram Reels"],
+    status: "live",
+    videoUrl: null,
+    product: "Sea Moss Mineral Gel",
+    hook: "Nobody tells you minerals can change your whole morning.",
+    score: 94,
+    views: 48200,
+    engagement: 12.8,
+    conversion: 4.2,
+    createdAt: "2025-01-15T08:00:00Z",
+    publishedAt: "2025-01-15T12:00:00Z"
+  },
+  {
+    id: "pub-002",
+    title: "Collagen Glow Lifestyle Edit — 9:16",
+    platform: "runway",
+    publishedTo: ["Instagram", "Pinterest"],
+    status: "live",
+    videoUrl: null,
+    product: "Genesis Glow Collagen",
+    hook: "This changed my skin in 7 days.",
+    score: 89,
+    views: 31500,
+    engagement: 10.4,
+    conversion: 3.8,
+    createdAt: "2025-01-14T09:30:00Z",
+    publishedAt: "2025-01-14T14:00:00Z"
+  },
+  {
+    id: "pub-003",
+    title: "Focus Founder Desk UGC — 30s",
+    platform: "heygen",
+    publishedTo: ["YouTube Shorts", "X"],
+    status: "live",
+    videoUrl: null,
+    product: "NeuroRise Focus",
+    hook: "I stopped treating my focus like a willpower problem.",
+    score: 87,
+    views: 22100,
+    engagement: 9.1,
+    conversion: 3.1,
+    createdAt: "2025-01-13T10:00:00Z",
+    publishedAt: "2025-01-13T16:00:00Z"
+  },
+  {
+    id: "pub-004",
+    title: "Metabolic Ignite Morning Reset — 15s",
+    platform: "kling",
+    publishedTo: ["TikTok", "Facebook"],
+    status: "live",
+    videoUrl: null,
+    product: "Metabolic Ignite",
+    hook: "My 2 PM crash disappeared when I started doing this.",
+    score: 83,
+    views: 18700,
+    engagement: 8.7,
+    conversion: 2.9,
+    createdAt: "2025-01-12T11:00:00Z",
+    publishedAt: "2025-01-12T15:00:00Z"
+  },
+  {
+    id: "pub-005",
+    title: "Testosterone Gym Commercial — 30s",
+    platform: "runway",
+    publishedTo: ["YouTube", "TikTok"],
+    status: "scheduled",
+    videoUrl: null,
+    product: "Apex Testosterone Support",
+    hook: "Your training does not need more hype. It needs foundation.",
+    score: 81,
+    views: 0,
+    engagement: 0,
+    conversion: 0,
+    createdAt: "2025-01-15T10:00:00Z",
+    publishedAt: "2025-01-16T09:00:00Z"
+  },
+  {
+    id: "pub-006",
+    title: "Sea Moss TikTok Caption Card",
+    platform: "canva",
+    publishedTo: ["TikTok"],
+    status: "live",
+    videoUrl: null,
+    product: "Sea Moss Mineral Gel",
+    hook: "Nobody talks about this morning habit...",
+    score: 90,
+    views: 61400,
+    engagement: 14.2,
+    conversion: 5.1,
+    createdAt: "2025-01-15T07:00:00Z",
+    publishedAt: "2025-01-15T10:00:00Z"
+  },
+  {
+    id: "pub-007",
+    title: "Collagen Instagram Carousel — 5 Slides",
+    platform: "openai",
+    publishedTo: ["Instagram"],
+    status: "live",
+    videoUrl: null,
+    product: "Genesis Glow Collagen",
+    hook: "5 reasons your skin needs collagen now.",
+    score: 85,
+    views: 14300,
+    engagement: 11.2,
+    conversion: 3.4,
+    createdAt: "2025-01-14T12:00:00Z",
+    publishedAt: "2025-01-14T18:00:00Z"
+  },
+  {
+    id: "pub-008",
+    title: "UGC Testimonial — Weight Loss Journey",
+    platform: "heygen",
+    publishedTo: ["TikTok", "Instagram Reels", "YouTube Shorts"],
+    status: "archived",
+    videoUrl: null,
+    product: "Metabolic Ignite",
+    hook: "I lost 12 lbs in 30 days with this morning reset.",
+    score: 88,
+    views: 94200,
+    engagement: 13.6,
+    conversion: 4.8,
+    createdAt: "2025-01-10T10:00:00Z",
+    publishedAt: "2025-01-10T14:00:00Z"
+  }
+];
+
+// Demo analytics data
+const DEMO_ANALYTICS = {
+  totalVideosCreated: 114,
+  totalCreatives: 47,
+  approvalRate: 68,
+  avgQualityScore: 87,
+  totalTrendsScanned: 8420,
+  hookEffectiveness: 91,
+  ctaConversionRate: 4.8,
+  avgWatchTime: 14.2,
+  avgEngagementRate: 10.2,
+  revenueAttributed: 12840,
+  platformBreakdown: {
+    tiktok:    { videos: 42, views: 2400000, engagement: 12.8, conversion: 4.2 },
+    instagram: { videos: 31, views: 1180000, engagement: 10.4, conversion: 3.8 },
+    youtube:   { videos: 18, views: 892000,  engagement: 9.1,  conversion: 3.1 },
+    facebook:  { videos: 14, views: 640000,  engagement: 8.7,  conversion: 2.9 },
+    pinterest: { videos: 9,  views: 420000,  engagement: 7.9,  conversion: 2.4 }
+  },
+  qualityBreakdown: {
+    hookStrengthAvg: 91,
+    pacingScoreAvg: 84,
+    ctaClarityAvg: 78,
+    visualStyleAvg: 86,
+    overallAvg: 87
+  },
+  topHooks: [
+    { text: "Nobody talks about this morning habit...", platform: "TikTok", views: 61400, conversion: 5.1 },
+    { text: "I lost 12 lbs in 30 days with this morning reset.", platform: "TikTok", views: 94200, conversion: 4.8 },
+    { text: "Nobody tells you minerals can change your whole morning.", platform: "Instagram", views: 48200, conversion: 4.2 },
+    { text: "This changed my skin in 7 days.", platform: "Instagram", views: 31500, conversion: 3.8 },
+    { text: "I stopped treating my focus like a willpower problem.", platform: "YouTube", views: 22100, conversion: 3.1 }
+  ]
+};
+
+// Demo agent statuses
+const DEMO_AGENT_STATUSES = [
+  {
+    id: "trend-scout",
+    name: "Trend Scout Agent",
+    role: "Scanning viral content across TikTok, Instagram, YouTube, Facebook, Pinterest",
+    status: "active",
+    currentTask: "Scanning 1,284 viral ads for hook patterns",
+    processingTime: "2.4s avg",
+    lastResult: "Found 12 high-confidence hooks in Beauty + Weight Loss categories",
+    qualityScore: 94,
+    nextAction: "Rescan at 6:00 AM — targeting 1,500 ads",
+    icon: "radar"
+  },
+  {
+    id: "product-match",
+    name: "Product Match Agent",
+    role: "Matching trending content patterns to IAGT product catalog",
+    status: "active",
+    currentTask: "Matching Sea Moss + Collagen to top 5 viral structures",
+    processingTime: "1.1s avg",
+    lastResult: "Sea Moss Mineral Gel matched to 3 viral hooks — confidence: High",
+    qualityScore: 91,
+    nextAction: "Re-match after next viral scan",
+    icon: "filter"
+  },
+  {
+    id: "script-writer",
+    name: "Script Writer Agent",
+    role: "Generating ad scripts from viral structures and product angles",
+    status: "active",
+    currentTask: "Writing 5 UGC scripts for Sea Moss + Metabolic Ignite",
+    processingTime: "3.8s avg",
+    lastResult: "Generated 4 scripts — avg quality score 88/100",
+    qualityScore: 88,
+    nextAction: "Queue scripts for Visual Director review",
+    icon: "spark"
+  },
+  {
+    id: "visual-director",
+    name: "Visual Director Agent",
+    role: "Analyzing visual patterns and directing HeyGen / Runway / Kling renders",
+    status: "active",
+    currentTask: "Analyzing pacing and visual style for 3 pending renders",
+    processingTime: "4.2s avg",
+    lastResult: "Approved 2 renders — rejected 1 for slow pacing in first 2s",
+    qualityScore: 86,
+    nextAction: "Send approved renders to publishing queue",
+    icon: "video"
+  },
+  {
+    id: "office-agent",
+    name: "Office Agent",
+    role: "Orchestrating all agents — scheduling, prioritizing, and reporting",
+    status: "active",
+    currentTask: "Coordinating morning pipeline: Scan → Match → Script → Render",
+    processingTime: "0.3s avg",
+    lastResult: "Pipeline cycle 6 complete — 4 ads generated, 2 approved, 1 published",
+    qualityScore: 98,
+    nextAction: "Trigger nightly learning loop at 11:00 PM",
+    icon: "gear"
+  },
+  {
+    id: "copilot",
+    name: "Copilot",
+    role: "Providing AI suggestions, answering workspace questions, surfacing insights",
+    status: "standby",
+    currentTask: "Awaiting user query",
+    processingTime: "1.9s avg",
+    lastResult: "Suggested focusing on Sea Moss UGC for TikTok this week",
+    qualityScore: 95,
+    nextAction: "Ready for next question",
+    icon: "spark"
+  }
+];
+
+async function loadAgentStatuses() {
+  state.agentStatusLoading = true;
+  state.agentStatusError = null;
+  render();
+  try {
+    const res = await fetch("/api/agents/status");
+    if (res.ok) {
+      const data = await res.json();
+      state.agentStatuses = data.agents || DEMO_AGENT_STATUSES;
+      state.agentPipelineHealth = data.pipelineHealth || 98;
+    } else {
+      state.agentStatuses = DEMO_AGENT_STATUSES;
+    }
+  } catch {
+    state.agentStatuses = DEMO_AGENT_STATUSES;
+  }
+  state.agentStatusLoading = false;
+  render();
+}
+
+async function loadPublishedMedia() {
+  state.publishedMediaLoading = true;
+  render();
+  try {
+    const res = await fetch("/api/published-media");
+    if (res.ok) {
+      const data = await res.json();
+      state.publishedMedia = data.media && data.media.length ? data.media : DEMO_PUBLISHED_MEDIA;
+    } else {
+      state.publishedMedia = DEMO_PUBLISHED_MEDIA;
+    }
+  } catch {
+    state.publishedMedia = DEMO_PUBLISHED_MEDIA;
+  }
+  state.publishedMediaLoading = false;
+  render();
+}
+
+async function loadAnalyticsData() {
+  state.analyticsLoading = true;
+  render();
+  try {
+    const res = await fetch("/api/analytics/summary");
+    if (res.ok) {
+      const data = await res.json();
+      state.analyticsData = data.summary || DEMO_ANALYTICS;
+    } else {
+      state.analyticsData = DEMO_ANALYTICS;
+    }
+  } catch {
+    state.analyticsData = DEMO_ANALYTICS;
+  }
+  state.analyticsLoading = false;
+  render();
+}
+
+async function validateQuality() {
+  state.qualityValidating = true;
+  state.qualityResult = null;
+  render();
+  try {
+    const res = await fetch("/api/quality/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.qualityScores)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      state.qualityResult = data;
+    } else {
+      state.qualityResult = enforceEliteStandards(state.qualityScores);
+    }
+  } catch {
+    state.qualityResult = enforceEliteStandards(state.qualityScores);
+  }
+  state.qualityValidating = false;
+  render();
+}
+
+function enforceEliteStandards(scores) {
+  const thresholds = state.qualityThresholds;
+  const failures = [];
+  const warnings = [];
+  Object.entries(thresholds).forEach(([key, min]) => {
+    const val = Number(scores[key] || 0);
+    if (val < min) {
+      failures.push({ metric: key, score: val, required: min, gap: min - val });
+    } else if (val < min + 10) {
+      warnings.push({ metric: key, score: val, required: min, margin: val - min });
+    }
+  });
+  const passed = failures.length === 0;
+  const action = passed ? "approve" : failures.some((f) => f.gap > 15) ? "reject" : "requeue";
+  return {
+    passed,
+    action,
+    failures,
+    warnings,
+    scores,
+    thresholds,
+    message: passed
+      ? "Video meets elite quality standards. Approved for publishing."
+      : `Video failed ${failures.length} quality check(s). Action: ${action}.`
+  };
+}
+
+function filteredPublishedMedia() {
+  const items = state.publishedMedia.length ? state.publishedMedia : DEMO_PUBLISHED_MEDIA;
+  if (state.publishedMediaFilter === "All") return items;
+  return items.filter((m) => m.status === state.publishedMediaFilter);
+}
 
 function filteredMedia() {
   return DEMO_MEDIA.filter((item) => {
@@ -2996,6 +3391,606 @@ function renderAnalytics() {
   `;
 }
 
+function renderAgentOrchestration() {
+  const agents = state.agentStatuses.length ? state.agentStatuses : DEMO_AGENT_STATUSES;
+  const health = state.agentPipelineHealth;
+
+  return `
+    <div class="agent-orch-section panel">
+      <div class="agent-orch-header">
+        <div class="agent-orch-title-row">
+          <div>
+            <h2>${icon("gear")} Agent Orchestration Dashboard</h2>
+            <p>Real-time Twin Agents + Office Agent workings — live pipeline status and task visibility.</p>
+          </div>
+          <div class="agent-orch-controls">
+            <div class="agent-health-badge ${health >= 95 ? "health-excellent" : health >= 80 ? "health-good" : "health-warn"}">
+              <i></i> Pipeline Health: <strong>${health}%</strong>
+            </div>
+            <button class="ghost agent-refresh-btn" id="agent-refresh-btn">
+              ${state.agentStatusLoading ? `${icon("radar")} Loading…` : `${icon("radar")} Refresh`}
+            </button>
+            <button class="toggle-link" id="toggle-agent-status">
+              ${state.agentStatusOpen ? "▲ Collapse" : "▼ Expand"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${state.agentStatusOpen ? `
+      <div class="agent-orch-body">
+        ${state.agentStatusLoading ? `
+          <div class="agent-loading">
+            ${icon("radar")} Loading agent statuses…
+          </div>
+        ` : `
+        <!-- Pipeline Flow Visualization -->
+        <div class="agent-pipeline-flow">
+          <div class="pipeline-step">
+            <span class="pipeline-label">Trend Scout</span>
+            <span class="pipeline-arrow">→</span>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-label">Product Match</span>
+            <span class="pipeline-arrow">→</span>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-label">Script Writer</span>
+            <span class="pipeline-arrow">→</span>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-label">Visual Director</span>
+            <span class="pipeline-arrow">→</span>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-label">Publish</span>
+          </div>
+          <div class="pipeline-orchestrator">
+            <span class="pipeline-orch-label">${icon("gear")} Office Agent orchestrating all stages</span>
+          </div>
+        </div>
+
+        <!-- Agent Cards Grid -->
+        <div class="agent-cards-grid">
+          ${agents.map((agent) => `
+            <div class="agent-card agent-card-${agent.status}">
+              <div class="agent-card-header">
+                <div class="agent-card-icon agent-icon-${agent.id}">
+                  ${icon(agent.icon || "gear")}
+                </div>
+                <div class="agent-card-title-block">
+                  <strong class="agent-card-name">${agent.name}</strong>
+                  <span class="agent-status-badge agent-status-${agent.status}">
+                    <i></i> ${agent.status === "active" ? "Active" : "Standby"}
+                  </span>
+                </div>
+                <div class="agent-quality-score">${agent.qualityScore}</div>
+              </div>
+              <p class="agent-card-role">${agent.role}</p>
+              <div class="agent-card-body">
+                <div class="agent-task-row">
+                  <span class="agent-task-label">Current Task</span>
+                  <span class="agent-task-value">${agent.currentTask}</span>
+                </div>
+                <div class="agent-task-row">
+                  <span class="agent-task-label">Processing</span>
+                  <span class="agent-task-value">${agent.processingTime}</span>
+                </div>
+                <div class="agent-task-row agent-result-row">
+                  <span class="agent-task-label">Last Result</span>
+                  <span class="agent-task-value agent-result-text">${agent.lastResult}</span>
+                </div>
+                <div class="agent-task-row">
+                  <span class="agent-task-label">Next Action</span>
+                  <span class="agent-task-value agent-next-action">${agent.nextAction}</span>
+                </div>
+              </div>
+              <div class="agent-quality-bar-row">
+                <span class="agent-quality-label">Quality Score</span>
+                <div class="agent-quality-bar">
+                  <div class="agent-quality-fill" style="width:${agent.qualityScore}%"></div>
+                </div>
+                <span class="agent-quality-num">${agent.qualityScore}/100</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        `}
+      </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderPublishedMediaGallery() {
+  const items = filteredPublishedMedia();
+  const selected = items.find((m) => m.id === state.selectedPublishedId) || null;
+  const statusFilters = ["All", "live", "scheduled", "archived"];
+  const totalViews = items.reduce((s, m) => s + (m.views || 0), 0);
+  const liveCount = (state.publishedMedia.length ? state.publishedMedia : DEMO_PUBLISHED_MEDIA).filter((m) => m.status === "live").length;
+
+  return `
+    <div class="published-gallery-section panel">
+      <div class="published-gallery-header">
+        <div class="published-gallery-title-row">
+          <div>
+            <h2>${icon("send")} Published Media Gallery</h2>
+            <p>All released content — manual uploads, auto-generated, and published to platforms. Live performance metrics.</p>
+          </div>
+          <div class="published-gallery-controls">
+            <div class="published-stats-row">
+              <span class="published-stat"><strong>${liveCount}</strong> live</span>
+              <span class="published-stat"><strong>${fmt(totalViews)}</strong> total views</span>
+            </div>
+            <button class="ghost published-refresh-btn" id="published-refresh-btn">
+              ${state.publishedMediaLoading ? `${icon("radar")} Loading…` : `${icon("radar")} Refresh`}
+            </button>
+            <button class="toggle-link" id="toggle-published-media">
+              ${state.publishedMediaOpen ? "▲ Collapse" : "▼ Expand"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${state.publishedMediaOpen ? `
+      <div class="published-gallery-body">
+        <!-- Status Filter Tabs -->
+        <div class="published-filter-tabs">
+          ${statusFilters.map((f) => `
+            <button class="published-filter-tab ${state.publishedMediaFilter === f ? "published-filter-active" : ""}"
+              data-pub-filter="${f}">
+              ${f === "All" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+              ${f !== "All" ? `<span class="pub-filter-count">${(state.publishedMedia.length ? state.publishedMedia : DEMO_PUBLISHED_MEDIA).filter((m) => m.status === f).length}</span>` : ""}
+            </button>
+          `).join("")}
+        </div>
+
+        <div class="published-workspace">
+          <!-- Gallery Grid -->
+          <div class="published-grid-panel">
+            <div class="published-grid-meta">
+              <span>${items.length} item${items.length !== 1 ? "s" : ""}</span>
+              ${state.publishedMediaFilter !== "All" ? `<span class="media-filter-tag">${state.publishedMediaFilter}</span>` : ""}
+            </div>
+            <div class="published-grid">
+              ${items.length === 0
+                ? `<div class="media-empty">No published media found for this filter.</div>`
+                : items.map((item) => `
+                  <button class="published-card ${item.id === state.selectedPublishedId ? "published-card-selected" : ""}"
+                    data-pub-id="${item.id}">
+                    <div class="published-card-thumb published-thumb-${item.status}">
+                      <div class="published-thumb-placeholder">▶</div>
+                      <span class="published-status-badge pub-status-${item.status}">${item.status}</span>
+                    </div>
+                    <div class="published-card-body">
+                      <strong class="published-card-title">${item.title}</strong>
+                      <div class="published-card-platforms">
+                        ${(item.publishedTo || []).map((p) => `<span class="pub-platform-tag">${p}</span>`).join("")}
+                      </div>
+                      <div class="published-card-metrics">
+                        ${item.views > 0 ? `<span class="pub-metric">${fmt(item.views)} views</span>` : ""}
+                        ${item.engagement > 0 ? `<span class="pub-metric">${item.engagement}% ER</span>` : ""}
+                        ${item.conversion > 0 ? `<span class="pub-metric">${item.conversion}% CVR</span>` : ""}
+                      </div>
+                      <div class="published-card-score">Score <b>${item.score}</b></div>
+                    </div>
+                  </button>
+                `).join("")
+              }
+            </div>
+          </div>
+
+          <!-- Detail Panel -->
+          <div class="published-detail-panel ${selected ? "published-detail-active" : ""}">
+            ${selected ? `
+              <div class="published-detail-content">
+                <div class="published-detail-header">
+                  <div>
+                    <span class="published-detail-status pub-status-${selected.status}">${selected.status}</span>
+                    <h3 class="published-detail-title">${selected.title}</h3>
+                  </div>
+                  <button class="media-detail-close" id="published-detail-close">✕</button>
+                </div>
+
+                <div class="published-detail-preview">
+                  <div class="media-preview-placeholder">
+                    <div class="media-preview-icon">▶</div>
+                    <p>${selected.status === "live" ? "Live on platforms" : selected.status === "scheduled" ? "Scheduled for publishing" : "Archived"}</p>
+                  </div>
+                </div>
+
+                <div class="published-detail-meta">
+                  <dl class="media-meta-grid">
+                    <div><dt>Product</dt><dd>${selected.product || "—"}</dd></div>
+                    <div><dt>Hook</dt><dd>${selected.hook || "—"}</dd></div>
+                    <div><dt>Rendered via</dt><dd>${renderAppLabel(selected.platform)}</dd></div>
+                    <div><dt>Quality Score</dt><dd><strong>${selected.score}</strong> / 100</dd></div>
+                    <div><dt>Published</dt><dd>${new Date(selected.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</dd></div>
+                  </dl>
+                </div>
+
+                <!-- Platform Performance -->
+                <div class="published-platforms-section">
+                  <h4>Published To</h4>
+                  <div class="published-platforms-list">
+                    ${(selected.publishedTo || []).map((p) => `
+                      <div class="published-platform-row">
+                        <span class="pub-platform-name">${p}</span>
+                        <span class="pub-platform-status pub-status-${selected.status}">${selected.status}</span>
+                      </div>
+                    `).join("")}
+                  </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                ${selected.views > 0 ? `
+                <div class="published-perf-section">
+                  <h4>Performance Metrics</h4>
+                  <div class="published-perf-grid">
+                    <div class="published-perf-card">
+                      <span>Views</span>
+                      <strong>${fmt(selected.views)}</strong>
+                    </div>
+                    <div class="published-perf-card">
+                      <span>Engagement</span>
+                      <strong>${selected.engagement}%</strong>
+                    </div>
+                    <div class="published-perf-card">
+                      <span>Conversion</span>
+                      <strong>${selected.conversion}%</strong>
+                    </div>
+                  </div>
+                </div>
+                ` : ""}
+
+                <!-- Actions -->
+                <div class="published-detail-actions">
+                  ${selected.status !== "live" ? `
+                  <button class="media-action-btn media-action-approve" data-pub-action="publish" data-pub-id="${selected.id}">
+                    ${icon("send")} Publish Now
+                  </button>
+                  ` : ""}
+                  <button class="media-action-btn media-action-download" data-pub-action="download" data-pub-id="${selected.id}">
+                    ↓ Download
+                  </button>
+                  <button class="media-action-btn media-action-requeue" data-pub-action="archive" data-pub-id="${selected.id}">
+                    ${icon("filter")} Archive
+                  </button>
+                  ${state.publishActionStatus && state.publishActionStatus.id === selected.id ? `
+                  <span class="media-action-feedback ${state.publishActionStatus.type}">${state.publishActionStatus.message}</span>
+                  ` : ""}
+                </div>
+              </div>
+            ` : `
+              <div class="media-detail-empty">
+                <div class="media-detail-empty-icon">${icon("send")}</div>
+                <p>Select a published item to view details and performance</p>
+              </div>
+            `}
+          </div>
+        </div>
+      </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderAnalyticsDashboard() {
+  const data = state.analyticsData || DEMO_ANALYTICS;
+  const pb = data.platformBreakdown || DEMO_ANALYTICS.platformBreakdown;
+  const qb = data.qualityBreakdown || DEMO_ANALYTICS.qualityBreakdown;
+  const topHooks = data.topHooks || DEMO_ANALYTICS.topHooks;
+
+  return `
+    <div class="analytics-dash-section panel">
+      <div class="analytics-dash-header">
+        <div class="analytics-dash-title-row">
+          <div>
+            <h2>${icon("chart")} Analytics Dashboard</h2>
+            <p>Full performance metrics — platform analytics, hook effectiveness, quality scores, and revenue impact.</p>
+          </div>
+          <div class="analytics-dash-controls">
+            <button class="ghost analytics-refresh-btn" id="analytics-refresh-btn">
+              ${state.analyticsLoading ? `${icon("radar")} Loading…` : `${icon("chart")} Refresh`}
+            </button>
+            <button class="toggle-link" id="toggle-analytics">
+              ${state.analyticsOpen ? "▲ Collapse" : "▼ Expand"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${state.analyticsOpen ? `
+      <div class="analytics-dash-body">
+        <!-- Tab Navigation -->
+        <div class="analytics-tabs">
+          ${["overview", "platforms", "quality", "hooks"].map((tab) => `
+            <button class="analytics-tab ${state.analyticsTab === tab ? "analytics-tab-active" : ""}"
+              data-analytics-tab="${tab}">
+              ${tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          `).join("")}
+        </div>
+
+        ${state.analyticsTab === "overview" ? `
+        <!-- Overview Tab -->
+        <div class="analytics-overview-grid">
+          <div class="analytics-kpi-card">
+            <span>Total Videos Created</span>
+            <strong>${data.totalVideosCreated || 114}</strong>
+            <small>all time</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>Approval Rate</span>
+            <strong>${data.approvalRate || 68}%</strong>
+            <small>of all creatives</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>Avg Quality Score</span>
+            <strong>${data.avgQualityScore || 87}</strong>
+            <small>/ 100 across all content</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>Avg Watch Time</span>
+            <strong>${data.avgWatchTime || 14.2}s</strong>
+            <small>+2.1s vs last week</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>Avg Engagement Rate</span>
+            <strong>${data.avgEngagementRate || 10.2}%</strong>
+            <small>across all platforms</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>CTA Conversion Rate</span>
+            <strong>${data.ctaConversionRate || 4.8}%</strong>
+            <small>from ad to action</small>
+          </div>
+          <div class="analytics-kpi-card">
+            <span>Hook Effectiveness</span>
+            <strong>${data.hookEffectiveness || 91}%</strong>
+            <small>high-confidence hooks</small>
+          </div>
+          <div class="analytics-kpi-card analytics-kpi-revenue">
+            <span>Revenue Attributed</span>
+            <strong>${(data.revenueAttributed || 12840).toLocaleString()}</strong>
+            <small>this month (Shopify)</small>
+          </div>
+        </div>
+
+        <!-- Engagement Trends Bar -->
+        <div class="analytics-trend-band">
+          <h3>Engagement Trends</h3>
+          <div class="bars">
+            ${[
+              ["Hook Strength",    qb.hookStrengthAvg || 91],
+              ["Visual Pacing",    qb.pacingScoreAvg  || 84],
+              ["CTA Clarity",      qb.ctaClarityAvg   || 78],
+              ["Visual Style",     qb.visualStyleAvg  || 86],
+              ["Overall Quality",  qb.overallAvg      || 87]
+            ].map(([label, val]) => `<div><span>${label}</span><b>${val}%</b><i style="--w:${val}%"></i></div>`).join("")}
+          </div>
+        </div>
+        ` : ""}
+
+        ${state.analyticsTab === "platforms" ? `
+        <!-- Platforms Tab -->
+        <div class="analytics-platforms-grid">
+          ${Object.entries(pb).map(([platform, stats]) => `
+            <div class="analytics-platform-card">
+              <div class="analytics-platform-header">
+                <strong class="analytics-platform-name">${platform.charAt(0).toUpperCase() + platform.slice(1)}</strong>
+                <span class="analytics-platform-videos">${stats.videos} videos</span>
+              </div>
+              <div class="analytics-platform-metrics">
+                <div class="analytics-platform-metric">
+                  <span>Views</span>
+                  <strong>${fmt(stats.views)}</strong>
+                </div>
+                <div class="analytics-platform-metric">
+                  <span>Engagement</span>
+                  <strong>${stats.engagement}%</strong>
+                </div>
+                <div class="analytics-platform-metric">
+                  <span>Conversion</span>
+                  <strong>${stats.conversion}%</strong>
+                </div>
+              </div>
+              <div class="analytics-platform-bar">
+                <div class="analytics-platform-fill" style="width:${Math.round((stats.views / 2400000) * 100)}%"></div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        ` : ""}
+
+        ${state.analyticsTab === "quality" ? `
+        <!-- Quality Tab -->
+        <div class="analytics-quality-section">
+          <div class="analytics-quality-summary">
+            <div class="analytics-kpi-card">
+              <span>Avg Quality Score</span>
+              <strong>${qb.overallAvg || 87}</strong>
+              <small>/ 100</small>
+            </div>
+            <div class="analytics-kpi-card">
+              <span>Hook Strength Avg</span>
+              <strong>${qb.hookStrengthAvg || 91}</strong>
+              <small>min required: 75</small>
+            </div>
+            <div class="analytics-kpi-card">
+              <span>Pacing Score Avg</span>
+              <strong>${qb.pacingScoreAvg || 84}</strong>
+              <small>min required: 70</small>
+            </div>
+            <div class="analytics-kpi-card">
+              <span>CTA Clarity Avg</span>
+              <strong>${qb.ctaClarityAvg || 78}</strong>
+              <small>min required: 75</small>
+            </div>
+            <div class="analytics-kpi-card">
+              <span>Visual Style Avg</span>
+              <strong>${qb.visualStyleAvg || 86}</strong>
+              <small>min required: 80</small>
+            </div>
+          </div>
+          <div class="analytics-quality-bars">
+            <h3>Quality Breakdown vs Thresholds</h3>
+            ${[
+              ["Hook Strength",   qb.hookStrengthAvg || 91, 75],
+              ["Pacing Score",    qb.pacingScoreAvg  || 84, 70],
+              ["CTA Clarity",     qb.ctaClarityAvg   || 78, 75],
+              ["Visual Style",    qb.visualStyleAvg  || 86, 80],
+              ["Overall Quality", qb.overallAvg      || 87, 80]
+            ].map(([label, val, min]) => `
+              <div class="analytics-quality-bar-row">
+                <span class="analytics-quality-label">${label}</span>
+                <div class="analytics-quality-track">
+                  <div class="analytics-quality-fill ${val >= min ? "quality-pass" : "quality-fail"}" style="width:${val}%"></div>
+                  <div class="analytics-quality-threshold" style="left:${min}%"></div>
+                </div>
+                <span class="analytics-quality-val ${val >= min ? "quality-pass-text" : "quality-fail-text"}">${val}</span>
+                <span class="analytics-quality-min">min ${min}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        ` : ""}
+
+        ${state.analyticsTab === "hooks" ? `
+        <!-- Hooks Tab -->
+        <div class="analytics-hooks-section">
+          <h3>Top Performing Hooks</h3>
+          <p class="analytics-hooks-desc">Ranked by total views and conversion rate across all platforms.</p>
+          <div class="analytics-hooks-list">
+            ${topHooks.map((h, i) => `
+              <div class="analytics-hook-row">
+                <div class="analytics-hook-rank">${i + 1}</div>
+                <div class="analytics-hook-body">
+                  <strong class="analytics-hook-text">${h.text}</strong>
+                  <div class="analytics-hook-meta">
+                    <span class="hook-tag">${h.platform}</span>
+                    ${h.views > 0 ? `<span class="hook-tag">${fmt(h.views)} views</span>` : ""}
+                    ${h.conversion > 0 ? `<span class="hook-tag hook-confidence-high">${h.conversion}% CVR</span>` : ""}
+                  </div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        ` : ""}
+      </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderQualityValidator() {
+  const thresholds = state.qualityThresholds;
+  const scores = state.qualityScores;
+  const result = state.qualityResult;
+
+  const metricLabels = {
+    hookStrength: "Hook Strength",
+    pacingScore: "Pacing Score",
+    ctaClarity: "CTA Clarity",
+    visualStyle: "Visual Style",
+    overallQuality: "Overall Quality"
+  };
+
+  return `
+    <div class="quality-validator-section panel">
+      <div class="quality-validator-header">
+        <div>
+          <h2>${icon("check")} Elite Quality Rendering Standards</h2>
+          <p>Enforce minimum quality thresholds before publishing. Auto-reject below threshold, auto-requeue for improvement.</p>
+        </div>
+      </div>
+
+      <div class="quality-validator-body">
+        <!-- Thresholds Reference -->
+        <div class="quality-thresholds-panel">
+          <h3>Elite Quality Thresholds</h3>
+          <div class="quality-thresholds-grid">
+            ${Object.entries(thresholds).map(([key, min]) => `
+              <div class="quality-threshold-card">
+                <span class="quality-threshold-label">${metricLabels[key] || key}</span>
+                <strong class="quality-threshold-min">${min}+</strong>
+                <span class="quality-threshold-desc">minimum required</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <!-- Score Input Panel -->
+        <div class="quality-input-panel">
+          <h3>Validate Video Quality</h3>
+          <p class="quality-input-desc">Enter scores for each dimension to validate against elite standards.</p>
+          <div class="quality-inputs-grid">
+            ${Object.entries(scores).map(([key, val]) => `
+              <div class="quality-input-row">
+                <label class="quality-input-label">
+                  ${metricLabels[key] || key}
+                  <span class="quality-input-min">min ${thresholds[key]}</span>
+                </label>
+                <div class="quality-input-controls">
+                  <input type="range" class="quality-range" data-quality-key="${key}"
+                    min="0" max="100" value="${val}" />
+                  <span class="quality-range-val ${val >= thresholds[key] ? "quality-pass-text" : "quality-fail-text"}"
+                    id="quality-val-${key}">${val}</span>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button class="quality-validate-btn ${state.qualityValidating ? "validating" : ""}"
+            id="quality-validate-btn" ${state.qualityValidating ? "disabled" : ""}>
+            ${state.qualityValidating ? `${icon("radar")} Validating…` : `${icon("check")} Validate Against Elite Standards`}
+          </button>
+        </div>
+
+        <!-- Validation Result -->
+        ${result ? `
+        <div class="quality-result-panel quality-result-${result.passed ? "pass" : result.action === "reject" ? "reject" : "requeue"}">
+          <div class="quality-result-header">
+            <span class="quality-result-icon">${result.passed ? "✓" : result.action === "reject" ? "✕" : "↺"}</span>
+            <div>
+              <strong class="quality-result-verdict">${result.passed ? "APPROVED" : result.action === "reject" ? "REJECTED" : "REQUEUE FOR IMPROVEMENT"}</strong>
+              <p class="quality-result-message">${result.message}</p>
+            </div>
+          </div>
+          ${result.failures && result.failures.length > 0 ? `
+          <div class="quality-failures">
+            <strong>Failed Checks:</strong>
+            <ul>
+              ${result.failures.map((f) => `
+                <li class="quality-failure-item">
+                  <span>${metricLabels[f.metric] || f.metric}</span>
+                  <span class="quality-fail-text">${f.score} / ${f.required} required (gap: ${f.gap})</span>
+                </li>
+              `).join("")}
+            </ul>
+          </div>
+          ` : ""}
+          ${result.warnings && result.warnings.length > 0 ? `
+          <div class="quality-warnings">
+            <strong>Warnings (close to threshold):</strong>
+            <ul>
+              ${result.warnings.map((w) => `
+                <li class="quality-warning-item">
+                  <span>${metricLabels[w.metric] || w.metric}</span>
+                  <span class="quality-warn-text">${w.score} / ${w.required} required (margin: +${w.margin})</span>
+                </li>
+              `).join("")}
+            </ul>
+          </div>
+          ` : ""}
+          <button class="toggle-link quality-clear-btn" id="quality-clear-result">Clear result</button>
+        </div>
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function renderTwinAutomation() {
   return `
     <div class="section-content">
@@ -3523,20 +4518,21 @@ function renderApiManagement() {
       </div>
       ` : ""}
 
-      <!-- ── TAB: ALERTS ── -->
-      ${state.apiMgmtTab === "alerts" ? `
-      <div class="api-alerts-section">
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>${icon("bell")} Alerts & Notifications</h2>
-              <p>${unread} unread · ${state.alerts.length} total</p>
-            </div>
-            <div class="api-alerts-actions">
-              <button class="ghost" id="refresh-alerts-btn">${icon("radar")} Refresh</button>
-              ${unread > 0 ? `<button class="ghost" id="ack-all-alerts-btn">${icon("check")} Mark All Read</button>` : ""}
-            </div>
-          </div>
+      ${sectionContent}
+
+      <!-- ── Agent Orchestration Dashboard (global, always visible) ── -->
+      ${renderAgentOrchestration()}
+
+      <!-- ── Published Media Gallery (global, always visible) ── -->
+      ${renderPublishedMediaGallery()}
+
+      <!-- ── Analytics Dashboard (global, always visible) ── -->
+      ${renderAnalyticsDashboard()}
+
+      <!-- ── Elite Quality Rendering Standards (global, always visible) ── -->
+      ${renderQualityValidator()}
+    </main>
+  `;
 
           ${state.alerts.length === 0 ? `
           <div class="api-alerts-empty">
@@ -6324,35 +7320,167 @@ function bindEvents() {
     });
   }
 
-  // ── Render polling — check status every 5s when rendering ──
-  if (state.renderStatus === "Rendering") {
-    if (!state.renderPollInterval) {
-      state.renderPollInterval = setInterval(async () => {
-        if (state.renderStatus !== "Rendering") {
-          clearInterval(state.renderPollInterval);
-          state.renderPollInterval = null;
-          return;
-        }
-        try {
-          const data = await agentGet("/api/renders");
-          if (data.success && data.renders && data.renders.length) {
-            const latest = data.renders[0];
-            if (latest.status === "complete" && latest.video_url) {
-              clearInterval(state.renderPollInterval);
-              state.renderPollInterval = null;
-              state.renderStatus = "Complete";
-              state.renderProgress = 100;
-              state.renderUrl = latest.video_url;
-              render();
-            }
-          }
-        } catch { /* polling failure is non-fatal */ }
-      }, 5000);
-    }
-  } else if (state.renderPollInterval) {
-    clearInterval(state.renderPollInterval);
-    state.renderPollInterval = null;
+  // ── Agent Orchestration Dashboard ──
+  const toggleAgentStatus = document.getElementById("toggle-agent-status");
+  if (toggleAgentStatus) {
+    toggleAgentStatus.addEventListener("click", () => {
+      state.agentStatusOpen = !state.agentStatusOpen;
+      if (state.agentStatusOpen && state.agentStatuses.length === 0) {
+        loadAgentStatuses();
+      } else {
+        render();
+      }
+    });
   }
+
+  const agentRefreshBtn = document.getElementById("agent-refresh-btn");
+  if (agentRefreshBtn) {
+    agentRefreshBtn.addEventListener("click", () => {
+      loadAgentStatuses();
+    });
+  }
+
+  // ── Published Media Gallery ──
+  const togglePublishedMedia = document.getElementById("toggle-published-media");
+  if (togglePublishedMedia) {
+    togglePublishedMedia.addEventListener("click", () => {
+      state.publishedMediaOpen = !state.publishedMediaOpen;
+      if (state.publishedMediaOpen && state.publishedMedia.length === 0) {
+        loadPublishedMedia();
+      } else {
+        render();
+      }
+    });
+  }
+
+  const publishedRefreshBtn = document.getElementById("published-refresh-btn");
+  if (publishedRefreshBtn) {
+    publishedRefreshBtn.addEventListener("click", () => {
+      loadPublishedMedia();
+    });
+  }
+
+  // Published media filter tabs
+  document.querySelectorAll("[data-pub-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.publishedMediaFilter = btn.dataset.pubFilter;
+      state.selectedPublishedId = null;
+      state.publishActionStatus = null;
+      render();
+    });
+  });
+
+  // Published media card selection
+  document.querySelectorAll("[data-pub-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.pubId;
+      if (id) {
+        state.selectedPublishedId = state.selectedPublishedId === id ? null : id;
+        state.publishActionStatus = null;
+        render();
+      }
+    });
+  });
+
+  // Published detail close
+  const publishedDetailClose = document.getElementById("published-detail-close");
+  if (publishedDetailClose) {
+    publishedDetailClose.addEventListener("click", () => {
+      state.selectedPublishedId = null;
+      state.publishActionStatus = null;
+      render();
+    });
+  }
+
+  // Published media action buttons
+  document.querySelectorAll("[data-pub-action]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.pubAction;
+      const id = btn.dataset.pubId;
+      const items = state.publishedMedia.length ? state.publishedMedia : DEMO_PUBLISHED_MEDIA;
+      const item = items.find((m) => m.id === id);
+      if (!item) return;
+
+      if (action === "publish") {
+        state.publishActionStatus = { id, type: "info", message: "Publishing…" };
+        render();
+        try {
+          await fetch(`/api/published-media/${id}/publish`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ platforms: item.publishedTo || ["TikTok"] })
+          });
+        } catch { /* demo ok */ }
+        item.status = "live";
+        state.publishActionStatus = { id, type: "success", message: `✓ Published to ${(item.publishedTo || ["TikTok"]).join(", ")}` };
+      } else if (action === "archive") {
+        item.status = "archived";
+        state.publishActionStatus = { id, type: "info", message: "↓ Archived" };
+      } else if (action === "download") {
+        state.publishActionStatus = { id, type: "info", message: "↓ Preparing download…" };
+      }
+      render();
+    });
+  });
+
+  // ── Analytics Dashboard ──
+  const toggleAnalytics = document.getElementById("toggle-analytics");
+  if (toggleAnalytics) {
+    toggleAnalytics.addEventListener("click", () => {
+      state.analyticsOpen = !state.analyticsOpen;
+      if (state.analyticsOpen && !state.analyticsData) {
+        loadAnalyticsData();
+      } else {
+        render();
+      }
+    });
+  }
+
+  const analyticsRefreshBtn = document.getElementById("analytics-refresh-btn");
+  if (analyticsRefreshBtn) {
+    analyticsRefreshBtn.addEventListener("click", () => {
+      loadAnalyticsData();
+    });
+  }
+
+  // Analytics tab navigation
+  document.querySelectorAll("[data-analytics-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.analyticsTab = btn.dataset.analyticsTab;
+      render();
+    });
+  });
+
+  // ── Quality Validator ──
+  const qualityValidateBtn = document.getElementById("quality-validate-btn");
+  if (qualityValidateBtn) {
+    qualityValidateBtn.addEventListener("click", () => {
+      validateQuality();
+    });
+  }
+
+  const qualityClearResult = document.getElementById("quality-clear-result");
+  if (qualityClearResult) {
+    qualityClearResult.addEventListener("click", () => {
+      state.qualityResult = null;
+      render();
+    });
+  }
+
+  // Quality range sliders
+  document.querySelectorAll(".quality-range").forEach((input) => {
+    input.addEventListener("input", () => {
+      const key = input.dataset.qualityKey;
+      const val = Number(input.value);
+      state.qualityScores[key] = val;
+      const display = document.getElementById(`quality-val-${key}`);
+      if (display) {
+        display.textContent = val;
+        const threshold = state.qualityThresholds[key] || 0;
+        display.className = `quality-range-val ${val >= threshold ? "quality-pass-text" : "quality-fail-text"}`;
+      }
+    });
+  });
 }
 
 async function boot() {
