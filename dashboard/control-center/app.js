@@ -1,4 +1,15 @@
 const state = {
+  // ── Navigation ──
+  currentSection: "viral-intelligence",
+
+  // ── Media Management ──
+  selectedMediaType: "All",
+  selectedRenderApp: "All",
+  mediaList: [],
+  selectedMediaId: null,
+  mediaLoading: false,
+  mediaActionStatus: null,
+
   // Filters
   category: "All",
   platform: "All",
@@ -27,25 +38,49 @@ const state = {
   selectedProducts: new Set(),
   creativeProductFilter: "All",
 
-  // Video Assembly Workspace
-  assemblyHookFilter: "All",
-  assemblyScriptFilter: "All",
-  assemblyProductFilter: "All",
+  // Video Generation Pipeline
+  scriptInput: "",
+  submittedScript: "",
+  uploadedScriptName: "",
+  inputStatus: "idle",
+  inputMessage: "Paste a script or upload a text file, then submit it to unlock generation.",
   videoDuration: "15s",
   videoStyle: "UGC",
   videoVoice: "Female",
   videoBackground: "Music",
   videoAspect: "9:16",
-  assemblyComponents: [],
-  videoDrafts: [],
-  renderStatus: null,
+  renderStatus: "idle",
+  renderMessage: "Waiting for submitted input.",
   renderUrl: null,
   renderProgress: 0,
-  showAssemblyWorkspace: true,
+  renderVideoId: null,
+  renderStatusUrl: null,
+  exportMessage: "Generate a completed video before exporting.",
+
+  // Legacy assembly data retained for non-video sections that still read shared creative state
+  assemblyHookFilter: "All",
+  assemblyScriptFilter: "All",
+  assemblyProductFilter: "All",
+  assemblyComponents: [],
+  videoDrafts: [],
+  showAssemblyWorkspace: false,
   compareDrafts: false,
   selectedDraftA: null,
-  selectedDraftB: null
+  selectedDraftB: null,
+
+  // Auto-generate
+  autoGenerating: false,
+  autoGenerateResult: null,
+
+  // Copilot
+  copilotOpen: false,
+  copilotQuestion: "",
+  copilotAnswer: null,
+  copilotNextActions: [],
+  copilotLoading: false
 };
+
+window.state = state;
 
 let viralAds = [
   {
@@ -380,6 +415,26 @@ function fmt(num) {
   return String(num);
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function renderStatusLabel(status) {
+  const labels = {
+    idle: "Idle",
+    ready: "Input Ready",
+    processing: "Processing",
+    complete: "Complete",
+    failed: "Failed"
+  };
+  return labels[status] || status;
+}
+
 function icon(name) {
   const paths = {
     radar: '<circle cx="12" cy="12" r="3"/><path d="M3 12a9 9 0 0 1 9-9"/><path d="M12 21a9 9 0 0 0 9-9"/><path d="m12 12 6-6"/>',
@@ -437,60 +492,280 @@ function filteredAssemblyProducts() {
   });
 }
 
-function render() {
-  const app = document.getElementById("app");
+// ── Media Management constants ──
+const MEDIA_TYPES = [
+  { id: "All",          label: "All Types" },
+  { id: "video",        label: "Video" },
+  { id: "print_ad",     label: "Print Ad" },
+  { id: "email",        label: "Email Marketing" },
+  { id: "social_post",  label: "Social Post" },
+  { id: "landing_page", label: "Landing Page" },
+  { id: "ugc",          label: "UGC" },
+  { id: "banner",       label: "Banner Ad" }
+];
+
+const RENDER_APPS = [
+  { id: "All",      label: "All Apps" },
+  { id: "heygen",   label: "HeyGen" },
+  { id: "runway",   label: "Runway" },
+  { id: "kling",    label: "Kling" },
+  { id: "internal", label: "Internal" },
+  { id: "manual",   label: "Manual" },
+  { id: "canva",    label: "Canva" },
+  { id: "openai",   label: "OpenAI" }
+];
+
+// Demo media items used when Supabase is unavailable
+const DEMO_MEDIA = [
+  { id: "m-001", media_type: "video",       platform: "heygen",   status: "complete", script: "Sea Moss morning ritual — 15s UGC",          score: 94, created_at: "2025-01-15T08:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "Nobody tells you minerals can change your whole morning." },
+  { id: "m-002", media_type: "video",       platform: "runway",   status: "complete", script: "Collagen glow lifestyle edit — 9:16",         score: 89, created_at: "2025-01-15T09:30:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "This changed my skin in 7 days." },
+  { id: "m-003", media_type: "video",       platform: "kling",    status: "pending",  script: "Testosterone gym commercial — 30s",           score: 81, created_at: "2025-01-15T10:00:00Z", video_url: null, product: "Apex Testosterone Support",  hook: "Your training needs foundation, not hype." },
+  { id: "m-004", media_type: "print_ad",    platform: "canva",    status: "complete", script: "Sea Moss flatlay print — A4 portrait",        score: 87, created_at: "2025-01-14T14:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "The mineral ritual your body has been missing." },
+  { id: "m-005", media_type: "print_ad",    platform: "manual",   status: "complete", script: "Collagen beauty magazine spread",             score: 83, created_at: "2025-01-14T15:30:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "Glow from within." },
+  { id: "m-006", media_type: "email",       platform: "internal", status: "complete", script: "Weekly wellness newsletter — Jan 15",         score: 76, created_at: "2025-01-14T16:00:00Z", video_url: null, product: "Genesis Wellness Bundle",    hook: "Your weekly ritual starts here." },
+  { id: "m-007", media_type: "email",       platform: "internal", status: "draft",    script: "Flash sale email — 48hr offer",               score: 71, created_at: "2025-01-13T11:00:00Z", video_url: null, product: "Metabolic Ignite",           hook: "48 hours. Your reset starts now." },
+  { id: "m-008", media_type: "social_post", platform: "canva",    status: "complete", script: "TikTok caption + hook card — Sea Moss",       score: 90, created_at: "2025-01-15T07:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "Nobody talks about this morning habit..." },
+  { id: "m-009", media_type: "social_post", platform: "openai",   status: "complete", script: "Instagram carousel — 5 slides, Collagen",     score: 85, created_at: "2025-01-14T12:00:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "5 reasons your skin needs collagen now." },
+  { id: "m-010", media_type: "landing_page",platform: "internal", status: "complete", script: "Sea Moss product landing page — v3",          score: 92, created_at: "2025-01-13T09:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "The mineral ritual trusted by 10,000+ customers." },
+  { id: "m-011", media_type: "ugc",         platform: "heygen",   status: "complete", script: "UGC testimonial — weight loss journey",       score: 88, created_at: "2025-01-12T10:00:00Z", video_url: null, product: "Metabolic Ignite",           hook: "I lost 12 lbs in 30 days with this morning reset." },
+  { id: "m-012", media_type: "banner",      platform: "canva",    status: "complete", script: "Google Display banner — 728x90 + 300x250",    score: 74, created_at: "2025-01-11T13:00:00Z", video_url: null, product: "NeuroRise Focus",            hook: "Upgrade your focus stack." }
+];
+
+function filteredMedia() {
+  return DEMO_MEDIA.filter((item) => {
+    const typeMatch = state.selectedMediaType === "All" || item.media_type === state.selectedMediaType;
+    const appMatch  = state.selectedRenderApp  === "All" || item.platform    === state.selectedRenderApp;
+    return typeMatch && appMatch;
+  });
+}
+
+function selectedMedia() {
+  return DEMO_MEDIA.find((m) => m.id === state.selectedMediaId) || null;
+}
+
+function mediaTypeLabel(id) {
+  const t = MEDIA_TYPES.find((t) => t.id === id);
+  return t ? t.label : id;
+}
+
+function renderAppLabel(id) {
+  const a = RENDER_APPS.find((a) => a.id === id);
+  return a ? a.label : id;
+}
+
+function statusBadgeClass(status) {
+  if (!status) return "";
+  const s = status.toLowerCase();
+  if (s === "complete" || s === "approved") return "status-ready";
+  if (s === "pending"  || s === "rendering") return "status-review";
+  if (s === "draft"    || s === "failed")    return "status-draft";
+  return "";
+}
+
+// ── Section definitions ──
+const SECTIONS = [
+  { id: "viral-intelligence", icon: "radar", label: "Viral Intelligence",  desc: "Trend scanning, hook discovery, viral pattern analysis" },
+  { id: "ai-reconstruction",  icon: "spark", label: "AI Reconstruction",   desc: "AI-powered creative reconstruction from viral ads" },
+  { id: "video-generation",   icon: "video", label: "Video Generation",    desc: "Video rendering via HeyGen, Runway, and Kling" },
+  { id: "media-output",       icon: "video", label: "Media Output",        desc: "Playback, QA, render routing, and publishing control" },
+  { id: "distribution",       icon: "send",  label: "Distribution",        desc: "Publishing queue and channel management" },
+  { id: "analytics",          icon: "chart", label: "Analytics",           desc: "Performance metrics and learning loop" },
+  { id: "twin-automation",    icon: "gear",  label: "Twin Automation",     desc: "Agent orchestration and auto-generate pipeline" }
+];
+
+// ── Media viewing area (shared across sections) ──
+function renderMediaArea(sectionId) {
+  const items = filteredMedia();
+  const selected = selectedMedia();
+
+  return `
+    <div class="media-area">
+      <div class="media-area-header">
+        <h2>Media Library</h2>
+        <div class="media-filters">
+          <label class="media-filter-label">
+            <span>Type</span>
+            <select id="media-type-filter" class="media-filter-select">
+              ${MEDIA_TYPES.map((t) => `<option value="${t.id}" ${state.selectedMediaType === t.id ? "selected" : ""}>${t.label}</option>`).join("")}
+            </select>
+          </label>
+          <label class="media-filter-label">
+            <span>App</span>
+            <select id="media-app-filter" class="media-filter-select">
+              ${RENDER_APPS.map((a) => `<option value="${a.id}" ${state.selectedRenderApp === a.id ? "selected" : ""}>${a.label}</option>`).join("")}
+            </select>
+          </label>
+          <button class="ghost media-refresh-btn" id="media-refresh-btn">${icon("radar")} Refresh</button>
+        </div>
+      </div>
+
+      <div class="media-workspace">
+        <!-- Media List -->
+        <div class="media-list-panel">
+          <div class="media-list-meta">
+            <span>${items.length} item${items.length !== 1 ? "s" : ""}</span>
+            ${state.selectedMediaType !== "All" ? `<span class="media-filter-tag">${mediaTypeLabel(state.selectedMediaType)}</span>` : ""}
+            ${state.selectedRenderApp !== "All" ? `<span class="media-filter-tag">${renderAppLabel(state.selectedRenderApp)}</span>` : ""}
+          </div>
+          <div class="media-grid">
+            ${items.length === 0
+              ? `<div class="media-empty">No media found for the selected filters.</div>`
+              : items.map((item) => `
+                <button class="media-card ${item.id === state.selectedMediaId ? "media-card-selected" : ""}" data-media-id="${item.id}">
+                  <div class="media-card-thumb media-thumb-${item.media_type}">
+                    ${item.video_url
+                      ? `<img src="${item.video_url}" alt="" />`
+                      : `<div class="media-thumb-placeholder">${mediaTypeIcon(item.media_type)}</div>`
+                    }
+                    <span class="media-type-badge">${mediaTypeLabel(item.media_type)}</span>
+                  </div>
+                  <div class="media-card-body">
+                    <strong class="media-card-title">${item.script}</strong>
+                    <div class="media-card-meta">
+                      <span class="media-app-tag">${renderAppLabel(item.platform)}</span>
+                      <span class="media-status-tag ${statusBadgeClass(item.status)}">${item.status}</span>
+                    </div>
+                    <div class="media-card-score">Score <b>${item.score}</b></div>
+                  </div>
+                </button>
+              `).join("")
+            }
+          </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div class="media-detail-panel ${selected ? "media-detail-active" : ""}">
+          ${selected ? renderMediaDetail(selected) : `
+            <div class="media-detail-empty">
+              <div class="media-detail-empty-icon">${icon("video")}</div>
+              <p>Select a media item to view details</p>
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function mediaTypeIcon(type) {
+  const icons = {
+    video:        "▶",
+    print_ad:     "🖼",
+    email:        "✉",
+    social_post:  "📱",
+    landing_page: "🌐",
+    ugc:          "🎥",
+    banner:       "📐"
+  };
+  return icons[type] || "📄";
+}
+
+function renderMediaDetail(item) {
+  return `
+    <div class="media-detail-content">
+      <div class="media-detail-header">
+        <div>
+          <span class="media-detail-type">${mediaTypeLabel(item.media_type)}</span>
+          <h3 class="media-detail-title">${item.script}</h3>
+        </div>
+        <button class="media-detail-close" id="media-detail-close">✕</button>
+      </div>
+
+      <!-- Preview -->
+      <div class="media-preview-area">
+        ${item.video_url
+          ? (item.media_type === "video" || item.media_type === "ugc"
+              ? `<video class="media-video-player" src="${item.video_url}" controls></video>`
+              : `<img class="media-image-viewer" src="${item.video_url}" alt="${item.script}" />`)
+          : `<div class="media-preview-placeholder">
+               <div class="media-preview-icon">${mediaTypeIcon(item.media_type)}</div>
+               <p>${item.media_type === "video" || item.media_type === "ugc" ? "Video preview not yet available" : "Preview not yet available"}</p>
+             </div>`
+        }
+      </div>
+
+      <!-- Metadata -->
+      <div class="media-detail-meta">
+        <dl class="media-meta-grid">
+          <div><dt>Product</dt><dd>${item.product || "—"}</dd></div>
+          <div><dt>Hook</dt><dd>${item.hook || "—"}</dd></div>
+          <div><dt>Rendering App</dt><dd>${renderAppLabel(item.platform)}</dd></div>
+          <div><dt>Media Type</dt><dd>${mediaTypeLabel(item.media_type)}</dd></div>
+          <div><dt>Quality Score</dt><dd><strong>${item.score}</strong> / 100</dd></div>
+          <div><dt>Status</dt><dd><span class="status-badge ${statusBadgeClass(item.status)}">${item.status}</span></dd></div>
+          <div><dt>Created</dt><dd>${new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</dd></div>
+        </dl>
+      </div>
+
+      <!-- Status & Approval Workflow -->
+      <div class="media-detail-workflow">
+        <h4>Approval Workflow</h4>
+        <div class="media-workflow-steps">
+          <div class="workflow-step ${item.status !== "draft" ? "workflow-done" : ""}">
+            <span class="workflow-dot"></span><span>Generated</span>
+          </div>
+          <div class="workflow-step ${item.status === "complete" || item.status === "approved" ? "workflow-done" : ""}">
+            <span class="workflow-dot"></span><span>Review</span>
+          </div>
+          <div class="workflow-step ${item.status === "approved" ? "workflow-done" : ""}">
+            <span class="workflow-dot"></span><span>Approved</span>
+          </div>
+          <div class="workflow-step">
+            <span class="workflow-dot"></span><span>Published</span>
+          </div>
+        </div>
+      </div>
+
+      ${item.status === "complete" || item.status === "pending" ? `
+      <!-- AI Suggestions for improvement -->
+      <div class="media-ai-suggestions">
+        <h4>${icon("spark")} AI Suggestions</h4>
+        <ul>
+          <li>Strengthen the hook in the first 2 seconds for higher retention.</li>
+          <li>Add a clear CTA overlay at the 80% mark.</li>
+          <li>Test a split-screen variant for A/B comparison.</li>
+        </ul>
+      </div>
+      ` : ""}
+
+      <!-- Action Buttons -->
+      <div class="media-detail-actions">
+        <button class="media-action-btn media-action-approve" data-media-action="approve" data-media-id="${item.id}">
+          ${icon("check")} Approve
+        </button>
+        <button class="media-action-btn media-action-reject" data-media-action="reject" data-media-id="${item.id}">
+          ✕ Reject
+        </button>
+        <button class="media-action-btn media-action-requeue" data-media-action="requeue" data-media-id="${item.id}">
+          ${icon("radar")} Requeue
+        </button>
+        <button class="media-action-btn media-action-download" data-media-action="download" data-media-id="${item.id}">
+          ↓ Download
+        </button>
+        ${state.mediaActionStatus && state.mediaActionStatus.id === item.id ? `
+        <span class="media-action-feedback ${state.mediaActionStatus.type}">${state.mediaActionStatus.message}</span>
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
+// ── Section-specific content renderers ──
+function renderViralIntelligence() {
   const ad = selectedAd();
   const categories = ["All", ...new Set(viralAds.map((item) => item.category))];
-  const platforms = ["All", ...new Set(viralAds.map((item) => item.platform))];
-  const productNames = ["All", ...products.map((p) => p.name)];
-  const hookCategories = ["All", ...new Set(winningHooks.map((h) => h.category))];
-  const hookPlatforms = ["All", ...new Set(winningHooks.map((h) => h.platform))];
-  const productCategories = ["All", ...new Set(products.map((p) => p.category))];
+  const platforms  = ["All", ...new Set(viralAds.map((item) => item.platform))];
   const highConfidenceCount = winningHooks.filter((h) => h.confidence === "High").length;
+  const hookCategories = ["All", ...new Set(winningHooks.map((h) => h.category))];
 
-  app.innerHTML = `
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">IG</div>
-        <div>
-          <strong>I AM GENESIS TECH</strong>
-          <span>AI Viral Engine</span>
-        </div>
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>Viral Intelligence</h2>
+        <p>Trend scanning, hook discovery, and viral pattern analysis across TikTok, Instagram, YouTube, Facebook, and Pinterest.</p>
       </div>
-      <nav>
-        ${[
-          ["radar", "Viral Intelligence"],
-          ["spark", "AI Reconstruction"],
-          ["video", "Video Generation"],
-          ["send", "Distribution"],
-          ["chart", "Analytics"],
-          ["gear", "Twin Automation"]
-        ].map(([ic, label], i) => `<button class="${i === 0 ? "active" : ""}">${icon(ic)}<span>${label}</span></button>`).join("")}
-      </nav>
-      <div class="automation-card">
-        <span>Automation Health</span>
-        <strong>Daily loop active</strong>
-        <div class="pulse-row"><i></i> Next scan at 6:00 AM</div>
-      </div>
-    </aside>
 
-    <main>
-      <header class="topbar">
-        <div>
-          <h1>Elite AI E-Commerce Workspace</h1>
-          <p>Viral ad intelligence, AI creative reconstruction, distribution, and learning loop for supplement growth.</p>
-        </div>
-        <div class="top-actions">
-          <div class="sync-status ${state.syncLevel}">
-            <b>${state.dataSource}</b>
-            <span>${state.syncMessage}</span>
-          </div>
-          <button class="ghost">${icon("filter")} Connect Sources</button>
-          <button class="primary">${icon("spark")} Generate Today's Ads</button>
-        </div>
-      </header>
-
-      <!-- ── METRICS GRID (interactive) ── -->
+      <!-- Metrics -->
       <section class="metrics-grid">
         <article class="metric metric-interactive">
           <span>Viral ads scanned</span>
@@ -503,7 +778,6 @@ function render() {
             </button>
           </div>
         </article>
-
         <article class="metric metric-interactive">
           <span>Winning hooks found</span>
           <strong id="hooks-count-display">${state.hooksFound}</strong>
@@ -521,24 +795,11 @@ function render() {
             </button>
           </div>
         </article>
-
-        <article class="metric metric-interactive">
-          <span>Creatives generated</span>
-          <strong>${creatives.length}</strong>
-          <small>${creatives.filter((c) => c.status === "Ready").length} ready to publish</small>
-          <div class="metric-controls">
-            <label class="metric-select-label">
-              <select data-select="creativeProductFilter" class="metric-select">
-                ${productNames.map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-        </article>
-
+        ${metric("Avg engagement rate", "10.2%", "across scanned ads")}
         ${metric("Projected ROAS signal", "3.7x", "based on patterns")}
       </section>
 
-      <!-- ── HOOKS LIST (expandable) ── -->
+      <!-- Hooks List -->
       ${state.showHooksList ? `
       <section class="hooks-list-section panel">
         <div class="panel-head">
@@ -573,7 +834,7 @@ function render() {
       </section>
       ` : ""}
 
-      <!-- ── VIRAL TRENDS MONITOR ── -->
+      <!-- Viral Trends Monitor -->
       <section class="workspace-grid">
         <div class="panel monitor">
           <div class="panel-head">
@@ -599,7 +860,6 @@ function render() {
             `).join("")}
           </div>
         </div>
-
         <div class="panel insight">
           <div class="panel-head compact">
             <h2>Winning Structure</h2>
@@ -621,341 +881,27 @@ function render() {
         </div>
       </section>
 
-      <!-- ── ELITE MANUAL VIDEO ASSEMBLY WORKSPACE ── -->
-      <section class="assembly-workspace">
-        <div class="assembly-header">
-          <div>
-            <h2>${icon("video")} Elite Manual Video Assembly Workspace</h2>
-            <p>Assemble videos from AI-generated components. Full edit controls, multi-platform rendering, draft comparison.</p>
-          </div>
-          <button class="ghost" id="toggle-assembly">${state.showAssemblyWorkspace ? "▲ Collapse" : "▼ Expand"}</button>
-        </div>
+      ${renderMediaArea("viral-intelligence")}
+    </div>
+  `;
+}
 
-        ${state.showAssemblyWorkspace ? `
-        <div class="assembly-body">
+function renderAiReconstruction() {
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>AI Reconstruction</h2>
+        <p>AI-powered creative reconstruction from viral ads. Deconstruct winning structures and rebuild them for your products.</p>
+      </div>
 
-          <!-- Component Libraries Row -->
-          <div class="assembly-libraries">
-
-            <!-- Hooks Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Hooks Library</h3>
-                <label><select data-select="assemblyHookFilter" class="lib-select">
-                  ${hookCategories.map((c) => `<option ${c === state.assemblyHookFilter ? "selected" : ""}>${c}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredHooks().map((h) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-text">${h.text}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${h.category}</span>
-                        <span class="hook-tag">${h.platform}</span>
-                        <span class="hook-tag hook-confidence-${h.confidence.toLowerCase()}">${h.confidence}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${h.text.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="hook" data-component-id="${h.id}" data-component-text="${h.text.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-
-            <!-- Scripts Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Scripts Library</h3>
-                <label><select data-select="assemblyScriptFilter" class="lib-select">
-                  ${["All", ...products.map((p) => p.name)].map((n) => `<option ${n === state.assemblyScriptFilter ? "selected" : ""}>${n}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredAssemblyScripts().map((c) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-label">${c.product}</span>
-                      <span class="lib-text">${c.script}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${c.format}</span>
-                        <span class="hook-tag">${c.channel}</span>
-                        <span class="hook-tag hook-confidence-${c.status === "Ready" ? "high" : c.status === "Review" ? "medium" : "low"}">${c.status}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${c.script.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="script" data-component-id="${c.id}" data-component-text="${c.script.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-
-            <!-- Products Library -->
-            <div class="library-panel">
-              <div class="library-head">
-                <h3>Products Library</h3>
-                <label><select data-select="assemblyProductFilter" class="lib-select">
-                  ${productCategories.map((c) => `<option ${c === state.assemblyProductFilter ? "selected" : ""}>${c}</option>`).join("")}
-                </select></label>
-              </div>
-              <div class="library-list">
-                ${filteredAssemblyProducts().map((p) => `
-                  <div class="library-item">
-                    <div class="library-item-body">
-                      <span class="lib-label">${p.name}</span>
-                      <div class="lib-meta">
-                        <span class="hook-tag">${p.category}</span>
-                        <span class="hook-tag">${p.angle}</span>
-                        <span class="hook-tag hook-confidence-high">Score ${p.score}</span>
-                      </div>
-                    </div>
-                    <div class="lib-actions">
-                      <button class="copy-btn" data-copy="${p.name.replace(/"/g, "&quot;")}">Copy</button>
-                      <button class="add-to-builder-btn" data-component-type="product" data-component-id="${p.name}" data-component-text="${p.name.replace(/"/g, "&quot;")}">+ Add</button>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-
-          </div><!-- /assembly-libraries -->
-
-          <!-- Builder + Parameters Row -->
-          <div class="assembly-builder-row">
-
-            <!-- Video Parameters Panel -->
-            <div class="params-panel">
-              <h3>Video Parameters</h3>
-              <div class="params-grid">
-                <label class="param-label">Duration
-                  <select data-state-key="videoDuration">
-                    ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Style
-                  <select data-state-key="videoStyle">
-                    ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Voice
-                  <select data-state-key="videoVoice">
-                    ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Background
-                  <select data-state-key="videoBackground">
-                    ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="param-label">Aspect Ratio
-                  <select data-state-key="videoAspect">
-                    ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
-                  </select>
-                </label>
-              </div>
-              <div class="params-summary">
-                <span>${state.videoDuration} · ${state.videoStyle} · ${state.videoVoice} voice · ${state.videoBackground} · ${state.videoAspect}</span>
-              </div>
-            </div>
-
-            <!-- Video Builder -->
-            <div class="builder-panel">
-              <div class="builder-head">
-                <h3>Video Builder</h3>
-                <div class="builder-actions">
-                  <button class="ghost" id="ai-suggestions-btn">${icon("spark")} AI Suggestions</button>
-                  <button class="ghost" id="save-draft-btn">${icon("check")} Save Draft</button>
-                </div>
-              </div>
-
-              <div class="drop-zone" id="builder-drop-zone">
-                ${state.assemblyComponents.length === 0
-                  ? `<div class="drop-zone-empty">Drag components here or click <strong>+ Add</strong> from the libraries above.<br/><small>Hook → Script → Product → CTA</small></div>`
-                  : state.assemblyComponents.map((comp, idx) => `
-                    <div class="builder-component" data-comp-idx="${idx}">
-                      <span class="comp-type-badge comp-type-${comp.type}">${comp.type}</span>
-                      <span class="comp-text">${comp.text}</span>
-                      <button class="comp-remove" data-remove-idx="${idx}">✕</button>
-                    </div>
-                  `).join("")
-                }
-              </div>
-
-              <!-- Real-time preview -->
-              ${state.assemblyComponents.length > 0 ? `
-              <div class="builder-preview">
-                <div class="preview-label">Structure Preview · ${state.videoAspect} · ${state.videoDuration}</div>
-                <div class="preview-body">
-                  ${state.assemblyComponents.map((comp, idx) => `
-                    <div class="preview-step">
-                      <b>${idx + 1}. ${comp.type.toUpperCase()}</b>
-                      <p>${comp.text.length > 120 ? comp.text.slice(0, 120) + "…" : comp.text}</p>
-                    </div>
-                  `).join("")}
-                  <div class="preview-params">
-                    Style: ${state.videoStyle} · Voice: ${state.videoVoice} · BG: ${state.videoBackground}
-                  </div>
-                </div>
-              </div>
-              ` : ""}
-
-              <!-- Send to Renderer -->
-              <div class="render-actions">
-                <button class="render-btn heygen" id="send-heygen" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to HeyGen
-                </button>
-                <button class="render-btn runway" id="send-runway" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to Runway
-                </button>
-                <button class="render-btn kling" id="send-kling" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to Kling
-                </button>
-              </div>
-            </div>
-
-          </div><!-- /assembly-builder-row -->
-
-          <!-- Rendering Status -->
-          ${state.renderStatus ? `
-          <div class="render-status-panel">
-            <div class="render-status-head">
-              <h3>Rendering Status</h3>
-              <span class="render-badge render-badge-${state.renderStatus.toLowerCase().replace(/\s/g, "-")}">${state.renderStatus}</span>
-            </div>
-            ${state.renderStatus === "Rendering" ? `
-              <div class="render-progress-bar"><div class="render-progress-fill" style="width:${state.renderProgress}%"></div></div>
-              <small>${state.renderProgress}% complete</small>
-            ` : ""}
-            ${state.renderUrl ? `
-              <div class="render-result">
-                <a href="${state.renderUrl}" target="_blank" class="render-url-link">${icon("video")} View Rendered Video</a>
-                <div class="render-result-actions">
-                  <button class="ghost" id="approve-render">✓ Approve &amp; Publish</button>
-                  <button class="ghost" id="reject-render">✕ Reject</button>
-                  <button class="ghost" id="regenerate-render">${icon("radar")} Re-generate</button>
-                </div>
-              </div>
-            ` : ""}
-          </div>
-          ` : ""}
-
-          <!-- Drafts & Compare -->
-          ${state.videoDrafts.length > 0 ? `
-          <div class="drafts-panel">
-            <div class="drafts-head">
-              <h3>Saved Drafts (${state.videoDrafts.length})</h3>
-              <button class="toggle-link" id="toggle-compare">${state.compareDrafts ? "▲ Close Compare" : "▼ Compare Versions"}</button>
-            </div>
-            <div class="drafts-list">
-              ${state.videoDrafts.map((draft, idx) => `
-                <div class="draft-row">
-                  <span class="draft-name">Draft ${idx + 1} — ${draft.style} · ${draft.duration} · ${draft.aspect}</span>
-                  <span class="draft-components">${draft.components.length} components</span>
-                  <div class="draft-actions">
-                    <button class="ghost" data-load-draft="${idx}">Load</button>
-                    <button class="ghost" data-delete-draft="${idx}">Delete</button>
-                    ${state.compareDrafts ? `
-                      <button class="ghost ${state.selectedDraftA === idx ? "active-link" : ""}" data-compare-a="${idx}">A</button>
-                      <button class="ghost ${state.selectedDraftB === idx ? "active-link" : ""}" data-compare-b="${idx}">B</button>
-                    ` : ""}
-                  </div>
-                </div>
-              `).join("")}
-            </div>
-            ${state.compareDrafts && state.selectedDraftA !== null && state.selectedDraftB !== null ? `
-            <div class="compare-view">
-              <div class="compare-col">
-                <div class="compare-label">Draft ${state.selectedDraftA + 1}</div>
-                ${state.videoDrafts[state.selectedDraftA].components.map((c, i) => `
-                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
-                `).join("")}
-                <div class="preview-params">${state.videoDrafts[state.selectedDraftA].style} · ${state.videoDrafts[state.selectedDraftA].voice} · ${state.videoDrafts[state.selectedDraftA].duration}</div>
-              </div>
-              <div class="compare-col">
-                <div class="compare-label">Draft ${state.selectedDraftB + 1}</div>
-                ${state.videoDrafts[state.selectedDraftB].components.map((c, i) => `
-                  <div class="preview-step"><b>${i + 1}. ${c.type.toUpperCase()}</b><p>${c.text.length > 100 ? c.text.slice(0, 100) + "…" : c.text}</p></div>
-                `).join("")}
-                <div class="preview-params">${state.videoDrafts[state.selectedDraftB].style} · ${state.videoDrafts[state.selectedDraftB].voice} · ${state.videoDrafts[state.selectedDraftB].duration}</div>
-              </div>
-            </div>
-            ` : ""}
-          </div>
-          ` : ""}
-
-        </div><!-- /assembly-body -->
-        ` : ""}
+      <section class="metrics-grid">
+        ${metric("Reconstructions today", creatives.length.toString(), "from viral patterns")}
+        ${metric("Avg quality score", Math.round(creatives.reduce((s, c) => s + c.score, 0) / (creatives.length || 1)).toString(), "across all creatives")}
+        ${metric("Ready to publish", creatives.filter((c) => c.status === "Ready").length.toString(), "approved creatives")}
+        ${metric("Pending review", creatives.filter((c) => c.status === "Review").length.toString(), "need approval")}
       </section>
 
-      <!-- ── PRODUCT MATCHING ── -->
-      <section class="workspace-grid secondary">
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Product Matching</h2>
-              <p>Pairs viral structures with IAGT products and positioning angles.</p>
-            </div>
-            <div class="product-toggle-row">
-              <button class="ghost" id="toggle-products">
-                ${state.productsExpanded ? "▲ Hide Products" : "▼ Show All Products"}
-              </button>
-              ${state.productsExpanded && state.selectedProducts.size > 0 ? `
-                <button class="ghost" id="filter-by-selected-products">Filter Creatives by Selected</button>
-                <button class="toggle-link" id="clear-product-selection">Clear Selection</button>
-              ` : ""}
-            </div>
-          </div>
-          ${state.productsExpanded ? `
-          <div class="product-grid">
-            ${products.map((product) => {
-              const isSelected = state.selectedProducts.has(product.name);
-              return `
-              <article class="${isSelected ? "product-selected" : ""}">
-                <div class="product-card-head">
-                  <input type="checkbox" class="product-checkbox" data-product-name="${product.name.replace(/"/g, "&quot;")}" ${isSelected ? "checked" : ""} />
-                  ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="" />` : `<div class="product-thumb empty-thumb"></div>`}
-                  <div>
-                    <strong>${product.name}</strong>
-                    <span>${product.category}</span>
-                  </div>
-                </div>
-                <meter min="0" max="100" value="${product.score}"></meter>
-                <p>${product.angle}</p>
-                <small class="product-source">${product.source === "shopify" ? "Shopify synced" : "Workspace product"}</small>
-              </article>
-            `}).join("")}
-          </div>
-          ` : `
-          <div class="product-collapsed-summary">
-            ${products.map((p) => `<span class="product-pill ${state.selectedProducts.has(p.name) ? "product-pill-selected" : ""}">${p.name}</span>`).join("")}
-          </div>
-          `}
-        </div>
-
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Daily Automation Pipeline</h2>
-              <p>Twin-ready workflow stages for the 24/7 marketing system.</p>
-            </div>
-          </div>
-          <div class="timeline">
-            ${workflow.map(([time, title, desc]) => `
-              <div>
-                <time>${time}</time>
-                <span></span>
-                <div><strong>${title}</strong><p>${desc}</p></div>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      </section>
-
-      <!-- ── AI CONTENT QUEUE ── -->
+      <!-- AI Content Queue -->
       <section class="queue-section">
         <div class="panel creative-panel">
           <div class="panel-head">
@@ -969,7 +915,7 @@ function render() {
               </div>
               <label class="metric-select-label">
                 <select data-select="creativeProductFilter" class="metric-select">
-                  ${productNames.map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
+                  ${["All", ...products.map((p) => p.name)].map((n) => `<option ${n === state.creativeProductFilter ? "selected" : ""}>${n}</option>`).join("")}
                 </select>
               </label>
             </div>
@@ -997,6 +943,156 @@ function render() {
           </div>
         </div>
 
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Reconstruction Pipeline</h2>
+          </div>
+          <div class="timeline">
+            ${[
+              ["Step 1", "Scan viral ad", "Identify hook, structure, emotion, and CTA pattern"],
+              ["Step 2", "Deconstruct", "Extract reusable components and winning formulas"],
+              ["Step 3", "Match product", "Pair structure with best-fit IAGT product"],
+              ["Step 4", "Reconstruct", "Generate new creative using AI with your brand voice"],
+              ["Step 5", "Score & review", "Quality score assigned, sent to approval queue"]
+            ].map(([time, title, desc]) => `
+              <div>
+                <time>${time}</time>
+                <span></span>
+                <div><strong>${title}</strong><p>${desc}</p></div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </section>
+
+      ${renderMediaArea("ai-reconstruction")}
+    </div>
+  `;
+}
+
+function renderVideoGeneration() {
+  const hasInput = Boolean(state.submittedScript.trim());
+  const isProcessing = state.renderStatus === "processing";
+  const canGenerate = hasInput && !isProcessing;
+  const canExport = Boolean(state.renderUrl) && state.renderStatus === "complete";
+
+  return `
+    <div class="section-content video-pipeline-content">
+      <div class="section-intro">
+        <h2>Video Generation Pipeline</h2>
+        <p>A single linear workflow: submit a real script, generate one video render, preview the completed video, then export the same output.</p>
+      </div>
+
+      <section class="video-pipeline">
+        <article class="pipeline-card input-layer">
+          <div class="pipeline-step-label">1 · INPUT LAYER</div>
+          <h3>Submit Script Input</h3>
+          <p>Paste a production script or upload a .txt file. Submitting locks the exact script used by the render request.</p>
+          <label class="script-input-label" for="script-input">Video script</label>
+          <textarea id="script-input" class="script-input" rows="9" placeholder="Paste the final script that should be rendered into video...">${escapeHtml(state.scriptInput)}</textarea>
+          <div class="file-input-row">
+            <label class="file-picker" for="script-file-input">Upload .txt Script</label>
+            <input id="script-file-input" type="file" accept=".txt,text/plain" />
+            <span>${state.uploadedScriptName ? escapeHtml(state.uploadedScriptName) : "No file selected"}</span>
+          </div>
+          <button class="primary pipeline-action" id="submit-video-input" ${state.scriptInput.trim() ? "" : "disabled"}>Use Script</button>
+          <div class="pipeline-feedback ${state.inputStatus}">${escapeHtml(state.inputMessage)}</div>
+        </article>
+
+        <article class="pipeline-card generation-layer">
+          <div class="pipeline-step-label">2 · PROCESSING / GENERATION LAYER</div>
+          <h3>Generate Video</h3>
+          <p>One render action sends the submitted script to the backend HeyGen integration. Status is polled until completion or failure.</p>
+          <div class="params-grid pipeline-params">
+            <label class="param-label">Duration
+              <select data-state-key="videoDuration" ${isProcessing ? "disabled" : ""}>
+                ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Style
+              <select data-state-key="videoStyle" ${isProcessing ? "disabled" : ""}>
+                ${["UGC","Commercial","Luxury","Educational"].map((v) => `<option ${state.videoStyle === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Voice
+              <select data-state-key="videoVoice" ${isProcessing ? "disabled" : ""}>
+                ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Background
+              <select data-state-key="videoBackground" ${isProcessing ? "disabled" : ""}>
+                ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Aspect Ratio
+              <select data-state-key="videoAspect" ${isProcessing ? "disabled" : ""}>
+                ${["9:16","16:9","1:1"].map((v) => `<option ${state.videoAspect === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <button class="primary pipeline-action generate-video-action" id="generate-video-btn" ${canGenerate ? "" : "disabled"}>
+            ${isProcessing ? `${icon("radar")} Generating Video…` : `${icon("video")} Generate Video`}
+          </button>
+          <div class="render-status-card ${state.renderStatus}">
+            <div>
+              <span>Status</span>
+              <strong>${renderStatusLabel(state.renderStatus)}</strong>
+            </div>
+            <p>${escapeHtml(state.renderMessage)}</p>
+            ${state.renderVideoId ? `<small>Render ID: ${escapeHtml(state.renderVideoId)}</small>` : ""}
+            ${isProcessing ? `
+              <div class="render-progress-bar"><div class="render-progress-fill" style="width:${state.renderProgress}%"></div></div>
+              <small>${state.renderProgress}% complete</small>
+            ` : ""}
+          </div>
+        </article>
+
+        <article class="pipeline-card output-layer">
+          <div class="pipeline-step-label">3 · OUTPUT / PREVIEW LAYER</div>
+          <h3>Preview Completed Video</h3>
+          ${state.renderUrl ? `
+            <video class="pipeline-video-player" src="${escapeHtml(state.renderUrl)}" controls preload="metadata"></video>
+            <a class="render-url-link" href="${escapeHtml(state.renderUrl)}" target="_blank" rel="noopener">Open direct video URL</a>
+          ` : `
+            <div class="empty-output-state">
+              <strong>No completed video output.</strong>
+              <span>Submit input and generate a render. Playback appears only after the backend returns a direct video URL.</span>
+            </div>
+          `}
+        </article>
+
+        <article class="pipeline-card export-layer">
+          <div class="pipeline-step-label">4 · EXPORT LAYER</div>
+          <h3>Download Output</h3>
+          <p>Exports the exact video URL returned by the completed render. Download is disabled until a real output exists.</p>
+          ${canExport ? `
+            <a class="primary pipeline-action export-download" href="${escapeHtml(state.renderUrl)}" download="iagt-generated-video.mp4">Download Video</a>
+          ` : `
+            <button class="primary pipeline-action" disabled>Download Video</button>
+          `}
+          <div class="pipeline-feedback ${canExport ? "ready" : "idle"}">${escapeHtml(canExport ? "Video is ready to download." : state.exportMessage)}</div>
+        </article>
+      </section>
+    </div>
+  `;
+}
+
+function renderDistribution() {
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>Distribution</h2>
+        <p>Publishing queue, channel management, and scheduled content delivery across all platforms.</p>
+      </div>
+
+      <section class="metrics-grid">
+        ${metric("Queued today", channels.filter((c) => c[3] === "Ready" || c[3] === "Queued").length.toString(), "ready to publish")}
+        ${metric("Channels active", channels.length.toString(), "TikTok, IG, YT, Pinterest")}
+        ${metric("Published this week", "14", "across all channels")}
+        ${metric("Avg publish time", "2.3h", "from approval to live")}
+      </section>
+
+      <section class="queue-section">
         <div class="panel publish-panel">
           <div class="panel-head compact">
             <h2>Publishing Queue</h2>
@@ -1013,6 +1109,41 @@ function render() {
             `).join("")}
           </div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head compact">
+            <h2>Channel Health</h2>
+          </div>
+          <div class="bars">
+            ${[
+              ["TikTok",     88],
+              ["Instagram",  82],
+              ["YouTube",    76],
+              ["Pinterest",  71],
+              ["Facebook",   68]
+            ].map(([label, val]) => `<div><span>${label}</span><b>${val}%</b><i style="--w:${val}%"></i></div>`).join("")}
+          </div>
+        </div>
+      </section>
+
+      ${renderMediaArea("distribution")}
+    </div>
+  `;
+}
+
+function renderAnalytics() {
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>Analytics</h2>
+        <p>Performance metrics, learning loop data, and pattern intelligence across all campaigns and creatives.</p>
+      </div>
+
+      <section class="metrics-grid">
+        ${metric("Avg watch time", "14.2s", "+2.1s vs last week")}
+        ${metric("Click-through rate", "4.8%", "+0.6% vs last week")}
+        ${metric("Conversion rate", "2.3%", "from ad to purchase")}
+        ${metric("Revenue attributed", "$12,840", "this month")}
       </section>
 
       <section class="analytics-band">
@@ -1022,17 +1153,231 @@ function render() {
         </div>
         <div class="bars">
           ${[
-            ["Hook strength", 91],
-            ["Visual pacing", 84],
-            ["CTA clarity", 78],
-            ["Product fit", 88]
+            ["Hook strength",  91],
+            ["Visual pacing",  84],
+            ["CTA clarity",    78],
+            ["Product fit",    88]
           ].map(([label, val]) => `<div><span>${label}</span><b>${val}%</b><i style="--w:${val}%"></i></div>`).join("")}
         </div>
       </section>
+
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Top Performing Hooks</h2>
+              <p>Ranked by conversion signal and engagement velocity.</p>
+            </div>
+          </div>
+          <div class="ad-list">
+            ${winningHooks.filter((h) => h.confidence === "High").slice(0, 5).map((h, i) => `
+              <div class="ad-row" style="cursor:default">
+                <div class="score">${95 - i * 4}</div>
+                <div>
+                  <strong>${h.text}</strong>
+                  <span>${h.category} · ${h.platform}</span>
+                </div>
+                <small>${h.confidence}</small>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Top Performing Products</h2>
+              <p>Ranked by ROAS signal and creative performance.</p>
+            </div>
+          </div>
+          <div class="ad-list">
+            ${products.map((p, i) => `
+              <div class="ad-row" style="cursor:default">
+                <div class="score">${p.score}</div>
+                <div>
+                  <strong>${p.name}</strong>
+                  <span>${p.category} · ${p.angle}</span>
+                </div>
+                <small>Score ${p.score}</small>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </section>
+
+      ${renderMediaArea("analytics")}
+    </div>
+  `;
+}
+
+function renderTwinAutomation() {
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>Twin Automation</h2>
+        <p>Agent orchestration, auto-generate pipeline, and 24/7 marketing system management.</p>
+      </div>
+
+      <section class="metrics-grid">
+        ${metric("Agent runs today", "6", "automated pipeline cycles")}
+        ${metric("Ads auto-generated", creatives.length.toString(), "this cycle")}
+        ${metric("Automation health", "98%", "daily loop active")}
+        ${metric("Next scan", "6:00 AM", "viral intelligence")}
+      </section>
+
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Daily Automation Pipeline</h2>
+              <p>Twin-ready workflow stages for the 24/7 marketing system.</p>
+            </div>
+          </div>
+          <div class="timeline">
+            ${workflow.map(([time, title, desc]) => `
+              <div>
+                <time>${time}</time>
+                <span></span>
+                <div><strong>${title}</strong><p>${desc}</p></div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Agent Controls</h2>
+              <p>Manually trigger pipeline stages or override automation.</p>
+            </div>
+          </div>
+          <div class="agent-controls-grid">
+            <button class="agent-ctrl-btn" id="agent-viral-scan-btn">
+              ${icon("radar")} Run Viral Scan
+            </button>
+            <button class="agent-ctrl-btn" id="agent-reconstruct-btn">
+              ${icon("spark")} Reconstruct Top Ad
+            </button>
+            <button class="agent-ctrl-btn primary ${state.autoGenerating ? "generating" : ""}" id="generate-today-btn" ${state.autoGenerating ? "disabled" : ""}>
+              ${state.autoGenerating ? `${icon("radar")} Generating…` : `${icon("spark")} Generate Today's Ads`}
+            </button>
+            <button class="agent-ctrl-btn" id="agent-learning-loop-btn">
+              ${icon("chart")} Run Learning Loop
+            </button>
+          </div>
+          ${state.autoGenerateResult ? `
+          <div class="auto-generate-banner" style="margin-top:12px">
+            ${icon("check")} ${state.autoGenerateResult}
+            <button class="toggle-link" id="dismiss-auto-generate">✕</button>
+          </div>
+          ` : ""}
+          <div class="automation-status-card">
+            <div class="pulse-row"><i></i> Daily loop active — next scan at 6:00 AM</div>
+          </div>
+        </div>
+      </section>
+
+      ${renderMediaArea("twin-automation")}
+    </div>
+  `;
+}
+
+function render() {
+  const app = document.getElementById("app");
+
+  // Determine which section content to render
+  const sectionRenderers = {
+    "viral-intelligence": renderViralIntelligence,
+    "ai-reconstruction":  renderAiReconstruction,
+    "video-generation":   renderVideoGeneration,
+    "media-output":       window.renderMediaOutputCenter || (() => "<div class=\"panel\">Media Output Center is loading.</div>"),
+    "distribution":       renderDistribution,
+    "analytics":          renderAnalytics,
+    "twin-automation":    renderTwinAutomation
+  };
+  const sectionContent = (sectionRenderers[state.currentSection] || renderViralIntelligence)();
+
+  app.innerHTML = `
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">IG</div>
+        <div>
+          <strong>I AM GENESIS TECH</strong>
+          <span>AI Viral Engine</span>
+        </div>
+      </div>
+      <nav>
+        ${SECTIONS.map((s) => `
+          <button class="nav-btn ${state.currentSection === s.id ? "active" : ""}" data-section="${s.id}">
+            ${icon(s.icon)}<span>${s.label}</span>
+          </button>
+        `).join("")}
+      </nav>
+      <div class="automation-card">
+        <span>Automation Health</span>
+        <strong>Daily loop active</strong>
+        <div class="pulse-row"><i></i> Next scan at 6:00 AM</div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1>Elite AI E-Commerce Workspace</h1>
+          <p>Viral ad intelligence, AI creative reconstruction, distribution, and learning loop for supplement growth.</p>
+        </div>
+        <div class="top-actions">
+          <div class="sync-status ${state.syncLevel}">
+            <b>${state.dataSource}</b>
+            <span>${state.syncMessage}</span>
+          </div>
+          <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} Copilot</button>
+        </div>
+      </header>
+
+      <!-- ── Section nav breadcrumb ── -->
+      <div class="section-nav-tabs">
+        ${SECTIONS.map((s) => `
+          <button class="section-tab ${state.currentSection === s.id ? "section-tab-active" : ""}" data-section="${s.id}">
+            ${icon(s.icon)} ${s.label}
+          </button>
+        `).join("")}
+      </div>
+
+      ${state.copilotOpen ? `
+      <section class="copilot-panel panel">
+        <div class="panel-head compact">
+          <h2>${icon("spark")} AI Copilot</h2>
+          <button class="toggle-link" id="close-copilot">✕ Close</button>
+        </div>
+        <p class="copilot-desc">Ask the AI anything about your workspace — trends, creatives, products, or next steps.</p>
+        <div class="copilot-input-row">
+          <input type="text" id="copilot-input" class="copilot-input" placeholder="e.g. What should I focus on today?" value="${state.copilotQuestion.replace(/"/g, "&quot;")}" />
+          <button class="primary" id="copilot-ask-btn" ${state.copilotLoading ? "disabled" : ""}>
+            ${state.copilotLoading ? "Thinking…" : "Ask"}
+          </button>
+        </div>
+        ${state.copilotAnswer ? `
+        <div class="copilot-answer">
+          <div class="copilot-answer-text">${state.copilotAnswer}</div>
+          ${state.copilotNextActions.length > 0 ? `
+          <div class="copilot-next-actions">
+            <strong>Suggested next actions:</strong>
+            <ul>${state.copilotNextActions.map((a) => `<li>${a}</li>`).join("")}</ul>
+          </div>
+          ` : ""}
+        </div>
+        ` : ""}
+      </section>
+      ` : ""}
+
+      ${sectionContent}
     </main>
   `;
 
   bindEvents();
+  if (state.currentSection === "media-output" && window.bindMediaOutputCenter) {
+    window.bindMediaOutputCenter();
+  }
 }
 
 function metric(label, value, delta) {
@@ -1043,7 +1388,357 @@ function select(name, options, value) {
   return `<label><select data-select="${name}">${options.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
 }
 
+let renderPollTimeout = null;
+
+function mapBackendRenderStatus(status) {
+  if (status === "completed" || status === "complete") return "complete";
+  if (status === "failed") return "failed";
+  return "processing";
+}
+
+async function pollRenderStatus(statusUrl) {
+  if (!statusUrl) return;
+
+  try {
+    const response = await fetch(statusUrl, { headers: { Accept: "application/json" } });
+    const data = await response.json();
+    const nextStatus = mapBackendRenderStatus(data.status);
+
+    state.renderStatus = nextStatus;
+    state.renderProgress = nextStatus === "complete" ? 100 : Math.min(95, Math.max(state.renderProgress + 10, 35));
+    state.renderUrl = data.video_url || data.videoUrl || state.renderUrl || null;
+    state.renderMessage = nextStatus === "complete"
+      ? "Render complete. A direct video URL is available for playback and export."
+      : nextStatus === "failed"
+        ? (data.error_message || data.error || "Render failed before a playable video URL was returned.")
+        : "Render is still processing. Checking backend status again.";
+    state.exportMessage = state.renderUrl ? "Video is ready to download." : "Generate a completed video before exporting.";
+
+    render();
+
+    if (nextStatus === "processing") {
+      renderPollTimeout = setTimeout(() => pollRenderStatus(statusUrl), 10000);
+    }
+  } catch (error) {
+    state.renderStatus = "failed";
+    state.renderProgress = 0;
+    state.renderMessage = error.message || "Unable to read render status from the backend.";
+    state.exportMessage = "Generate a completed video before exporting.";
+    render();
+  }
+}
+
+async function generateVideoFromSubmittedScript() {
+  if (!state.submittedScript.trim() || state.renderStatus === "processing") return;
+
+  if (renderPollTimeout) {
+    clearTimeout(renderPollTimeout);
+    renderPollTimeout = null;
+  }
+
+  state.renderStatus = "processing";
+  state.renderMessage = "Render submitted to backend. Waiting for provider status.";
+  state.renderProgress = 15;
+  state.renderUrl = null;
+  state.renderVideoId = null;
+  state.renderStatusUrl = null;
+  state.exportMessage = "Generate a completed video before exporting.";
+  render();
+
+  try {
+    const response = await fetch("/api/video/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        script: state.submittedScript,
+        duration: state.videoDuration,
+        style: state.videoStyle,
+        background: state.videoBackground,
+        aspect: state.videoAspect,
+        config: { display_voice: state.videoVoice }
+      })
+    });
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.error || "Video generation request failed.");
+    }
+
+    state.renderVideoId = data.video_id || null;
+    state.renderStatusUrl = data.status_url || null;
+    state.renderUrl = data.video_url || data.videoUrl || null;
+    state.renderStatus = mapBackendRenderStatus(data.status);
+    state.renderProgress = state.renderStatus === "complete" ? 100 : 30;
+    state.renderMessage = state.renderStatus === "complete"
+      ? "Render complete. A direct video URL is available for playback and export."
+      : "Render accepted. Polling backend until a direct video URL is returned.";
+
+    render();
+
+    if (state.renderStatus === "processing" && state.renderStatusUrl) {
+      renderPollTimeout = setTimeout(() => pollRenderStatus(state.renderStatusUrl), 10000);
+    }
+  } catch (error) {
+    state.renderStatus = "failed";
+    state.renderProgress = 0;
+    state.renderMessage = error.message || "Video generation failed.";
+    state.renderUrl = null;
+    state.exportMessage = "Generate a completed video before exporting.";
+    render();
+  }
+}
+
 function bindEvents() {
+  // ── Navigation: sidebar nav buttons ──
+  document.querySelectorAll("[data-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.currentSection = btn.dataset.section;
+      // Reset media selection when switching sections
+      state.selectedMediaId = null;
+      state.mediaActionStatus = null;
+      render();
+    });
+  });
+
+  // ── Video pipeline input layer ──
+  const scriptInput = document.getElementById("script-input");
+  if (scriptInput) {
+    scriptInput.addEventListener("input", () => {
+      state.scriptInput = scriptInput.value;
+      if (state.inputStatus !== "ready") {
+        state.inputStatus = state.scriptInput.trim() ? "idle" : "idle";
+        state.inputMessage = state.scriptInput.trim()
+          ? "Script entered. Submit it to use this input for generation."
+          : "Paste a script or upload a text file, then submit it to unlock generation.";
+      }
+    });
+  }
+
+  const scriptFileInput = document.getElementById("script-file-input");
+  if (scriptFileInput) {
+    scriptFileInput.addEventListener("change", async () => {
+      const file = scriptFileInput.files && scriptFileInput.files[0];
+      if (!file) return;
+      if (file.type && file.type !== "text/plain" && !file.name.toLowerCase().endsWith(".txt")) {
+        state.inputStatus = "failed";
+        state.inputMessage = "Only plain text script files are accepted.";
+        state.uploadedScriptName = "";
+        render();
+        return;
+      }
+      const text = await file.text();
+      state.scriptInput = text;
+      state.uploadedScriptName = file.name;
+      state.inputStatus = "idle";
+      state.inputMessage = "Script file loaded. Submit it to use this input for generation.";
+      render();
+    });
+  }
+
+  const submitVideoInput = document.getElementById("submit-video-input");
+  if (submitVideoInput) {
+    submitVideoInput.addEventListener("click", () => {
+      const script = state.scriptInput.trim();
+      if (!script) return;
+      state.submittedScript = script;
+      state.inputStatus = "ready";
+      state.inputMessage = `Submitted ${script.length.toLocaleString()} characters for video generation.`;
+      state.renderStatus = "ready";
+      state.renderMessage = "Input ready. Generate Video will send this script to the backend renderer.";
+      state.renderProgress = 0;
+      state.renderUrl = null;
+      state.renderVideoId = null;
+      state.renderStatusUrl = null;
+      state.exportMessage = "Generate a completed video before exporting.";
+      if (renderPollTimeout) {
+        clearTimeout(renderPollTimeout);
+        renderPollTimeout = null;
+      }
+      render();
+    });
+  }
+
+  const generateVideoBtn = document.getElementById("generate-video-btn");
+  if (generateVideoBtn) {
+    generateVideoBtn.addEventListener("click", generateVideoFromSubmittedScript);
+  }
+
+  // ── Media type filter ──
+  const mediaTypeFilter = document.getElementById("media-type-filter");
+  if (mediaTypeFilter) {
+    mediaTypeFilter.addEventListener("change", () => {
+      state.selectedMediaType = mediaTypeFilter.value;
+      state.selectedMediaId = null;
+      render();
+    });
+  }
+
+  // ── Media app filter ──
+  const mediaAppFilter = document.getElementById("media-app-filter");
+  if (mediaAppFilter) {
+    mediaAppFilter.addEventListener("change", () => {
+      state.selectedRenderApp = mediaAppFilter.value;
+      state.selectedMediaId = null;
+      render();
+    });
+  }
+
+  // ── Media refresh button ──
+  const mediaRefreshBtn = document.getElementById("media-refresh-btn");
+  if (mediaRefreshBtn) {
+    mediaRefreshBtn.addEventListener("click", async () => {
+      mediaRefreshBtn.textContent = "Refreshing…";
+      mediaRefreshBtn.disabled = true;
+      // Try to fetch from backend; fall back to demo data
+      try {
+        let url = "/api/renders";
+        if (state.selectedMediaType !== "All" && state.selectedRenderApp !== "All") {
+          url = `/api/media/by-type/${state.selectedMediaType}/by-app/${state.selectedRenderApp}`;
+        } else if (state.selectedMediaType !== "All") {
+          url = `/api/media/by-type/${state.selectedMediaType}`;
+        } else if (state.selectedRenderApp !== "All") {
+          url = `/api/media/by-app/${state.selectedRenderApp}`;
+        }
+        await fetch(url);
+      } catch { /* demo mode */ }
+      await new Promise((r) => setTimeout(r, 600));
+      render();
+    });
+  }
+
+  // ── Media card selection ──
+  document.querySelectorAll("[data-media-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.mediaId;
+      state.selectedMediaId = state.selectedMediaId === id ? null : id;
+      state.mediaActionStatus = null;
+      render();
+    });
+  });
+
+  // ── Media detail close ──
+  const mediaDetailClose = document.getElementById("media-detail-close");
+  if (mediaDetailClose) {
+    mediaDetailClose.addEventListener("click", () => {
+      state.selectedMediaId = null;
+      state.mediaActionStatus = null;
+      render();
+    });
+  }
+
+  // ── Media action buttons (approve, reject, requeue, download) ──
+  document.querySelectorAll("[data-media-action]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.mediaAction;
+      const id     = btn.dataset.mediaId;
+      const item   = DEMO_MEDIA.find((m) => m.id === id);
+      if (!item) return;
+
+      if (action === "approve") {
+        item.status = "approved";
+        state.mediaActionStatus = { id, type: "success", message: "✓ Approved" };
+        // Persist to backend
+        try {
+          await fetch("/api/agent/approve-creative", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, approved: true })
+          });
+        } catch { /* demo ok */ }
+      } else if (action === "reject") {
+        item.status = "draft";
+        state.mediaActionStatus = { id, type: "warning", message: "✕ Rejected — returned to draft" };
+        try {
+          await fetch("/api/agent/approve-creative", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, approved: false, rejectionReason: "Rejected via media manager" })
+          });
+        } catch { /* demo ok */ }
+      } else if (action === "requeue") {
+        item.status = "pending";
+        state.mediaActionStatus = { id, type: "info", message: "↺ Requeued for rendering" };
+      } else if (action === "download") {
+        state.mediaActionStatus = { id, type: "info", message: "↓ Preparing download…" };
+        render();
+        try {
+          const res = await fetch(`/api/media/${id}/download`, { method: "POST" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.downloadUrl) {
+              const a = document.createElement("a");
+              a.href = data.downloadUrl;
+              a.download = data.filename || `media-${id}.mp4`;
+              a.click();
+              state.mediaActionStatus = { id, type: "success", message: "✓ Download started" };
+            } else {
+              state.mediaActionStatus = { id, type: "warning", message: "No file URL available yet" };
+            }
+          }
+        } catch {
+          state.mediaActionStatus = { id, type: "warning", message: "Download unavailable in demo mode" };
+        }
+      }
+      render();
+    });
+  });
+
+  // ── Agent controls (Twin Automation section) ──
+  const agentViralScanBtn = document.getElementById("agent-viral-scan-btn");
+  if (agentViralScanBtn) {
+    agentViralScanBtn.addEventListener("click", async () => {
+      agentViralScanBtn.textContent = "Scanning…";
+      agentViralScanBtn.disabled = true;
+      try {
+        await fetch("/api/agent/viral-scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: state.scanAmount })
+        });
+      } catch { /* demo ok */ }
+      await new Promise((r) => setTimeout(r, 1200));
+      agentViralScanBtn.textContent = "✓ Scan complete";
+      setTimeout(() => render(), 1000);
+    });
+  }
+
+  const agentReconstructBtn = document.getElementById("agent-reconstruct-btn");
+  if (agentReconstructBtn) {
+    agentReconstructBtn.addEventListener("click", async () => {
+      agentReconstructBtn.textContent = "Reconstructing…";
+      agentReconstructBtn.disabled = true;
+      try {
+        const ad = selectedAd();
+        await fetch("/api/agent/reconstruct", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hook: ad.hook, platform: ad.platform, category: ad.category })
+        });
+      } catch { /* demo ok */ }
+      await new Promise((r) => setTimeout(r, 1000));
+      agentReconstructBtn.textContent = "✓ Reconstruction queued";
+      setTimeout(() => render(), 1000);
+    });
+  }
+
+  const agentLearningLoopBtn = document.getElementById("agent-learning-loop-btn");
+  if (agentLearningLoopBtn) {
+    agentLearningLoopBtn.addEventListener("click", async () => {
+      agentLearningLoopBtn.textContent = "Running…";
+      agentLearningLoopBtn.disabled = true;
+      try {
+        await fetch("/api/agent/learning-loop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ creativeId: "all", watchTime: 14.2, engagement: 10.2, ctr: 4.8 })
+        });
+      } catch { /* demo ok */ }
+      await new Promise((r) => setTimeout(r, 1000));
+      agentLearningLoopBtn.textContent = "✓ Loop complete";
+      setTimeout(() => render(), 1000);
+    });
+  }
+
   // ── Ad selection ──
   document.querySelectorAll("[data-ad]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1508,6 +2203,122 @@ function bindEvents() {
   const sendKling = document.getElementById("send-kling");
   if (sendKling) sendKling.addEventListener("click", () => sendToRenderer("kling"));
 
+  // ── Generate Today's Ads ──
+  const generateTodayBtn = document.getElementById("generate-today-btn");
+  if (generateTodayBtn) {
+    generateTodayBtn.addEventListener("click", async () => {
+      state.autoGenerating = true;
+      state.autoGenerateResult = null;
+      render();
+      try {
+        const res = await fetch("/api/agent/generate-ads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            products: products.slice(0, 5),
+            hooks: winningHooks.filter((h) => h.confidence === "High").slice(0, 5)
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.autoGenerateResult = data.message || `${data.generated || 0} ads queued for generation.`;
+        } else {
+          // Demo fallback
+          await new Promise((r) => setTimeout(r, 1500));
+          state.autoGenerateResult = `${products.length} ads queued for generation (demo mode).`;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        state.autoGenerateResult = `${products.length} ads queued for generation (demo mode).`;
+      }
+      state.autoGenerating = false;
+      render();
+    });
+  }
+
+  // ── Dismiss auto-generate banner ──
+  const dismissAutoGenerate = document.getElementById("dismiss-auto-generate");
+  if (dismissAutoGenerate) {
+    dismissAutoGenerate.addEventListener("click", () => {
+      state.autoGenerateResult = null;
+      render();
+    });
+  }
+
+  // ── Copilot toggle ──
+  const copilotToggleBtn = document.getElementById("copilot-toggle-btn");
+  if (copilotToggleBtn) {
+    copilotToggleBtn.addEventListener("click", () => {
+      state.copilotOpen = !state.copilotOpen;
+      render();
+    });
+  }
+
+  // ── Close copilot ──
+  const closeCopilot = document.getElementById("close-copilot");
+  if (closeCopilot) {
+    closeCopilot.addEventListener("click", () => {
+      state.copilotOpen = false;
+      render();
+    });
+  }
+
+  // ── Copilot ask ──
+  const copilotAskBtn = document.getElementById("copilot-ask-btn");
+  const copilotInput = document.getElementById("copilot-input");
+  if (copilotInput) {
+    copilotInput.addEventListener("input", () => {
+      state.copilotQuestion = copilotInput.value;
+    });
+    copilotInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !state.copilotLoading) {
+        copilotAskBtn && copilotAskBtn.click();
+      }
+    });
+  }
+  if (copilotAskBtn) {
+    copilotAskBtn.addEventListener("click", async () => {
+      const question = state.copilotQuestion.trim();
+      if (!question) return;
+      state.copilotLoading = true;
+      state.copilotAnswer = null;
+      state.copilotNextActions = [];
+      render();
+      try {
+        const res = await fetch("/api/agent/copilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question,
+            context: {
+              products: products.slice(0, 3).map((p) => p.name),
+              topHooks: winningHooks.slice(0, 3).map((h) => h.text),
+              creativeCount: creatives.length
+            }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.copilotAnswer = data.answer || "No answer returned.";
+          state.copilotNextActions = data.nextActions || [];
+        } else {
+          state.copilotAnswer = "Copilot is unavailable right now. Check your backend connection.";
+        }
+      } catch {
+        // Demo fallback
+        state.copilotAnswer = `Based on your workspace, focus on your top product with a curiosity-led hook. You have ${creatives.filter((c) => c.status === "Ready").length} creatives ready to publish.`;
+        state.copilotNextActions = [
+          "Run a viral rescan to refresh trend data",
+          "Review pending creatives in the AI Content Queue",
+          "Generate new ads using the top winning hooks",
+          "Check the publishing queue for today"
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
   // ── Render result actions ──
   const approveRender = document.getElementById("approve-render");
   if (approveRender) {
@@ -1539,6 +2350,9 @@ async function boot() {
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
+  if (window.loadMediaOutputs) {
+    await window.loadMediaOutputs();
+  }
   render();
 }
 
