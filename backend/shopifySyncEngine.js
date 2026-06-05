@@ -1,5 +1,5 @@
 // backend/shopifySyncEngine.js
-const supabase = require("../utils/supabaseConnector");
+const supabase = require("../utils/SupabaseConnector");
 const shopify = require("./shopifyAuth");
 
 async function getOfflineSession(shop) {

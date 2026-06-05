@@ -3850,3 +3850,232 @@ meter {
     flex-direction: column;
   }
 }
+
+/* ── Purpose-built Video Generation Pipeline ── */
+.video-pipeline-content .section-intro {
+  max-width: 980px;
+}
+
+.video-pipeline {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.pipeline-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.pipeline-card h3 {
+  margin: 6px 0 8px;
+  font-size: 20px;
+}
+
+.pipeline-card p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.pipeline-step-label {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.script-input-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.script-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  background: #fafbf9;
+  color: var(--ink);
+  padding: 14px;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.script-input:focus,
+.param-label select:focus {
+  outline: 2px solid rgba(31, 107, 75, 0.2);
+  border-color: var(--green);
+}
+
+.file-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.file-input-row input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pipeline-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  text-decoration: none;
+  font-weight: 900;
+}
+
+.pipeline-action:disabled,
+.param-label select:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.pipeline-feedback {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fafbf9;
+  border-left: 4px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pipeline-feedback.ready,
+.pipeline-feedback.complete {
+  border-left-color: var(--green);
+  background: var(--mint);
+  color: var(--green);
+}
+
+.pipeline-feedback.failed {
+  border-left-color: var(--coral);
+  background: #f9e3dc;
+  color: var(--coral);
+}
+
+.pipeline-params {
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  margin-bottom: 16px;
+}
+
+.render-status-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: #fafbf9;
+}
+
+.render-status-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.render-status-card span,
+.render-status-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.render-status-card strong {
+  color: var(--ink);
+}
+
+.render-status-card p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.render-status-card.ready,
+.render-status-card.complete {
+  border-color: rgba(31, 107, 75, 0.35);
+}
+
+.render-status-card.processing {
+  border-color: rgba(185, 144, 75, 0.45);
+}
+
+.render-status-card.failed {
+  border-color: rgba(217, 111, 76, 0.45);
+}
+
+.pipeline-video-player {
+  display: block;
+  width: 100%;
+  max-height: 620px;
+  background: #000;
+}
+
+.empty-output-state {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  padding: 28px;
+  border: 1px dashed var(--line);
+  background: #fafbf9;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-output-state strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.empty-output-state span {
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.export-download {
+  width: fit-content;
+}
+
+@media (max-width: 1100px) {
+  .pipeline-params {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .pipeline-params {
+    grid-template-columns: 1fr;
+  }
+
+  .pipeline-card {
+    padding: 16px;
+  }
+}

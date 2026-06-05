@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVICS Live Operations</title>
+    <style>
+      :root {
+        --bg: #f6f7f2;
+        --ink: #17201b;
+        --muted: #68736c;
+        --panel: #ffffff;
+        --line: #dfe4dc;
+        --green: #1f6b4b;
+        --danger: #b94b4b;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, Segoe UI, Arial, sans-serif; }
+      main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+      header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
+      h1 { margin: 0; font-size: 34px; line-height: 1; }
+      p { margin: 6px 0 0; color: var(--muted); line-height: 1.5; }
+      .grid { display: grid; grid-template-columns: 360px 1fr; gap: 14px; align-items: start; }
+      .panel { background: var(--panel); border: 1px solid var(--line); padding: 18px; box-shadow: 0 14px 34px rgba(23,32,27,.08); }
+      .panel h2 { margin: 0 0 12px; font-size: 18px; }
+      .status { display: grid; gap: 8px; margin-bottom: 14px; }
+      .status div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 7px; font-size: 13px; }
+      .status strong { color: var(--ink); }
+      label { display: grid; gap: 5px; font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+      input { min-height: 38px; border: 1px solid var(--line); padding: 0 10px; font: inherit; }
+      button { min-height: 40px; border: 0; padding: 0 14px; font: inherit; font-weight: 800; cursor: pointer; }
+      .primary { background: var(--green); color: #fff; }
+      .secondary { background: #e7ece5; color: var(--ink); }
+      .danger { background: var(--danger); color: #fff; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .message { margin-top: 12px; padding: 10px; background: #eef4ea; border-left: 4px solid var(--green); font-size: 13px; }
+      .products { display: grid; gap: 10px; }
+      .card { border: 1px solid var(--line); padding: 14px; display: grid; gap: 8px; background: #fff; }
+      .card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+      .score { min-width: 42px; height: 42px; display: grid; place-items: center; background: var(--green); color: #fff; font-weight: 900; }
+      .hook { font-weight: 800; }
+      .meta { color: var(--muted); font-size: 12px; }
+      .script { white-space: pre-wrap; background: #17201b; color: #e8f0eb; padding: 12px; font-size: 12px; line-height: 1.45; display: none; }
+      .card.open .script { display: block; }
+      .toplink { color: var(--green); font-weight: 800; text-decoration: none; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } header { flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>EVICS Live Operations</h1>
+          <p>Manual scan, automatic scanner controls, live product viral memory, and creative reproduction from the recovered Railway work.</p>
+        </div>
+        <a class="toplink" href="/">Back to EVICS dashboard</a>
+      </header>
+      <div class="grid">
+        <section class="panel">
+          <h2>Viral Scanner</h2>
+          <div class="status" id="status"></div>
+          <label>Scan target <input id="scanTarget" type="number" min="1" value="1284" /></label>
+          <label>Auto interval minutes <input id="intervalMinutes" type="number" min="1" value="60" /></label>
+          <div class="actions">
+            <button class="primary" id="startScan">Start Scan</button>
+            <button class="secondary" id="autoOn">Auto Run On</button>
+            <button class="secondary" id="autoOff">Auto Run Off</button>
+            <button class="danger" id="turnOff">Turn Off</button>
+          </div>
+          <div class="message" id="message">Loading EVICS status...</div>
+        </section>
+        <section class="panel">
+          <h2>Shopify Connection</h2>
+          <div class="status" id="shopifyStatus"></div>
+          <div class="actions">
+            <a class="toplink" id="shopifyReconnect" href="/shopify/reconnect">Reconnect Shopify</a>
+          </div>
+          <div class="message" id="shopifyMessage">Checking Shopify connection...</div>
+        </section>
+        <section class="panel">
+          <h2>Generated Video Evidence</h2>
+          <video controls playsinline style="width:100%;background:#111" src="/generated/evics-sea-moss-proof-render.mp4"></video>
+          <div class="message">10-second EVICS proof render with audio. This confirms local video playback and file delivery; external HeyGen/Runway/Kling rendering still needs valid API completion/polling.</div>
+          <div class="actions">
+            <a class="toplink" href="/generated/evics-sea-moss-proof-render.mp4" target="_blank">Open MP4</a>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Product Viral Memory</h2>
+          <div class="products" id="products"></div>
+        </section>
+      </div>
+    </main>
+    <script>
+      const statusEl = document.getElementById('status');
+      const shopifyStatusEl = document.getElementById('shopifyStatus');
+      const shopifyMessageEl = document.getElementById('shopifyMessage');
+      const productsEl = document.getElementById('products');
+      const messageEl = document.getElementById('message');
+      async function call(url, body) {
+        const response = await fetch(url, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || response.statusText);
+        return data;
+      }
+      function scanSettings() {
+        return { scanTarget: Number(document.getElementById('scanTarget').value || 1284), intervalMinutes: Number(document.getElementById('intervalMinutes').value || 60) };
+      }
+      function renderStatus(scanner, liveProducts) {
+        statusEl.innerHTML = [['Scanner', scanner.enabled ? 'On' : 'Off'], ['Auto Run', scanner.autoRun ? 'On' : 'Off'], ['State', scanner.lastStatus || 'idle'], ['Live Products', liveProducts], ['Last', scanner.lastRun ? new Date(scanner.lastRun).toLocaleString() : 'Not run yet'], ['Next', scanner.nextRun ? new Date(scanner.nextRun).toLocaleString() : 'Paused']].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('');
+      }
+      function renderShopify(diag) {
+        const primary = diag.primary || {};
+        const session = diag.primarySession || {};
+        const live = Boolean(primary.ok || session.ok);
+        shopifyStatusEl.innerHTML = [['Store', diag.expectedStore || 'Not set'], ['Env token', primary.ok ? 'Accepted' : `Rejected ${primary.status || ''}`], ['Supabase session', session.ok ? 'Accepted' : 'Not connected'], ['Backup sessions', (diag.sessions || []).filter((item) => !item.isPrimary).length]].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('');
+        shopifyMessageEl.textContent = live
+          ? 'Correct Shopify store is connected.'
+          : 'Correct store is selected, but Shopify has not accepted an Admin token yet. Use Reconnect Shopify and approve access.';
+      }
+      function renderProducts(memories) {
+        if (!memories || !memories.length) {
+          productsEl.innerHTML = '<div class="message">No product viral memories yet. Press Start Scan.</div>';
+          return;
+        }
+        productsEl.innerHTML = memories.map((item) => {
+          const script = `HOOK: ${item.hook}\n\n${(item.structure || []).map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nCTA: ${item.cta}\n\nStyle: ${item.visual_style}\nPacing: ${item.pacing}`;
+          return `<article class="card" data-product="${item.product_id}"><div class="card-head"><div><strong>${item.product_name}</strong><div class="hook">${item.hook}</div><div class="meta">${item.visual_style} | ${(item.emotional_triggers || []).join(', ')}</div></div><div class="score">${item.viral_score}</div></div><div class="actions"><button class="secondary" data-toggle="${item.product_id}">View Script</button><button class="primary" data-reproduce="${item.product_id}">Create Creative</button></div><div class="script">${script}</div></article>`;
+        }).join('');
+        document.querySelectorAll('[data-toggle]').forEach((button) => button.addEventListener('click', () => document.querySelector(`[data-product="${button.dataset.toggle}"]`).classList.toggle('open')));
+        document.querySelectorAll('[data-reproduce]').forEach((button) => button.addEventListener('click', async () => {
+          button.disabled = true;
+          button.textContent = 'Creating...';
+          try {
+            const result = await call(`/api/viral/product/${encodeURIComponent(button.dataset.reproduce)}/reproduce`, { platform: 'TikTok' });
+            messageEl.textContent = result.nextStep || 'Creative created.';
+          } catch (error) {
+            messageEl.textContent = error.message;
+          }
+          button.disabled = false;
+          button.textContent = 'Create Creative';
+        }));
+      }
+      async function refresh() {
+        try {
+          const status = await call('/api/evics/recovery/status');
+          renderStatus(status.scanner, status.liveProducts);
+          messageEl.textContent = status.message;
+        } catch (error) {
+          messageEl.textContent = error.message;
+        }
+        try {
+          const memories = await call('/api/viral/products/all-memories');
+          renderProducts(memories.memories);
+        } catch (error) {
+          renderProducts([]);
+          messageEl.textContent = error.message;
+        }
+        try {
+          const diag = await call('/api/shopify/diagnostics');
+          renderShopify(diag);
+        } catch (error) {
+          shopifyMessageEl.textContent = error.message;
+        }
+      }
+      document.getElementById('startScan').addEventListener('click', async () => {
+        messageEl.textContent = 'Running live scan...';
+        try {
+          const result = await call('/api/viral/scan-by-product', scanSettings());
+          messageEl.textContent = `${result.message} Duration: ${Math.round((result.durationMs || 0) / 1000)} seconds.`;
+          renderProducts(result.memories);
+        } catch (error) {
+          messageEl.textContent = error.message;
+        }
+        refresh();
+      });
+      document.getElementById('autoOn').addEventListener('click', async () => { await call('/api/evics/scanner/auto', { ...scanSettings(), autoRun: true }); refresh(); });
+      document.getElementById('autoOff').addEventListener('click', async () => { await call('/api/evics/scanner/auto', { ...scanSettings(), autoRun: false }); refresh(); });
+      document.getElementById('turnOff').addEventListener('click', async () => { await call('/api/evics/scanner/off', {}); refresh(); });
+      refresh();
+      setInterval(refresh, 10000);
+    </script>
+  </body>
+</html>
