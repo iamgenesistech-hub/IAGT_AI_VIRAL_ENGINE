@@ -1,23 +1,21 @@
-const API_BASE = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-  ? window.location.origin
-  : "https://exemplary-communication-production-aab5.up.railway.app";
+// ── API helpers ──
+const API_BASE = "";
 
-async function agentFetch(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+async function agentFetch(endpoint, body = {}) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {})
+    body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(err.error || `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
   return res.json();
 }
 
-async function agentGet(path) {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function agentGet(endpoint) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    headers: { Accept: "application/json" }
+  });
+  if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
   return res.json();
 }
 
@@ -98,44 +96,29 @@ const state = {
   selectedDraftA: null,
   selectedDraftB: null,
 
-  // Copilot
-  copilotSuggestions: null,
-  copilotRefinements: null,
-  copilotExplanations: null,
-  copilotLoading: false,
-  showCopilotPanel: false,
+  // Agent states
+  agentRunning: null,
+  agentResult: null,
+  agentError: null,
 
-  // Auto-Generate Pipeline
+  // Copilot panel
+  showCopilot: false,
+  copilotInput: "",
+  copilotInputType: "hook",
+  copilotSuggestions: [],
+  copilotRefinements: [],
+  copilotExplanation: null,
+  copilotLoading: false,
+
+  // Auto-generate pipeline
   autoGenerating: false,
-  autoGenerateStep: null,
-  autoGenerateResult: null,
-  autoGeneratePipelineSteps: [],
+  autoGeneratePipeline: [],
+  autoGenerateResults: [],
+  autoGenerateCount: 3,
+  showAutoGenerateResult: false,
 
-  // Copilot
-  copilotOpen: false,
-  copilotQuestion: "",
-  copilotAnswer: null,
-  copilotNextActions: [],
-  copilotLoading: false,
-
-  // Media Gallery
-  mediaGalleryOpen: false,
-  mediaVideos: [],
-  mediaLoading: false,
-  mediaFilter: "all",
-  mediaSelectedIds: new Set(),
-  mediaStats: { total: 0, approved: 0, pending: 0, rerender: 0, discarded: 0 },
-
-  // Review Panel
-  mediaReviewVideo: null,
-  mediaReviewOpen: false,
-  mediaRejectionReason: "",
-  mediaAiSuggestions: null,
-  mediaActionLoading: false,
-
-  // Render Queue
-  mediaRenderQueue: [],
-  mediaRenderQueueLoading: false
+  // Render polling
+  renderPollInterval: null
 };
 
 window.state = state;
@@ -1559,11 +1542,181 @@ function renderViralVideoCard(video) {
           <span>${video.engagement}% ER</span>
           <span class="viral-category-tag">${video.category}</span>
         </div>
-        <div class="viral-card-tags">
-          ${(video.tags || []).slice(0, 3).map((t) => `<span class="viral-tag">${t}</span>`).join("")}
+      </section>
+
+      <!-- ── AI COPILOT PANEL ── -->
+      <section class="copilot-panel">
+        <div class="copilot-header">
+          <div>
+            <h2>${icon("spark")} AI Copilot</h2>
+            <p>Get strategic suggestions, refine hooks and scripts, and understand every AI decision in plain language.</p>
+          </div>
+          <button class="ghost" id="toggle-copilot">${state.showCopilot ? "▲ Collapse" : "▼ Expand Copilot"}</button>
         </div>
-      </div>
-    </button>
+
+        ${state.showCopilot ? `
+        <div class="copilot-body">
+          <div class="copilot-actions-row">
+            <div class="copilot-input-group">
+              <select id="copilot-input-type" class="metric-select" style="min-width:100px">
+                ${["hook","script","product","general"].map((t) => `<option ${state.copilotInputType === t ? "selected" : ""} value="${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("")}
+              </select>
+              <input
+                type="text"
+                id="copilot-input"
+                class="copilot-text-input"
+                placeholder="Paste a hook, script, or describe your goal…"
+                value="${state.copilotInput.replace(/"/g, "&quot;")}"
+              />
+            </div>
+            <div class="copilot-btn-row">
+              <button class="metric-btn ${state.copilotLoading ? "scanning" : ""}" id="copilot-suggest-btn" ${state.copilotLoading ? "disabled" : ""}>
+                ${icon("spark")} AI Suggestions
+              </button>
+              <button class="metric-btn ${state.copilotLoading ? "scanning" : ""}" id="copilot-refine-btn" ${state.copilotLoading ? "disabled" : ""}>
+                ${icon("radar")} Refine Hook
+              </button>
+              <button class="metric-btn ${state.copilotLoading ? "scanning" : ""}" id="copilot-explain-btn" ${state.copilotLoading ? "disabled" : ""}>
+                ${icon("chart")} Explain Decision
+              </button>
+            </div>
+          </div>
+
+          ${state.copilotLoading ? `<div class="copilot-loading"><span class="pulse-row"><i></i> Copilot is thinking…</span></div>` : ""}
+
+          ${state.copilotSuggestions.length > 0 ? `
+          <div class="copilot-results">
+            <h3>Strategic Suggestions</h3>
+            <div class="copilot-suggestions-grid">
+              ${state.copilotSuggestions.map((s) => `
+                <div class="copilot-suggestion-card copilot-priority-${s.priority.toLowerCase()}">
+                  <div class="copilot-suggestion-head">
+                    <span class="copilot-type-badge">${s.type}</span>
+                    <span class="copilot-priority-badge">${s.priority}</span>
+                  </div>
+                  <p class="copilot-suggestion-text">${s.suggestion}</p>
+                  <small class="copilot-rationale">${s.rationale}</small>
+                  <button class="copy-btn" data-copy="${s.suggestion.replace(/"/g, "&quot;")}" style="margin-top:8px">Copy</button>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+          ` : ""}
+
+          ${state.copilotRefinements.length > 0 ? `
+          <div class="copilot-results">
+            <h3>Refined Variants</h3>
+            <div class="copilot-refinements-grid">
+              ${state.copilotRefinements.map((r) => `
+                <div class="copilot-refinement-card">
+                  <div class="copilot-refinement-head">
+                    <span class="copilot-type-badge">${r.variant}</span>
+                    <span class="copilot-lift-badge">${r.expectedLift}</span>
+                  </div>
+                  <p class="copilot-refined-text">${r.refined}</p>
+                  <small class="copilot-rationale">${r.improvement}</small>
+                  <button class="copy-btn" data-copy="${r.refined.replace(/"/g, "&quot;")}" style="margin-top:8px">Copy</button>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+          ` : ""}
+
+          ${state.copilotExplanation ? `
+          <div class="copilot-results">
+            <h3>Decision Explanation</h3>
+            <div class="copilot-explanation">
+              <p class="copilot-explanation-summary">${state.copilotExplanation.summary}</p>
+              <div class="copilot-factors-grid">
+                ${state.copilotExplanation.factors.map((f) => `
+                  <div class="copilot-factor">
+                    <div class="copilot-factor-head">
+                      <span>${f.factor}</span>
+                      <span class="copilot-factor-score">${f.score}/100</span>
+                      <span class="copilot-factor-weight">${f.weight}</span>
+                    </div>
+                    <div class="copilot-factor-bar"><div class="copilot-factor-fill" style="width:${f.score}%"></div></div>
+                    <small>${f.explanation}</small>
+                  </div>
+                `).join("")}
+              </div>
+              ${state.copilotExplanation.recommendation ? `
+                <div class="copilot-recommendation">
+                  <strong>Recommendation:</strong> ${state.copilotExplanation.recommendation}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          ` : ""}
+        </div>
+        ` : ""}
+      </section>
+
+      <!-- ── AUTO-GENERATE EVERYTHING ── -->
+      <section class="auto-generate-section">
+        <div class="auto-generate-header">
+          <div>
+            <h2>${icon("radar")} Auto-Generate Everything</h2>
+            <p>Run the full pipeline: Trend Scout → Product Match → Script Writer → Queue. One click generates a complete batch of ready-to-review creatives.</p>
+          </div>
+          <div class="auto-generate-controls">
+            <label class="param-label" style="flex-direction:row;align-items:center;gap:8px">
+              <span style="white-space:nowrap;font-size:12px;color:var(--muted)">Creatives to generate:</span>
+              <input type="number" id="auto-generate-count" class="metric-input" value="${state.autoGenerateCount}" min="1" max="10" step="1" style="width:60px" />
+            </label>
+            <button
+              class="primary ${state.autoGenerating ? "scanning" : ""}"
+              id="auto-generate-btn"
+              ${state.autoGenerating ? "disabled" : ""}
+            >
+              ${state.autoGenerating ? `${icon("radar")} Generating…` : `${icon("spark")} Auto-Generate Everything`}
+            </button>
+          </div>
+        </div>
+
+        ${state.autoGenerating || state.autoGeneratePipeline.length > 0 ? `
+        <div class="pipeline-steps">
+          ${(state.autoGeneratePipeline.length > 0 ? state.autoGeneratePipeline : [
+            { step: 1, name: "Trend Scout", status: "pending", result: "" },
+            { step: 2, name: "Product Match", status: "pending", result: "" },
+            { step: 3, name: "Script Writer", status: "pending", result: "" },
+            { step: 4, name: "Queue", status: "pending", result: "" }
+          ]).map((step) => `
+            <div class="pipeline-step pipeline-step-${step.status}">
+              <div class="pipeline-step-num">${step.status === "complete" ? "✓" : step.step}</div>
+              <div class="pipeline-step-body">
+                <strong>${step.name}</strong>
+                ${step.result ? `<small>${step.result}</small>` : `<small class="pipeline-pending">Waiting…</small>`}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        ` : ""}
+
+        ${state.showAutoGenerateResult && state.autoGenerateResults.length > 0 ? `
+        <div class="auto-generate-result">
+          <div class="auto-generate-result-head">
+            <h3>${icon("check")} ${state.autoGenerateResults.length} Creatives Generated</h3>
+            <span>Added to Draft queue — review and approve below.</span>
+          </div>
+          <div class="auto-generate-cards">
+            ${state.autoGenerateResults.map((c) => `
+              <div class="auto-generate-card">
+                <div class="auto-generate-card-head">
+                  <span class="metric-generated-badge">${c.platform}</span>
+                  <span class="hook-tag hook-confidence-high">Score ${c.score}</span>
+                </div>
+                <strong>${c.product}</strong>
+                <p class="copilot-rationale">${c.hook}</p>
+                <small>${c.format}</small>
+                <button class="copy-btn" data-copy="${c.script.replace(/"/g, "&quot;")}" style="margin-top:6px">Copy Script</button>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        ` : ""}
+      </section>
+    </main>
   `;
 }
 
@@ -5081,8 +5234,9 @@ function bindEvents() {
   const sendRunway = document.getElementById("send-runway");
   if (sendRunway) sendRunway.addEventListener("click", () => sendToRenderer("runway"));
 
-  const sendKling = document.getElementById("send-kling");
-  if (sendKling) sendKling.addEventListener("click", () => sendToRenderer("kling"));
+
+  bindEvents();
+}
 
   // ── Generate Today's Ads ──
   const generateTodayBtn = document.getElementById("generate-today-btn");
@@ -5888,6 +6042,316 @@ function bindEvents() {
       state.mediaActionLoading = false;
       render();
     });
+  }
+
+  // ── Generate Creatives (script-writer) ──
+  const generateCreativesBtn = document.querySelector(".primary");
+  if (generateCreativesBtn && generateCreativesBtn.textContent.includes("Generate Today")) {
+    generateCreativesBtn.addEventListener("click", async () => {
+      generateCreativesBtn.disabled = true;
+      generateCreativesBtn.textContent = "Generating…";
+      try {
+        const data = await agentFetch("/api/agents/script-writer/generate", {
+          style: state.videoStyle,
+          platform: "TikTok",
+          duration: state.videoDuration
+        });
+        if (data.success && data.scripts) {
+          data.scripts.forEach((s) => {
+            creatives.unshift({
+              id: s.id,
+              status: "Draft",
+              product: s.product,
+              format: s.format,
+              hook: s.hook,
+              script: s.script,
+              asset: "AI Generated",
+              channel: s.platform,
+              score: s.score,
+              approved: false,
+              rejectionReason: ""
+            });
+          });
+          state.syncMessage = `Script Writer generated ${data.scripts.length} new creatives.`;
+          state.syncLevel = "connected";
+        }
+      } catch (e) {
+        console.warn("Script writer agent unavailable:", e);
+        state.syncMessage = "Script Writer ran in demo mode.";
+      }
+      render();
+    });
+  }
+
+  // ── Match Products (product-match agent) ──
+  const matchProductsBtn = document.getElementById("filter-by-selected-products");
+  // Also wire a dedicated match button if present
+  document.querySelectorAll("[data-agent='product-match']").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Analyzing…";
+      try {
+        const data = await agentFetch("/api/agents/product-match/analyze", {
+          category: state.category !== "All" ? state.category : undefined
+        });
+        if (data.success && data.matches) {
+          state.syncMessage = `Product Match: ${data.message}`;
+          state.syncLevel = "connected";
+        }
+      } catch (e) {
+        console.warn("Product match agent unavailable:", e);
+      }
+      render();
+    });
+  });
+
+  // ── Toggle Copilot panel ──
+  const toggleCopilot = document.getElementById("toggle-copilot");
+  if (toggleCopilot) {
+    toggleCopilot.addEventListener("click", () => {
+      state.showCopilot = !state.showCopilot;
+      render();
+    });
+  }
+
+  // ── Copilot input type ──
+  const copilotInputType = document.getElementById("copilot-input-type");
+  if (copilotInputType) {
+    copilotInputType.addEventListener("change", () => {
+      state.copilotInputType = copilotInputType.value;
+    });
+  }
+
+  // ── Copilot input text ──
+  const copilotInputEl = document.getElementById("copilot-input");
+  if (copilotInputEl) {
+    copilotInputEl.addEventListener("input", () => {
+      state.copilotInput = copilotInputEl.value;
+    });
+  }
+
+  // ── Copilot: AI Suggestions ──
+  const copilotSuggestBtn = document.getElementById("copilot-suggest-btn");
+  if (copilotSuggestBtn) {
+    copilotSuggestBtn.addEventListener("click", async () => {
+      state.copilotLoading = true;
+      state.copilotSuggestions = [];
+      state.copilotRefinements = [];
+      state.copilotExplanation = null;
+      render();
+      try {
+        const data = await agentFetch("/api/agents/copilot/suggest", {
+          context: state.copilotInputType,
+          hook: state.copilotInputType === "hook" ? state.copilotInput : undefined,
+          product: state.copilotInputType === "product" ? state.copilotInput : undefined,
+          platform: state.platform !== "All" ? state.platform : undefined
+        });
+        if (data.success && data.suggestions) {
+          state.copilotSuggestions = data.suggestions;
+        }
+      } catch (e) {
+        console.warn("Copilot suggest unavailable:", e);
+        // Demo fallback
+        state.copilotSuggestions = [
+          { type: "hook", priority: "High", suggestion: "Lead with a curiosity gap hook: 'Nobody talks about this 7-day morning habit...'", rationale: "Curiosity-gap hooks average 2.3x higher watch-through rate.", action: "Apply to script" },
+          { type: "structure", priority: "High", suggestion: "Use the 5-beat structure: Hook → Problem → Proof → Product → CTA.", rationale: "Matches top-performing creatives in your workspace.", action: "Generate script" }
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
+  // ── Copilot: Refine Hook ──
+  const copilotRefineBtn = document.getElementById("copilot-refine-btn");
+  if (copilotRefineBtn) {
+    copilotRefineBtn.addEventListener("click", async () => {
+      if (!state.copilotInput.trim()) {
+        alert("Paste a hook or script into the Copilot input first.");
+        return;
+      }
+      state.copilotLoading = true;
+      state.copilotSuggestions = [];
+      state.copilotRefinements = [];
+      state.copilotExplanation = null;
+      render();
+      try {
+        const data = await agentFetch("/api/agents/copilot/refine", {
+          input: state.copilotInput,
+          type: state.copilotInputType,
+          goal: "increase engagement",
+          platform: state.platform !== "All" ? state.platform : "TikTok"
+        });
+        if (data.success && data.refinements) {
+          state.copilotRefinements = data.refinements;
+        }
+      } catch (e) {
+        console.warn("Copilot refine unavailable:", e);
+        state.copilotRefinements = [
+          { variant: "Urgency", refined: state.copilotInput + " — and most people miss it.", improvement: "Added urgency trigger.", expectedLift: "+12% CTR" },
+          { variant: "Specificity", refined: state.copilotInput.replace("this", "this one 30-second"), improvement: "Specific numbers increase credibility.", expectedLift: "+18% watch-through" }
+        ];
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
+  // ── Copilot: Explain Decision ──
+  const copilotExplainBtn = document.getElementById("copilot-explain-btn");
+  if (copilotExplainBtn) {
+    copilotExplainBtn.addEventListener("click", async () => {
+      state.copilotLoading = true;
+      state.copilotSuggestions = [];
+      state.copilotRefinements = [];
+      state.copilotExplanation = null;
+      render();
+      try {
+        const data = await agentFetch("/api/agents/copilot/explain", {
+          decision: state.copilotInput || "creative scoring",
+          context: state.copilotInputType
+        });
+        if (data.success && data.explanation) {
+          state.copilotExplanation = data.explanation;
+        }
+      } catch (e) {
+        console.warn("Copilot explain unavailable:", e);
+        state.copilotExplanation = {
+          summary: "The AI evaluated this decision using viral pattern data, platform velocity signals, and historical conversion benchmarks.",
+          factors: [
+            { factor: "Hook strength", weight: "35%", score: 88, explanation: "Curiosity-gap hooks with a specific timeframe score highest." },
+            { factor: "Structural clarity", weight: "25%", score: 82, explanation: "The 5-beat structure is present and well-paced." },
+            { factor: "Platform fit", weight: "20%", score: 79, explanation: "Format and pacing match the target platform's top patterns." },
+            { factor: "Product-trend alignment", weight: "20%", score: 91, explanation: "The product category is trending +28% this week." }
+          ],
+          recommendation: "This creative is ready for A/B testing. Pair with a high-velocity hook variant for best results.",
+          confidence: "High"
+        };
+      }
+      state.copilotLoading = false;
+      render();
+    });
+  }
+
+  // ── Auto-Generate Everything ──
+  const autoGenerateCountInput = document.getElementById("auto-generate-count");
+  if (autoGenerateCountInput) {
+    autoGenerateCountInput.addEventListener("change", () => {
+      state.autoGenerateCount = Math.max(1, Math.min(10, Number(autoGenerateCountInput.value) || 3));
+    });
+  }
+
+  const autoGenerateBtn = document.getElementById("auto-generate-btn");
+  if (autoGenerateBtn) {
+    autoGenerateBtn.addEventListener("click", async () => {
+      state.autoGenerateCount = Number(document.getElementById("auto-generate-count")?.value || state.autoGenerateCount);
+      state.autoGenerating = true;
+      state.showAutoGenerateResult = false;
+      state.autoGenerateResults = [];
+      state.autoGeneratePipeline = [
+        { step: 1, name: "Trend Scout", status: "running", result: "" },
+        { step: 2, name: "Product Match", status: "pending", result: "" },
+        { step: 3, name: "Script Writer", status: "pending", result: "" },
+        { step: 4, name: "Queue", status: "pending", result: "" }
+      ];
+      render();
+
+      try {
+        const data = await agentFetch("/api/agents/auto-generate", {
+          count: state.autoGenerateCount,
+          style: state.videoStyle,
+          platforms: ["TikTok", "Instagram", "YouTube"]
+        });
+
+        if (data.success) {
+          state.autoGeneratePipeline = data.pipeline || state.autoGeneratePipeline.map((s) => ({ ...s, status: "complete" }));
+          state.autoGenerateResults = data.generated || [];
+
+          // Add generated creatives to the workspace
+          if (data.generated && data.generated.length) {
+            data.generated.forEach((c) => {
+              creatives.unshift({
+                id: c.id,
+                status: "Draft",
+                product: c.product,
+                format: c.format,
+                hook: c.hook,
+                script: c.script,
+                asset: "Auto-Generated",
+                channel: c.channel,
+                score: c.score,
+                approved: false,
+                rejectionReason: ""
+              });
+            });
+          }
+
+          state.syncMessage = data.message || `Auto-Generate complete: ${state.autoGenerateResults.length} creatives ready.`;
+          state.syncLevel = "connected";
+          state.showAutoGenerateResult = true;
+        }
+      } catch (e) {
+        console.warn("Auto-generate agent unavailable:", e);
+        // Demo fallback
+        await new Promise((r) => setTimeout(r, 2000));
+        const demoResults = Array.from({ length: state.autoGenerateCount }, (_, i) => ({
+          id: `demo-ag-${i}`,
+          product: products[i % products.length].name,
+          hook: winningHooks[i % winningHooks.length].text,
+          script: `Demo script for ${products[i % products.length].name}. Hook: ${winningHooks[i % winningHooks.length].text}`,
+          format: `UGC ${["TikTok","Instagram","YouTube"][i % 3]}`,
+          platform: ["TikTok","Instagram","YouTube"][i % 3],
+          channel: ["TikTok","Instagram","YouTube"][i % 3],
+          score: Math.floor(Math.random() * 15) + 80,
+          status: "Draft"
+        }));
+        state.autoGeneratePipeline = [
+          { step: 1, name: "Trend Scout", status: "complete", result: `${winningHooks.length} hooks analyzed` },
+          { step: 2, name: "Product Match", status: "complete", result: `${products.length} products matched` },
+          { step: 3, name: "Script Writer", status: "complete", result: `${demoResults.length} scripts generated` },
+          { step: 4, name: "Queue", status: "complete", result: `${demoResults.length} creatives added to Draft queue` }
+        ];
+        state.autoGenerateResults = demoResults;
+        demoResults.forEach((c) => {
+          creatives.unshift({ ...c, asset: "Auto-Generated (Demo)", approved: false, rejectionReason: "" });
+        });
+        state.showAutoGenerateResult = true;
+        state.syncMessage = `Auto-Generate (demo): ${demoResults.length} creatives ready.`;
+      }
+
+      state.autoGenerating = false;
+      render();
+    });
+  }
+
+  // ── Render polling — check status every 5s when rendering ──
+  if (state.renderStatus === "Rendering") {
+    if (!state.renderPollInterval) {
+      state.renderPollInterval = setInterval(async () => {
+        if (state.renderStatus !== "Rendering") {
+          clearInterval(state.renderPollInterval);
+          state.renderPollInterval = null;
+          return;
+        }
+        try {
+          const data = await agentGet("/api/renders");
+          if (data.success && data.renders && data.renders.length) {
+            const latest = data.renders[0];
+            if (latest.status === "complete" && latest.video_url) {
+              clearInterval(state.renderPollInterval);
+              state.renderPollInterval = null;
+              state.renderStatus = "Complete";
+              state.renderProgress = 100;
+              state.renderUrl = latest.video_url;
+              render();
+            }
+          }
+        } catch { /* polling failure is non-fatal */ }
+      }, 5000);
+    }
+  } else if (state.renderPollInterval) {
+    clearInterval(state.renderPollInterval);
+    state.renderPollInterval = null;
   }
 }
 
