@@ -118,20 +118,24 @@ const state = {
   copilotNextActions: [],
   copilotLoading: false,
 
-  // Viral Gallery
-  viralGalleryOpen: true,
-  viralVideos: [],
-  viralLoading: false,
-  viralFilterPlatform: "All",
-  viralFilterCategory: "All",
-  viralSelectedVideo: null,
-  viralAnalysis: null,
-  viralAnalysisLoading: false,
-  viralProductMatches: [],
-  viralProductMatchLoading: false,
-  viralCreativeBrief: null,
-  viralBriefLoading: false,
-  viralBriefSuccess: false
+  // Media Gallery
+  mediaGalleryOpen: false,
+  mediaVideos: [],
+  mediaLoading: false,
+  mediaFilter: "all",
+  mediaSelectedIds: new Set(),
+  mediaStats: null,
+
+  // Review Panel
+  mediaReviewVideo: null,
+  mediaReviewOpen: false,
+  mediaRejectionReason: "",
+  mediaAiSuggestions: [],
+  mediaActionLoading: false,
+
+  // Render Queue
+  mediaRenderQueue: [],
+  mediaRenderQueueLoading: false
 };
 
 window.state = state;
@@ -2992,83 +2996,341 @@ function renderApiManagement() {
   `;
 }
 
-// ── API Management data loaders ──
-async function loadServicesConfig() {
-  state.servicesLoading = true;
+// ── Media Gallery helpers ──
+
+function mediaApprovalLabel(status) {
+  const map = {
+    approved: "Approved",
+    rejected: "Rejected",
+    discarded: "Discarded",
+    requeued: "Re-queued",
+    pending: "Pending",
+    complete: "Complete"
+  };
+  return map[status] || status || "Pending";
+}
+
+function filteredMediaVideos() {
+  if (state.mediaFilter === "all") return state.mediaVideos;
+  return state.mediaVideos.filter((v) => (v.status || "pending") === state.mediaFilter);
+}
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return "Unknown";
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function buildDemoMediaVideos() {
+  return [
+    {
+      id: "mv-001",
+      platform: "HeyGen",
+      status: "pending",
+      script: "Nobody talks about this morning habit. I started this ritual 30 days ago and everything changed.",
+      parameters: JSON.stringify({ duration: "15s", style: "UGC", voice: "Female", aspect: "9:16" }),
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      thumbnail: null
+    },
+    {
+      id: "mv-002",
+      platform: "Runway",
+      status: "approved",
+      script: "The glow routine that finally feels premium. Collagen, ceramides, and ritual in one.",
+      parameters: JSON.stringify({ duration: "10s", style: "Luxury", voice: "Female", aspect: "9:16" }),
+      created_at: new Date(Date.now() - 7200000).toISOString(),
+      thumbnail: null
+    },
+    {
+      id: "mv-003",
+      platform: "Kling",
+      status: "rejected",
+      script: "I stopped treating my focus like a willpower problem. Turns out it was a nutrition gap.",
+      parameters: JSON.stringify({ duration: "15s", style: "Founder", voice: "Male", aspect: "9:16" }),
+      rejection_reason: "Hook lacks urgency. Needs stronger emotional trigger in first 3 seconds.",
+      created_at: new Date(Date.now() - 10800000).toISOString(),
+      thumbnail: null
+    },
+    {
+      id: "mv-004",
+      platform: "HeyGen",
+      status: "pending",
+      script: "Your training does not need more hype. It needs foundation. Build yours today.",
+      parameters: JSON.stringify({ duration: "30s", style: "Commercial", voice: "Male", aspect: "16:9" }),
+      created_at: new Date(Date.now() - 14400000).toISOString(),
+      thumbnail: null
+    },
+    {
+      id: "mv-005",
+      platform: "Runway",
+      status: "complete",
+      script: "Wellness that looks as good as it feels. Genesis Wellness Bundle — your daily ritual.",
+      parameters: JSON.stringify({ duration: "10s", style: "Luxury", voice: "Female", aspect: "1:1" }),
+      video_url: null,
+      created_at: new Date(Date.now() - 18000000).toISOString(),
+      thumbnail: null
+    },
+    {
+      id: "mv-006",
+      platform: "HeyGen",
+      status: "requeued",
+      script: "What if your energy problem was never about sleep? It was about minerals.",
+      parameters: JSON.stringify({ duration: "15s", style: "UGC", voice: "Female", aspect: "9:16" }),
+      rejection_reason: "Visual pacing too slow. Needs faster cuts.",
+      created_at: new Date(Date.now() - 21600000).toISOString(),
+      thumbnail: null
+    }
+  ];
+}
+
+async function loadMediaGallery() {
+  state.mediaLoading = true;
   render();
   try {
-    const [configRes, alertsRes, failoverRes] = await Promise.all([
-      fetch("/api/services/config"),
-      fetch("/api/services/alerts"),
-      fetch("/api/services/failover-status")
+    const [galleryRes, statsRes] = await Promise.all([
+      fetch(`/api/media/gallery?status=${state.mediaFilter}&limit=50`),
+      fetch("/api/media/stats")
     ]);
-    if (configRes.ok) {
-      const data = await configRes.json();
-      state.servicesConfig = data.services || [];
+    if (galleryRes.ok) {
+      const galleryData = await galleryRes.json();
+      if (galleryData.success && galleryData.videos && galleryData.videos.length > 0) {
+        state.mediaVideos = galleryData.videos;
+      } else {
+        state.mediaVideos = buildDemoMediaVideos();
+      }
+    } else {
+      state.mediaVideos = buildDemoMediaVideos();
     }
-    if (alertsRes.ok) {
-      const data = await alertsRes.json();
-      state.alerts = data.alerts || [];
-      state.alertsUnread = data.count || 0;
+    if (statsRes.ok) {
+      const statsData = await statsRes.json();
+      if (statsData.success) state.mediaStats = statsData.stats;
     }
-    if (failoverRes.ok) {
-      const data = await failoverRes.json();
-      state.failoverMode = data.autoFailover;
-      state.failoverLog = data.failoverLog || [];
-      state.failoverStatus = data.activeServices || {};
-    }
-  } catch (e) {
-    console.warn("Services API unavailable — using demo data.", e);
-    // Populate with demo data so the UI is still useful
-    state.servicesConfig = buildDemoServices();
-    state.failoverStatus = buildDemoFailoverStatus(state.servicesConfig);
+  } catch {
+    state.mediaVideos = buildDemoMediaVideos();
   }
-  state.servicesLoading = false;
+  state.mediaLoading = false;
   render();
 }
 
-function buildDemoServices() {
-  const defs = [
-    { id: "heygen",           name: "HeyGen",                  category: "video",     isPrimary: true,  plan: "free",  limit: 100,       used: 23,  unit: "minutes",     costPerUnit: 0.10, backups: ["runway","kling"],                              hasKey: false },
-    { id: "runway",           name: "Runway",                  category: "video",     isPrimary: false, plan: "free",  limit: 5,         used: 1,   unit: "generations", costPerUnit: 0.10, backups: ["heygen","kling"],                              hasKey: false },
-    { id: "kling",            name: "Kling",                   category: "video",     isPrimary: false, plan: "free",  limit: 10,        used: 0,   unit: "generations", costPerUnit: 0.08, backups: ["heygen","runway"],                             hasKey: false },
-    { id: "canva",            name: "Canva",                   category: "image",     isPrimary: true,  plan: "free",  limit: 50,        used: 12,  unit: "designs",     costPerUnit: 0.05, backups: ["openai"],                                     hasKey: false },
-    { id: "openai",           name: "OpenAI (DALL-E + GPT-4)", category: "ai",        isPrimary: true,  plan: "payg",  limit: null,      used: 4200, unit: "tokens",     costPerUnit: 0.00003, backups: ["anthropic","gemini"],                      hasKey: false },
-    { id: "tiktok",           name: "TikTok API",              category: "social",    isPrimary: true,  plan: "free",  limit: 100,       used: 8,   unit: "posts",       costPerUnit: 0.01, backups: ["instagram","youtube","facebook","pinterest"],  hasKey: false },
-    { id: "instagram",        name: "Instagram API",           category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 5,   unit: "posts",       costPerUnit: 0.01, backups: ["tiktok","youtube","facebook","pinterest"],     hasKey: false },
-    { id: "youtube",          name: "YouTube API",             category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 3,   unit: "uploads",     costPerUnit: 0.01, backups: ["tiktok","instagram","facebook","pinterest"],   hasKey: false },
-    { id: "facebook",         name: "Facebook API",            category: "social",    isPrimary: false, plan: "free",  limit: 100,       used: 2,   unit: "posts",       costPerUnit: 0.01, backups: ["tiktok","instagram","youtube","pinterest"],    hasKey: false },
-    { id: "pinterest",        name: "Pinterest API",           category: "social",    isPrimary: false, plan: "free",  limit: 50,        used: 1,   unit: "pins",        costPerUnit: 0.02, backups: ["tiktok","instagram","youtube","facebook"],     hasKey: false },
-    { id: "anthropic",        name: "Anthropic Claude",        category: "ai",        isPrimary: false, plan: "payg",  limit: null,      used: 1800, unit: "tokens",     costPerUnit: 0.000008, backups: ["openai","gemini"],                         hasKey: false },
-    { id: "gemini",           name: "Google Gemini",           category: "ai",        isPrimary: false, plan: "free",  limit: 60,        used: 14,  unit: "req/min",     costPerUnit: 0,    backups: ["openai","anthropic"],                          hasKey: false },
-    { id: "shopify_analytics",name: "Shopify API",             category: "analytics", isPrimary: true,  plan: "free",  limit: 100,       used: 42,  unit: "req/min",     costPerUnit: 0,    backups: ["google_analytics"],                           hasKey: false },
-    { id: "google_analytics", name: "Google Analytics",        category: "analytics", isPrimary: false, plan: "free",  limit: 10000000,  used: 0,   unit: "hits/mo",     costPerUnit: 0,    backups: ["shopify_analytics"],                          hasKey: false }
-  ];
-  return defs.map((d) => {
-    const pct = d.limit ? Math.min(100, Math.round((d.used / d.limit) * 100)) : 0;
-    const remaining = d.limit !== null ? Math.max(0, d.limit - d.used) : null;
-    const status = !d.enabled ? "disabled" : !d.hasKey ? "no-key" : pct >= 95 ? "critical" : pct >= 80 ? "warning" : "healthy";
-    return {
-      ...d,
-      enabled: true,
-      pct,
-      remaining,
-      estimatedCost: Math.round(d.used * d.costPerUnit * 100) / 100,
-      daysUntilReset: 14,
-      status,
-      plans: {}
-    };
-  });
+function renderMediaStatusDashboard() {
+  const s = state.mediaStats;
+  if (!s) return "";
+  return `
+  <div class="media-status-dashboard">
+    ${[
+      ["Total", s.total || 0, ""],
+      ["Pending", s.pending || 0, "pending"],
+      ["Approved", s.approved || 0, "approved"],
+      ["Rejected", s.rejected || 0, "rejected"],
+      ["Discarded", s.discarded || 0, "discarded"],
+      ["Re-queued", s.requeued || 0, "requeued"]
+    ].map(([label, count, cls]) => `
+      <div class="media-stat-pill ${cls ? "media-stat-" + cls : ""}">
+        <strong>${count}</strong>
+        <span>${label}</span>
+      </div>
+    `).join("")}
+  </div>`;
 }
 
-function buildDemoFailoverStatus(services) {
-  const cats = ["video", "image", "social", "ai", "analytics"];
-  const result = {};
-  cats.forEach((cat) => {
-    const primary = services.find((s) => s.category === cat && s.isPrimary);
-    if (primary) result[cat] = primary;
-  });
-  return result;
+function renderMediaCard(video) {
+  const params = (() => { try { return JSON.parse(video.parameters || "{}"); } catch { return {}; } })();
+  const isSelected = state.mediaSelectedIds.has(video.id);
+  const statusCls = (video.status || "pending").toLowerCase();
+  return `
+  <div class="media-card ${isSelected ? "media-card-selected" : ""}" data-media-id="${video.id}">
+    <div class="media-card-thumb">
+      ${video.video_url
+        ? `<video src="${video.video_url}" class="media-thumb-video" muted preload="none"></video>`
+        : `<div class="media-thumb-placeholder"><span>${video.platform || "Video"}</span></div>`
+      }
+      <div class="media-card-overlay">
+        <button class="media-review-btn" data-review-id="${video.id}">▶ Review</button>
+      </div>
+      <span class="media-status-badge media-status-${statusCls}">${mediaApprovalLabel(video.status)}</span>
+      <input type="checkbox" class="media-card-checkbox" data-media-checkbox="${video.id}" ${isSelected ? "checked" : ""} />
+    </div>
+    <div class="media-card-body">
+      <div class="media-card-meta">
+        <span class="media-platform-tag">${video.platform || "Unknown"}</span>
+        <span class="media-time">${formatRelativeTime(video.created_at)}</span>
+      </div>
+      <p class="media-card-script">${(video.script || "").length > 80 ? video.script.slice(0, 80) + "…" : (video.script || "No script")}</p>
+      <div class="media-card-params">
+        ${params.duration ? `<span>${params.duration}</span>` : ""}
+        ${params.style ? `<span>${params.style}</span>` : ""}
+        ${params.aspect ? `<span>${params.aspect}</span>` : ""}
+      </div>
+      ${video.rejection_reason ? `<div class="media-rejection-note">⚠ ${video.rejection_reason}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+function renderReviewPanel() {
+  const v = state.mediaReviewVideo;
+  if (!v) return "";
+  const params = (() => { try { return JSON.parse(v.parameters || "{}"); } catch { return {}; } })();
+  const statusCls = (v.status || "pending").toLowerCase();
+  return `
+  <div class="media-review-overlay" id="media-review-overlay">
+    <div class="media-review-panel">
+      <div class="media-review-header">
+        <div>
+          <h2>Review Video</h2>
+          <span class="media-status-badge media-status-${statusCls}">${mediaApprovalLabel(v.status)}</span>
+        </div>
+        <button class="toggle-link" id="close-review-panel">✕ Close</button>
+      </div>
+
+      <div class="media-review-body">
+        <div class="media-video-container">
+          ${v.video_url
+            ? `<video src="${v.video_url}" controls class="media-review-video-player"></video>`
+            : `<div class="media-video-placeholder"><span>${v.platform || "Video"}</span><small>No preview available</small></div>`
+          }
+        </div>
+
+        <div class="media-review-details">
+          <div class="media-metadata-grid">
+            <div><dt>Platform</dt><dd>${v.platform || "Unknown"}</dd></div>
+            <div><dt>Duration</dt><dd>${params.duration || "—"}</dd></div>
+            <div><dt>Style</dt><dd>${params.style || "—"}</dd></div>
+            <div><dt>Aspect</dt><dd>${params.aspect || "—"}</dd></div>
+            <div><dt>Voice</dt><dd>${params.voice || "—"}</dd></div>
+            <div><dt>Created</dt><dd>${formatRelativeTime(v.created_at)}</dd></div>
+          </div>
+
+          <div class="media-script-block">
+            <strong>Script</strong>
+            <p>${v.script || "No script available."}</p>
+          </div>
+
+          ${state.mediaAiSuggestions.length > 0 ? `
+          <div class="media-ai-suggestions-panel">
+            <strong>${icon("spark")} AI Improvement Suggestions</strong>
+            <ul>${state.mediaAiSuggestions.map((s) => `<li>${s}</li>`).join("")}</ul>
+          </div>
+          ` : ""}
+
+          <div class="media-rejection-input">
+            <label for="media-rejection-reason">Rejection reason / improvement notes</label>
+            <textarea id="media-rejection-reason" class="media-rejection-textarea" rows="3" placeholder="Describe what needs to change for re-render…">${state.mediaRejectionReason}</textarea>
+          </div>
+
+          <div class="media-review-actions">
+            <button class="media-review-action-btn media-approve-btn" id="review-approve-btn" ${state.mediaActionLoading ? "disabled" : ""}>
+              ✓ Approve
+            </button>
+            <button class="media-review-action-btn media-reject-btn" id="review-reject-btn" ${state.mediaActionLoading ? "disabled" : ""}>
+              ✕ Reject
+            </button>
+            <button class="media-review-action-btn media-requeue-btn" id="review-requeue-btn" ${state.mediaActionLoading ? "disabled" : ""}>
+              ${icon("radar")} Re-queue with AI
+            </button>
+            <button class="media-review-action-btn media-discard-btn" id="review-discard-btn" ${state.mediaActionLoading ? "disabled" : ""}>
+              🗑 Discard
+            </button>
+          </div>
+          ${state.mediaActionLoading ? `<div class="media-action-loading">Processing…</div>` : ""}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMediaGallery() {
+  const filtered = filteredMediaVideos();
+  const filterTabs = ["all", "pending", "approved", "rejected", "discarded", "requeued", "complete"];
+  const hasSelection = state.mediaSelectedIds.size > 0;
+
+  return `
+  <section class="media-gallery-section panel">
+    <div class="panel-head">
+      <div>
+        <h2>${icon("video")} Media Review &amp; Approval Workspace</h2>
+        <p>Review, approve, reject, and requeue all generated videos. AI-powered re-render loop for rejected content.</p>
+      </div>
+      <div class="media-gallery-controls">
+        ${hasSelection ? `
+          <span class="media-selection-count">${state.mediaSelectedIds.size} selected</span>
+          <button class="ghost" id="bulk-approve-btn">✓ Approve All</button>
+          <button class="ghost" id="bulk-discard-btn">🗑 Discard All</button>
+          <button class="toggle-link" id="clear-media-selection">Clear</button>
+        ` : ""}
+        <button class="ghost" id="refresh-media-btn">${icon("radar")} Refresh</button>
+        <button class="toggle-link" id="toggle-media-gallery">${state.mediaGalleryOpen ? "▲ Collapse" : "▼ Expand"}</button>
+      </div>
+    </div>
+
+    ${state.mediaGalleryOpen ? `
+    <div class="media-gallery-body">
+      ${renderMediaStatusDashboard()}
+
+      <div class="media-filter-tabs">
+        ${filterTabs.map((tab) => `
+          <button class="media-filter-tab ${state.mediaFilter === tab ? "active" : ""}" data-media-filter="${tab}">
+            ${tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        `).join("")}
+      </div>
+
+      ${state.mediaLoading ? `
+        <div class="media-loading">Loading videos…</div>
+      ` : filtered.length === 0 ? `
+        <div class="empty">No videos found for this filter. Generate some ads to get started.</div>
+      ` : `
+        <div class="media-grid">
+          ${filtered.map(renderMediaCard).join("")}
+        </div>
+      `}
+
+      ${state.mediaRenderQueue.length > 0 ? `
+      <div class="media-render-queue-bar">
+        ${icon("radar")} ${state.mediaRenderQueue.length} video${state.mediaRenderQueue.length > 1 ? "s" : ""} in render queue
+        <span class="media-queue-items">${state.mediaRenderQueue.map((q) => q.platform || "Video").join(", ")}</span>
+      </div>
+      ` : ""}
+    </div>
+    ` : ""}
+  </section>
+
+  ${state.mediaReviewOpen ? renderReviewPanel() : ""}`;
+}
+
+function generateAiSuggestions(video) {
+  const script = (video.script || "").toLowerCase();
+  const reason = (video.rejection_reason || "").toLowerCase();
+  const suggestions = [];
+
+  if (reason.includes("hook") || reason.includes("urgency") || reason.includes("opening")) {
+    suggestions.push("Rewrite the opening 3 seconds with a stronger curiosity or problem-led hook.");
+    suggestions.push("Add a pattern interrupt in the first frame — unexpected visual or bold statement.");
+  }
+  if (reason.includes("pacing") || reason.includes("slow") || reason.includes("cuts")) {
+    suggestions.push("Increase cut frequency — aim for a new visual every 1.5–2 seconds in the first 5 seconds.");
+    suggestions.push("Add dynamic text overlays to maintain visual momentum.");
+  }
+  if (reason.includes("cta") || reason.includes("call to action")) {
+    suggestions.push("Strengthen the CTA with urgency language: 'Today only', 'Limited stock', or 'Start now'.");
+  }
+  if (script.includes("collagen") || script.includes("glow") || script.includes("skin")) {
+    suggestions.push("Lead with a before/after visual contrast to anchor the transformation promise.");
+  }
+  if (script.includes("focus") || script.includes("energy") || script.includes("nootropic")) {
+    suggestions.push("Open with a relatable productivity pain point before introducing the solution.");
+  }
+  if (suggestions.length === 0) {
+    suggestions.push("Tighten the hook — first 3 seconds should create immediate curiosity or tension.");
+    suggestions.push("Ensure product is visible within the first 5 seconds.");
+    suggestions.push("Add social proof element: testimonial quote, view count, or star rating overlay.");
+  }
+  return suggestions.slice(0, 4);
 }
 
 function render() {
@@ -3161,6 +3423,8 @@ function render() {
       ` : ""}
 
       ${sectionContent}
+
+      ${renderMediaGallery()}
     </main>
   `;
 
@@ -4829,229 +5093,264 @@ function bindEvents() {
     });
   }
 
-  // ── Viral Gallery: toggle collapse ──
-  const toggleViralGallery = document.getElementById("toggle-viral-gallery");
-  if (toggleViralGallery) {
-    toggleViralGallery.addEventListener("click", () => {
-      state.viralGalleryOpen = !state.viralGalleryOpen;
-      render();
-    });
-  }
-
-  // ── Viral Gallery: platform filter ──
-  const viralPlatformFilter = document.getElementById("viral-platform-filter");
-  if (viralPlatformFilter) {
-    viralPlatformFilter.addEventListener("change", () => {
-      state.viralFilterPlatform = viralPlatformFilter.value;
-      state.viralSelectedVideo = null;
-      state.viralAnalysis = null;
-      state.viralCreativeBrief = null;
-      loadViralGallery();
-    });
-  }
-
-  // ── Viral Gallery: category filter ──
-  const viralCategoryFilter = document.getElementById("viral-category-filter");
-  if (viralCategoryFilter) {
-    viralCategoryFilter.addEventListener("change", () => {
-      state.viralFilterCategory = viralCategoryFilter.value;
-      state.viralSelectedVideo = null;
-      state.viralAnalysis = null;
-      state.viralCreativeBrief = null;
-      loadViralGallery();
-    });
-  }
-
-  // ── Viral Gallery: refresh button ──
-  const viralGalleryRefresh = document.getElementById("viral-gallery-refresh");
-  if (viralGalleryRefresh) {
-    viralGalleryRefresh.addEventListener("click", () => {
-      state.viralSelectedVideo = null;
-      state.viralAnalysis = null;
-      state.viralCreativeBrief = null;
-      loadViralGallery();
-    });
-  }
-
-  // ── Viral Gallery: select video card ──
-  document.querySelectorAll("[data-viral-video-id]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.viralVideoId;
-      const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
-      const video = allVideos.find((v) => v.id === id);
-      if (!video) return;
-      if (state.viralSelectedVideo && state.viralSelectedVideo.id === id) {
-        // Deselect
-        state.viralSelectedVideo = null;
-        state.viralAnalysis = null;
-        state.viralCreativeBrief = null;
+  // ── Media Gallery toggle ──
+  const toggleMediaGallery = document.getElementById("toggle-media-gallery");
+  if (toggleMediaGallery) {
+    toggleMediaGallery.addEventListener("click", () => {
+      state.mediaGalleryOpen = !state.mediaGalleryOpen;
+      if (state.mediaGalleryOpen && state.mediaVideos.length === 0) {
+        loadMediaGallery();
       } else {
-        state.viralSelectedVideo = video;
-        state.viralAnalysis = null;
-        state.viralCreativeBrief = null;
-        state.viralProductMatches = [];
-      }
-      render();
-    });
-  });
-
-  // ── Viral Gallery: close analysis panel ──
-  const viralAnalysisClose = document.getElementById("viral-analysis-close");
-  if (viralAnalysisClose) {
-    viralAnalysisClose.addEventListener("click", () => {
-      state.viralSelectedVideo = null;
-      state.viralAnalysis = null;
-      state.viralCreativeBrief = null;
-      render();
-    });
-  }
-
-  // ── Viral Gallery: run AI analysis ──
-  const runViralAnalysis = document.getElementById("run-viral-analysis");
-  if (runViralAnalysis) {
-    runViralAnalysis.addEventListener("click", () => {
-      const videoId = runViralAnalysis.dataset.videoId;
-      if (videoId) generateViralAnalysis(videoId);
-    });
-  }
-
-  // ── Viral Gallery: refresh product matches ──
-  const refreshProductMatches = document.getElementById("refresh-product-matches");
-  if (refreshProductMatches) {
-    refreshProductMatches.addEventListener("click", async () => {
-      const videoId = refreshProductMatches.dataset.videoId;
-      if (!videoId) return;
-      state.viralProductMatchLoading = true;
-      render();
-      try {
-        const res = await fetch(`/api/viral/${videoId}/match-products`, { method: "POST" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.matches) {
-            state.viralProductMatches = { videoId, matches: data.matches };
-          }
-        }
-      } catch { /* demo ok */ }
-      state.viralProductMatchLoading = false;
-      render();
-    });
-  }
-
-  // ── Viral Gallery: use product (pre-select in product matching) ──
-  document.querySelectorAll(".viral-use-product-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const name = btn.dataset.productName;
-      if (name) {
-        state.selectedProducts.add(name);
-        state.creativeProductFilter = name;
-        // Navigate to AI Reconstruction to see the product in context
-        state.currentSection = "ai-reconstruction";
         render();
       }
     });
+  }
+
+  // ── Media refresh ──
+  const refreshMediaBtn = document.getElementById("refresh-media-btn");
+  if (refreshMediaBtn) {
+    refreshMediaBtn.addEventListener("click", () => {
+      if (state.mediaGalleryOpen) loadMediaGallery();
+      else {
+        state.mediaGalleryOpen = true;
+        loadMediaGallery();
+      }
+    });
+  }
+
+  // ── Media filter tabs ──
+  document.querySelectorAll("[data-media-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.mediaFilter = btn.dataset.mediaFilter;
+      render();
+    });
   });
 
-  // ── Viral Gallery: create creative brief ──
-  const createViralBrief = document.getElementById("create-viral-brief");
-  if (createViralBrief) {
-    createViralBrief.addEventListener("click", async () => {
-      const videoId = createViralBrief.dataset.videoId;
-      if (!videoId) return;
-      state.viralBriefLoading = true;
-      state.viralCreativeBrief = null;
+  // ── Media card checkboxes ──
+  document.querySelectorAll("[data-media-checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.mediaCheckbox;
+      if (cb.checked) state.mediaSelectedIds.add(id);
+      else state.mediaSelectedIds.delete(id);
       render();
+    });
+  });
+
+  // ── Clear media selection ──
+  const clearMediaSelection = document.getElementById("clear-media-selection");
+  if (clearMediaSelection) {
+    clearMediaSelection.addEventListener("click", () => {
+      state.mediaSelectedIds = new Set();
+      render();
+    });
+  }
+
+  // ── Bulk approve ──
+  const bulkApproveBtn = document.getElementById("bulk-approve-btn");
+  if (bulkApproveBtn) {
+    bulkApproveBtn.addEventListener("click", async () => {
+      const ids = [...state.mediaSelectedIds];
+      if (!ids.length) return;
       try {
-        const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
-        const video = allVideos.find((v) => v.id === videoId);
-        const productName = video && video.productMatch ? video.productMatch : (products[0] ? products[0].name : "");
-        const res = await fetch(`/api/viral/${videoId}/create-brief`, {
+        const res = await fetch("/api/media/bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productName })
+          body: JSON.stringify({ ids, action: "approve" })
+        });
+        if (res.ok) {
+          ids.forEach((id) => {
+            const v = state.mediaVideos.find((m) => m.id === id);
+            if (v) v.status = "approved";
+          });
+        }
+      } catch {
+        ids.forEach((id) => {
+          const v = state.mediaVideos.find((m) => m.id === id);
+          if (v) v.status = "approved";
+        });
+      }
+      state.mediaSelectedIds = new Set();
+      render();
+    });
+  }
+
+  // ── Bulk discard ──
+  const bulkDiscardBtn = document.getElementById("bulk-discard-btn");
+  if (bulkDiscardBtn) {
+    bulkDiscardBtn.addEventListener("click", async () => {
+      const ids = [...state.mediaSelectedIds];
+      if (!ids.length) return;
+      try {
+        const res = await fetch("/api/media/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, action: "discard" })
+        });
+        if (res.ok) {
+          ids.forEach((id) => {
+            const v = state.mediaVideos.find((m) => m.id === id);
+            if (v) v.status = "discarded";
+          });
+        }
+      } catch {
+        ids.forEach((id) => {
+          const v = state.mediaVideos.find((m) => m.id === id);
+          if (v) v.status = "discarded";
+        });
+      }
+      state.mediaSelectedIds = new Set();
+      render();
+    });
+  }
+
+  // ── Open review panel ──
+  document.querySelectorAll("[data-review-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.reviewId;
+      const video = state.mediaVideos.find((v) => v.id === id);
+      if (!video) return;
+      state.mediaReviewVideo = video;
+      state.mediaReviewOpen = true;
+      state.mediaRejectionReason = video.rejection_reason || "";
+      state.mediaAiSuggestions = generateAiSuggestions(video);
+      render();
+    });
+  });
+
+  // ── Close review panel ──
+  const closeReviewPanel = document.getElementById("close-review-panel");
+  if (closeReviewPanel) {
+    closeReviewPanel.addEventListener("click", () => {
+      state.mediaReviewOpen = false;
+      state.mediaReviewVideo = null;
+      state.mediaRejectionReason = "";
+      state.mediaAiSuggestions = [];
+      render();
+    });
+  }
+
+  // ── Close review panel on overlay click ──
+  const reviewOverlay = document.getElementById("media-review-overlay");
+  if (reviewOverlay) {
+    reviewOverlay.addEventListener("click", (e) => {
+      if (e.target === reviewOverlay) {
+        state.mediaReviewOpen = false;
+        state.mediaReviewVideo = null;
+        state.mediaRejectionReason = "";
+        state.mediaAiSuggestions = [];
+        render();
+      }
+    });
+  }
+
+  // ── Rejection reason textarea ──
+  const rejectionTextarea = document.getElementById("media-rejection-reason");
+  if (rejectionTextarea) {
+    rejectionTextarea.addEventListener("input", () => {
+      state.mediaRejectionReason = rejectionTextarea.value;
+    });
+  }
+
+  // ── Review: Approve ──
+  const reviewApproveBtn = document.getElementById("review-approve-btn");
+  if (reviewApproveBtn) {
+    reviewApproveBtn.addEventListener("click", async () => {
+      if (!state.mediaReviewVideo) return;
+      const id = state.mediaReviewVideo.id;
+      state.mediaActionLoading = true;
+      render();
+      try {
+        await fetch(`/api/media/${id}/approve`, { method: "POST" });
+      } catch { /* demo ok */ }
+      const v = state.mediaVideos.find((m) => m.id === id);
+      if (v) v.status = "approved";
+      state.mediaActionLoading = false;
+      state.mediaReviewOpen = false;
+      state.mediaReviewVideo = null;
+      state.mediaRejectionReason = "";
+      state.mediaAiSuggestions = [];
+      render();
+    });
+  }
+
+  // ── Review: Reject ──
+  const reviewRejectBtn = document.getElementById("review-reject-btn");
+  if (reviewRejectBtn) {
+    reviewRejectBtn.addEventListener("click", async () => {
+      if (!state.mediaReviewVideo) return;
+      const id = state.mediaReviewVideo.id;
+      const reason = state.mediaRejectionReason;
+      state.mediaActionLoading = true;
+      render();
+      try {
+        await fetch(`/api/media/${id}/reject`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason, aiSuggestions: state.mediaAiSuggestions })
+        });
+      } catch { /* demo ok */ }
+      const v = state.mediaVideos.find((m) => m.id === id);
+      if (v) { v.status = "rejected"; v.rejection_reason = reason; }
+      state.mediaActionLoading = false;
+      state.mediaReviewOpen = false;
+      state.mediaReviewVideo = null;
+      state.mediaRejectionReason = "";
+      state.mediaAiSuggestions = [];
+      render();
+    });
+  }
+
+  // ── Review: Re-queue with AI ──
+  const reviewRequeueBtn = document.getElementById("review-requeue-btn");
+  if (reviewRequeueBtn) {
+    reviewRequeueBtn.addEventListener("click", async () => {
+      if (!state.mediaReviewVideo) return;
+      const id = state.mediaReviewVideo.id;
+      const improvements = state.mediaAiSuggestions;
+      state.mediaActionLoading = true;
+      render();
+      try {
+        const res = await fetch(`/api/media/${id}/requeue`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ improvements })
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.brief) {
-            state.viralCreativeBrief = data.brief;
-            state.viralBriefLoading = false;
-            render();
-            return;
+          if (data.newRenderId) {
+            state.mediaRenderQueue.push({ id: data.newRenderId, platform: state.mediaReviewVideo.platform });
           }
         }
-      } catch { /* fall through to demo */ }
-      // Demo brief
-      const allVideos = state.viralVideos.length ? state.viralVideos : viralAds;
-      const video = allVideos.find((v) => v.id === videoId) || viralAds[0];
-      const product = (video && video.productMatch) || (products[0] ? products[0].name : "your product");
-      const platform = video.platform || "TikTok";
-      state.viralCreativeBrief = {
-        videoId,
-        product,
-        platform,
-        title: `${platform} Ad Brief — ${product}`,
-        hook: `Inspired by: "${video.hook || "Pattern-matched hook"}"`,
-        structure: video.structure || ["Hook", "Problem", "Solution", "CTA"],
-        script: `Open on [scene]. VO: "${video.hook || "Pattern-matched hook"}" — Cut to product. Show benefit. CTA: "${video.cta || "Shop now"}".`,
-        visualNotes: "Match the pacing and visual style of the source viral ad. Use authentic UGC-style framing. Product reveal at 40% mark.",
-        cta: video.cta || "Shop now",
-        targetPlatform: platform,
-        aspectRatio: platform === "YouTube" ? "16:9" : "9:16",
-        duration: platform === "YouTube" ? "30–60s" : "15–30s",
-        createdAt: new Date().toISOString()
-      };
-      state.viralBriefLoading = false;
+      } catch { /* demo ok */ }
+      const v = state.mediaVideos.find((m) => m.id === id);
+      if (v) v.status = "requeued";
+      state.mediaActionLoading = false;
+      state.mediaReviewOpen = false;
+      state.mediaReviewVideo = null;
+      state.mediaRejectionReason = "";
+      state.mediaAiSuggestions = [];
       render();
     });
   }
 
-  // ── Viral Gallery: dismiss brief ──
-  const dismissViralBrief = document.getElementById("dismiss-viral-brief");
-  if (dismissViralBrief) {
-    dismissViralBrief.addEventListener("click", () => {
-      state.viralCreativeBrief = null;
+  // ── Review: Discard ──
+  const reviewDiscardBtn = document.getElementById("review-discard-btn");
+  if (reviewDiscardBtn) {
+    reviewDiscardBtn.addEventListener("click", async () => {
+      if (!state.mediaReviewVideo) return;
+      const id = state.mediaReviewVideo.id;
+      state.mediaActionLoading = true;
       render();
-    });
-  }
-
-  // ── Viral Gallery: copy brief script ──
-  const copyViralBrief = document.getElementById("copy-viral-brief");
-  if (copyViralBrief) {
-    copyViralBrief.addEventListener("click", () => {
-      const text = copyViralBrief.dataset.copy;
-      if (!text) return;
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = copyViralBrief.textContent;
-        copyViralBrief.textContent = "Copied!";
-        setTimeout(() => { copyViralBrief.textContent = orig; }, 1400);
-      }).catch(() => {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        const orig = copyViralBrief.textContent;
-        copyViralBrief.textContent = "Copied!";
-        setTimeout(() => { copyViralBrief.textContent = orig; }, 1400);
-      });
-    });
-  }
-
-  // ── Viral Gallery: send brief to video assembly ──
-  const sendBriefToAssembly = document.getElementById("send-brief-to-assembly");
-  if (sendBriefToAssembly) {
-    sendBriefToAssembly.addEventListener("click", () => {
-      if (!state.viralCreativeBrief) return;
-      const brief = state.viralCreativeBrief;
-      // Pre-populate assembly workspace with brief components
-      state.assemblyComponents = [
-        { type: "hook", id: "brief-hook", text: brief.hook },
-        { type: "script", id: "brief-script", text: brief.script },
-        { type: "product", id: brief.product, text: brief.product }
-      ];
-      state.videoAspect = brief.aspectRatio || "9:16";
-      state.currentSection = "video-generation";
-      state.showAssemblyWorkspace = true;
+      try {
+        await fetch(`/api/media/${id}/discard`, { method: "POST" });
+      } catch { /* demo ok */ }
+      const v = state.mediaVideos.find((m) => m.id === id);
+      if (v) v.status = "discarded";
+      state.mediaActionLoading = false;
+      state.mediaReviewOpen = false;
+      state.mediaReviewVideo = null;
+      state.mediaRejectionReason = "";
+      state.mediaAiSuggestions = [];
       render();
     });
   }
