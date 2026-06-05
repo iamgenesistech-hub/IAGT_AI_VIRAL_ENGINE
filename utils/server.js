@@ -1,3 +1,10 @@
+/**
+ * WARNING: This is an obsolete/duplicate server file.
+ * The primary active production backend is located at backend/server.js.
+ * This file (utils/server.js) was a legacy mock server that served a 'frontend' directory (which does not exist on disk).
+ * Do not run this server for production. Use backend/server.js instead.
+ */
+
 const express = require('express');
 const path = require('path');
 

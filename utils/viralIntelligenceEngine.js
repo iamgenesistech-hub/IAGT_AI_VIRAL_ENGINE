@@ -1,3 +1,5 @@
+const llmProvider = require('./llmProvider');
+
 function calculateViralScore(ad) {
   const viewsScore = Math.min((ad.views || 0) / 1000000 * 25, 25);
   const shareScore = Math.min((ad.shares || 0) / 10000 * 20, 20);
@@ -26,35 +28,35 @@ function classifyViralAd(ad) {
   if (ad.category?.toLowerCase().includes('testosterone')) return 'Testosterone';
   if (ad.category?.toLowerCase().includes('focus')) return 'Nootropics';
   if (ad.category?.toLowerCase().includes('sleep')) return 'Sleep';
-  if (ad.category?.toLowerCase().includes('fitness')) return 'Sports Nutrition';
-
   return 'General Wellness';
 }
 
-function extractWinningStructure(ad) {
-  return {
-    hook: ad.hook || '',
-    problem: ad.problem || '',
-    agitation: ad.agitation || '',
-    solution: ad.solution || '',
-    proof: ad.proof || '',
-    cta: ad.cta || '',
-    visualPattern: ad.visualPattern || '',
-    pacing: ad.pacing || '',
-    emotionalTrigger: ad.emotionalTrigger || ''
+async function analyzeViralAd(ad, options = {}) {
+  const score = calculateViralScore(ad);
+  const classification = classifyViralAd(ad);
+  const analysis = {
+    ...ad,
+    viral_score: score,
+    classification,
+    decision: score >= 70 ? 'ADD_TO_ENGINE' : 'WATCHLIST'
   };
-}
 
-function determineViralAction(score) {
-  if (score >= 85) return 'Recreate Immediately';
-  if (score >= 70) return 'Test Concept';
-  if (score >= 50) return 'Archive for Learning';
-  return 'Reject';
+  if (options.llmEnhanced === true || options.includeViralInsight === true) {
+    try {
+      const insight = await llmProvider.generateViralInsight({ ad, score, classification });
+      analysis.viral_insight = insight.viral_insight || insight.insight || null;
+      analysis.llm = insight.llm;
+    } catch (error) {
+      analysis.viral_insight = 'LLM viral insight unavailable; arithmetic score remains authoritative.';
+      analysis.llm_warning = error.message;
+    }
+  }
+
+  return analysis;
 }
 
 module.exports = {
   calculateViralScore,
   classifyViralAd,
-  extractWinningStructure,
-  determineViralAction
+  analyzeViralAd
 };

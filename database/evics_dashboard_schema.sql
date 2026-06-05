@@ -234,6 +234,7 @@ alter table public.workflow_steps enable row level security;
 alter table public.shopify_products enable row level security;
 alter table public.shopify_collections enable row level security;
 alter table public.shopify_sessions enable row level security;
+alter table public.evics_renders enable row level security;
 
 drop policy if exists "dashboard read viral ads" on public.viral_ads;
 drop policy if exists "dashboard read products" on public.products;
@@ -242,6 +243,8 @@ drop policy if exists "dashboard read publishing queue" on public.publishing_que
 drop policy if exists "dashboard read workflow steps" on public.workflow_steps;
 drop policy if exists "dashboard read shopify products" on public.shopify_products;
 drop policy if exists "dashboard read shopify collections" on public.shopify_collections;
+drop policy if exists "dashboard read evics renders" on public.evics_renders;
+drop policy if exists "dashboard write evics renders" on public.evics_renders;
 
 create policy "dashboard read viral ads"
 on public.viral_ads for select
