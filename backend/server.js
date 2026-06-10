@@ -4,7 +4,6 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require('express');
-const path = require('path');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
@@ -26,7 +25,6 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
 
-const path = require('path');
 
 // Serve static files from dashboard/control-center
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
@@ -185,6 +183,205 @@ app.get('/api/production-closeout/status', async (_req, res) => {
 
   res.json({ success: true, checks, timestamp: new Date().toISOString() });
 });
+
+
+// -----------------------------------------------------------------------------
+// EVICS PATCH: Supabase-backed Shopify products bridge
+// Purpose:
+// - /api/media/products must not return empty fallback when Shopify Admin token is missing.
+// - Supabase already contains Shopify product rows in public.shopify_products.
+// - This route reads Supabase first, then falls back to products/evics_products.
+// -----------------------------------------------------------------------------
+async function evicsReadSupabaseProductCatalog(limit = 150) {
+  const sources = [
+    {
+      table: 'shopify_products',
+      source: 'supabase_shopify_products',
+      select: '*',
+      orderColumn: 'synced_at',
+      map: (row) => ({
+        id: row.id,
+        title: row.title || row.product_name || row.name || 'Untitled Product',
+        name: row.title || row.product_name || row.name || 'Untitled Product',
+        handle: row.handle || null,
+        vendor: row.vendor || 'I AM GENESIS TECH',
+        product_type: row.product_type || row.category || 'Supplement',
+        category: row.product_type || row.category || 'Supplement',
+        status: row.status || '',
+        tags: row.tags || [],
+        image_url: row.image_url || null,
+        url: row.handle ? `https://iamgenesistech.com/products/${row.handle}` : null,
+        synced_at: row.synced_at || null,
+        raw_data: row.raw_data || null,
+        source: 'supabase_shopify_products'
+      })
+    },
+    {
+      table: 'products',
+      source: 'supabase_products',
+      select: '*',
+      orderColumn: 'score',
+      map: (row) => ({
+        id: row.id,
+        title: row.title || row.name || 'Untitled Product',
+        name: row.name || row.title || 'Untitled Product',
+        handle: row.handle || null,
+        vendor: row.vendor || 'I AM GENESIS TECH',
+        product_type: row.product_type || row.category || 'Supplement',
+        category: row.category || row.product_type || 'Supplement',
+        score: row.score || null,
+        angle: row.angle || null,
+        tags: row.tags || [],
+        image_url: row.image_url || null,
+        url: row.product_url || row.url || null,
+        source: 'supabase_products'
+      })
+    },
+    {
+      table: 'evics_products',
+      source: 'supabase_evics_products',
+      select: '*',
+      orderColumn: 'created_at',
+      map: (row) => ({
+        id: row.id,
+        sku: row.sku || null,
+        title: row.product_name || row.name || row.title || 'Untitled Product',
+        name: row.product_name || row.name || row.title || 'Untitled Product',
+        vendor: row.vendor || 'I AM GENESIS TECH',
+        product_type: row.category || 'Supplement',
+        category: row.category || 'Supplement',
+        score: row.profit_score || row.score || row.render_grade || null,
+        active: row.active,
+        source: 'supabase_evics_products'
+      })
+    }
+  ];
+
+  const errors = [];
+
+  for (const src of sources) {
+    try {
+      let query = SupabaseConnector
+        .from(src.table)
+        .select(src.select)
+        .limit(limit);
+
+      if (src.orderColumn) {
+        query = query.order(src.orderColumn, { ascending: false });
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        errors.push({ table: src.table, error: error.message });
+        continue;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        return {
+          ok: true,
+          source: src.source,
+          count: data.length,
+          products: data.map(src.map),
+          fallbackReason: null,
+          tableErrors: errors
+        };
+      }
+
+      errors.push({ table: src.table, error: 'Table exists but returned 0 rows.' });
+    } catch (error) {
+      errors.push({ table: src.table, error: error.message || String(error) });
+    }
+  }
+
+  return {
+    ok: false,
+    source: 'fallback',
+    count: 0,
+    products: [],
+    fallbackReason: 'No Supabase product rows found in shopify_products, products, or evics_products.',
+    tableErrors: errors
+  };
+}
+
+app.get('/api/shopify/synced-products', async (_req, res) => {
+  try {
+    const result = await evicsReadSupabaseProductCatalog(250);
+    noStore(res);
+    res.json({
+      success: result.ok,
+      ok: result.ok,
+      count: result.count,
+      products: result.products,
+      source: result.source,
+      fallbackReason: result.fallbackReason,
+      tableErrors: result.tableErrors
+    });
+  } catch (error) {
+    noStore(res);
+    res.status(500).json({
+      success: false,
+      ok: false,
+      count: 0,
+      products: [],
+      source: 'error',
+      error: error.message || String(error)
+    });
+  }
+});
+
+app.get('/api/media/products', async (_req, res) => {
+  try {
+    const result = await evicsReadSupabaseProductCatalog(250);
+    noStore(res);
+    res.json({
+      success: true,
+      ok: true,
+      count: result.count,
+      products: result.products,
+      source: result.source,
+      fallbackReason: result.fallbackReason,
+      tableErrors: result.tableErrors
+    });
+  } catch (error) {
+    noStore(res);
+    res.status(500).json({
+      success: false,
+      ok: false,
+      count: 0,
+      products: [],
+      source: 'error',
+      error: error.message || String(error)
+    });
+  }
+});
+
+app.get('/api/products', async (_req, res) => {
+  try {
+    const result = await evicsReadSupabaseProductCatalog(250);
+    noStore(res);
+    res.json({
+      success: true,
+      ok: true,
+      count: result.count,
+      products: result.products,
+      source: result.source,
+      fallbackReason: result.fallbackReason,
+      tableErrors: result.tableErrors
+    });
+  } catch (error) {
+    noStore(res);
+    res.status(500).json({
+      success: false,
+      ok: false,
+      count: 0,
+      products: [],
+      source: 'error',
+      error: error.message || String(error)
+    });
+  }
+});
+
 
 registerEvicsRecoveryRoutes(app, SupabaseConnector);
 registerEvicsEvieRoutes(app);

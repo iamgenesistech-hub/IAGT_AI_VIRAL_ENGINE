@@ -1,3 +1,8 @@
+// EVICS Cloud Run Node 20 WebSocket shim for Supabase realtime dependency
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = require('ws');
+}
+
 const path = require('path');
 const { createRequire } = require('module');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
