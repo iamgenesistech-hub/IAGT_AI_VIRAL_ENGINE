@@ -4534,77 +4534,8 @@ function renderApiManagement() {
     </main>
   `;
 
-          ${state.alerts.length === 0 ? `
-          <div class="api-alerts-empty">
-            ${icon("check")}
-            <p>No alerts. All services are operating normally.</p>
-          </div>
-          ` : `
-          <div class="api-alerts-list">
-            ${state.alerts.slice().reverse().map((alert) => `
-              <div class="api-alert-item api-alert-${alert.level} ${alert.acknowledged ? "api-alert-read" : ""}">
-                <div class="api-alert-icon">
-                  ${alert.level === "critical" ? "🔴" : alert.level === "warning" ? "🟡" : "🔵"}
-                </div>
-                <div class="api-alert-body">
-                  <div class="api-alert-head">
-                    <strong>${alert.serviceName}</strong>
-                    <span class="api-alert-level api-alert-level-${alert.level}">${alert.level.toUpperCase()}</span>
-                    <span class="api-alert-time">${new Date(alert.timestamp).toLocaleString()}</span>
-                  </div>
-                  <p>${alert.message}</p>
-                  <div class="api-alert-actions">
-                    ${!alert.acknowledged ? `
-                      <button class="api-card-btn" data-ack-alert="${alert.id}">Mark Read</button>
-                    ` : `<span class="api-alert-acked">✓ Acknowledged</span>`}
-                    <button class="api-card-btn" data-select-service="${alert.serviceId}" data-open-config="true" data-switch-tab="config">
-                      Configure Service
-                    </button>
-                    ${alert.level === "critical" || alert.level === "warning" ? `
-                      <button class="api-card-btn api-card-btn-credits" data-add-credits="${alert.serviceId}">
-                        + Add Credits
-                      </button>
-                    ` : ""}
-                  </div>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          `}
-        </div>
 
-        <!-- Usage summary for all services -->
-        <div class="panel">
-          <div class="panel-head compact">
-            <h2>Monthly Usage Summary</h2>
-          </div>
-          <div class="api-usage-summary">
-            ${services.filter((s) => s.limit !== null).map((svc) => `
-              <div class="api-usage-row">
-                <span class="api-usage-name">${svc.name}</span>
-                <div class="api-usage-bar-wrap">
-                  ${tokenBar(svc.pct, svc.status)}
-                </div>
-                <span class="api-usage-pct ${svc.status === "critical" ? "text-critical" : svc.status === "warning" ? "text-warning" : ""}">${svc.pct}%</span>
-                <span class="api-usage-detail">${svc.used.toLocaleString()} / ${svc.limit.toLocaleString()} ${svc.unit}</span>
-                <span class="api-usage-cost">${svc.estimatedCost}</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      </div>
-      ` : ""}
-
-      ${state.serviceActionStatus && state.apiMgmtTab !== "config" ? `
-      <div class="api-global-feedback api-action-feedback ${state.serviceActionStatus.type}">
-        ${state.serviceActionStatus.message}
-        <button class="api-feedback-close" id="dismiss-service-action">✕</button>
-      </div>
-      ` : ""}
-    </div>
-  `;
 }
-
 // ── Media Gallery helpers ──
 
 function mediaApprovalLabel(status) {
@@ -6786,22 +6717,18 @@ function bindEvents() {
     });
   }
 
-  // Bulk discard
-  const mediaBulkDiscard = document.getElementById("media-bulk-discard");
-  if (mediaBulkDiscard) {
-    mediaBulkDiscard.addEventListener("click", async () => {
-  // ── Bulk discard ──
-  const bulkDiscardBtn = document.getElementById("bulk-discard-btn");
-  if (bulkDiscardBtn) {
-    bulkDiscardBtn.addEventListener("click", async () => {
+    // Bulk discard
+    async function runBulkDiscard() {
       const ids = [...state.mediaSelectedIds];
       if (!ids.length) return;
+
       try {
         const res = await fetch("/api/media/bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids, action: "discard" })
         });
+
         if (res.ok) {
           ids.forEach((id) => {
             const v = state.mediaVideos.find((v) => v.id === id);
@@ -6814,10 +6741,20 @@ function bindEvents() {
           if (v) v.approvalStatus = "discarded";
         });
       }
+
       state.mediaSelectedIds = new Set();
       render();
-    });
-  }
+    }
+
+    const mediaBulkDiscard = document.getElementById("media-bulk-discard");
+    if (mediaBulkDiscard) {
+      mediaBulkDiscard.addEventListener("click", runBulkDiscard);
+    }
+
+    const bulkDiscardBtn = document.getElementById("bulk-discard-btn");
+    if (bulkDiscardBtn) {
+      bulkDiscardBtn.addEventListener("click", runBulkDiscard);
+    }
 
   // Open review panel
   document.querySelectorAll("[data-review-id]").forEach((btn) => {

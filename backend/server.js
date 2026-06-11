@@ -16,6 +16,104 @@ const app = express();
 const PORT = process.env.PORT || 4175;
 
 app.use(express.json());
+
+
+// ─────────────────────────────────────────────────────────────
+// EVICS Dashboard JSON Fallback Routes
+// Prevent frontend JSON.parse crashes when optional dashboard APIs
+// are not fully wired yet. These must stay before later dynamic/fallback routes.
+// ─────────────────────────────────────────────────────────────
+
+app.get("/api/media/gallery", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    videos: [],
+    media: [],
+    count: 0,
+    message: "Media gallery fallback active. No rendered media records returned yet."
+  });
+});
+
+app.get("/api/media/stats", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    stats: {
+      total: 0,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      discarded: 0,
+      requeued: 0,
+      complete: 0,
+      rerender: 0
+    }
+  });
+});
+
+app.get("/api/services/config", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    services: [],
+    config: {
+      renderProviders: [],
+      automationProviders: [],
+      socialProviders: [],
+      storageProviders: []
+    },
+    message: "Service configuration fallback active."
+  });
+});
+
+app.get("/api/services/status", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    status: "online",
+    services: [],
+    failoverStatus: {},
+    message: "Service status fallback active."
+  });
+});
+
+app.get("/api/agents/status", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    agents: [
+      { id: "trend-scout", name: "Trend Scout", status: "standby" },
+      { id: "product-match", name: "Product Match", status: "standby" },
+      { id: "script-writer", name: "Script Writer", status: "standby" },
+      { id: "queue", name: "Render Queue", status: "standby" }
+    ],
+    message: "Agent status fallback active."
+  });
+});
+
+app.get("/api/analytics/dashboard", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    dashboard: {
+      views: 0,
+      clicks: 0,
+      conversions: 0,
+      revenue: 0,
+      engagementRate: 0
+    },
+    metrics: [],
+    message: "Analytics dashboard fallback active."
+  });
+});
+
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
 
 // Serve static files from dashboard/control-center
