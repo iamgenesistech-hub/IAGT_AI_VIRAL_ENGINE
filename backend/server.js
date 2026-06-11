@@ -195,21 +195,118 @@ app.get("/api/agents/status", (req, res) => {
   });
 });
 
-app.get("/api/analytics/dashboard", (req, res) => {
-  res.json({
-    success: true,
-    ok: true,
-    source: "dashboard_json_fallback",
-    dashboard: {
-      views: 0,
-      clicks: 0,
-      conversions: 0,
-      revenue: 0,
-      engagementRate: 0
-    },
-    metrics: [],
-    message: "Analytics dashboard fallback active."
-  });
+app.get("/api/analytics/dashboard", async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const [summaryRes, qualityRes, publishedRes] = await Promise.all([
+      fetch(`${baseUrl}/api/analytics/summary`, { headers: { Accept: "application/json" } }),
+      fetch(`${baseUrl}/api/analytics/quality-report`, { headers: { Accept: "application/json" } }),
+      fetch(`${baseUrl}/api/published-media`, { headers: { Accept: "application/json" } })
+    ]);
+
+    const summaryPayload = summaryRes.ok ? await summaryRes.json() : {};
+    const qualityPayload = qualityRes.ok ? await qualityRes.json() : {};
+    const publishedPayload = publishedRes.ok ? await publishedRes.json() : {};
+
+    const summary = summaryPayload.summary || {};
+    const qualityReport = qualityPayload.qualityReport || {};
+    const publishedMedia = Array.isArray(publishedPayload.media) ? publishedPayload.media : [];
+
+    const publishedViews = publishedMedia.reduce((sum, item) => sum + Number(item.views || 0), 0);
+    const publishedEngagement = publishedMedia.reduce((sum, item) => sum + Number(item.engagement || 0), 0);
+    const publishedConversions = publishedMedia.reduce((sum, item) => sum + Number(item.conversion || 0), 0);
+
+    const platformBreakdown = summary.platformBreakdown || {};
+
+    const topPlatforms = Object.entries(platformBreakdown).map(([platform, data]) => ({
+      platform,
+      videos: Number(data.videos || 0),
+      views: Number(data.views || 0),
+      engagement: Number(data.engagement || 0),
+      conversion: Number(data.conversion || 0)
+    })).sort((a, b) => b.views - a.views);
+
+    const metrics = [
+      {
+        label: "Videos Created",
+        value: Number(summary.totalVideosCreated || publishedMedia.length || 0),
+        source: "analytics_summary"
+      },
+      {
+        label: "Total Creatives",
+        value: Number(summary.totalCreatives || 0),
+        source: "analytics_summary"
+      },
+      {
+        label: "Approval Rate",
+        value: Number(summary.approvalRate || 0),
+        suffix: "%",
+        source: "analytics_summary"
+      },
+      {
+        label: "Average Quality",
+        value: Number(qualityReport.avgQualityScore || summary.avgQualityScore || 0),
+        source: "quality_report"
+      },
+      {
+        label: "Quality Pass Rate",
+        value: Number(qualityReport.passRate || 0),
+        suffix: "%",
+        source: "quality_report"
+      },
+      {
+        label: "Published Media",
+        value: publishedMedia.length,
+        source: "published_media"
+      }
+    ];
+
+    res.json({
+      success: true,
+      ok: true,
+      source: "analytics_live_composite",
+      dashboard: {
+        views: Number(summary.totalViews || publishedViews || 0),
+        clicks: Number(summary.clicks || 0),
+        conversions: Number(summary.conversions || publishedConversions || 0),
+        revenue: Number(summary.revenueAttributed || 0),
+        engagementRate: Number(summary.avgEngagementRate || publishedEngagement || 0),
+        totalVideosCreated: Number(summary.totalVideosCreated || 0),
+        totalCreatives: Number(summary.totalCreatives || 0),
+        approvalRate: Number(summary.approvalRate || 0),
+        avgQualityScore: Number(qualityReport.avgQualityScore || summary.avgQualityScore || 0),
+        totalTrendsScanned: Number(summary.totalTrendsScanned || 0),
+        hookEffectiveness: Number(summary.hookEffectiveness || 0),
+        ctaConversionRate: Number(summary.ctaConversionRate || 0),
+        avgWatchTime: Number(summary.avgWatchTime || 0),
+        publishedMediaCount: publishedMedia.length,
+        qualityPassRate: Number(qualityReport.passRate || 0)
+      },
+      summary,
+      qualityReport,
+      platformBreakdown,
+      topPlatforms,
+      metrics,
+      publishedMedia: publishedMedia.slice(0, 10),
+      message: "Analytics dashboard loaded from live summary, quality report, and published media routes."
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      ok: true,
+      source: "dashboard_json_fallback",
+      dashboard: {
+        views: 0,
+        clicks: 0,
+        conversions: 0,
+        revenue: 0,
+        engagementRate: 0
+      },
+      metrics: [],
+      warning: error.message
+    });
+  }
 });
 
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
