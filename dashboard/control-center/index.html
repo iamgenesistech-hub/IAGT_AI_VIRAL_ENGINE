@@ -17,5 +17,88 @@
     <script src="supabase.js"></script>
     <script src="media-output.js"></script>
     <script src="app.js"></script>
+
+    <script>
+      (function () {
+        function evicsFallback(message) {
+          const app = document.getElementById("app");
+          if (!app) return;
+
+          const current = (app.innerHTML || "").trim();
+          if (current.length > 40) return;
+
+          app.innerHTML = `
+            <main style="min-height:100vh;background:#050714;color:#fff;font-family:Inter,Segoe UI,Arial,sans-serif;padding:42px;">
+              <section style="max-width:1180px;margin:0 auto;">
+                <div style="display:flex;justify-content:space-between;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:28px;">
+                  <div>
+                    <div style="color:#d4af37;font-weight:900;letter-spacing:.14em;text-transform:uppercase;">EVICS Control Center</div>
+                    <h1 style="font-size:44px;line-height:1.05;margin:10px 0 8px;">EVICS Backend Online</h1>
+                    <p style="color:#b8c0d9;font-size:18px;margin:0;">Safe dashboard fallback loaded. APIs are active while the full UI script is being repaired.</p>
+                  </div>
+                  <a href="/live-ops" style="background:#1f6b4b;color:#fff;padding:14px 18px;text-decoration:none;font-weight:900;border-radius:10px;">Open Live Ops</a>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:26px 0;">
+                  <a href="/status" style="display:block;background:#10172f;color:#fff;text-decoration:none;padding:22px;border:1px solid rgba(212,175,55,.35);border-radius:16px;">
+                    <b style="color:#d4af37;">Status</b><br><span>EVICS backend online</span>
+                  </a>
+                  <a href="/health" style="display:block;background:#10172f;color:#fff;text-decoration:none;padding:22px;border:1px solid rgba(212,175,55,.35);border-radius:16px;">
+                    <b style="color:#d4af37;">Health</b><br><span>Runtime heartbeat</span>
+                  </a>
+                  <a href="/api/shopify/products" style="display:block;background:#10172f;color:#fff;text-decoration:none;padding:22px;border:1px solid rgba(212,175,55,.35);border-radius:16px;">
+                    <b style="color:#d4af37;">Products</b><br><span>Supabase Shopify catalog</span>
+                  </a>
+                  <a href="/api/shopify/live-auth-test" style="display:block;background:#10172f;color:#fff;text-decoration:none;padding:22px;border:1px solid rgba(212,175,55,.35);border-radius:16px;">
+                    <b style="color:#d4af37;">Shopify Live Test</b><br><span>Admin API diagnostic</span>
+                  </a>
+                </div>
+
+                <pre id="evics-fallback-status" style="white-space:pre-wrap;background:#0b1024;color:#dbe7ff;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.12);overflow:auto;">Checking EVICS APIs...</pre>
+
+                <p style="color:#8e99b8;margin-top:18px;">
+                  ${message ? "Frontend note: " + message : "Frontend note: full dashboard script did not render content into #app."}
+                </p>
+              </section>
+            </main>
+          `;
+
+          Promise.allSettled([
+            fetch("/status").then(r => r.text()),
+            fetch("/health").then(r => r.text()),
+            fetch("/api/shopify/products").then(r => r.json())
+          ]).then(results => {
+            const box = document.getElementById("evics-fallback-status");
+            if (!box) return;
+
+            const status = results[0].status === "fulfilled" ? results[0].value : "status failed";
+            const health = results[1].status === "fulfilled" ? results[1].value : "health failed";
+            const products = results[2].status === "fulfilled" ? results[2].value : null;
+
+            box.textContent =
+              "STATUS: " + status + "\n\n" +
+              "HEALTH: " + health + "\n\n" +
+              "PRODUCT ROUTE: " + (products ? `success=${products.success}, count=${products.count}` : "failed");
+          });
+        }
+
+        window.addEventListener("error", function (event) {
+          setTimeout(function () {
+            evicsFallback(event.message || "JavaScript error detected.");
+          }, 250);
+        });
+
+        window.addEventListener("unhandledrejection", function (event) {
+          setTimeout(function () {
+            evicsFallback((event.reason && event.reason.message) || "Unhandled frontend promise rejection.");
+          }, 250);
+        });
+
+        setTimeout(function () {
+          evicsFallback("");
+        }, 1400);
+      })();
+    </script>
+
   </body>
 </html>
