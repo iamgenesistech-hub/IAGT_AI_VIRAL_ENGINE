@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections } = require('../utils/shopifyLiveConnector');
+const { testShopifyAdminAuth, fetchLiveShopifyProducts } = require('../utils/shopifyAdminConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
@@ -1525,6 +1526,64 @@ app.post('/api/agents/auto-generate', async (req, res) => {
   }
 });
 
+
+// -------------------------
+// /api/shopify/live-auth-test — real Shopify Admin API diagnostic
+// -------------------------
+app.get('/api/shopify/live-auth-test', async (_req, res) => {
+  try {
+    const result = await testShopifyAdminAuth();
+    noStore(res);
+    res.status(result.ok ? 200 : 503).json({
+      success: result.ok,
+      ok: result.ok,
+      source: 'shopify_admin_api',
+      ...result
+    });
+  } catch (e) {
+    noStore(res);
+    res.status(e.status || 500).json({
+      success: false,
+      ok: false,
+      source: 'shopify_admin_api',
+      error: e.message || String(e),
+      status: e.status || null,
+      details: e.body || null
+    });
+  }
+});
+
+// -------------------------
+// /api/shopify/live-products — real Shopify Admin API product pull
+// -------------------------
+app.get('/api/shopify/live-products', async (req, res) => {
+  try {
+    const limit = req.query.limit || 50;
+    const products = await fetchLiveShopifyProducts(limit);
+    noStore(res);
+    res.json({
+      success: true,
+      ok: true,
+      source: 'shopify_admin_api',
+      count: products.length,
+      products
+    });
+  } catch (e) {
+    noStore(res);
+    res.status(e.status || 500).json({
+      success: false,
+      ok: false,
+      source: 'shopify_admin_api',
+      count: 0,
+      products: [],
+      error: e.message || String(e),
+      status: e.status || null,
+      details: e.body || null
+    });
+  }
+});
+
+
 // -------------------------
 // /api/shopify/products — live Shopify product list
 // -------------------------
@@ -2233,6 +2292,64 @@ app.post('/api/quality/validate', async (req, res) => {
     res.status(500).json({ success: false, error: e.message || String(e) });
   }
 });
+
+
+// -------------------------
+// /api/shopify/live-auth-test — real Shopify Admin API diagnostic
+// -------------------------
+app.get('/api/shopify/live-auth-test', async (_req, res) => {
+  try {
+    const result = await testShopifyAdminAuth();
+    noStore(res);
+    res.status(result.ok ? 200 : 503).json({
+      success: result.ok,
+      ok: result.ok,
+      source: 'shopify_admin_api',
+      ...result
+    });
+  } catch (e) {
+    noStore(res);
+    res.status(e.status || 500).json({
+      success: false,
+      ok: false,
+      source: 'shopify_admin_api',
+      error: e.message || String(e),
+      status: e.status || null,
+      details: e.body || null
+    });
+  }
+});
+
+// -------------------------
+// /api/shopify/live-products — real Shopify Admin API product pull
+// -------------------------
+app.get('/api/shopify/live-products', async (req, res) => {
+  try {
+    const limit = req.query.limit || 50;
+    const products = await fetchLiveShopifyProducts(limit);
+    noStore(res);
+    res.json({
+      success: true,
+      ok: true,
+      source: 'shopify_admin_api',
+      count: products.length,
+      products
+    });
+  } catch (e) {
+    noStore(res);
+    res.status(e.status || 500).json({
+      success: false,
+      ok: false,
+      source: 'shopify_admin_api',
+      count: 0,
+      products: [],
+      error: e.message || String(e),
+      status: e.status || null,
+      details: e.body || null
+    });
+  }
+});
+
 
 // -------------------------
 // /api/shopify/products — live Shopify product list
