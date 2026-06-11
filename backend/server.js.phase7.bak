@@ -156,7 +156,20 @@ app.get("/api/media/stats", async (req, res) => {
 
 
 
-
+app.get("/api/agents/status", (req, res) => {
+  res.json({
+    success: true,
+    ok: true,
+    source: "dashboard_json_fallback",
+    agents: [
+      { id: "trend-scout", name: "Trend Scout", status: "standby" },
+      { id: "product-match", name: "Product Match", status: "standby" },
+      { id: "script-writer", name: "Script Writer", status: "standby" },
+      { id: "queue", name: "Render Queue", status: "standby" }
+    ],
+    message: "Agent status fallback active."
+  });
+});
 
 app.get("/api/analytics/dashboard", async (req, res) => {
   try {
@@ -2654,20 +2667,6 @@ app.get("/api/services/status", (req, res) => {
       { name: "media-processor", status: "operational", lastPing: new Date() },
       { name: "analytics-aggregator", status: "operational", lastPing: new Date() }
     ]
-  });
-});
-
-
-// --- LIVE AGENT READINESS UPGRADE ---
-app.get("/api/agents/status", (req, res) => {
-  res.json({
-    timestamp: new Date(),
-    agents: [
-      { id: "evie-001", name: "Evie", role: "Primary Orchestrator", status: "active", capability: "NLP/Reasoning" },
-      { id: "cat-mgr-002", name: "Catalog Manager", role: "Shopify Specialist", status: "idle", capability: "Inventory Sync" },
-      { id: "media-scout-003", name: "Media Scout", role: "Asset Curator", status: "active", capability: "Image/Video Analysis" }
-    ],
-    fleetStatus: "operational"
   });
 });
 
