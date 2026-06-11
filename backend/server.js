@@ -24,25 +24,88 @@ app.use(express.json());
 // are not fully wired yet. These must stay before later dynamic/fallback routes.
 // ─────────────────────────────────────────────────────────────
 
-app.get("/api/media/gallery", (req, res) => {
-  res.json({
-    success: true,
-    ok: true,
-    source: "dashboard_json_fallback",
-    videos: [],
-    media: [],
-    count: 0,
-    message: "Media gallery fallback active. No rendered media records returned yet."
-  });
+app.get("/api/media/gallery", async (req, res) => {
+  try {
+    const statusFilter = String(req.query.status || "all").toLowerCase();
+    const limit = Math.min(Number(req.query.limit || 50), 100);
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const publishedRes = await fetch(`${baseUrl}/api/published-media`, {
+      headers: { Accept: "application/json" }
+    });
+
+    if (!publishedRes.ok) {
+      throw new Error(`Published media route returned ${publishedRes.status}`);
+    }
+
+    const publishedPayload = await publishedRes.json();
+    const sourceMedia = Array.isArray(publishedPayload.media) ? publishedPayload.media : [];
+
+    let videos = sourceMedia.map((item) => ({
+      id: item.id,
+      title: item.title || item.name || "Untitled",
+      platform: item.platform || "internal",
+      status: item.status || "complete",
+      approvalStatus: item.approvalStatus || item.status || "complete",
+      media_type: item.media_type || item.type || "published",
+      script: item.script || item.description || item.title || "Published EVICS media item",
+      product: item.product || item.productName || "",
+      hook: item.hook || "",
+      score: item.score || item.qualityScore || 0,
+      views: item.views || 0,
+      engagement: item.engagement || 0,
+      conversion: item.conversion || 0,
+      created_at: item.created_at || item.createdAt || item.publishedAt || new Date().toISOString(),
+      video_url: item.video_url || item.videoUrl || item.url || null,
+      thumbnail: item.thumbnail || item.thumbnailUrl || null,
+      publishedTo: item.publishedTo || [],
+      raw: item
+    }));
+
+    if (statusFilter !== "all") {
+      videos = videos.filter((item) => String(item.status || "").toLowerCase() === statusFilter);
+    }
+
+    videos = videos.slice(0, limit);
+
+    res.json({
+      success: true,
+      ok: true,
+      source: "published_media_route_live",
+      count: videos.length,
+      videos,
+      media: videos,
+      message: `Media gallery loaded from /api/published-media with ${sourceMedia.length} total records.`
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      ok: true,
+      source: "dashboard_json_fallback",
+      count: 0,
+      videos: [],
+      media: [],
+      warning: error.message
+    });
+  }
 });
 
-app.get("/api/media/stats", (req, res) => {
-  res.json({
-    success: true,
-    ok: true,
-    source: "dashboard_json_fallback",
-    stats: {
-      total: 0,
+app.get("/api/media/stats", async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const publishedRes = await fetch(`${baseUrl}/api/published-media`, {
+      headers: { Accept: "application/json" }
+    });
+
+    if (!publishedRes.ok) {
+      throw new Error(`Published media route returned ${publishedRes.status}`);
+    }
+
+    const publishedPayload = await publishedRes.json();
+    const media = Array.isArray(publishedPayload.media) ? publishedPayload.media : [];
+
+    const stats = {
+      total: media.length,
       pending: 0,
       approved: 0,
       rejected: 0,
@@ -50,8 +113,43 @@ app.get("/api/media/stats", (req, res) => {
       requeued: 0,
       complete: 0,
       rerender: 0
+    };
+
+    for (const item of media) {
+      const status = String(item.status || item.approvalStatus || "complete").toLowerCase();
+
+      if (status.includes("pending") || status.includes("draft") || status.includes("queued")) stats.pending += 1;
+      else if (status.includes("approved") || status.includes("live") || status.includes("published")) stats.approved += 1;
+      else if (status.includes("reject")) stats.rejected += 1;
+      else if (status.includes("discard") || status.includes("archive")) stats.discarded += 1;
+      else if (status.includes("requeue")) stats.requeued += 1;
+      else stats.complete += 1;
     }
-  });
+
+    res.json({
+      success: true,
+      ok: true,
+      source: "published_media_route_live",
+      stats
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      ok: true,
+      source: "dashboard_json_fallback",
+      stats: {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        discarded: 0,
+        requeued: 0,
+        complete: 0,
+        rerender: 0
+      },
+      warning: error.message
+    });
+  }
 });
 
 app.get("/api/services/config", (req, res) => {
