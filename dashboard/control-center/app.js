@@ -1442,17 +1442,35 @@ async function loadPublishedMedia() {
 async function loadAnalyticsData() {
   state.analyticsLoading = true;
   render();
+
   try {
-    const res = await fetch("/api/analytics/summary");
+    const res = await fetch("/api/analytics/dashboard");
+
     if (res.ok) {
       const data = await res.json();
-      state.analyticsData = data.summary || DEMO_ANALYTICS;
+
+      if (data.success && data.source === "analytics_live_composite") {
+        state.analyticsData = {
+          ...(data.summary || {}),
+          ...(data.dashboard || {}),
+          qualityReport: data.qualityReport || {},
+          qualityBreakdown: data.qualityReport?.breakdown || DEMO_ANALYTICS.qualityBreakdown,
+          platformBreakdown: data.platformBreakdown || DEMO_ANALYTICS.platformBreakdown,
+          topPlatforms: data.topPlatforms || [],
+          metrics: data.metrics || [],
+          publishedMediaCount: data.dashboard?.publishedMediaCount || 0,
+          liveSource: data.source
+        };
+      } else {
+        state.analyticsData = data.summary || data.dashboard || DEMO_ANALYTICS;
+      }
     } else {
       state.analyticsData = DEMO_ANALYTICS;
     }
   } catch {
     state.analyticsData = DEMO_ANALYTICS;
   }
+
   state.analyticsLoading = false;
   render();
 }
