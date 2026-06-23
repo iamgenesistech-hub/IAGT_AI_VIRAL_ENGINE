@@ -1,0 +1,842 @@
+{
+  "media_assets": [
+    {
+      "id": "media-1782014114747-0",
+      "title": "Agent Chain Proof Asset",
+      "origin_section_id": "elite-executive-workspace",
+      "originating_request_id": "media-1782014114747-0",
+      "agent_orchestration_id": "",
+      "render_status": "complete",
+      "render_job_id": "proof-render-job",
+      "provider_render_job_id": "proof-provider-job",
+      "error_code": "",
+      "retry_eligible": false,
+      "rework_eligible": false,
+      "delivery_status": "partial",
+      "delivery_destinations_json": {
+        "originSection": {
+          "id": "elite-executive-workspace",
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "videoViewingArea": {
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "googleWorkspace": {
+          "delivered": false,
+          "status": "failed",
+          "deliveredAt": null,
+          "reference": "proof-local",
+          "error": "Google Workspace storage did not complete; local registry retained the video."
+        }
+      },
+      "product_url": "https://iamgenesistech.com/products/sea-moss-capsules",
+      "playback_url": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+      "preview_url": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+      "google_drive_file_id": "",
+      "google_drive_web_view_link": "",
+      "updatedAt": "2026-06-21T03:55:15.809Z",
+      "createdAt": "2026-06-21T03:55:14.747Z"
+    }
+  ],
+  "render_jobs": [
+    {
+      "id": "heygen-37d23d0f-0",
+      "mediaId": "media-1782014114747-0",
+      "provider": "HeyGen",
+      "providerKey": "heygen",
+      "providerJobId": "",
+      "lifecycle": "provider_failed",
+      "status": "provider_failed",
+      "origin_section_id": "elite-executive-workspace",
+      "error": "Provider request failed with 401: Unauthorized",
+      "error_code": "RENDER_SUBMIT_FAILED",
+      "retry_eligible": true,
+      "rework_eligible": true,
+      "metadata": {
+        "mode": "live_provider_submit",
+        "readiness": {
+          "configured": true,
+          "ready": true,
+          "error": "",
+          "errorCode": "",
+          "missing": []
+        },
+        "note": "EVICS submits to the provider and polls until a direct playable media URL is returned."
+      },
+      "submittedAt": "2026-06-21T03:55:14.821Z",
+      "updatedAt": "2026-06-21T03:55:15.576Z",
+      "createdAt": "2026-06-21T03:55:14.823Z"
+    }
+  ],
+  "prompt_compiler_outputs": [
+    {
+      "id": "compiler-media-1782014114747-0",
+      "mediaId": "media-1782014114747-0",
+      "lifecycle": "compiled",
+      "productUrl": "https://iamgenesistech.com/products/sea-moss-capsules",
+      "productSku": "",
+      "origin_section_id": "elite-executive-workspace",
+      "metadata": {
+        "title": "Agent Chain Proof Asset",
+        "productUrl": "https://iamgenesistech.com/products/sea-moss-capsules",
+        "source": "system"
+      },
+      "updatedAt": "2026-06-21T03:55:14.781Z",
+      "createdAt": "2026-06-21T03:55:14.765Z",
+      "eliteScript": "Sea Moss Capsules supports daily mineral balance and natural energy.",
+      "eliteVideoPrompt": "Sea Moss Capsules supports daily mineral balance and natural energy.\n\nInclude product reveal, CTA timing, Buy Now timing in the final 8-10 seconds, product zoom-in, and product page link metadata.\n\nProduct URL: https://iamgenesistech.com/products/sea-moss-capsules",
+      "rankedScript": "Sea Moss Capsules supports daily mineral balance and natural energy.",
+      "rankedFormat": "hook-problem-solution-cta"
+    }
+  ],
+  "delivery_records": [
+    {
+      "id": "media-1782014114747-0-googleWorkspace",
+      "mediaId": "media-1782014114747-0",
+      "origin_section_id": "elite-executive-workspace",
+      "destination": "googleWorkspace",
+      "delivered": false,
+      "status": "failed",
+      "reference": "proof-local",
+      "error": "Google Workspace storage did not complete; local registry retained the video.",
+      "deliveredAt": null,
+      "updatedAt": "2026-06-21T03:55:15.747Z",
+      "createdAt": "2026-06-21T03:55:15.747Z"
+    },
+    {
+      "id": "media-1782014114747-0-videoViewingArea",
+      "mediaId": "media-1782014114747-0",
+      "origin_section_id": "elite-executive-workspace",
+      "destination": "videoViewingArea",
+      "delivered": true,
+      "status": "delivered",
+      "reference": "",
+      "error": "",
+      "deliveredAt": "2026-06-21T03:55:15.675Z",
+      "updatedAt": "2026-06-21T03:55:15.715Z",
+      "createdAt": "2026-06-21T03:55:15.715Z"
+    },
+    {
+      "id": "media-1782014114747-0-originSection",
+      "mediaId": "media-1782014114747-0",
+      "origin_section_id": "elite-executive-workspace",
+      "destination": "originSection",
+      "delivered": true,
+      "status": "delivered",
+      "reference": "",
+      "error": "",
+      "deliveredAt": "2026-06-21T03:55:15.675Z",
+      "updatedAt": "2026-06-21T03:55:15.680Z",
+      "createdAt": "2026-06-21T03:55:15.680Z"
+    }
+  ],
+  "agent_events": [
+    {
+      "id": "agent_events-1782014116155-dadf172b821b2",
+      "eventId": "event-1782014116146-14494b9ac0",
+      "correlationId": "corr-1782014116146-3839a19fdc",
+      "signature": "unsigned",
+      "type": "queue_worker",
+      "actor": "office-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "partial",
+      "status": "partial",
+      "error_code": "",
+      "message": "Office Agent verified delivery routing.",
+      "metadata": {
+        "originSection": {
+          "id": "elite-executive-workspace",
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "videoViewingArea": {
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "googleWorkspace": {
+          "delivered": false,
+          "status": "failed",
+          "deliveredAt": null,
+          "reference": "proof-local",
+          "error": "Google Workspace storage did not complete; local registry retained the video."
+        }
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014116146-14494b9ac0",
+        "correlationId": "corr-1782014116146-3839a19fdc",
+        "timestamp": "2026-06-21T03:55:16.146Z",
+        "actor": "office-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "queue_worker",
+        "lifecycle": "partial",
+        "status": "partial",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Office Agent verified delivery routing.",
+        "payload": {
+          "originSection": {
+            "id": "elite-executive-workspace",
+            "delivered": true,
+            "status": "delivered",
+            "deliveredAt": "2026-06-21T03:55:15.675Z",
+            "error": ""
+          },
+          "videoViewingArea": {
+            "delivered": true,
+            "status": "delivered",
+            "deliveredAt": "2026-06-21T03:55:15.675Z",
+            "error": ""
+          },
+          "googleWorkspace": {
+            "delivered": false,
+            "status": "failed",
+            "deliveredAt": null,
+            "reference": "proof-local",
+            "error": "Google Workspace storage did not complete; local registry retained the video."
+          }
+        },
+        "payloadHash": "df25c2d771f98339c5ee6704db4947d6832f53fbbf93044e780144d8c20bb57c",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:16.155Z",
+      "updatedAt": "2026-06-21T03:55:16.155Z"
+    },
+    {
+      "id": "agent_events-1782014116130-c29dee749244f",
+      "eventId": "event-1782014116092-b61aa8d762",
+      "correlationId": "corr-1782014116092-7af211fc45",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "publisher-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "media.publish_now",
+      "status": "info",
+      "error_code": "",
+      "message": "",
+      "metadata": {
+        "action": "media.publish_now"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014116092-b61aa8d762",
+        "correlationId": "corr-1782014116092-7af211fc45",
+        "timestamp": "2026-06-21T03:55:16.092Z",
+        "actor": "publisher-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "media.publish_now",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "",
+        "payload": {
+          "action": "media.publish_now"
+        },
+        "payloadHash": "99e5a6d5f60dc7ec063bd5a82d8951c0a3ba222fcfd13cacf5ccbc10ce94cce3",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:16.130Z",
+      "updatedAt": "2026-06-21T03:55:16.130Z"
+    },
+    {
+      "id": "agent_events-1782014115979-8d83d3734cf87",
+      "eventId": "event-1782014115953-f8d89cf7bb",
+      "correlationId": "corr-1782014115953-3e0da92d35",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "review-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "media.approve",
+      "status": "info",
+      "error_code": "",
+      "message": "",
+      "metadata": {
+        "action": "media.approve"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115953-f8d89cf7bb",
+        "correlationId": "corr-1782014115953-3e0da92d35",
+        "timestamp": "2026-06-21T03:55:15.953Z",
+        "actor": "review-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "media.approve",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "",
+        "payload": {
+          "action": "media.approve"
+        },
+        "payloadHash": "d4b21eedb0284fb4fa965723a3a440acbac0521d52e140deee2ad4e076a8b8dd",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.979Z",
+      "updatedAt": "2026-06-21T03:55:15.979Z"
+    },
+    {
+      "id": "agent_events-1782014115894-75576332cacc1",
+      "eventId": "event-1782014115815-98cbf1ed0f",
+      "correlationId": "corr-1782014115815-3ef63cfd37",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "quality-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "quality.checked",
+      "status": "info",
+      "error_code": "",
+      "message": "Approved / 92",
+      "metadata": {
+        "action": "quality.checked"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115815-98cbf1ed0f",
+        "correlationId": "corr-1782014115815-3ef63cfd37",
+        "timestamp": "2026-06-21T03:55:15.815Z",
+        "actor": "quality-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "quality.checked",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Approved / 92",
+        "payload": {
+          "action": "quality.checked"
+        },
+        "payloadHash": "c063cfb2fa49bfab6b045ca7febca255376b9823d97618df34902a313c821e92",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.894Z",
+      "updatedAt": "2026-06-21T03:55:15.894Z"
+    },
+    {
+      "id": "agent_events-1782014115771-4172d67254cb2",
+      "eventId": "event-1782014115762-06b9128917",
+      "correlationId": "corr-1782014115762-56489ba88e",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "render-provider-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "render.completed.media.attached",
+      "status": "info",
+      "error_code": "",
+      "message": "Rendered video URL attached to Agent Chain Proof Asset.",
+      "metadata": {
+        "action": "render.completed.media.attached"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115762-06b9128917",
+        "correlationId": "corr-1782014115762-56489ba88e",
+        "timestamp": "2026-06-21T03:55:15.762Z",
+        "actor": "render-provider-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "render.completed.media.attached",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Rendered video URL attached to Agent Chain Proof Asset.",
+        "payload": {
+          "action": "render.completed.media.attached"
+        },
+        "payloadHash": "56228e5072c5283baa3ef1e7a57100a1b146014213fe51312c7b569f2f3d8f89",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.771Z",
+      "updatedAt": "2026-06-21T03:55:15.771Z"
+    },
+    {
+      "id": "agent_events-1782014115649-ad40a547daacc",
+      "eventId": "event-1782014115647-d420e29bda",
+      "correlationId": "corr-1782014115647-0e21535a3c",
+      "signature": "unsigned",
+      "type": "queue_worker",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "provider_failed",
+      "status": "provider_failed",
+      "error_code": "",
+      "message": "Provider request failed with 401: Unauthorized",
+      "metadata": {
+        "provider": "heygen",
+        "renderJobId": "heygen-37d23d0f-0"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115647-d420e29bda",
+        "correlationId": "corr-1782014115647-0e21535a3c",
+        "timestamp": "2026-06-21T03:55:15.647Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "queue_worker",
+        "lifecycle": "provider_failed",
+        "status": "provider_failed",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Provider request failed with 401: Unauthorized",
+        "payload": {
+          "provider": "heygen",
+          "renderJobId": "heygen-37d23d0f-0"
+        },
+        "payloadHash": "84ec6ad7b4cf4b91215aa5e365d8343ca6538eafbf04d33c0edacfa89ef49efb",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.649Z",
+      "updatedAt": "2026-06-21T03:55:15.649Z"
+    },
+    {
+      "id": "agent_events-1782014115592-d5182aa18abe1",
+      "eventId": "event-1782014115588-8c12dc5a58",
+      "correlationId": "corr-1782014115588-de8190a244",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "render.failed",
+      "status": "info",
+      "error_code": "",
+      "message": "Provider request failed with 401: Unauthorized",
+      "metadata": {
+        "action": "render.failed"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115588-8c12dc5a58",
+        "correlationId": "corr-1782014115588-de8190a244",
+        "timestamp": "2026-06-21T03:55:15.588Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "render.failed",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Provider request failed with 401: Unauthorized",
+        "payload": {
+          "action": "render.failed"
+        },
+        "payloadHash": "6697b2176277a4abb853683cc9994d21e8d3b0718ccdc4fefa990efe846749be",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.592Z",
+      "updatedAt": "2026-06-21T03:55:15.592Z"
+    },
+    {
+      "id": "agent_events-1782014115581-dbb5dee2a1883",
+      "eventId": "event-1782014115577-31bd047b14",
+      "correlationId": "corr-1782014115577-ec652d2a24",
+      "signature": "unsigned",
+      "type": "twin_agent.render_job",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "heygen-37d23d0f-0",
+      "lifecycle": "provider_failed",
+      "status": "provider_failed",
+      "error_code": "RENDER_SUBMIT_FAILED",
+      "message": "Provider request failed with 401: Unauthorized",
+      "metadata": {
+        "provider": "HeyGen",
+        "providerJobId": ""
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014115577-31bd047b14",
+        "correlationId": "corr-1782014115577-ec652d2a24",
+        "timestamp": "2026-06-21T03:55:15.577Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "twin_agent.render_job",
+        "lifecycle": "provider_failed",
+        "status": "provider_failed",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "heygen-37d23d0f-0",
+        "message": "Provider request failed with 401: Unauthorized",
+        "payload": {
+          "provider": "HeyGen",
+          "providerJobId": ""
+        },
+        "payloadHash": "cf17d43701b2c38cfd286092a309600a0d6be9d6dbffbf164680528517ca4be0",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:15.581Z",
+      "updatedAt": "2026-06-21T03:55:15.581Z"
+    },
+    {
+      "id": "agent_events-1782014114831-5e68e991b6143",
+      "eventId": "event-1782014114829-42c2302da9",
+      "correlationId": "corr-1782014114829-31fc636a33",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "error_code": "",
+      "message": "",
+      "metadata": {
+        "action": "render.queued"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114829-42c2302da9",
+        "correlationId": "corr-1782014114829-31fc636a33",
+        "timestamp": "2026-06-21T03:55:14.829Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "render.queued",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "",
+        "payload": {
+          "action": "render.queued"
+        },
+        "payloadHash": "cb9655d76caed4d74624529f78ea6d05ce6b323145588a679b078f7f10e17e36",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.831Z",
+      "updatedAt": "2026-06-21T03:55:14.831Z"
+    },
+    {
+      "id": "agent_events-1782014114826-f48da60a9e597",
+      "eventId": "event-1782014114824-7c96ae8410",
+      "correlationId": "corr-1782014114824-645624c976",
+      "signature": "unsigned",
+      "type": "twin_agent.render_job",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "heygen-37d23d0f-0",
+      "lifecycle": "created",
+      "status": "created",
+      "error_code": "",
+      "message": "HeyGen render job created.",
+      "metadata": {
+        "provider": "HeyGen",
+        "providerJobId": ""
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114824-7c96ae8410",
+        "correlationId": "corr-1782014114824-645624c976",
+        "timestamp": "2026-06-21T03:55:14.824Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "twin_agent.render_job",
+        "lifecycle": "created",
+        "status": "created",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "heygen-37d23d0f-0",
+        "message": "HeyGen render job created.",
+        "payload": {
+          "provider": "HeyGen",
+          "providerJobId": ""
+        },
+        "payloadHash": "cf17d43701b2c38cfd286092a309600a0d6be9d6dbffbf164680528517ca4be0",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.826Z",
+      "updatedAt": "2026-06-21T03:55:14.826Z"
+    },
+    {
+      "id": "agent_events-1782014114809-623e0ee5f5611",
+      "eventId": "event-1782014114806-125718e328",
+      "correlationId": "corr-1782014114806-a34bf0094b",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "video-twin-agent",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "error_code": "",
+      "message": "Twin Agent accepted render submission.",
+      "metadata": {
+        "action": "render.queued"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114806-125718e328",
+        "correlationId": "corr-1782014114806-a34bf0094b",
+        "timestamp": "2026-06-21T03:55:14.806Z",
+        "actor": "video-twin-agent",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "render.queued",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Twin Agent accepted render submission.",
+        "payload": {
+          "action": "render.queued"
+        },
+        "payloadHash": "cb9655d76caed4d74624529f78ea6d05ce6b323145588a679b078f7f10e17e36",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.809Z",
+      "updatedAt": "2026-06-21T03:55:14.809Z"
+    },
+    {
+      "id": "agent_events-1782014114796-93fcfcadc4632",
+      "eventId": "event-1782014114794-f517fb8583",
+      "correlationId": "corr-1782014114794-b50bfaf8ec",
+      "signature": "unsigned",
+      "type": "queue_worker",
+      "actor": "compiler-worker",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "compiled",
+      "status": "compiled",
+      "error_code": "",
+      "message": "Compiler output persisted.",
+      "metadata": {
+        "compilerOutputId": "compiler-media-1782014114747-0"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114794-f517fb8583",
+        "correlationId": "corr-1782014114794-b50bfaf8ec",
+        "timestamp": "2026-06-21T03:55:14.794Z",
+        "actor": "compiler-worker",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "queue_worker",
+        "lifecycle": "compiled",
+        "status": "compiled",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Compiler output persisted.",
+        "payload": {
+          "compilerOutputId": "compiler-media-1782014114747-0"
+        },
+        "payloadHash": "81cc2200d5e7f3d0999b883d8a9ff6f3893bea0b623ec5e19613e2fd257a3546",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.796Z",
+      "updatedAt": "2026-06-21T03:55:14.796Z"
+    },
+    {
+      "id": "agent_events-1782014114790-83384a80cd88c",
+      "eventId": "event-1782014114788-0ce143b7a1",
+      "correlationId": "corr-1782014114788-a6635fcfd6",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "compiler-worker",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "error_code": "",
+      "message": "Compiler completed.",
+      "metadata": {
+        "action": "render.queued"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114788-0ce143b7a1",
+        "correlationId": "corr-1782014114788-a6635fcfd6",
+        "timestamp": "2026-06-21T03:55:14.788Z",
+        "actor": "compiler-worker",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "render.queued",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Compiler completed.",
+        "payload": {
+          "action": "render.queued"
+        },
+        "payloadHash": "cb9655d76caed4d74624529f78ea6d05ce6b323145588a679b078f7f10e17e36",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.790Z",
+      "updatedAt": "2026-06-21T03:55:14.790Z"
+    },
+    {
+      "id": "agent_events-1782014114777-4626e515d0e41",
+      "eventId": "event-1782014114775-fd3f71d595",
+      "correlationId": "corr-1782014114776-19582e5455",
+      "signature": "unsigned",
+      "type": "queue_worker",
+      "actor": "prompt-generation-worker",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "prompt_generated",
+      "status": "prompt_generated",
+      "error_code": "",
+      "message": "Elite video prompt generated.",
+      "metadata": {
+        "compilerOutputId": "compiler-media-1782014114747-0"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114775-fd3f71d595",
+        "correlationId": "corr-1782014114776-19582e5455",
+        "timestamp": "2026-06-21T03:55:14.776Z",
+        "actor": "prompt-generation-worker",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "queue_worker",
+        "lifecycle": "prompt_generated",
+        "status": "prompt_generated",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Elite video prompt generated.",
+        "payload": {
+          "compilerOutputId": "compiler-media-1782014114747-0"
+        },
+        "payloadHash": "81cc2200d5e7f3d0999b883d8a9ff6f3893bea0b623ec5e19613e2fd257a3546",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.777Z",
+      "updatedAt": "2026-06-21T03:55:14.777Z"
+    },
+    {
+      "id": "agent_events-1782014114770-85780a4d3e268",
+      "eventId": "event-1782014114766-2f6912893c",
+      "correlationId": "corr-1782014114766-cf042adf58",
+      "signature": "unsigned",
+      "type": "queue_worker",
+      "actor": "product-match-worker",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "matched",
+      "status": "matched",
+      "error_code": "",
+      "message": "Product matching completed.",
+      "metadata": {
+        "productUrl": "https://iamgenesistech.com/products/sea-moss-capsules"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114766-2f6912893c",
+        "correlationId": "corr-1782014114766-cf042adf58",
+        "timestamp": "2026-06-21T03:55:14.766Z",
+        "actor": "product-match-worker",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "queue_worker",
+        "lifecycle": "matched",
+        "status": "matched",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Product matching completed.",
+        "payload": {
+          "productUrl": "https://iamgenesistech.com/products/sea-moss-capsules"
+        },
+        "payloadHash": "d8e778ba11a754daa807ea4d862cb201ed8ed88773099bf7905661dadcebb3da",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.770Z",
+      "updatedAt": "2026-06-21T03:55:14.770Z"
+    },
+    {
+      "id": "agent_events-1782014114755-49b6fb12064c9",
+      "eventId": "event-1782014114752-7c7be6be77",
+      "correlationId": "corr-1782014114752-961f7f2ccd",
+      "signature": "unsigned",
+      "type": "media_audit",
+      "actor": "owner-admin",
+      "source": "evics-runtime",
+      "channel": "agent-bus",
+      "mediaId": "media-1782014114747-0",
+      "renderJobId": "",
+      "lifecycle": "media.created",
+      "status": "info",
+      "error_code": "",
+      "message": "Agent Chain Proof Asset created in auto_assist mode.",
+      "metadata": {
+        "action": "media.created"
+      },
+      "envelope": {
+        "version": "1.0",
+        "eventId": "event-1782014114752-7c7be6be77",
+        "correlationId": "corr-1782014114752-961f7f2ccd",
+        "timestamp": "2026-06-21T03:55:14.752Z",
+        "actor": "owner-admin",
+        "source": "evics-runtime",
+        "channel": "agent-bus",
+        "type": "media_audit",
+        "lifecycle": "media.created",
+        "status": "info",
+        "mediaId": "media-1782014114747-0",
+        "renderJobId": "",
+        "message": "Agent Chain Proof Asset created in auto_assist mode.",
+        "payload": {
+          "action": "media.created"
+        },
+        "payloadHash": "3e42ed61486d3f7edd51dfb80386824afdccc8136ddd3156410a62119e9c96f0",
+        "signature": "unsigned"
+      },
+      "createdAt": "2026-06-21T03:55:14.755Z",
+      "updatedAt": "2026-06-21T03:55:14.755Z"
+    }
+  ],
+  "updatedAt": "2026-06-21T03:55:16.155Z"
+}

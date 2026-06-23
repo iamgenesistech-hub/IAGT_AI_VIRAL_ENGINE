@@ -1,0 +1,64 @@
+/**
+ * EVICS App Store Submission Configuration (Capacitor)
+ * 
+ * Wraps the EVICS web app as a native iOS + Android application
+ * using Capacitor (the official solution from Ionic for PWA→native).
+ * 
+ * SETUP INSTRUCTIONS:
+ * 1. npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+ * 2. npx cap init
+ * 3. npx cap add android && npx cap add ios
+ * 4. npx cap sync
+ * 5. npx cap open android  (requires Android Studio)
+ * 6. npx cap open ios      (requires Xcode on macOS)
+ */
+{
+  "appId": "com.evics.affiliate",
+  "appName": "EVICS Elite Affiliate",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false,
+    "hostname": "app.evics.com"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#0f172a",
+    "buildOptions": {
+      "keystorePath": "android/app/evics.keystore",
+      "keystoreAlias": "evics-release",
+      "releaseType": "APK"
+    }
+  },
+  "ios": {
+    "backgroundColor": "#0f172a",
+    "contentInset": "automatic",
+    "scrollEnabled": true,
+    "limitsNavigationsToAppBoundDomains": true,
+    "allowsLinkPreview": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0f172a"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#0f172a",
+      "androidSplashResourceName": "splash",
+      "iosSplashResourceName": "Default",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK",
+      "resizeOnFullScreen": true
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "operatingMode": "auto_assist",
+  "scanner": {},
+  "media": [
+    {
+      "id": "media-test",
+      "title": "Provider URL Gate Test",
+      "media_type": "video",
+      "playback_url": "/api/media/playback/media-test",
+      "preview_url": "",
+      "thumbnail_url": "",
+      "approval_status": "pending",
+      "publish_status": "draft",
+      "archive_status": "hot",
+      "storage_location": "hot",
+      "metadata_json": {},
+      "target_platforms_json": [
+        "TikTok"
+      ],
+      "readiness_score": 80
+    }
+  ],
+  "dispatches": [],
+  "scanRuns": [],
+  "findings": [],
+  "auditEvents": [
+    {
+      "id": "audit-1780602573316-0",
+      "actor": "test",
+      "action": "provider.heygen.queued",
+      "mediaId": "media-test",
+      "detail": "HeyGen provider package prepared with active credentials.",
+      "createdAt": "2026-06-04T19:49:33.316Z"
+    }
+  ],
+  "providerJobs": [
+    {
+      "id": "provider-1780602573316-0",
+      "media_id": "media-test",
+      "provider": "HeyGen",
+      "type": "video_render_brief",
+      "status": "ready_for_provider",
+      "credentialMode": "connected",
+      "payload": {
+        "title": "Provider URL Gate Test",
+        "mediaType": "video",
+        "prompt": "Prepare HeyGen production package for Provider URL Gate Test."
+      },
+      "createdAt": "2026-06-04T19:49:33.316Z",
+      "actor": "test"
+    }
+  ],
+  "analytics": [],
+  "complianceRules": [
+    {
+      "id": "rule-fda-disclaimer",
+      "type": "required",
+      "phrase": "These statements have not been evaluated by the Food and Drug Administration.",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-cure",
+      "type": "blocked",
+      "phrase": "cure",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-treat",
+      "type": "blocked",
+      "phrase": "treat",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-guarantee",
+      "type": "blocked",
+      "phrase": "guaranteed",
+      "severity": "medium"
+    },
+    {
+      "id": "rule-safe-supports",
+      "type": "safe",
+      "phrase": "supports daily wellness routines",
+      "severity": "low"
+    }
+  ],
+  "alerts": [],
+  "folderCache": {},
+  "updatedAt": "2026-06-04T19:49:33.316Z"
+}

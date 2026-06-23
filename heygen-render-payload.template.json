@@ -1,0 +1,27 @@
+{
+  "title": "{{title}}",
+  "video_inputs": [
+    {
+      "character": {
+        "type": "avatar",
+        "avatar_id": "{{avatarId}}"
+      },
+      "voice": {
+        "type": "text",
+        "voice_id": "{{voiceId}}",
+        "input_text": "{{spokenScript}}"
+      },
+      "background": {
+        "type": "color",
+        "value": "#111827"
+      }
+    }
+  ],
+  "dimension": {
+    "width": 1080,
+    "height": 1920
+  },
+  "caption": true,
+  "test": false,
+  "callback_id": "{{mediaId}}"
+}

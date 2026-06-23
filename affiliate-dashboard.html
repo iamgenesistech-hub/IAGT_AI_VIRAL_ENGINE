@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EVICS Affiliate Hub</title>
+<style>
+  :root {
+    --bg: #09090f;
+    --surface: #13131f;
+    --card: #1a1a2e;
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --gold: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #2d2d44;
+    --radius: 12px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+  a { color: var(--accent2); text-decoration: none; }
+  button { cursor: pointer; border: none; font-family: inherit; font-size: 14px; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .main { overflow-y: auto; }
+  @media (max-width: 768px) { .app { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  /* Sidebar */
+  .sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
+  .sidebar-logo h2 { font-size: 18px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .sidebar-logo .tagline { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sidebar-nav { padding: 16px 0; }
+  .nav-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 12px 20px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 14px; color: var(--muted); cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover { color: var(--text); background: rgba(124, 58, 237, 0.08); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(124, 58, 237, 0.12); }
+  .nav-item .icon { font-size: 16px; }
+  .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); }
+  .affiliate-badge { display: flex; align-items: center; gap: 10px; }
+  .affiliate-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+  .affiliate-info .name { font-size: 13px; font-weight: 600; }
+  .affiliate-info .tier { font-size: 11px; color: var(--gold); }
+
+  /* Header */
+  .page-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .page-header h1 { font-size: 20px; font-weight: 700; }
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+
+  /* Sections */
+  .section { display: none; padding: 28px; }
+  .section.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .card h3 { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 28px; font-weight: 800; }
+  .card .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 1200px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 768px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+  /* Stat cards */
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-card .number { font-size: 32px; font-weight: 900; line-height: 1; }
+  .stat-card .caption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .stat-card.green .number { color: var(--green); }
+  .stat-card.gold .number { color: var(--gold); }
+  .stat-card.accent .number { color: var(--accent); }
+  .stat-card.cyan .number { color: var(--accent2); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-success { background: var(--green); color: white; }
+  .btn-gold { background: var(--gold); color: #1a1a2e; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  /* Badges / Pills */
+  .pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .pill-green { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+  .pill-gold { background: rgba(245, 158, 11, 0.15); color: var(--gold); }
+  .pill-accent { background: rgba(124, 58, 237, 0.15); color: var(--accent); }
+  .pill-red { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+  .pill-muted { background: rgba(148, 163, 184, 0.1); color: var(--muted); }
+
+  /* Tier card */
+  .tier-card { border-radius: var(--radius); padding: 24px; margin-bottom: 24px; background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(124, 58, 237, 0.3); }
+  .tier-card .tier-name { font-size: 24px; font-weight: 900; }
+  .tier-progress { background: var(--border); border-radius: 20px; height: 8px; margin: 12px 0 6px; overflow: hidden; }
+  .tier-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 20px; transition: width 0.6s ease; }
+
+  /* Product grid */
+  .product-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+  .product-card:hover { border-color: var(--accent); }
+  .product-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 48px; }
+  .product-body { padding: 14px; }
+  .product-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+  .product-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .product-price { font-size: 18px; font-weight: 800; color: var(--green); }
+  .viral-score { font-size: 12px; color: var(--gold); font-weight: 700; }
+  .product-actions { display: flex; gap: 8px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 2px solid var(--border); }
+  th { text-align: left; padding: 12px 16px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  td { padding: 14px 16px; font-size: 14px; }
+
+  /* Avatar Studio */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(124, 58, 237, 0.05); }
+  .upload-zone .icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-zone h4 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .upload-zone p { font-size: 13px; color: var(--muted); }
+  .style-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+  .style-option { border: 2px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .style-option:hover, .style-option.selected { border-color: var(--accent); background: rgba(124, 58, 237, 0.08); }
+  .style-option .icon { font-size: 32px; margin-bottom: 8px; }
+  .style-option .name { font-size: 14px; font-weight: 600; }
+  .style-option .desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* Wallet */
+  .wallet-card { background: linear-gradient(135deg, #1a1a2e, #2d1b69); border: 1px solid rgba(124, 58, 237, 0.4); border-radius: 16px; padding: 28px; margin-bottom: 20px; }
+  .wallet-balance { font-size: 48px; font-weight: 900; background: linear-gradient(135deg, var(--gold), #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .wallet-btc { font-size: 20px; color: var(--gold); font-weight: 700; margin-top: 4px; }
+  .btc-address { font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 8px; word-break: break-all; color: var(--accent2); }
+
+  /* Form */
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: 14px; transition: border-color 0.15s; outline: none; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+  /* Toast */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 14px; min-width: 280px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: slideIn 0.3s ease; }
+  .toast.success { border-left: 4px solid var(--green); }
+  .toast.error { border-left: 4px solid var(--red); }
+  .toast.info { border-left: 4px solid var(--accent); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Misc */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .section-title { font-size: 22px; font-weight: 800; }
+  .section-subtitle { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .text-green { color: var(--green); }
+  .text-gold { color: var(--gold); }
+  .text-red { color: var(--red); }
+  .text-accent { color: var(--accent); }
+  .text-muted { color: var(--muted); }
+  .mt-4 { margin-top: 16px; }
+  .mt-6 { margin-top: 24px; }
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .loading { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Referral section */
+  .referral-box { background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(124,58,237,0.1)); border: 1px solid rgba(6,182,212,0.3); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .referral-code { font-size: 36px; font-weight: 900; letter-spacing: 4px; color: var(--accent2); }
+  .referral-link { font-size: 13px; color: var(--muted); background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; font-family: monospace; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h2>EVICS Affiliate Hub</h2>
+      <div class="tagline">Earn. Create. Grow.</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-section="dashboard"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-section="earnings"><span class="icon">💰</span> Earnings</div>
+      <div class="nav-item" data-section="wallet"><span class="icon">₿</span> Wallet & Payouts</div>
+
+      <div class="nav-section">Content</div>
+      <div class="nav-item" data-section="products"><span class="icon">🔥</span> Viral Products</div>
+      <div class="nav-item" data-section="avatar"><span class="icon">🎭</span> Avatar Studio</div>
+      <div class="nav-item" data-section="videos"><span class="icon">🎬</span> My Videos</div>
+
+      <div class="nav-section">Account</div>
+      <div class="nav-item" data-section="referrals"><span class="icon">🔗</span> Referrals</div>
+      <div class="nav-item" data-section="leaderboard"><span class="icon">🏆</span> Leaderboard</div>
+      <div class="nav-item" data-section="profile"><span class="icon">👤</span> Profile</div>
+      <div class="nav-item" data-section="register"><span class="icon">✨</span> Join Program</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="affiliate-badge" id="sidebar-profile">
+        <div class="affiliate-avatar" id="sidebar-avatar-initials">?</div>
+        <div class="affiliate-info">
+          <div class="name" id="sidebar-name">Not logged in</div>
+          <div class="tier" id="sidebar-tier">—</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main">
+    <div class="page-header">
+      <h1 id="page-title">Dashboard</h1>
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-refresh">🔄 Refresh</button>
+        <button class="btn btn-primary btn-sm" id="btn-create-video">+ Create Video</button>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="section active" id="section-dashboard">
+      <div class="tier-card" id="tier-card">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-muted" style="font-size:12px;text-transform:uppercase;letter-spacing:1px;">Current Tier</div>
+            <div class="tier-name" id="tier-name">🌱 Starter</div>
+            <div class="text-muted" style="font-size:13px;margin-top:4px;" id="tier-desc">Earn $1,000 in sales to reach Growth tier</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="text-muted" style="font-size:12px;">Commission Rate</div>
+            <div style="font-size:32px;font-weight:900;color:var(--gold);" id="commission-rate">7%</div>
+          </div>
+        </div>
+        <div class="tier-progress"><div class="tier-progress-fill" id="tier-progress" style="width:0%"></div></div>
+        <div class="text-muted" style="font-size:12px;" id="tier-progress-label">$0 / $1,000 to Growth</div>
+      </div>
+
+      <div class="grid-4">
+        <div class="stat-card green"><div class="label">Pending Balance</div><div class="number" id="stat-pending">$0.00</div><div class="caption">Ready to withdraw</div></div>
+        <div class="stat-card gold"><div class="label">Total Earned</div><div class="number" id="stat-earned">$0.00</div><div class="caption">All time earnings</div></div>
+        <div class="stat-card accent"><div class="label">Total Sales</div><div class="number" id="stat-sales">$0.00</div><div class="caption">Attributed revenue</div></div>
+        <div class="stat-card cyan"><div class="label">Videos Created</div><div class="number" id="stat-videos">0</div><div class="caption">Published + drafts</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Recent Commissions</div>
+          <div id="recent-commissions"><div class="text-muted" style="font-size:13px;padding:12px 0;">No commissions yet. Start promoting viral products.</div></div>
+        </div>
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn btn-primary" onclick="showSection('products')">🔥 Browse Viral Products</button>
+            <button class="btn btn-secondary" onclick="showSection('avatar')">🎭 Create My Avatar</button>
+            <button class="btn btn-secondary" onclick="showSection('wallet')">₿ Set Up Wallet</button>
+            <button class="btn btn-gold" onclick="showSection('referrals')">🔗 Share My Referral Link</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Earnings -->
+    <div class="section" id="section-earnings">
+      <div class="section-header">
+        <div><div class="section-title">Earnings Overview</div><div class="section-subtitle">Your commission history and payout records</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadEarnings()">🔄 Refresh</button>
+      </div>
+      <div class="grid-3" id="earnings-stats"></div>
+      <div class="card">
+        <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Commission History</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Sale Amount</th><th>Commission</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="commissions-table"><tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No commissions yet</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- Wallet & Payouts -->
+    <div class="section" id="section-wallet">
+      <div class="section-header">
+        <div><div class="section-title">₿ Wallet & Payouts</div><div class="section-subtitle">Receive earnings in Bitcoin, USDC, or USD</div></div>
+      </div>
+      <div class="wallet-card">
+        <div class="text-muted" style="font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Available Balance</div>
+        <div class="wallet-balance" id="wallet-balance-usd">$0.00</div>
+        <div class="wallet-btc" id="wallet-balance-btc">≈ 0.00000000 BTC</div>
+        <div class="flex gap-3 mt-4">
+          <button class="btn btn-gold" id="btn-request-payout">₿ Request Payout</button>
+          <button class="btn btn-secondary" onclick="loadBtcPrice()">📈 BTC Price</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Payment Method</div>
+          <div class="form-group">
+            <label>Preferred Payout Method</label>
+            <select id="payout-method" onchange="updatePayoutMethod()">
+              <option value="btc">₿ Bitcoin (Recommended)</option>
+              <option value="usdc">💎 USDC (Stablecoin)</option>
+              <option value="paypal">💳 PayPal</option>
+              <option value="usd">🏦 USD Bank Transfer</option>
+            </select>
+          </div>
+          <div class="form-group" id="btc-address-group">
+            <label>Bitcoin Wallet Address</label>
+            <input type="text" id="btc-address" placeholder="bc1q... or 1A1z... or 3J98t..." />
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Your personal BTC wallet. EVICS never holds your funds longer than needed.</div>
+          </div>
+          <div class="form-group" id="paypal-email-group" style="display:none;">
+            <label>PayPal Email</label>
+            <input type="email" id="paypal-email" placeholder="your@paypal.com" />
+          </div>
+          <button class="btn btn-primary" onclick="savePaymentMethod()">Save Payment Method</button>
+        </div>
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Live BTC Price</div>
+          <div id="btc-market-data" class="text-muted">Loading market data...</div>
+          <hr class="divider" />
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Payout History</div>
+          <div id="payout-history" class="text-muted" style="font-size:13px;">No payouts yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Viral Products -->
+    <div class="section" id="section-products">
+      <div class="section-header">
+        <div><div class="section-title">🔥 Viral 100 Products</div><div class="section-subtitle">Top trending products updated daily — pick one to promote</div></div>
+        <div class="flex gap-2">
+          <select id="category-filter" onchange="filterProducts()" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:14px;">
+            <option value="">All Categories</option>
+            <option value="beauty">Beauty</option>
+            <option value="fitness">Fitness</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="electronics">Electronics</option>
+            <option value="pets">Pets</option>
+            <option value="supplements">Supplements</option>
+            <option value="fashion">Fashion</option>
+            <option value="gadgets">Gadgets</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadProducts()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="grid-4" id="products-grid">
+        <div class="text-muted" style="grid-column:1/-1;text-align:center;padding:40px;">Loading viral products...</div>
+      </div>
+    </div>
+
+    <!-- Avatar Studio -->
+    <div class="section" id="section-avatar">
+      <div class="section-header">
+        <div><div class="section-title">🎭 Avatar Studio</div><div class="section-subtitle">Create your AI talking avatar for product promotions</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">1. Upload Your Photo</div>
+          <div class="upload-zone" id="photo-upload-zone" onclick="document.getElementById('photo-input').click()">
+            <div class="icon">📷</div>
+            <h4>Drop your photo here</h4>
+            <p>JPEG, PNG, WebP — clear face shot works best</p>
+            <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="previewPhoto(event)" />
+          </div>
+          <img id="photo-preview" style="display:none;width:100%;border-radius:8px;margin-top:12px;max-height:200px;object-fit:cover;" />
+
+          <div style="font-size:16px;font-weight:700;margin:20px 0 12px;">2. Choose Video Style</div>
+          <div class="style-selector">
+            <div class="style-option selected" data-style="avatar" onclick="selectStyle(this)">
+              <div class="icon">🧑</div>
+              <div class="name">Avatar</div>
+              <div class="desc">You talking to camera</div>
+            </div>
+            <div class="style-option" data-style="faceless" onclick="selectStyle(this)">
+              <div class="icon">🎥</div>
+              <div class="name">Faceless</div>
+              <div class="desc">Product + voice-over</div>
+            </div>
+            <div class="style-option" data-style="viral-format" onclick="selectStyle(this)">
+              <div class="icon">🔥</div>
+              <div class="name">Viral Format</div>
+              <div class="desc">TikTok-style hook edit</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;" onclick="createAvatar()">✨ Create My Avatar</button>
+          <div id="avatar-status" style="margin-top:12px;font-size:13px;"></div>
+        </div>
+
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">3. Generate Product Video</div>
+          <div class="form-group">
+            <label>My Avatar</label>
+            <select id="avatar-select"><option value="">— Select avatar —</option></select>
+          </div>
+          <div class="form-group">
+            <label>Select Product</label>
+            <select id="product-select"><option value="">— Select product —</option></select>
+          </div>
+          <div class="form-group">
+            <label>Custom Script (optional)</label>
+            <textarea id="video-script" rows="4" placeholder="Leave blank to auto-generate from product data..."></textarea>
+          </div>
+          <button class="btn btn-primary" style="width:100%;" onclick="generateVideo()">🎬 Generate Video</button>
+          <div id="video-gen-status" style="margin-top:12px;font-size:13px;"></div>
+
+          <hr class="divider" />
+          <div style="font-size:16px;font-weight:700;margin-bottom:12px;">My Avatars</div>
+          <div id="my-avatars" class="text-muted" style="font-size:13px;">No avatars created yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Videos -->
+    <div class="section" id="section-videos">
+      <div class="section-header">
+        <div><div class="section-title">🎬 My Videos</div><div class="section-subtitle">Your generated product videos — share them anywhere</div></div>
+        <button class="btn btn-primary btn-sm" onclick="showSection('avatar')">+ Create Video</button>
+      </div>
+      <div class="grid-3" id="videos-grid">
+        <div class="text-muted" style="grid-column:1/-1;text-align:center;padding:40px;">No videos yet. Create your first video in Avatar Studio.</div>
+      </div>
+    </div>
+
+    <!-- Referrals -->
+    <div class="section" id="section-referrals">
+      <div class="section-header">
+        <div><div class="section-title">🔗 Referrals</div><div class="section-subtitle">Earn by referring other affiliates</div></div>
+      </div>
+      <div class="referral-box">
+        <div class="text-muted" style="font-size:12px;margin-bottom:6px;">Your Referral Code</div>
+        <div class="referral-code" id="referral-code">—</div>
+        <div style="margin-top:12px;">
+          <div class="text-muted" style="font-size:12px;margin-bottom:4px;">Your Referral Link</div>
+          <div class="referral-link" id="referral-link">—</div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button class="btn btn-primary" onclick="copyReferralLink()">📋 Copy Link</button>
+          <button class="btn btn-secondary" onclick="shareReferralLink()">📤 Share</button>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Referred Affiliates</div>
+        <div id="referred-list" class="text-muted" style="font-size:13px;padding:12px 0;">No referrals yet.</div>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="section" id="section-leaderboard">
+      <div class="section-header">
+        <div><div class="section-title">🏆 Leaderboard</div><div class="section-subtitle">Top performers this month</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadLeaderboard()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Rank</th><th>Affiliate</th><th>Tier</th><th>Total Sales</th><th>Earnings</th></tr></thead>
+          <tbody id="leaderboard-table"><tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Loading leaderboard...</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div class="section" id="section-profile">
+      <div class="section-header">
+        <div><div class="section-title">👤 My Profile</div><div class="section-subtitle">Manage your affiliate account</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Account Details</div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="profile-name" /></div>
+          <div class="form-group"><label>Email</label><input type="email" id="profile-email" /></div>
+          <div class="form-group"><label>Phone</label><input type="tel" id="profile-phone" /></div>
+          <div class="form-group"><label>Bio</label><textarea id="profile-bio" rows="3"></textarea></div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+        </div>
+        <div class="card">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Social Handles</div>
+          <div class="form-group"><label>TikTok</label><input type="text" id="social-tiktok" placeholder="@yourhandle" /></div>
+          <div class="form-group"><label>Instagram</label><input type="text" id="social-instagram" placeholder="@yourhandle" /></div>
+          <div class="form-group"><label>YouTube</label><input type="text" id="social-youtube" placeholder="@yourchannel" /></div>
+          <div class="form-group"><label>Pinterest</label><input type="text" id="social-pinterest" placeholder="yourprofile" /></div>
+          <button class="btn btn-primary" onclick="saveSocials()">Save Socials</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Register -->
+    <div class="section" id="section-register">
+      <div class="section-header">
+        <div><div class="section-title">✨ Join the EVICS Affiliate Program</div><div class="section-subtitle">Start earning crypto by promoting viral products</div></div>
+      </div>
+      <div style="max-width:560px;">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="grid-3">
+            <div style="text-align:center;padding:12px;"><div style="font-size:32px;">₿</div><div style="font-size:14px;font-weight:700;margin-top:6px;">Bitcoin Payouts</div><div style="font-size:12px;color:var(--muted);">Get paid in BTC or USD</div></div>
+            <div style="text-align:center;padding:12px;"><div style="font-size:32px;">🔥</div><div style="font-size:14px;font-weight:700;margin-top:6px;">Viral Products</div><div style="font-size:12px;color:var(--muted);">100 top trending items</div></div>
+            <div style="text-align:center;padding:12px;"><div style="font-size:32px;">🎭</div><div style="font-size:14px;font-weight:700;margin-top:6px;">AI Avatar</div><div style="font-size:12px;color:var(--muted);">Your face on every ad</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-size:18px;font-weight:700;margin-bottom:20px;">Create Your Account</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Full Name *</label><input type="text" id="reg-name" placeholder="Jane Doe" /></div>
+            <div class="form-group"><label>Email *</label><input type="email" id="reg-email" placeholder="jane@example.com" /></div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group"><label>Phone</label><input type="tel" id="reg-phone" placeholder="+1 555 000 0000" /></div>
+            <div class="form-group"><label>TikTok Handle</label><input type="text" id="reg-tiktok" placeholder="@yourhandle" /></div>
+          </div>
+          <div class="form-group"><label>Your Niche / Content Type</label><input type="text" id="reg-niche" placeholder="beauty, fitness, gadgets..." /></div>
+          <div class="form-group"><label>Referral Code (if any)</label><input type="text" id="reg-ref" placeholder="FRIEND1234" /></div>
+          <div class="form-group"><label>Preferred Payout</label>
+            <select id="reg-payment">
+              <option value="btc">₿ Bitcoin (Recommended)</option>
+              <option value="usdc">💎 USDC</option>
+              <option value="paypal">💳 PayPal</option>
+              <option value="usd">🏦 USD</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" style="width:100%;padding:14px;" onclick="register()">Join Now — Start Earning</button>
+          <div id="register-status" style="margin-top:12px;font-size:13px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main -->
+</div><!-- end app -->
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ====== STATE ======
+const state = {
+  affiliateId: localStorage.getItem("evics_aff_id") || null,
+  affiliateCode: localStorage.getItem("evics_aff_code") || null,
+  affiliate: null,
+  products: [],
+  avatars: [],
+  stats: null,
+  btcPrice: 65000,
+  selectedStyle: "avatar",
+  selectedProductId: null,
+};
+
+// ====== INIT ======
+document.addEventListener("DOMContentLoaded", () => {
+  setupNav();
+  if (state.affiliateId) {
+    loadDashboard();
+  } else {
+    showSection("register");
+    toast("Welcome! Join the EVICS Affiliate Program to get started.", "info");
+  }
+  loadBtcPrice();
+});
+
+// ====== NAVIGATION ======
+function setupNav() {
+  document.querySelectorAll(".nav-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const section = el.dataset.section;
+      showSection(section);
+      document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
+      el.classList.add("active");
+    });
+  });
+}
+
+function showSection(name) {
+  document.querySelectorAll(".section").forEach((s) => s.classList.remove("active"));
+  const el = document.getElementById("section-" + name);
+  if (el) el.classList.add("active");
+  document.getElementById("page-title").textContent = {
+    dashboard: "Dashboard", earnings: "Earnings", wallet: "Wallet & Payouts",
+    products: "Viral 100 Products", avatar: "Avatar Studio", videos: "My Videos",
+    referrals: "Referrals", leaderboard: "Leaderboard", profile: "Profile", register: "Join Program",
+  }[name] || name;
+
+  // Lazy loads
+  if (name === "products") loadProducts();
+  if (name === "leaderboard") loadLeaderboard();
+  if (name === "earnings") loadEarnings();
+  if (name === "avatar") loadAvatars();
+  if (name === "wallet") loadWallet();
+}
+
+// ====== API HELPERS ======
+async function api(path, method = "GET", body = null) {
+  const opts = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+// ====== DASHBOARD ======
+async function loadDashboard() {
+  if (!state.affiliateId) return;
+  try {
+    const data = await api("/api/affiliate/stats?id=" + state.affiliateId);
+    if (!data.success) return;
+    state.stats = data.stats;
+    state.affiliate = data.stats.affiliate;
+    renderDashboard(data.stats);
+    updateSidebar(data.stats.affiliate);
+  } catch (e) { console.error(e); }
+}
+
+function renderDashboard(stats) {
+  const aff = stats.affiliate;
+  const tierDefs = { starter: {name:"🌱 Starter",rate:7,next:1000}, growth: {name:"🚀 Growth",rate:10,next:5000}, elite: {name:"⭐ Elite",rate:12,next:25000}, diamond: {name:"💎 Diamond",rate:15,next:Infinity} };
+  const t = tierDefs[aff.tier] || tierDefs.starter;
+  const nextT = { starter:"growth", growth:"elite", elite:"diamond" };
+  const nextTierDef = tierDefs[nextT[aff.tier]] || null;
+  const progress = nextTierDef ? Math.min(100, (aff.totalSales / nextTierDef.rate) * 100) : 100;
+
+  document.getElementById("tier-name").textContent = t.name;
+  document.getElementById("commission-rate").textContent = t.rate + "%";
+  document.getElementById("tier-progress").style.width = progress + "%";
+  document.getElementById("tier-progress-label").textContent = nextTierDef ? `$${aff.totalSales.toFixed(0)} / $${nextTierDef.rate} to ${nextT[aff.tier]}` : "💎 Diamond — Maximum tier reached!";
+  document.getElementById("stat-pending").textContent = "$" + aff.pendingBalance.toFixed(2);
+  document.getElementById("stat-earned").textContent = "$" + aff.totalEarnings.toFixed(2);
+  document.getElementById("stat-sales").textContent = "$" + aff.totalSales.toFixed(2);
+
+  // Referral info
+  document.getElementById("referral-code").textContent = aff.code || "—";
+  document.getElementById("referral-link").textContent = aff.referralLink || "—";
+
+  const walletBtc = (aff.pendingBalance / state.btcPrice).toFixed(8);
+  document.getElementById("wallet-balance-usd").textContent = "$" + aff.pendingBalance.toFixed(2);
+  document.getElementById("wallet-balance-btc").textContent = `≈ ${walletBtc} BTC`;
+
+  // Recent commissions
+  const comms = stats.recentCommissions || [];
+  document.getElementById("recent-commissions").innerHTML = comms.length
+    ? comms.map((c) => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;"><span>${c.productTitle || "Product"}</span><span class="text-green">+$${c.commissionEarned.toFixed(2)}</span></div>`).join("")
+    : `<div class="text-muted" style="font-size:13px;padding:12px 0;">No commissions yet. Start promoting viral products.</div>`;
+}
+
+function updateSidebar(aff) {
+  const initials = aff.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  document.getElementById("sidebar-avatar-initials").textContent = initials;
+  document.getElementById("sidebar-name").textContent = aff.name;
+  const tierBadges = { starter:"🌱 Starter", growth:"🚀 Growth", elite:"⭐ Elite", diamond:"💎 Diamond" };
+  document.getElementById("sidebar-tier").textContent = tierBadges[aff.tier] || aff.tier;
+}
+
+// ====== PRODUCTS ======
+async function loadProducts() {
+  const catFilter = document.getElementById("category-filter")?.value || "";
+  try {
+    const data = await api("/api/viral-products" + (catFilter ? "?category=" + catFilter : ""));
+    state.products = data.products || [];
+    renderProducts(state.products);
+    // Populate product select in avatar studio
+    const sel = document.getElementById("product-select");
+    if (sel) {
+      sel.innerHTML = '<option value="">— Select product —</option>' + state.products.slice(0, 30).map((p) => `<option value="${p.id}" data-image="${p.imageUrl}" data-title="${p.title}">${p.rank}. ${p.title} — $${p.price}</option>`).join("");
+    }
+  } catch (e) { console.error(e); }
+}
+
+function filterProducts() { loadProducts(); }
+
+function renderProducts(products) {
+  const grid = document.getElementById("products-grid");
+  if (!grid) return;
+  if (!products.length) { grid.innerHTML = '<div class="text-muted" style="grid-column:1/-1;text-align:center;padding:40px;">No products found.</div>'; return; }
+  grid.innerHTML = products.slice(0, 40).map((p) => `
+    <div class="product-card">
+      <div class="product-img" style="font-size:40px;">${p.imageUrl && !p.imageUrl.includes("placeholder") ? `<img src="${p.imageUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'" />` : getCategoryEmoji(p.category)}</div>
+      <div class="product-body">
+        <div class="product-title">${escapeHtml(p.title)}</div>
+        <div class="product-meta">
+          <div class="product-price">$${p.price}</div>
+          <div class="viral-score">🔥 ${p.viralScore}</div>
+        </div>
+        <div style="margin-bottom:10px;"><span class="pill pill-${p.salesVelocity === 'VERY_HIGH' ? 'gold' : p.salesVelocity === 'HIGH' ? 'green' : 'muted'}" style="font-size:11px;">${p.salesVelocity}</span> <span class="pill pill-muted" style="font-size:11px;">${p.category}</span></div>
+        <div class="product-actions">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="promoteProduct('${p.id}', '${escapeHtml(p.title)}')">Promote</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyAffLink('${p.id}')">🔗</button>
+        </div>
+      </div>
+    </div>`).join("");
+}
+
+function getCategoryEmoji(cat) {
+  const map = { beauty:"💄", fitness:"💪", kitchen:"🍳", electronics:"💻", pets:"🐾", supplements:"💊", fashion:"👗", gadgets:"🔧", "home-decor":"🏠", toys:"🧸" };
+  return map[cat] || "📦";
+}
+
+async function promoteProduct(productId, productTitle) {
+  if (!state.affiliateId) { toast("Please register first.", "error"); showSection("register"); return; }
+  toast(`Getting your affiliate link for ${productTitle}...`, "info");
+  const data = await api("/api/affiliate/link", "POST", { affiliateId: state.affiliateId, productId });
+  if (data.link) {
+    await navigator.clipboard.writeText(data.link).catch(() => {});
+    toast(`✅ Affiliate link copied! Share it everywhere: ${data.link}`, "success");
+  }
+}
+
+async function copyAffLink(productId) {
+  return promoteProduct(productId, "Product");
+}
+
+// ====== AVATAR STUDIO ======
+function previewPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById("photo-preview");
+    img.src = e.target.result;
+    img.style.display = "block";
+    document.getElementById("photo-upload-zone").style.display = "none";
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectStyle(el) {
+  document.querySelectorAll(".style-option").forEach((s) => s.classList.remove("selected"));
+  el.classList.add("selected");
+  state.selectedStyle = el.dataset.style;
+}
+
+async function createAvatar() {
+  if (!state.affiliateId) { toast("Please register first.", "error"); return; }
+  const photoInput = document.getElementById("photo-input");
+  const statusEl = document.getElementById("avatar-status");
+  if (!photoInput.files[0]) { toast("Please upload a photo first.", "error"); return; }
+
+  statusEl.innerHTML = '<span class="loading"></span> Uploading photo and creating avatar...';
+
+  // Upload photo
+  const formData = new FormData();
+  formData.append("photo", photoInput.files[0]);
+  formData.append("affiliateId", state.affiliateId);
+  formData.append("style", state.selectedStyle);
+
+  try {
+    const res = await fetch("/api/affiliate/avatar/create", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.success) {
+      statusEl.innerHTML = `<span style="color:var(--green);">✅ Avatar created: "${data.avatar.name}"</span>`;
+      toast("Avatar created successfully!", "success");
+      loadAvatars();
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--red);">❌ ${data.error}</span>`;
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:var(--red);">❌ ${e.message}</span>`;
+  }
+}
+
+async function loadAvatars() {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/avatars?affiliateId=" + state.affiliateId);
+  state.avatars = data.avatars || [];
+  const sel = document.getElementById("avatar-select");
+  if (sel) {
+    sel.innerHTML = '<option value="">— Select avatar —</option>' + state.avatars.map((a) => `<option value="${a.id}">${a.name} (${a.status})</option>`).join("");
+  }
+  const myAvatarsEl = document.getElementById("my-avatars");
+  if (myAvatarsEl) {
+    myAvatarsEl.innerHTML = state.avatars.length
+      ? state.avatars.map((a) => `<div style="padding:8px;border-bottom:1px solid var(--border);"><strong>${a.name}</strong> <span class="pill pill-${a.status === 'ready' ? 'green' : 'muted'}">${a.status}</span></div>`).join("")
+      : "No avatars yet.";
+  }
+}
+
+async function generateVideo() {
+  const avatarId = document.getElementById("avatar-select").value;
+  const productSel = document.getElementById("product-select");
+  const productId = productSel.value;
+  const script = document.getElementById("video-script").value;
+  const statusEl = document.getElementById("video-gen-status");
+
+  if (!state.affiliateId) { toast("Please register first.", "error"); return; }
+  if (!avatarId) { toast("Select an avatar first.", "error"); return; }
+  if (!productId) { toast("Select a product first.", "error"); return; }
+
+  const selectedOpt = productSel.options[productSel.selectedIndex];
+  const productTitle = selectedOpt?.dataset?.title || "";
+  const productImageUrl = selectedOpt?.dataset?.image || "";
+
+  statusEl.innerHTML = '<span class="loading"></span> Generating video with HeyGen...';
+
+  const data = await api("/api/affiliate/avatar/generate-video", "POST", {
+    affiliateId: state.affiliateId, avatarId, productId, productTitle, productImageUrl, style: state.selectedStyle, script,
+  });
+
+  if (data.success) {
+    statusEl.innerHTML = `<span style="color:var(--green);">✅ Video rendering! Check "My Videos" in a few minutes.</span>`;
+    toast("Video is rendering!", "success");
+  } else {
+    statusEl.innerHTML = `<span style="color:var(--red);">❌ ${data.error}</span>`;
+  }
+}
+
+// ====== WALLET ======
+async function loadWallet() {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/stats?id=" + state.affiliateId);
+  if (!data.success) return;
+  const aff = data.stats.affiliate;
+  document.getElementById("wallet-balance-usd").textContent = "$" + aff.pendingBalance.toFixed(2);
+  document.getElementById("wallet-balance-btc").textContent = "≈ " + (aff.pendingBalance / state.btcPrice).toFixed(8) + " BTC";
+  if (aff.btcAddress) document.getElementById("btc-address").value = aff.btcAddress;
+  if (aff.paypalEmail) document.getElementById("paypal-email").value = aff.paypalEmail;
+  if (aff.paymentMethod) document.getElementById("payout-method").value = aff.paymentMethod;
+  updatePayoutMethod();
+}
+
+function updatePayoutMethod() {
+  const method = document.getElementById("payout-method").value;
+  document.getElementById("btc-address-group").style.display = method === "btc" || method === "usdc" ? "block" : "none";
+  document.getElementById("paypal-email-group").style.display = method === "paypal" ? "block" : "none";
+}
+
+async function loadBtcPrice() {
+  const data = await api("/api/crypto/market-data");
+  if (data.btcUsd) {
+    state.btcPrice = data.btcUsd;
+    const el = document.getElementById("btc-market-data");
+    if (el) {
+      el.innerHTML = `<div style="font-size:28px;font-weight:900;color:var(--gold);">$${data.btcUsd.toLocaleString()}</div><div class="text-muted" style="font-size:12px;margin-top:4px;">Bitcoin (BTC/USD)</div><div class="text-muted" style="font-size:11px;margin-top:2px;">Updated: ${new Date(data.updatedAt).toLocaleTimeString()}</div>`;
+    }
+  }
+}
+
+async function savePaymentMethod() {
+  if (!state.affiliateId) return;
+  const method = document.getElementById("payout-method").value;
+  const btcAddress = document.getElementById("btc-address").value;
+  const paypalEmail = document.getElementById("paypal-email").value;
+  const data = await api("/api/affiliate/update", "POST", { id: state.affiliateId, paymentMethod: method, btcAddress, paypalEmail });
+  toast(data.success ? "Payment method saved!" : data.error, data.success ? "success" : "error");
+}
+
+document.getElementById("btn-request-payout")?.addEventListener("click", async () => {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/payout/request", "POST", { affiliateId: state.affiliateId });
+  toast(data.success ? "Payout requested! Processing in 1-3 business days." : data.error, data.success ? "success" : "error");
+  if (data.success) loadWallet();
+});
+
+// ====== EARNINGS ======
+async function loadEarnings() {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/stats?id=" + state.affiliateId);
+  if (!data.success) return;
+  const stats = data.stats;
+  document.getElementById("earnings-stats").innerHTML = `
+    <div class="stat-card gold"><div class="label">Total Earned</div><div class="number">$${stats.commissions.totalEarned.toFixed(2)}</div><div class="caption">${stats.commissions.total} commissions</div></div>
+    <div class="stat-card accent"><div class="label">Pending</div><div class="number">${stats.commissions.pending}</div><div class="caption">Awaiting approval</div></div>
+    <div class="stat-card green"><div class="label">Paid Out</div><div class="number">$${stats.payouts.totalPaid.toFixed(2)}</div><div class="caption">${stats.payouts.completed} payouts</div></div>`;
+  const tbody = document.getElementById("commissions-table");
+  const comms = stats.recentCommissions || [];
+  tbody.innerHTML = comms.length
+    ? comms.map((c) => `<tr><td>${escapeHtml(c.productTitle)}</td><td>$${c.saleAmount.toFixed(2)}</td><td class="text-green">$${c.commissionEarned.toFixed(2)}</td><td><span class="pill pill-${c.status === 'paid' ? 'green' : c.status === 'approved' ? 'accent' : 'muted'}">${c.status}</span></td><td>${new Date(c.createdAt).toLocaleDateString()}</td></tr>`).join("")
+    : '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No commissions yet</td></tr>';
+}
+
+// ====== LEADERBOARD ======
+async function loadLeaderboard() {
+  const data = await api("/api/affiliate/leaderboard");
+  const tbody = document.getElementById("leaderboard-table");
+  const rows = data.leaderboard || [];
+  tbody.innerHTML = rows.length
+    ? rows.map((a, i) => `<tr><td>${i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : a.rank}</td><td><strong>${escapeHtml(a.name)}</strong></td><td><span class="pill pill-${a.tier === 'diamond' ? 'gold' : 'accent'}">${a.badge} ${a.tier}</span></td><td>$${a.totalSales.toFixed(2)}</td><td class="text-green">$${a.totalEarnings.toFixed(2)}</td></tr>`).join("")
+    : '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No data yet</td></tr>';
+}
+
+// ====== REGISTER ======
+async function register() {
+  const name = document.getElementById("reg-name").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  if (!name || !email) { toast("Name and email are required.", "error"); return; }
+
+  const statusEl = document.getElementById("register-status");
+  statusEl.innerHTML = '<span class="loading"></span> Creating your account...';
+
+  const data = await api("/api/affiliate/register", "POST", {
+    name, email,
+    phone: document.getElementById("reg-phone").value,
+    socialHandles: { tiktok: document.getElementById("reg-tiktok").value },
+    niche: document.getElementById("reg-niche").value.split(",").map((s) => s.trim()).filter(Boolean),
+    referredBy: document.getElementById("reg-ref").value || null,
+    paymentMethod: document.getElementById("reg-payment").value,
+  });
+
+  if (data.success) {
+    localStorage.setItem("evics_aff_id", data.affiliate.id);
+    localStorage.setItem("evics_aff_code", data.affiliate.code);
+    state.affiliateId = data.affiliate.id;
+    state.affiliateCode = data.affiliate.code;
+    statusEl.innerHTML = `<span style="color:var(--green);">✅ Welcome! Your code: <strong>${data.affiliate.code}</strong></span>`;
+    toast("🎉 Welcome to EVICS Affiliates!", "success");
+    setTimeout(() => { loadDashboard(); showSection("dashboard"); }, 1500);
+  } else {
+    statusEl.innerHTML = `<span style="color:var(--red);">❌ ${data.error}</span>`;
+  }
+}
+
+// ====== PROFILE ======
+async function saveProfile() {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/update", "POST", {
+    id: state.affiliateId,
+    name: document.getElementById("profile-name").value,
+    phone: document.getElementById("profile-phone").value,
+    bio: document.getElementById("profile-bio").value,
+  });
+  toast(data.success ? "Profile saved!" : data.error, data.success ? "success" : "error");
+}
+
+async function saveSocials() {
+  if (!state.affiliateId) return;
+  const data = await api("/api/affiliate/update", "POST", {
+    id: state.affiliateId,
+    socialHandles: {
+      tiktok: document.getElementById("social-tiktok").value,
+      instagram: document.getElementById("social-instagram").value,
+      youtube: document.getElementById("social-youtube").value,
+      pinterest: document.getElementById("social-pinterest").value,
+    },
+  });
+  toast(data.success ? "Socials saved!" : data.error, data.success ? "success" : "error");
+}
+
+// ====== REFERRALS ======
+async function copyReferralLink() {
+  const link = document.getElementById("referral-link").textContent;
+  await navigator.clipboard.writeText(link).catch(() => {});
+  toast("Referral link copied to clipboard!", "success");
+}
+
+function shareReferralLink() {
+  const link = document.getElementById("referral-link").textContent;
+  if (navigator.share) {
+    navigator.share({ title: "Join EVICS Affiliates", text: "Earn Bitcoin promoting viral products!", url: link });
+  } else {
+    copyReferralLink();
+  }
+}
+
+// ====== TOAST ======
+function toast(message, type = "info") {
+  const container = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+// ====== UTILS ======
+function escapeHtml(str) {
+  return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ====== BUTTON HANDLERS ======
+document.getElementById("btn-refresh")?.addEventListener("click", () => { loadDashboard(); toast("Data refreshed", "info"); });
+document.getElementById("btn-create-video")?.addEventListener("click", () => { showSection("avatar"); loadProducts(); });
+</script>
+</body>
+</html>

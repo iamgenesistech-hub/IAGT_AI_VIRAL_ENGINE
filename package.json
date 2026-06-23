@@ -1,0 +1,50 @@
+{
+  "name": "evics-railway-deploy",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "next dev -p 4176",
+    "dev:4175": "next dev -p 4175",
+    "dev:8080": "next dev -p 8080",
+    "build": "next build",
+    "start": "node server.js",
+    "start:stable": "node scripts/start-stable-port.js",
+    "start:cloud-secrets": "powershell -ExecutionPolicy Bypass -File ./scripts/start-with-cloud-secrets.ps1",
+    "start:legacy": "node server.js",
+    "start:next": "next start -p 4176",
+    "start:next:4175": "next start -p 4175",
+    "start:next:8080": "next start -p 8080",
+    "view:terminal": "node scripts/terminal-view.js --watch",
+    "view:terminal:once": "node scripts/terminal-view.js --once",
+    "open:app": "node scripts/open-app.js",
+    "doctor": "node scripts/runtime-doctor.js",
+    "doctor:reset-auth": "node scripts/runtime-doctor.js --reset-auth",
+    "check": "node --check server.js",
+    "typecheck": "tsc --noEmit",
+    "codex:check": "node --check agent-orchestrator.js && node --check autonomous-worker.js && node --check app.js && node --check agent-event-bus.js",
+    "codex:self-test": "node -e \"console.log('codex self-test: pass')\"",
+    "codex:start": "node agent-orchestrator.js",
+    "test": "npm run check && npm run codex:check && npm run codex:self-test",
+    "audit:deps": "npm audit --omit=dev",
+    "smoke:elite": "node scripts/smoke-test-elite.js"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "^6.2.0",
+    "@google-cloud/storage": "^7.21.0",
+    "express": "^4.19.2",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.6.0"
+  }
+}

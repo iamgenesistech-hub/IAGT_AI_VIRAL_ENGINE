@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVICS Affiliate Product Workspace</title>
+    <style>
+      :root {
+        --bg: #07111b;
+        --panel: #0d1b2a;
+        --line: #22415f;
+        --text: #eef6ff;
+        --muted: #9fb6cf;
+        --brand: #25b5ff;
+        --ok: #26b56f;
+        --warn: #d89f45;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--text);
+        background: radial-gradient(circle at 0 0, rgba(37,181,255,.15), transparent 35%), linear-gradient(180deg, #081423, var(--bg));
+        font-family: "Segoe UI", "Arial Nova", Arial, sans-serif;
+      }
+      header {
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(8, 15, 24, .85);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+      }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      .muted { color: var(--muted); }
+      .wrap {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 360px 1fr;
+        padding: 16px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(15,29,44,.9), rgba(8,15,24,.95));
+        padding: 14px;
+      }
+      .stack { display: grid; gap: 10px; }
+      label span {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      input, select, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        color: var(--text);
+        background: #08111c;
+      }
+      textarea { min-height: 100px; }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: var(--text);
+        background: linear-gradient(180deg, #19314a, #0c1a2a);
+        cursor: pointer;
+      }
+      button:hover { border-color: #2f648f; }
+      .primary { background: linear-gradient(180deg, #2aa8ea, #1b6ea7); }
+      .ok { background: linear-gradient(180deg, #2ea36c, #1f6f49); }
+      .warn { background: linear-gradient(180deg, #d4a34b, #996f2a); }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+      .stats.four { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .stats.tight { margin-bottom: 10px; }
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        background: rgba(8, 15, 24, .65);
+      }
+      .stat strong { display: block; font-size: 24px; margin-top: 6px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td {
+        border-bottom: 1px solid #1e3348;
+        text-align: left;
+        padding: 8px 6px;
+        font-size: 13px;
+        vertical-align: top;
+      }
+      th { color: #bee1ff; font-weight: 600; }
+      td small { color: var(--muted); }
+      .toolbar { margin-bottom: 10px; }
+      .scroll { max-height: 68vh; overflow: auto; }
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 11px;
+        padding: 3px 8px;
+        color: var(--muted);
+      }
+      .kv { display:grid; gap:6px; margin-top:8px; }
+      .kv div { display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid #1d3244; padding-bottom:6px; }
+      .kv span:last-child { color:#dfefff; text-align:right; }
+      .mini { font-size:12px; color: var(--muted); }
+      .header-links { margin-top:8px; }
+      .add-title { margin:0; }
+      .field-half { flex:1; }
+      .toolbar-input { max-width:240px; }
+      .analytics-shell { margin-bottom:10px; background: rgba(8, 15, 24, .58); }
+      .analytics-header { justify-content:space-between; margin-bottom:8px; }
+      .analytics-controls { margin-bottom:8px; }
+      .analytics-select { max-width:180px; }
+      .analytics-search { max-width:260px; }
+      .analytics-list { min-width:220px; flex:1; }
+      .analytics-kpis { grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:10px; }
+      .status { min-height: 18px; color: #b8dcff; font-size: 12px; }
+      a { color: #8fd8ff; text-decoration: none; }
+      @media (max-width: 1100px) {
+        .wrap { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Affiliate Product Workspace</h1>
+      <div class="muted">View viral + high-commission products, add your own products, and activate them into the affiliate marketing engine.</div>
+      <div class="row header-links">
+        <a href="/workspace">Back to Workspace</a>
+        <a href="/affiliate-manual">Affiliate Manual</a>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="panel stack">
+        <h2 class="add-title">Add Product</h2>
+        <label><span>Track</span>
+          <select id="sourceTrack" title="Select product track">
+            <option value="viral">Viral Products</option>
+            <option value="high-commission">High-Commission Products</option>
+          </select>
+        </label>
+        <label><span>Title</span><input id="title" placeholder="Product name" /></label>
+        <label><span>Description</span><textarea id="description" placeholder="What affiliates should say about this product"></textarea></label>
+        <label><span>Category</span><input id="category" placeholder="beauty, software, electronics..." /></label>
+        <div class="row">
+          <label class="field-half"><span>Price (USD)</span><input id="price" type="number" step="0.01" /></label>
+          <label class="field-half"><span>Commission Rate (0-1)</span><input id="commissionRate" type="number" step="0.01" value="0.15" /></label>
+        </div>
+        <label><span>Affiliate Link</span><input id="affiliateLink" placeholder="https://... (optional)" /></label>
+        <label><span>Image URL</span><input id="imageUrl" placeholder="https://... (optional)" /></label>
+        <label><span>Source URL</span><input id="sourceUrl" placeholder="https://... (optional)" /></label>
+        <button id="addBtn" class="primary">Add Product To Catalog</button>
+        <div class="status" id="addStatus"></div>
+      </section>
+
+      <section class="panel">
+        <div class="stats four tight">
+          <div class="stat"><span class="muted">Total</span><strong id="totalCount">0</strong></div>
+          <div class="stat"><span class="muted">Viral</span><strong id="viralCount">0</strong></div>
+          <div class="stat"><span class="muted">High-Commission</span><strong id="highCount">0</strong></div>
+          <div class="stat"><span class="muted">Selected Affiliate</span><strong id="selectedAffiliateShort">None</strong></div>
+        </div>
+
+        <div class="panel analytics-shell">
+          <div class="row analytics-header">
+            <h2 class="add-title">Affiliate Analytics</h2>
+            <button id="saveSnapshotBtn" class="ok">Save Snapshot to GCS</button>
+          </div>
+          <div class="row analytics-controls">
+            <input id="affiliateQuery" class="analytics-search" placeholder="Search affiliate by name, code, or id" />
+            <select id="affiliateStatusFilter" class="analytics-select" title="Filter affiliates by status">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="pending">Pending</option>
+            </select>
+            <select id="affiliateSelect" class="analytics-list" title="Select affiliate to view analytics"></select>
+            <button id="loadAffiliateBtn" class="primary">Load Affiliate</button>
+          </div>
+          <div class="stats analytics-kpis">
+            <div class="stat"><span class="muted">Videos Sent</span><strong id="analyticsVideosSent">0</strong></div>
+            <div class="stat"><span class="muted">Purchases</span><strong id="analyticsPurchases">0</strong></div>
+            <div class="stat"><span class="muted">Revenue</span><strong id="analyticsRevenue">$0.00</strong></div>
+            <div class="stat"><span class="muted">Commission</span><strong id="analyticsCommission">$0.00</strong></div>
+          </div>
+          <div class="kv mini" id="affiliateDetail"></div>
+          <div class="status" id="affiliateStatus"></div>
+        </div>
+
+        <div class="panel analytics-shell">
+          <div class="row analytics-header">
+            <h2 class="add-title">Minor-Safe Access Controls</h2>
+            <button id="saveAccessBtn" class="primary">Save Access Controls</button>
+          </div>
+          <div class="row analytics-controls">
+            <label class="field-half"><span>Guardian Name</span><input id="guardianName" placeholder="Parent or guardian full name" /></label>
+            <label class="field-half"><span>Guardian Contact</span><input id="guardianContact" placeholder="email or phone" /></label>
+          </div>
+          <div class="row analytics-controls">
+            <label class="field-half"><span>Account Type</span>
+              <select id="isMinor" title="Select if affiliate is a minor">
+                <option value="false">Adult (18+)</option>
+                <option value="true">Minor (Under 18)</option>
+              </select>
+            </label>
+            <label class="field-half"><span>Adult Catalog Access</span>
+              <select id="adultCatalogAccessEnabled" title="Enable adult catalog only with guardian consent">
+                <option value="false">Disabled</option>
+                <option value="true">Enabled</option>
+              </select>
+            </label>
+          </div>
+          <div class="row analytics-controls">
+            <label class="field-half"><span>Guardian Consent</span>
+              <select id="parentalConsentRecorded" title="Record guardian consent">
+                <option value="false">Not Recorded</option>
+                <option value="true">Recorded</option>
+              </select>
+            </label>
+            <label class="field-half"><span>Consent Timestamp</span><input id="consentRecordedAt" placeholder="ISO timestamp (optional)" /></label>
+          </div>
+          <div class="mini">Adult catalog must stay disabled for minors unless guardian consent is recorded.</div>
+          <div class="status" id="accessStatus"></div>
+        </div>
+
+        <div class="toolbar row">
+          <select id="sourceFilter" title="Filter products by source">
+            <option value="all">All Sources</option>
+            <option value="viral">Viral</option>
+            <option value="high-commission">High-Commission</option>
+          </select>
+          <input id="search" class="toolbar-input" placeholder="Search title/category" />
+          <button id="refreshBtn" class="warn">Refresh</button>
+          <span class="pill" id="loadMeta">Ready</span>
+        </div>
+
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Track</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Commission</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="status" id="tableStatus"></div>
+      </section>
+    </main>
+
+    <script>
+      const rowsEl = document.getElementById("rows");
+      const totalCountEl = document.getElementById("totalCount");
+      const viralCountEl = document.getElementById("viralCount");
+      const highCountEl = document.getElementById("highCount");
+      const selectedAffiliateShortEl = document.getElementById("selectedAffiliateShort");
+      const tableStatusEl = document.getElementById("tableStatus");
+      const loadMetaEl = document.getElementById("loadMeta");
+      const affiliateQueryEl = document.getElementById("affiliateQuery");
+      const affiliateStatusFilterEl = document.getElementById("affiliateStatusFilter");
+      const affiliateSelectEl = document.getElementById("affiliateSelect");
+      const affiliateDetailEl = document.getElementById("affiliateDetail");
+      const affiliateStatusEl = document.getElementById("affiliateStatus");
+      const analyticsVideosSentEl = document.getElementById("analyticsVideosSent");
+      const analyticsPurchasesEl = document.getElementById("analyticsPurchases");
+      const analyticsRevenueEl = document.getElementById("analyticsRevenue");
+      const analyticsCommissionEl = document.getElementById("analyticsCommission");
+      const saveSnapshotBtn = document.getElementById("saveSnapshotBtn");
+      const loadAffiliateBtn = document.getElementById("loadAffiliateBtn");
+      const saveAccessBtn = document.getElementById("saveAccessBtn");
+      const accessStatusEl = document.getElementById("accessStatus");
+      const isMinorEl = document.getElementById("isMinor");
+      const adultCatalogAccessEnabledEl = document.getElementById("adultCatalogAccessEnabled");
+      const parentalConsentRecordedEl = document.getElementById("parentalConsentRecorded");
+      const guardianNameEl = document.getElementById("guardianName");
+      const guardianContactEl = document.getElementById("guardianContact");
+      const consentRecordedAtEl = document.getElementById("consentRecordedAt");
+
+      function esc(v) {
+        return String(v || "").replace(/[&<>\"']/g, (ch) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+      }
+
+      function money(value) {
+        return `$${Number(value || 0).toFixed(2)}`;
+      }
+
+      function selectedAffiliateId() {
+        return String(affiliateSelectEl.value || "").trim();
+      }
+
+      function boolToSelect(v) {
+        return v ? "true" : "false";
+      }
+
+      function readBoolean(selectEl) {
+        return String(selectEl.value || "false") === "true";
+      }
+
+      function enforceMinorPolicyInForm() {
+        const isMinor = readBoolean(isMinorEl);
+        const hasConsent = readBoolean(parentalConsentRecordedEl);
+        if (isMinor && !hasConsent) {
+          adultCatalogAccessEnabledEl.value = "false";
+        }
+      }
+
+      async function loadAccessControl(affiliateId) {
+        if (!affiliateId) {
+          accessStatusEl.textContent = "Select an affiliate to manage access controls.";
+          return;
+        }
+        accessStatusEl.textContent = "Loading access controls...";
+        try {
+          const res = await fetch(`/api/affiliate/access-controls/${encodeURIComponent(affiliateId)}`);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Unable to load access controls");
+          const control = data.accessControl || {};
+          isMinorEl.value = boolToSelect(Boolean(control.isMinor));
+          adultCatalogAccessEnabledEl.value = boolToSelect(Boolean(control.adultCatalogAccessEnabled));
+          parentalConsentRecordedEl.value = boolToSelect(Boolean(control.parentalConsentRecorded));
+          guardianNameEl.value = String(control.parentalContactName || "");
+          guardianContactEl.value = String(control.parentalContactMethod || "");
+          consentRecordedAtEl.value = String(control.parentalConsentRecordedAt || "");
+          enforceMinorPolicyInForm();
+          accessStatusEl.textContent = "Access controls loaded.";
+        } catch (err) {
+          accessStatusEl.textContent = err.message || "Access controls failed to load";
+        }
+      }
+
+      async function saveAccessControl() {
+        const affiliateId = selectedAffiliateId();
+        if (!affiliateId) {
+          accessStatusEl.textContent = "Select an affiliate before saving access controls.";
+          return;
+        }
+
+        enforceMinorPolicyInForm();
+        accessStatusEl.textContent = "Saving access controls...";
+        const payload = {
+          affiliateId,
+          isMinor: readBoolean(isMinorEl),
+          parentalConsentRecorded: readBoolean(parentalConsentRecordedEl),
+          parentalContactName: String(guardianNameEl.value || "").trim(),
+          parentalContactMethod: String(guardianContactEl.value || "").trim(),
+          parentalConsentRecordedAt: String(consentRecordedAtEl.value || "").trim() || null,
+          adultCatalogAccessEnabled: readBoolean(adultCatalogAccessEnabledEl)
+        };
+
+        try {
+          const res = await fetch("/api/affiliate/access-controls", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Unable to save access controls");
+          accessStatusEl.textContent = "Access controls saved.";
+          await loadProducts();
+        } catch (err) {
+          accessStatusEl.textContent = err.message || "Access controls failed to save";
+        }
+      }
+
+      function renderAffiliateDetail(data) {
+        const affiliate = data?.affiliate || {};
+        const progress = data?.progress || {};
+        const instrumentation = data?.instrumentation || {};
+        const performance = data?.performance || {};
+        const learning = data?.learningLoop || {};
+
+        selectedAffiliateShortEl.textContent = affiliate.code || affiliate.id || "None";
+        analyticsVideosSentEl.textContent = instrumentation.totalVideosSent || 0;
+        analyticsPurchasesEl.textContent = performance.purchases || 0;
+        analyticsRevenueEl.textContent = money(performance.grossRevenue || 0);
+        analyticsCommissionEl.textContent = money(performance.commissionEarned || 0);
+
+        affiliateDetailEl.innerHTML = `
+          <div><span>Affiliate</span><span>${esc(affiliate.name || "-")}</span></div>
+          <div><span>Code</span><span>${esc(affiliate.code || "-")}</span></div>
+          <div><span>Track / Tier</span><span>${esc(affiliate.track || "-")} / ${esc(progress.tier?.id || affiliate.tier || "-")}</span></div>
+          <div><span>Total Sales</span><span>${money(progress.totalSales || 0)}</span></div>
+          <div><span>Total Earnings</span><span>${money(progress.totalEarnings || 0)}</span></div>
+          <div><span>Pending Balance</span><span>${money(progress.pendingBalance || 0)}</span></div>
+          <div><span>Fully Instrumented Videos</span><span>${instrumentation.fullyInstrumented || 0}</span></div>
+          <div><span>Learning Loop</span><span>${esc((learning.recommendations || []).slice(0, 2).join(" | ") || "No learning notes yet")}</span></div>
+        `;
+      }
+
+      async function loadAffiliateSelector() {
+        affiliateStatusEl.textContent = "Loading affiliates...";
+        try {
+          const q = affiliateQueryEl.value.trim();
+          const status = affiliateStatusFilterEl.value;
+          const res = await fetch(`/api/affiliate/analytics/affiliates?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Unable to load affiliates");
+
+          const selector = data.selector || {};
+          const options = selector.options || [];
+          affiliateSelectEl.innerHTML = options.map((item) => `<option value="${esc(item.id)}" ${item.id === selector.selectedId ? "selected" : ""}>${esc(item.label)}</option>`).join("") || `<option value="">No affiliates found</option>`;
+          if (selector.selected) renderAffiliateDetail(selector.selected);
+          affiliateStatusEl.textContent = `Loaded ${options.length} affiliates.`;
+        } catch (err) {
+          affiliateStatusEl.textContent = err.message || "Affiliate lookup failed";
+        }
+      }
+
+      async function loadAffiliateAnalytics(affiliateId) {
+        if (!affiliateId) return;
+        affiliateStatusEl.textContent = `Loading analytics for ${affiliateId}...`;
+        try {
+          const res = await fetch(`/api/affiliate/analytics/${encodeURIComponent(affiliateId)}`);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Analytics load failed");
+          renderAffiliateDetail(data.analytics);
+          await loadAccessControl(affiliateId);
+          affiliateStatusEl.textContent = `Loaded analytics for ${data.analytics.affiliate?.name || affiliateId}.`;
+        } catch (err) {
+          affiliateStatusEl.textContent = err.message || "Analytics failed";
+        }
+      }
+
+      async function saveAffiliateSnapshot() {
+        const affiliateId = affiliateSelectEl.value;
+        if (!affiliateId) {
+          affiliateStatusEl.textContent = "Choose an affiliate before saving a snapshot.";
+          return;
+        }
+        affiliateStatusEl.textContent = "Saving snapshot...";
+        try {
+          const res = await fetch("/api/affiliate/analytics/snapshot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ affiliateId, trigger: "workspace", actor: "affiliate-workspace" })
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Snapshot failed");
+          affiliateStatusEl.textContent = data.snapshot?.storage?.gcs?.uploaded
+            ? `Snapshot saved to ${data.snapshot.storage.gcs.uri}`
+            : "Snapshot saved locally; GCS upload skipped or unavailable.";
+        } catch (err) {
+          affiliateStatusEl.textContent = err.message || "Snapshot failed";
+        }
+      }
+
+      async function loadProducts() {
+        const source = document.getElementById("sourceFilter").value;
+        const q = document.getElementById("search").value.trim();
+        const affiliateId = selectedAffiliateId();
+        loadMetaEl.textContent = "Loading...";
+        tableStatusEl.textContent = "";
+        try {
+          const url = `/api/affiliate/workspace/products?source=${encodeURIComponent(source)}&q=${encodeURIComponent(q)}&affiliateId=${encodeURIComponent(affiliateId)}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Load failed");
+
+          totalCountEl.textContent = data.total || 0;
+          viralCountEl.textContent = data.counts?.viral || 0;
+          highCountEl.textContent = data.counts?.highCommission || 0;
+          loadMetaEl.textContent = `Loaded ${data.total || 0}`;
+
+          rowsEl.innerHTML = (data.items || []).map((item) => {
+            const pct = Number(item.commissionRate || 0) * 100;
+            return `<tr>
+              <td><strong>${esc(item.title)}</strong><br /><small>${esc(item.description || "")}</small></td>
+              <td>${esc(item.source)}</td>
+              <td>${esc(item.category)}</td>
+              <td>$${Number(item.price || 0).toFixed(2)}</td>
+              <td>${pct.toFixed(1)}%</td>
+              <td>
+                <button data-id="${esc(item.id)}" class="ok activate-btn">Activate</button>
+              </td>
+            </tr>`;
+          }).join("") || `<tr><td colspan="6">No products found.</td></tr>`;
+
+          document.querySelectorAll(".activate-btn").forEach((btn) => {
+            btn.addEventListener("click", () => activateProduct(btn.getAttribute("data-id")));
+          });
+        } catch (err) {
+          loadMetaEl.textContent = "Load error";
+          tableStatusEl.textContent = err.message || "Failed to load products";
+        }
+      }
+
+      async function addProduct() {
+        const addStatus = document.getElementById("addStatus");
+        addStatus.textContent = "Saving...";
+        const payload = {
+          sourceTrack: document.getElementById("sourceTrack").value,
+          title: document.getElementById("title").value,
+          description: document.getElementById("description").value,
+          category: document.getElementById("category").value,
+          price: Number(document.getElementById("price").value || 0),
+          commissionRate: Number(document.getElementById("commissionRate").value || 0.15),
+          affiliateLink: document.getElementById("affiliateLink").value,
+          imageUrl: document.getElementById("imageUrl").value,
+          sourceUrl: document.getElementById("sourceUrl").value
+        };
+
+        try {
+          const res = await fetch("/api/affiliate/workspace/products/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Add failed");
+          addStatus.textContent = `Added: ${data.product.title}`;
+          await loadProducts();
+        } catch (err) {
+          addStatus.textContent = err.message || "Failed to add product";
+        }
+      }
+
+      async function activateProduct(productId) {
+        tableStatusEl.textContent = `Activating ${productId}...`;
+        try {
+          const res = await fetch("/api/affiliate/workspace/products/activate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId })
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Activate failed");
+          tableStatusEl.textContent = `${productId} activated for ${data.activatedForAffiliates}/${data.totalActiveAffiliates} active affiliates.`;
+        } catch (err) {
+          tableStatusEl.textContent = err.message || "Failed to activate product";
+        }
+      }
+
+      document.getElementById("refreshBtn").addEventListener("click", loadProducts);
+      document.getElementById("sourceFilter").addEventListener("change", loadProducts);
+      document.getElementById("search").addEventListener("input", () => {
+        clearTimeout(window.__searchDebounce);
+        window.__searchDebounce = setTimeout(loadProducts, 220);
+      });
+      document.getElementById("addBtn").addEventListener("click", addProduct);
+      loadAffiliateBtn.addEventListener("click", () => loadAffiliateAnalytics(affiliateSelectEl.value));
+      saveSnapshotBtn.addEventListener("click", saveAffiliateSnapshot);
+      saveAccessBtn.addEventListener("click", saveAccessControl);
+      isMinorEl.addEventListener("change", enforceMinorPolicyInForm);
+      parentalConsentRecordedEl.addEventListener("change", enforceMinorPolicyInForm);
+      affiliateSelectEl.addEventListener("change", async () => {
+        await loadAffiliateAnalytics(affiliateSelectEl.value);
+        await loadProducts();
+      });
+      affiliateQueryEl.addEventListener("input", () => {
+        clearTimeout(window.__affiliateSearchDebounce);
+        window.__affiliateSearchDebounce = setTimeout(loadAffiliateSelector, 220);
+      });
+      affiliateStatusFilterEl.addEventListener("change", loadAffiliateSelector);
+
+      loadAffiliateSelector();
+      loadProducts();
+    </script>
+  </body>
+</html>

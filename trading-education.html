@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="EVICS Trading" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>EVICS Certified Trader Program</title>
+  <link rel="manifest" href="/manifest.json" />
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --border:   #334155;
+      --accent:   #6366f1;
+      --gold:     #f59e0b;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --radius:   12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 22px; font-weight: 800; color: var(--accent); }
+    header .subtitle { font-size: 12px; color: var(--muted); }
+    header .back { margin-left: auto; color: var(--muted); text-decoration: none; font-size: 14px; }
+
+    /* ── Hero progress bar ──────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .hero p  { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .progress-track { background: var(--border); border-radius: 99px; height: 8px; overflow: hidden; }
+    .progress-fill  { background: linear-gradient(90deg, var(--accent), var(--gold)); height: 100%; border-radius: 99px; transition: width .5s ease; }
+    .progress-label { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .cert-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(34,197,94,.15); border: 1px solid var(--green);
+      border-radius: 99px; padding: 4px 12px; font-size: 12px; color: var(--green);
+      margin-top: 12px;
+    }
+    .cert-badge.locked { background: rgba(148,163,184,.1); border-color: var(--border); color: var(--muted); }
+
+    /* ── Gate banner ─────────────────────────────── */
+    .gate-banner {
+      margin: 16px 20px 0;
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.4);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 13px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .gate-banner .icon { font-size: 20px; flex-shrink: 0; }
+    .gate-banner.ok { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
+
+    /* ── Tab bar ─────────────────────────────────── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 0 20px;
+      margin-top: 20px;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      white-space: nowrap; padding: 10px 16px; font-size: 13px; font-weight: 600;
+      color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer;
+      transition: all .2s; flex-shrink: 0;
+    }
+    .tab.active { color: var(--text); border-color: var(--accent); }
+
+    /* ── Content sections ────────────────────────── */
+    .content { padding: 20px; }
+    .hidden { display: none !important; }
+
+    /* ── Level headers ───────────────────────────── */
+    .level-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      border-left: 3px solid var(--accent);
+      cursor: pointer;
+    }
+    .level-header.locked { border-left-color: var(--border); opacity: .7; cursor: default; }
+    .level-header.done   { border-left-color: var(--green); }
+    .level-number {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 13px; flex-shrink: 0;
+    }
+    .level-header.locked .level-number { background: var(--border); }
+    .level-header.done   .level-number { background: var(--green); }
+    .level-info { flex: 1; }
+    .level-info h3 { font-size: 14px; font-weight: 700; }
+    .level-info p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .level-arrow { color: var(--muted); font-size: 18px; }
+
+    /* ── Video card ──────────────────────────────── */
+    .video-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .video-card:hover { border-color: var(--accent); }
+    .video-card.completed { border-color: rgba(34,197,94,.5); }
+    .video-card.locked { opacity: .5; pointer-events: none; }
+    .video-card.buffett { border-color: rgba(245,158,11,.4); }
+
+    .video-thumb {
+      position: relative; aspect-ratio: 16/9;
+      background: #000; overflow: hidden;
+    }
+    .video-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .video-thumb .play-btn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 48px; height: 48px; background: rgba(99,102,241,.9); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      cursor: pointer; transition: transform .2s, background .2s;
+    }
+    .video-thumb .play-btn:hover { transform: translate(-50%,-50%) scale(1.1); background: var(--accent); }
+    .video-thumb .done-overlay {
+      position: absolute; inset: 0; background: rgba(34,197,94,.25);
+      display: flex; align-items: center; justify-content: center; font-size: 40px;
+    }
+    .buffett-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: var(--gold); color: #000;
+      font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px;
+    }
+    .video-thumb .locked-overlay {
+      position: absolute; inset: 0; background: rgba(15,23,42,.7);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; font-size: 13px; color: var(--muted);
+    }
+
+    .video-info { padding: 12px 14px; }
+    .video-info .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+    .video-info .tag {
+      font-size: 10px; padding: 2px 8px; border-radius: 99px;
+      background: rgba(99,102,241,.15); color: var(--accent); font-weight: 600;
+    }
+    .video-info .tag.gold { background: rgba(245,158,11,.15); color: var(--gold); }
+    .video-info .duration { font-size: 11px; color: var(--muted); }
+    .video-info h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .video-info p  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .video-info .source { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+    .complete-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 10px;
+      background: var(--accent); color: #fff;
+      border: none; cursor: pointer; font-weight: 700; font-size: 13px;
+      transition: background .2s;
+    }
+    .complete-btn:hover  { background: #4f46e5; }
+    .complete-btn.done   { background: rgba(34,197,94,.2); color: var(--green); cursor: default; }
+    .complete-btn.loading { opacity: .7; pointer-events: none; }
+
+    /* ── Disclaimer section ───────────────────────── */
+    .disclaimer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .disclaimer-card.done { border-color: rgba(34,197,94,.4); }
+    .disclaimer-header {
+      padding: 14px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+    }
+    .disclaimer-header .disc-icon { font-size: 20px; }
+    .disclaimer-header h4 { flex: 1; font-size: 14px; font-weight: 700; }
+    .disclaimer-header .disc-status { font-size: 20px; }
+    .disclaimer-body { padding: 16px; border-top: 1px solid var(--border); display: none; }
+    .disclaimer-body pre {
+      white-space: pre-wrap; font-family: inherit; font-size: 12px;
+      color: var(--muted); line-height: 1.7; max-height: 300px; overflow-y: auto;
+    }
+    .sign-btn {
+      width: 100%; margin-top: 14px; padding: 12px;
+      background: linear-gradient(90deg, var(--accent), #8b5cf6);
+      border: none; color: #fff; font-weight: 800; font-size: 14px;
+      border-radius: 8px; cursor: pointer;
+    }
+    .sign-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Certification card ───────────────────────── */
+    .cert-card {
+      background: linear-gradient(135deg, #1e1b4b 0%, #1e293b 100%);
+      border: 1px solid rgba(99,102,241,.5);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      text-align: center;
+    }
+    .cert-card.active { border-color: var(--gold); box-shadow: 0 0 30px rgba(245,158,11,.2); }
+    .cert-card .seal { font-size: 56px; margin-bottom: 12px; }
+    .cert-card h2 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+    .cert-card p  { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    .cert-id { font-size: 11px; color: var(--accent); letter-spacing: 2px; font-family: monospace; }
+    .trading-unlock-btn {
+      display: block; width: 100%; margin-top: 16px; padding: 14px;
+      background: linear-gradient(90deg, var(--gold), #f97316);
+      border: none; color: #000; font-weight: 800; font-size: 15px;
+      border-radius: 10px; cursor: pointer; text-decoration: none;
+      transition: opacity .2s;
+    }
+    .trading-unlock-btn:hover { opacity: .9; }
+
+    /* ── Buffett wisdom card ──────────────────────── */
+    .buffett-card {
+      background: linear-gradient(135deg, #1c1a0e, #1e293b);
+      border: 1px solid rgba(245,158,11,.4);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .buffett-card .header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .buffett-card .avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .buffett-card .name { font-weight: 800; font-size: 14px; color: var(--gold); }
+    .buffett-card .role { font-size: 11px; color: var(--muted); }
+    .principle-list { list-style: none; }
+    .principle-list li {
+      font-size: 13px; color: var(--muted); padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      padding-left: 20px; position: relative; line-height: 1.5;
+    }
+    .principle-list li:before {
+      content: "◆"; position: absolute; left: 0; color: var(--gold); font-size: 8px; top: 11px;
+    }
+    .principle-list li:last-child { border-bottom: none; }
+    .weight-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.3);
+      border-radius: 99px; padding: 4px 10px; font-size: 11px; color: var(--gold); font-weight: 700;
+      margin-top: 12px;
+    }
+
+    /* ── Consent Gate (full-screen blocking modal) ── */
+    #consentGate {
+      position: fixed; inset: 0; background: rgba(0,0,0,.97);
+      z-index: 9999; display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    .consent-wrap {
+      max-width: 600px; margin: 0 auto; padding: 24px 20px 40px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .consent-header { text-align: center; padding-top: 10px; }
+    .consent-header .seal { font-size: 48px; margin-bottom: 8px; }
+    .consent-header h1 { font-size: 20px; font-weight: 800; }
+    .consent-header p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .consent-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .consent-card .card-head {
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.03); border-bottom: 1px solid var(--border);
+    }
+    .consent-card .card-head h3 { font-size: 14px; font-weight: 700; flex: 1; }
+    .consent-card .card-head .badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 99px;
+      background: rgba(239,68,68,.2); color: var(--red); font-weight: 700;
+    }
+    .consent-card pre {
+      white-space: pre-wrap; font-family: inherit; font-size: 12px;
+      color: var(--muted); line-height: 1.7; padding: 14px 16px;
+      max-height: 200px; overflow-y: auto;
+    }
+    .fee-highlight {
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.4);
+      border-radius: var(--radius); padding: 16px 18px;
+    }
+    .fee-highlight h3 { font-size: 15px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
+    .fee-highlight p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .fee-example {
+      background: var(--surface); border-radius: 8px; padding: 12px 14px;
+      margin-top: 10px; font-size: 13px;
+    }
+    .fee-example .row { display: flex; justify-content: space-between; padding: 5px 0; }
+    .fee-example .row:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,.05); }
+    .risk-checklist { display: flex; flex-direction: column; gap: 10px; }
+    .risk-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+    .risk-check input[type=checkbox] {
+      width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;
+      accent-color: var(--accent); cursor: pointer;
+    }
+    .risk-check label { font-size: 13px; color: var(--muted); line-height: 1.5; cursor: pointer; }
+    .risk-check label strong { color: var(--text); }
+    .signature-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .signature-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .signature-box p { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+    #signatureInput {
+      width: 100%; padding: 12px 14px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 14px; font-family: inherit;
+    }
+    #signatureInput:focus { outline: none; border-color: var(--accent); }
+    #consentSubmitBtn {
+      width: 100%; padding: 15px; border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 800; cursor: pointer;
+      background: linear-gradient(90deg, var(--accent), #7c3aed);
+      color: #fff; transition: opacity .2s; letter-spacing: .5px;
+    }
+    #consentSubmitBtn:disabled { opacity: .35; cursor: default; }
+    .consent-footer {
+      text-align: center; font-size: 11px; color: var(--muted); line-height: 1.6;
+    }
+
+    /* ── Consent Gate (full-screen blocking modal) ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 8px 4px; font-size: 10px; color: var(--muted); cursor: pointer;
+      transition: color .2s; text-decoration: none;
+    }
+    .nav-item.active { color: var(--accent); }
+    .nav-item .nav-icon { font-size: 20px; margin-bottom: 2px; }
+    .page-padding { padding-bottom: 72px; }
+
+    /* ── Toast ───────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #1e293b; border: 1px solid var(--border);
+      color: var(--text); padding: 10px 20px; border-radius: 99px;
+      font-size: 13px; font-weight: 600; opacity: 0; transition: all .3s;
+      pointer-events: none; white-space: nowrap; z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: var(--green); color: var(--green); }
+
+    /* ── Responsive tweaks ───────────────────────── */
+    @media (min-width: 640px) {
+      .content { max-width: 680px; margin: 0 auto; }
+      .bottom-nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     CONSENT GATE — Blocks all content until affiliate signs.
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="consentGate">
+  <div class="consent-wrap">
+
+    <div class="consent-header">
+      <div class="seal">⚖️</div>
+      <h1>Trading Feature — Consent Required</h1>
+      <p>You must read and electronically sign all risk disclosures<br>before accessing trading education and investment features.</p>
+    </div>
+
+    <div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.5);border-radius:var(--radius);padding:16px 18px;">
+      <div style="font-size:16px;font-weight:800;color:var(--red);margin-bottom:10px;">⚠️ IMPORTANT RISK WARNING</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;">
+        Trading stocks and options involves <strong style="color:var(--text)">substantial risk of loss</strong>.
+        You may lose <strong style="color:var(--text)">some or all of your invested capital</strong>.
+        Options can expire <strong style="color:var(--text)">completely worthless (100% loss of premium)</strong>.
+        Past performance does not guarantee future results.
+        <strong style="color:var(--text)">Only invest money you can afford to lose entirely.</strong>
+      </p>
+      <div style="margin-top:12px;padding:10px 14px;background:rgba(0,0,0,.3);border-radius:8px;font-size:12px;color:var(--muted);font-style:italic;">
+        "Rule #1: Never lose money. Rule #2: Never forget Rule #1." — Warren Buffett, EVICS Chief Investment Advisor (3× Board Vote Weight)
+      </div>
+    </div>
+
+    <div class="fee-highlight">
+      <h3>💰 Platform Service Fee — 5% of Trading Profits</h3>
+      <p>EVICS charges a <strong style="color:var(--gold)">5% platform fee on net trading profits only</strong>.
+      This covers AI signal delivery, push notifications, Warren Buffett-governed trading advice, and platform operations.
+      <strong>No fee on losses. No monthly subscription.</strong></p>
+      <div class="fee-example">
+        <div class="row"><span style="color:var(--text)">Example: Trade profit</span><span style="color:var(--green);font-weight:700">$1,000.00</span></div>
+        <div class="row"><span>EVICS platform fee (5%)</span><span style="color:var(--red)">− $50.00</span></div>
+        <div class="row"><span>Your net profit</span><span style="color:var(--green);font-weight:800">$950.00</span></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px;">
+        Fees are transferred immediately to the EVICS company profit wallet (maintained in BTC/ETH).
+        Admin-only access. Full fee history is visible in your affiliate dashboard.
+      </p>
+    </div>
+
+    <div class="consent-card">
+      <div class="card-head"><span style="font-size:18px">📋</span><h3>1. General Investment Risks</h3><span class="badge">REQUIRED</span></div>
+      <pre>• Markets can rise AND fall — capital loss is always possible.
+• AI signals are algorithmic — they are NOT a guarantee of profit.
+• Economic events can cause sudden, extreme price movements.
+• You are solely responsible for all investment decisions made.
+• EVICS, its officers, and Board bear NO liability for trading losses.
+• Nothing here constitutes personalised financial advice.</pre>
+    </div>
+
+    <div class="consent-card">
+      <div class="card-head"><span style="font-size:18px">📉</span><h3>2. Options Trading Specific Risks</h3><span class="badge">REQUIRED</span></div>
+      <pre>• Options are COMPLEX — not suitable for all investors.
+• Options CAN expire completely worthless (100% loss of premium paid).
+• Theta decay erodes option value daily, even when direction is correct.
+• Selling uncovered options: theoretically unlimited loss potential.
+• Buffett advisory: derivatives are "financial weapons of mass destruction"
+  without full understanding and discipline.
+• Only covered calls and cash-secured puts recommended for beginners.</pre>
+    </div>
+
+    <div class="consent-card">
+      <div class="card-head"><span style="font-size:18px">🤖</span><h3>3. AI Signals & Platform Limitations</h3><span class="badge">REQUIRED</span></div>
+      <pre>• AI signals are trained on historical data — they CANNOT predict the future.
+• Signals may be delayed. High-confidence signals still fail regularly.
+• You must perform your own due diligence before acting on any signal.
+• Paper trade (simulate) for 30+ days before risking real capital.
+• Never allocate more than 5% of portfolio to a single signal-based trade.
+• EVICS does not independently verify third-party signal accuracy.</pre>
+    </div>
+
+    <div class="consent-card">
+      <div class="card-head"><span style="font-size:18px">₿</span><h3>4. Cryptocurrency & Wallet Risks</h3><span class="badge">REQUIRED</span></div>
+      <pre>• Crypto markets are SIGNIFICANTLY more volatile than traditional markets.
+• Digital assets have lost 50–90% of value in short periods historically.
+• Crypto transactions are IRREVERSIBLE — errors cannot be undone.
+• EVICS does not store, manage, or access your private keys.
+• Buffett advisory: "Cryptocurrencies basically have no value."
+  Exercise extreme caution with all digital asset investment.</pre>
+    </div>
+
+    <div class="consent-card" style="border-color:rgba(245,158,11,.5)">
+      <div class="card-head" style="background:rgba(245,158,11,.08)"><span style="font-size:18px">💰</span><h3>5. Platform Fee — 5% Profit Share</h3><span class="badge" style="background:rgba(245,158,11,.2);color:var(--gold)">FEE</span></div>
+      <pre>• EVICS charges 5% of NET PROFIT on every winning trade.
+• Fee is AUTOMATICALLY deducted when you report a profitable trade close.
+• Fee is immediately credited to the EVICS company profit wallet (BTC/ETH).
+• NO fee on losing or flat trades. NO hidden fees or subscriptions.
+• Fee covers: platform usage · AI signals · notifications · Buffett advisory.
+• Only registered EVICS administrators may withdraw from the company wallet.
+• Full fee history is always visible to you in your affiliate dashboard.</pre>
+    </div>
+
+    <div class="consent-card">
+      <div class="card-head"><span style="font-size:18px">🏛️</span><h3>6. Governance & Platform Terms</h3><span class="badge">REQUIRED</span></div>
+      <pre>• Governed by the EVICS Board of Directors — 6 roles + Warren Buffett (3× weight).
+• You must complete ALL 5 education levels before trading is activated.
+• You must be 18+ and legally permitted to invest in your jurisdiction.
+• Affiliate marketing earnings and investment activity are completely separate.
+• Accounts showing fraud or misuse may be suspended without notice.
+• EVICS may update these terms; material changes require re-acknowledgment.</pre>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;">
+      <h3 style="font-size:14px;font-weight:800;margin-bottom:14px">✅ I Acknowledge Each of the Following:</h3>
+      <div class="risk-checklist">
+        <label class="risk-check"><input type="checkbox" id="chk1" onchange="validateConsent()"><span><strong>I understand trading involves substantial risk and I may lose all invested capital.</strong></span></label>
+        <label class="risk-check"><input type="checkbox" id="chk2" onchange="validateConsent()"><span><strong>I understand options can expire completely worthless and carry amplified risks.</strong></span></label>
+        <label class="risk-check"><input type="checkbox" id="chk3" onchange="validateConsent()"><span><strong>I understand AI signals are not guaranteed and I will conduct my own research.</strong></span></label>
+        <label class="risk-check"><input type="checkbox" id="chk4" onchange="validateConsent()"><span><strong>I accept the 5% platform fee on all net trading profits generated through EVICS.</strong></span></label>
+        <label class="risk-check"><input type="checkbox" id="chk5" onchange="validateConsent()"><span><strong>I confirm I am 18 or older and legally permitted to invest in my jurisdiction.</strong></span></label>
+        <label class="risk-check"><input type="checkbox" id="chk6" onchange="validateConsent()"><span><strong>I have read all 6 disclosures above and accept all EVICS platform terms.</strong></span></label>
+      </div>
+    </div>
+
+    <div class="signature-box">
+      <h3>✍️ Electronic Signature</h3>
+      <p>Type exactly <strong style="color:var(--accent)">I AGREE AND ACCEPT</strong> to apply your legally binding electronic signature. Your signature is recorded with timestamp, IP address, and device information.</p>
+      <input id="signatureInput" type="text" placeholder="Type: I AGREE AND ACCEPT"
+        oninput="validateConsent()" autocomplete="off" spellcheck="false" />
+      <div id="sigError" style="font-size:11px;color:var(--red);margin-top:6px;display:none">⚠ Please type exactly: I AGREE AND ACCEPT</div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">👤 Your Affiliate ID</div>
+      <input id="consentAffiliateId" type="text" placeholder="Enter your Affiliate ID to record your consent"
+        style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit"
+        oninput="validateConsent()" />
+    </div>
+
+    <button id="consentSubmitBtn" disabled onclick="submitConsent()">
+      🔐 Sign All Disclosures &amp; Proceed to Training
+    </button>
+
+    <div class="consent-footer">
+      Your electronic signature is binding and stored with full audit trail.<br>
+      Governed by the EVICS Board of Directors · Warren Buffett Investment Advisory
+    </div>
+
+  </div>
+</div><!-- /#consentGate -->
+
+  <header>
+    <div>
+      <div class="logo">📈 EVICS</div>
+      <div class="subtitle">Certified Trader Program</div>
+    </div>
+    <a href="/affiliate" class="back">← Hub</a>
+  </header>
+
+  <!-- Hero: Progress Summary -->
+  <div class="hero">
+    <h1>Trading Certification</h1>
+    <p>Complete all 5 levels to unlock AI trading signals and wallet investing.</p>
+    <div class="progress-track">
+      <div class="progress-fill" id="heroProgressFill" style="width: 0%"></div>
+    </div>
+    <div class="progress-label">
+      <span id="progressText">0 of 15 modules completed</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="cert-badge locked" id="certBadge">🔒 Certification Locked</div>
+  </div>
+
+  <!-- Gate Banner -->
+  <div id="gateBanner" class="gate-banner">
+    <span class="icon">🚫</span>
+    <div>
+      <strong>Trading Feature Locked</strong><br>
+      <span style="font-size: 12px; color: var(--muted)">Complete all video modules and sign all risk disclosures to unlock AI trading signals and wallet investing.</span>
+    </div>
+  </div>
+
+  <!-- Affiliate ID Input -->
+  <div class="content" style="padding-top: 16px; padding-bottom: 0;">
+    <div style="background: var(--surface); border-radius: var(--radius); padding: 14px 16px; border: 1px solid var(--border); display: flex; gap: 10px; align-items: center;">
+      <span style="font-size: 16px;">👤</span>
+      <input id="affiliateIdInput" type="text" placeholder="Enter your Affiliate ID to track progress…"
+        style="flex: 1; background: none; border: none; color: var(--text); font-size: 13px; outline: none;" />
+      <button onclick="loadProgress()" style="background: var(--accent); border: none; color: #fff; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700;">Load</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('curriculum', this)">📚 Curriculum</div>
+    <div class="tab" onclick="showTab('disclaimers', this)">📋 Disclaimers</div>
+    <div class="tab" onclick="showTab('buffett', this)">💡 Buffett</div>
+    <div class="tab" onclick="showTab('certificate', this)">🏆 Certificate</div>
+  </div>
+
+  <!-- ── TAB: CURRICULUM ───────────────────────────── -->
+  <div id="tab-curriculum" class="content page-padding">
+    <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+      Complete all required modules in order. Each level unlocks after finishing the previous.
+    </p>
+    <div id="curriculumContainer">
+      <div style="text-align: center; padding: 40px; color: var(--muted); font-size: 13px;">
+        Enter your Affiliate ID above and tap <strong>Load</strong> to see your curriculum.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: DISCLAIMERS ──────────────────────────── -->
+  <div id="tab-disclaimers" class="content page-padding hidden">
+    <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+      Read and sign all risk disclosures before trading features are unlocked. Your electronic signature is recorded.
+    </p>
+    <div id="disclaimersContainer">Loading disclaimers…</div>
+  </div>
+
+  <!-- ── TAB: BUFFETT ──────────────────────────────── -->
+  <div id="tab-buffett" class="content page-padding hidden">
+    <div class="buffett-card">
+      <div class="header">
+        <div class="avatar">🎩</div>
+        <div>
+          <div class="name">Warren Buffett</div>
+          <div class="role">Chief Investment Advisor — EVICS Board</div>
+        </div>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6;">
+        Warren Buffett's investment principles govern all AI trading signals and recommendations on EVICS. 
+        His guidance carries <strong style="color: var(--gold)">3× the weight</strong> of any other board member on all investment decisions.
+      </p>
+      <ul class="principle-list" id="principleList">
+        <li>Loading principles…</li>
+      </ul>
+      <div class="weight-badge">⚖️ 3× Vote Weight on All Investment Decisions</div>
+    </div>
+
+    <div style="background: var(--surface); border-radius: var(--radius); padding: 16px; border: 1px solid var(--border); margin-bottom: 14px;">
+      <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--gold);">🎓 Buffett Video Highlights</h3>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5;">
+        These special modules from the curriculum are tagged with Buffett's approval and carry extra governance weight.
+        Complete them in Level 1, 2, 3, and 5.
+      </p>
+      <div id="buffettVideos"></div>
+    </div>
+
+    <div style="background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.3); border-radius: var(--radius); padding: 16px;">
+      <h3 style="font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 8px;">⚠️ Buffett's Standing Warnings</h3>
+      <ul style="list-style: none; font-size: 12px; color: var(--muted); line-height: 1.7;">
+        <li>🔴 <strong>Cryptocurrency:</strong> "Cryptocurrencies basically have no value." — Extreme caution required.</li>
+        <li>🔴 <strong>Options speculation:</strong> Derivatives are "financial weapons of mass destruction" without discipline.</li>
+        <li>🟡 <strong>Leverage:</strong> Never borrow to invest. Risk what you can afford to lose entirely.</li>
+        <li>🟡 <strong>FOMO:</strong> "Be fearful when others are greedy." Discipline beats timing.</li>
+        <li>🟢 <strong>Long-term:</strong> "Our favourite holding period is forever." Time cures most mistakes.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── TAB: CERTIFICATE ──────────────────────────── -->
+  <div id="tab-certificate" class="content page-padding hidden">
+    <div class="cert-card" id="certCard">
+      <div class="seal">🔒</div>
+      <h2 id="certTitle">Certification Locked</h2>
+      <p id="certDesc">Complete all 5 levels and sign all risk disclosures to earn your EVICS Certified Trader designation and unlock AI investment features.</p>
+      <div class="cert-id" id="certId">CERT-PENDING</div>
+    </div>
+
+    <div style="margin-top: 20px; background: var(--surface); border-radius: var(--radius); padding: 16px; border: 1px solid var(--border);">
+      <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">What you unlock:</h3>
+      <ul style="list-style: none; font-size: 13px; color: var(--muted); line-height: 1.9;">
+        <li>📡 Live AI trading signals from TradeAlgo</li>
+        <li>💼 Wallet investment feature — reinvest affiliate profits</li>
+        <li>🔔 Real-time buy/sell push notifications</li>
+        <li>📊 Warren Buffett-governed portfolio recommendations</li>
+        <li>🏆 EVICS Certified Trader badge on your profile</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a href="/affiliate" class="nav-item">
+      <span class="nav-icon">🏠</span> Hub
+    </a>
+    <a href="/trading-education" class="nav-item active">
+      <span class="nav-icon">📚</span> Training
+    </a>
+    <a href="/trading-signals" class="nav-item">
+      <span class="nav-icon">📡</span> Signals
+    </a>
+    <a href="/workspace" class="nav-item">
+      <span class="nav-icon">⚙️</span> Admin
+    </a>
+  </nav>
+
+  <div id="toast"></div>
+
+  <!-- YouTube video modal -->
+  <div id="videoModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:200; flex-direction:column; align-items:center; justify-content:center; padding: 20px;">
+    <div style="width:100%; max-width:680px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+        <span id="modalTitle" style="font-size: 14px; font-weight: 700; color: var(--text)"></span>
+        <button onclick="closeVideoModal()" style="background: none; border: none; color: var(--muted); font-size: 24px; cursor:pointer;">✕</button>
+      </div>
+      <div style="aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden;">
+        <iframe id="ytFrame" width="100%" height="100%" frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen style="border-radius: 10px;"></iframe>
+      </div>
+      <div style="margin-top: 14px;">
+        <button id="modalCompleteBtn" onclick="completeFromModal()" style="width:100%; padding: 13px; background: var(--green); border: none; color: #fff; font-weight: 800; font-size: 14px; border-radius: 10px; cursor: pointer;">
+          ✅ Mark as Completed
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let affiliateId = localStorage.getItem("evics_affiliate_id") || "";
+let curriculum   = [];
+let disclaimers  = [];
+let progress     = null;
+let currentModal = null;
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("affiliateIdInput").value = affiliateId;
+  checkConsentOnLoad();
+  loadDisclaimers();
+  loadBuffettPrinciples();
+  if (affiliateId) loadProgress();
+
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showToast(msg, type = "") {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "show " + type;
+  setTimeout(() => { t.className = ""; }, 3000);
+}
+
+function showTab(name, el) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  if (el) el.classList.add("active");
+  ["curriculum","disclaimers","buffett","certificate"].forEach(t => {
+    document.getElementById("tab-" + t).classList.toggle("hidden", t !== name);
+  });
+}
+
+function api(method, path, body) {
+  return fetch(path, {
+    method, headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(r => r.json());
+}
+
+// ── Load progress ─────────────────────────────────────────────────────────────
+async function loadProgress() {
+  affiliateId = document.getElementById("affiliateIdInput").value.trim();
+  if (!affiliateId) { showToast("Please enter your Affiliate ID"); return; }
+  localStorage.setItem("evics_affiliate_id", affiliateId);
+
+  const [currRes, certRes] = await Promise.all([
+    api("GET", `/api/trading/curriculum?affiliateId=${affiliateId}`),
+    api("GET", `/api/trading/certification/${affiliateId}`),
+  ]);
+
+  if (currRes.success) {
+    curriculum = currRes.curriculum;
+    renderCurriculum();
+  }
+
+  if (certRes.success) {
+    progress = certRes;
+    updateHeroProgress();
+    updateGateBanner();
+    updateCertificateTab();
+  }
+}
+
+// ── Update hero ───────────────────────────────────────────────────────────────
+function updateHeroProgress() {
+  if (!progress) return;
+  const { education } = progress;
+  const pct = Math.round((education.completedCount / education.requiredCount) * 100);
+  document.getElementById("heroProgressFill").style.width = pct + "%";
+  document.getElementById("progressText").textContent =
+    `${education.completedCount} of ${education.requiredCount} modules completed`;
+  document.getElementById("progressPct").textContent = pct + "%";
+
+  const badge = document.getElementById("certBadge");
+  if (education.certified && progress.disclaimers?.complete) {
+    badge.className = "cert-badge";
+    badge.textContent = "🏆 EVICS Certified Trader";
+  } else if (education.certified) {
+    badge.className = "cert-badge";
+    badge.textContent = "✅ Education Complete — Sign Disclosures";
+  }
+}
+
+function updateGateBanner() {
+  if (!progress) return;
+  const banner = document.getElementById("gateBanner");
+  if (progress.tradingAllowed) {
+    banner.className = "gate-banner ok";
+    banner.innerHTML = `<span class="icon">✅</span>
+      <div><strong>Trading Feature Unlocked!</strong><br>
+      <span style="font-size:12px;color:var(--muted)">You are certified and cleared to use AI trading signals and wallet investing.</span></div>`;
+  }
+}
+
+// ── Render curriculum ─────────────────────────────────────────────────────────
+function renderCurriculum() {
+  const container = document.getElementById("curriculumContainer");
+  if (!curriculum.length) { container.innerHTML = "<p style='color:var(--muted);text-align:center;padding:30px;font-size:13px;'>No curriculum data.</p>"; return; }
+
+  // Group by level
+  const levels = {};
+  curriculum.forEach(v => {
+    if (!levels[v.level]) levels[v.level] = { name: v.levelName, videos: [], allDone: true, locked: v.locked };
+    levels[v.level].videos.push(v);
+    if (!v.completed) levels[v.level].allDone = false;
+  });
+
+  let html = "";
+  Object.keys(levels).forEach(lvl => {
+    const l = levels[lvl];
+    const statusClass = l.allDone ? "done" : l.locked ? "locked" : "";
+    const icon = l.allDone ? "✅" : l.locked ? "🔒" : "▶";
+    html += `
+    <div class="level-header ${statusClass}" onclick="toggleLevel(${lvl})">
+      <div class="level-number">${icon === "▶" ? lvl : icon}</div>
+      <div class="level-info">
+        <h3>${l.name}</h3>
+        <p>${l.videos.filter(v=>v.completed).length} / ${l.videos.length} completed${l.locked ? " — Unlock previous level first" : ""}</p>
+      </div>
+      <span class="level-arrow" id="arrow-${lvl}">▼</span>
+    </div>
+    <div id="level-${lvl}" style="display:block; margin-bottom: 16px;">`;
+    l.videos.forEach(v => html += renderVideoCard(v, l.locked));
+    html += "</div>";
+  });
+
+  container.innerHTML = html;
+
+  // Render Buffett videos list in Buffett tab
+  const bv = curriculum.filter(v => v.buffettAlignment);
+  const bvContainer = document.getElementById("buffettVideos");
+  if (bvContainer) {
+    bvContainer.innerHTML = bv.map(v => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+        <span style="font-size:16px;">${v.completed ? "✅" : "⬜"}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;">${v.title}</div>
+          <div style="font-size:11px;color:var(--muted);">Level ${v.level} · ${v.duration}</div>
+        </div>
+        <span style="margin-left:auto;font-size:20px;">🎩</span>
+      </div>
+    `).join("");
+  }
+}
+
+function renderVideoCard(v, levelLocked) {
+  const isLocked = v.locked || levelLocked;
+  const thumbSrc = v.youtubeId
+    ? `https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`
+    : "/icons/icon-192.png";
+  const buffettTag = v.buffettAlignment ? `<span class="tag gold">🎩 Buffett</span>` : "";
+
+  return `
+  <div class="video-card ${v.completed ? "completed" : ""} ${isLocked ? "locked" : ""} ${v.buffettAlignment ? "buffett" : ""}">
+    <div class="video-thumb" onclick="${!isLocked && !v.completed ? `openVideoModal('${v.moduleId}', '${v.youtubeId || ""}', '${escapeJs(v.title)}')` : ""}">
+      <img src="${thumbSrc}" alt="${v.title}" loading="lazy" onerror="this.src='/icons/icon-192.png'" />
+      ${v.completed
+        ? `<div class="done-overlay">✅</div>`
+        : isLocked
+          ? `<div class="locked-overlay">🔒<span>Complete previous level</span></div>`
+          : `<div class="play-btn">▶</div>`}
+      ${v.buffettAlignment ? `<span class="buffett-badge">🎩 Buffett</span>` : ""}
+    </div>
+    <div class="video-info">
+      <div class="meta">
+        <span class="tag">L${v.level}</span>
+        ${buffettTag}
+        <span class="duration">⏱ ${v.duration}</span>
+      </div>
+      <h4>${v.title}</h4>
+      <p>${v.description}</p>
+      <div class="source">📺 ${v.source}</div>
+    </div>
+    <button class="complete-btn ${v.completed ? "done" : ""}"
+      ${isLocked ? "disabled" : ""}
+      onclick="markComplete('${v.moduleId}')">
+      ${v.completed ? "✅ Completed" : "Mark as Watched & Completed"}
+    </button>
+  </div>`;
+}
+
+function escapeJs(s) { return s.replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
+
+function toggleLevel(lvl) {
+  const el = document.getElementById("level-" + lvl);
+  const arrow = document.getElementById("arrow-" + lvl);
+  if (!el) return;
+  const hidden = el.style.display === "none";
+  el.style.display = hidden ? "block" : "none";
+  if (arrow) arrow.textContent = hidden ? "▼" : "▶";
+}
+
+// ── Mark video complete ────────────────────────────────────────────────────────
+async function markComplete(moduleId) {
+  if (!affiliateId) { showToast("Enter your Affiliate ID first"); return; }
+  const btn = document.querySelector(`button[onclick="markComplete('${moduleId}')"]`);
+  if (btn) { btn.textContent = "Saving…"; btn.classList.add("loading"); }
+
+  const res = await api("POST", "/api/trading/complete-module", { affiliateId, moduleId });
+  if (res.success) {
+    showToast("✅ Module completed!", "success");
+    await loadProgress();
+  } else {
+    showToast("Error: " + (res.error || "Could not save"), "");
+  }
+}
+
+// ── Video Modal ───────────────────────────────────────────────────────────────
+function openVideoModal(moduleId, youtubeId, title) {
+  currentModal = moduleId;
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("ytFrame").src = youtubeId
+    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1`
+    : "";
+  document.getElementById("videoModal").style.display = "flex";
+}
+
+function closeVideoModal() {
+  document.getElementById("videoModal").style.display = "none";
+  document.getElementById("ytFrame").src = "";
+  currentModal = null;
+}
+
+function completeFromModal() {
+  if (currentModal) {
+    closeVideoModal();
+    markComplete(currentModal);
+  }
+}
+
+// ── Disclaimers ───────────────────────────────────────────────────────────────
+async function loadDisclaimers() {
+  const afId = localStorage.getItem("evics_affiliate_id") || "";
+  const res = await api("GET", `/api/trading/disclaimers${afId ? "?affiliateId=" + afId : ""}`);
+  if (!res.success) return;
+  disclaimers = res.disclaimers;
+  const status = res.complianceStatus;
+  const signedIds = new Set(status ? status.pending.map(p => p.id) : []);
+  renderDisclaimers(signedIds);
+}
+
+function renderDisclaimers(pendingIds = new Set()) {
+  const container = document.getElementById("disclaimersContainer");
+  container.innerHTML = disclaimers.map(d => {
+    const signed = !pendingIds.has(d.id);
+    return `
+    <div class="disclaimer-card ${signed ? "done" : ""}">
+      <div class="disclaimer-header" onclick="toggleDisclaimer('disc-${d.id}')">
+        <span class="disc-icon">${signed ? "✅" : "📋"}</span>
+        <h4>${d.title}</h4>
+        <span class="disc-status">${signed ? "✅" : "▼"}</span>
+      </div>
+      <div class="disclaimer-body" id="disc-${d.id}">
+        <pre>${d.content}</pre>
+        <button class="sign-btn" id="sign-${d.id}"
+          onclick="signDisclaimer('${d.id}')"
+          ${signed ? "disabled" : ""}>
+          ${signed ? "✅ Signed & Acknowledged" : "✍️ I Have Read & I Acknowledge This Disclosure"}
+        </button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleDisclaimer(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === "block" ? "none" : "block";
+}
+
+async function signDisclaimer(disclaimerId) {
+  affiliateId = document.getElementById("affiliateIdInput").value.trim();
+  if (!affiliateId) { showToast("Enter your Affiliate ID first"); showTab("curriculum"); return; }
+
+  const btn = document.getElementById("sign-" + disclaimerId);
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+
+  const res = await api("POST", "/api/trading/disclaimers/acknowledge", { affiliateId, disclaimerId });
+  if (res.success) {
+    showToast("✅ Disclaimer signed", "success");
+    await loadDisclaimers();
+    await loadProgress();
+  } else {
+    showToast("Error: " + (res.error || "Could not save"), "");
+    if (btn) { btn.disabled = false; btn.textContent = "✍️ Acknowledge"; }
+  }
+}
+
+// ── Buffett principles ────────────────────────────────────────────────────────
+async function loadBuffettPrinciples() {
+  const res = await api("GET", "/api/governance/buffett-principles");
+  if (!res.success) return;
+  const list = document.getElementById("principleList");
+  if (list) {
+    list.innerHTML = res.investmentPrinciples.map(p => `<li>${p}</li>`).join("");
+  }
+}
+
+// ── Certificate tab ───────────────────────────────────────────────────────────
+function updateCertificateTab() {
+  if (!progress || !progress.tradingAllowed) return;
+  const card = document.getElementById("certCard");
+  card.className = "cert-card active";
+  document.getElementById("certTitle").textContent = "EVICS Certified Trader";
+  document.getElementById("certDesc").textContent =
+    "Congratulations! You have completed the full EVICS Certified Trader Program and are cleared to use all AI trading and investment features.";
+  const cert = progress.education?.certificate;
+  document.getElementById("certId").textContent = cert?.id || "CERT-ACTIVE";
+
+  const existing = document.getElementById("tradingUnlockBtn");
+  if (!existing) {
+    const btn = document.createElement("a");
+    btn.id = "tradingUnlockBtn";
+    btn.href = "/trading-signals";
+    btn.className = "trading-unlock-btn";
+    btn.textContent = "🚀 Go to Trading Signals →";
+    card.appendChild(btn);
+  }
+}
+
+// ── Consent Gate Logic ────────────────────────────────────────────────────────
+const CONSENT_KEY = "evics_consent_signed";
+
+function checkConsentOnLoad() {
+  const affiliateIdSaved = localStorage.getItem("evics_affiliate_id") || "";
+  const consentRecord = localStorage.getItem(CONSENT_KEY + "_" + affiliateIdSaved);
+  // Pre-fill affiliate ID from storage
+  const afInput = document.getElementById("consentAffiliateId");
+  if (afInput && affiliateIdSaved) afInput.value = affiliateIdSaved;
+  const gate = document.getElementById("consentGate");
+  // If already consented for this affiliate, hide gate; otherwise keep it visible.
+  if (consentRecord && affiliateIdSaved) {
+    if (gate) gate.style.display = "none";
+  } else if (gate) {
+    gate.style.display = "flex";
+  }
+}
+
+function validateConsent() {
+  const allChecked = ["chk1","chk2","chk3","chk4","chk5","chk6"]
+    .every(id => document.getElementById(id)?.checked);
+  const sig = (document.getElementById("signatureInput")?.value || "").trim().toUpperCase();
+  const afId = (document.getElementById("consentAffiliateId")?.value || "").trim();
+  const sigOk = sig === "I AGREE AND ACCEPT";
+  const errEl = document.getElementById("sigError");
+  if (errEl) errEl.style.display = (sig.length > 0 && !sigOk) ? "block" : "none";
+  const btn = document.getElementById("consentSubmitBtn");
+  if (btn) btn.disabled = !(allChecked && sigOk && afId.length > 0);
+}
+
+async function submitConsent() {
+  const afId = (document.getElementById("consentAffiliateId")?.value || "").trim();
+  if (!afId) { alert("Please enter your Affiliate ID."); return; }
+  const btn = document.getElementById("consentSubmitBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Recording signature…"; }
+
+  // Sign all required disclaimers via API
+  const disclaimerIds = ["general_risk","options_risk","ai_signals_risk","crypto_risk","platform_fee_consent","platform_terms"];
+  let allOk = true;
+  for (const disclaimerId of disclaimerIds) {
+    try {
+      const res = await fetch("/api/trading/disclaimers/acknowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ affiliateId: afId, disclaimerId }),
+      }).then(r => r.json());
+      if (!res.success) { allOk = false; console.warn("Failed:", disclaimerId, res.error); }
+    } catch(e) { allOk = false; }
+  }
+
+  if (allOk) {
+    // Store consent confirmation locally so gate doesn't re-show on page reload
+    localStorage.setItem("evics_affiliate_id", afId);
+    localStorage.setItem(CONSENT_KEY + "_" + afId, new Date().toISOString());
+    // Pre-fill main affiliate ID field
+    const mainInput = document.getElementById("affiliateIdInput");
+    if (mainInput) mainInput.value = afId;
+    affiliateId = afId;
+    // Hide the gate with a brief confirmation
+    if (btn) { btn.style.background = "var(--green)"; btn.textContent = "✅ Consent Recorded — Loading Training…"; }
+    setTimeout(() => {
+      document.getElementById("consentGate").style.display = "none";
+      loadProgress();
+      loadDisclaimers();
+    }, 1200);
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = "🔐 Sign All Disclosures & Proceed to Training"; }
+    showToast("There was an error recording your consent. Please try again.", "");
+  }
+}
+</script>
+</body>
+</html>

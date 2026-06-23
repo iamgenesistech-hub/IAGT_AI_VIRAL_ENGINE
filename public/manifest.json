@@ -1,0 +1,85 @@
+{
+  "name": "EVICS Elite Affiliate Platform",
+  "short_name": "EVICS",
+  "description": "Earn, invest, and grow — AI-powered affiliate marketing with trading signals governed by Warren Buffett principles.",
+  "start_url": "/affiliate",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "business", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "apple touch icon"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/affiliate-hub.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "EVICS Affiliate Hub"
+    },
+    {
+      "src": "/screenshots/trading-education.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Trading Education Portal"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Affiliate Dashboard",
+      "short_name": "Dashboard",
+      "description": "View earnings and stats",
+      "url": "/affiliate",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Trading Education",
+      "short_name": "Training",
+      "description": "Complete your certification",
+      "url": "/trading-education",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Trading Signals",
+      "short_name": "Signals",
+      "description": "Live investment signals",
+      "url": "/trading-signals",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.evics.affiliate",
+      "id": "com.evics.affiliate"
+    },
+    {
+      "platform": "itunes",
+      "url": "https://apps.apple.com/app/evics-elite-affiliate/id0000000000"
+    }
+  ],
+  "prefer_related_applications": false
+}

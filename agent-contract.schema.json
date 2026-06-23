@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evics.local/schemas/agent-contract.schema.json",
+  "title": "EVICS Agent Contract",
+  "type": "object",
+  "required": ["contractId", "taskId", "sourceAgent", "targetAgent", "objective", "status", "confidence", "evidence", "acceptanceCriteria", "createdAt", "updatedAt"],
+  "properties": {
+    "contractId": { "type": "string", "minLength": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "sourceAgent": { "type": "string", "minLength": 1 },
+    "targetAgent": { "type": "string", "minLength": 1 },
+    "objective": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["created", "approved", "blocked", "completed"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "evidence": {
+      "type": "array",
+      "items": { "oneOf": [{ "type": "string" }, { "type": "object" }] }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "inputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evaluation": {
+      "type": "object",
+      "required": ["decision", "score", "reasons", "evaluatedAt", "evaluator"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["approved", "blocked"] },
+        "score": { "type": "number" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "evaluatedAt": { "type": "string" },
+        "evaluator": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "minimumConfidence": { "type": "number" },
+    "nextAgent": { "type": "string" },
+    "evaluatedBy": { "type": "string" },
+    "evaluatedAt": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  },
+  "additionalProperties": true
+}

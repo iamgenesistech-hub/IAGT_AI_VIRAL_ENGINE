@@ -1,0 +1,163 @@
+{
+  "evidenceRunId": "agent-proof-1782014114657",
+  "mediaStatePath": "C:\\Users\\rolan\\Documents\\Codex\\2026-06-12\\my-evics-api-app-has-crashed\\work\\evics-repaired\\work\\qa\\media-ops-agent-proof-1782014114657.json",
+  "pipelineStatePath": "C:\\Users\\rolan\\Documents\\Codex\\2026-06-12\\my-evics-api-app-has-crashed\\work\\evics-repaired\\work\\qa\\pipeline-agent-proof-1782014114657.json",
+  "mediaId": "media-1782014114747-0",
+  "renderedOutput": {
+    "preview_url": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+    "playback_url": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    "render_status": "complete",
+    "publish_status": "published",
+    "quality_status": "Approved",
+    "quality_score": 92,
+    "delivery_status": "partial",
+    "delivery_destinations": {
+      "originSection": {
+        "id": "elite-executive-workspace",
+        "delivered": true,
+        "status": "delivered",
+        "deliveredAt": "2026-06-21T03:55:15.675Z",
+        "error": ""
+      },
+      "videoViewingArea": {
+        "delivered": true,
+        "status": "delivered",
+        "deliveredAt": "2026-06-21T03:55:15.675Z",
+        "error": ""
+      },
+      "googleWorkspace": {
+        "delivered": false,
+        "status": "failed",
+        "deliveredAt": null,
+        "reference": "proof-local",
+        "error": "Google Workspace storage did not complete; local registry retained the video."
+      }
+    }
+  },
+  "agentTouchChecklist": {
+    "product-match-worker": true,
+    "prompt-generation-worker": true,
+    "compiler-worker": true,
+    "video-twin-agent": true,
+    "render-provider-agent": true,
+    "quality-agent": true,
+    "review-agent": true,
+    "publisher-agent": true,
+    "office-agent": true
+  },
+  "allAgentsTouched": true,
+  "handoffs": [
+    {
+      "createdAt": "2026-06-21T03:55:14.755Z",
+      "actor": "owner-admin",
+      "lifecycle": "media.created",
+      "status": "info",
+      "message": "Agent Chain Proof Asset created in auto_assist mode."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.770Z",
+      "actor": "product-match-worker",
+      "lifecycle": "matched",
+      "status": "matched",
+      "message": "Product matching completed."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.777Z",
+      "actor": "prompt-generation-worker",
+      "lifecycle": "prompt_generated",
+      "status": "prompt_generated",
+      "message": "Elite video prompt generated."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.790Z",
+      "actor": "compiler-worker",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "message": "Compiler completed."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.796Z",
+      "actor": "compiler-worker",
+      "lifecycle": "compiled",
+      "status": "compiled",
+      "message": "Compiler output persisted."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.809Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "message": "Twin Agent accepted render submission."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.826Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "created",
+      "status": "created",
+      "message": "HeyGen render job created."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:14.831Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "render.queued",
+      "status": "info",
+      "message": ""
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.581Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "provider_failed",
+      "status": "provider_failed",
+      "message": "Provider request failed with 401: Unauthorized"
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.592Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "render.failed",
+      "status": "info",
+      "message": "Provider request failed with 401: Unauthorized"
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.649Z",
+      "actor": "video-twin-agent",
+      "lifecycle": "provider_failed",
+      "status": "provider_failed",
+      "message": "Provider request failed with 401: Unauthorized"
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.771Z",
+      "actor": "render-provider-agent",
+      "lifecycle": "render.completed.media.attached",
+      "status": "info",
+      "message": "Rendered video URL attached to Agent Chain Proof Asset."
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.894Z",
+      "actor": "quality-agent",
+      "lifecycle": "quality.checked",
+      "status": "info",
+      "message": "Approved / 92"
+    },
+    {
+      "createdAt": "2026-06-21T03:55:15.979Z",
+      "actor": "review-agent",
+      "lifecycle": "media.approve",
+      "status": "info",
+      "message": ""
+    },
+    {
+      "createdAt": "2026-06-21T03:55:16.130Z",
+      "actor": "publisher-agent",
+      "lifecycle": "media.publish_now",
+      "status": "info",
+      "message": ""
+    },
+    {
+      "createdAt": "2026-06-21T03:55:16.155Z",
+      "actor": "office-agent",
+      "lifecycle": "partial",
+      "status": "partial",
+      "message": "Office Agent verified delivery routing."
+    }
+  ]
+}

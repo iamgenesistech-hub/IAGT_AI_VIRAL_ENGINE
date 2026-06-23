@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVICS Admin Training — Interactive Walkthrough</title>
+  <style>
+    :root {
+      --bg:#07090f; --bg2:#0a0f1a; --panel:#0e1421; --line:#20314c;
+      --text:#ecf3ff; --muted:#8ca1c0; --sky:#42b7ff; --green:#22c07a;
+      --red:#cf4a57; --amber:#d89d45; --gold:#d2ab58;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body {
+      background: radial-gradient(circle at 15% -20%, rgba(80,46,183,0.35), transparent 40%),
+                  radial-gradient(circle at 85% 0%, rgba(46,146,214,0.25), transparent 32%),
+                  linear-gradient(180deg, var(--bg2), var(--bg));
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* ---- TOP BAR ---- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8,14,24,.92);
+      gap: 12px;
+    }
+    .topbar h1 { font-size: 17px; color: var(--gold); letter-spacing:.03em; }
+    .topbar .pill {
+      border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 10px; font-size: 12px; color: var(--muted);
+    }
+    .close-btn {
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 8px 14px; background: rgba(10,18,30,.9);
+      color: var(--text); cursor: pointer; font-size:13px;
+    }
+    .close-btn:hover { border-color: #2a4368; }
+    /* ---- LAYOUT ---- */
+    .player-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* ---- CHAPTER LIST ---- */
+    .chapters {
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(10,18,30,.94), rgba(8,14,24,.82));
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .chapters h2 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing:.08em; margin-bottom: 10px; }
+    .chapter-btn {
+      display: block; width: 100%; text-align: left;
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 9px 12px; background: rgba(12,20,34,.7);
+      color: var(--muted); cursor: pointer; margin-bottom: 6px;
+      font-size: 13px; transition: all .18s ease;
+    }
+    .chapter-btn:hover { color: var(--text); border-color: #2a4368; }
+    .chapter-btn.active {
+      color: var(--text); border-color: rgba(210,171,88,.75);
+      box-shadow: inset 3px 0 0 var(--gold);
+      background: rgba(18,32,52,.9);
+    }
+    .chapter-num { display: inline-block; width: 22px; color: var(--gold); font-size: 12px; }
+    /* ---- MAIN VIEWER ---- */
+    .viewer { display: flex; flex-direction: column; overflow: hidden; }
+    .slide-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 32px 36px 16px;
+      overflow-y: auto;
+      gap: 16px;
+    }
+    .slide-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid rgba(210,171,88,.5); border-radius: 999px;
+      padding: 5px 12px; background: rgba(20,36,60,.8);
+      font-size: 12px; color: var(--gold); width: fit-content;
+    }
+    .slide-badge .dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: var(--gold); animation: pulse 1.6s ease-in-out infinite;
+    }
+    .slide-title { font-size: 26px; font-weight: 700; color: #e8f0ff; line-height: 1.2; }
+    .slide-subtitle { font-size: 15px; color: var(--muted); line-height: 1.5; max-width: 700px; }
+    .slide-content { display: grid; gap: 12px; }
+    .step-card {
+      border: 1px solid var(--line); border-radius: 14px;
+      background: linear-gradient(180deg, rgba(15,23,36,.9), rgba(11,18,29,.92));
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 12px;
+      align-items: start;
+      animation: fadeSlide .35s ease both;
+    }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 999px;
+      border: 1px solid rgba(210,171,88,.6);
+      background: rgba(20,36,60,.8);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--gold); font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-body h3 { font-size: 14px; color: #d4e8ff; margin-bottom: 4px; }
+    .step-body p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .step-body .tag {
+      display: inline-flex; border: 1px solid var(--line); border-radius: 6px;
+      padding: 2px 8px; font-size: 11px; color: var(--sky);
+      background: rgba(66,183,255,.08); margin-right: 4px; margin-bottom: 4px;
+    }
+    .highlight-box {
+      border: 1px solid rgba(66,183,255,.35); border-radius: 12px;
+      background: rgba(66,183,255,.06); padding: 14px 16px;
+    }
+    .highlight-box h4 { font-size: 13px; color: var(--sky); margin-bottom: 6px; }
+    .highlight-box p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .warning-box {
+      border: 1px solid rgba(216,157,69,.35); border-radius: 12px;
+      background: rgba(216,157,69,.06); padding: 14px 16px;
+    }
+    .warning-box h4 { font-size: 13px; color: var(--amber); margin-bottom: 6px; }
+    .warning-box p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    /* ---- PROGRESS BAR ---- */
+    .progress-bar-wrap {
+      padding: 0 36px;
+      background: rgba(8,14,24,.5);
+    }
+    .progress-track {
+      height: 4px; border-radius: 999px;
+      background: rgba(255,255,255,.08); position: relative; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--sky), var(--gold));
+      transition: width .5s ease;
+    }
+    /* ---- CONTROLS ---- */
+    .controls {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 36px 18px;
+      border-top: 1px solid var(--line);
+      background: rgba(8,14,24,.7);
+    }
+    .ctrl-btn {
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 9px 16px; background: rgba(12,22,38,.9);
+      color: var(--text); cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; gap: 6px;
+      transition: all .2s ease;
+    }
+    .ctrl-btn:hover { border-color: #2a4368; transform: translateY(-1px); }
+    .ctrl-btn.primary { background: linear-gradient(180deg, #2e8fcc, #1f5f9f); border-color: transparent; }
+    .ctrl-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .auto-label { font-size: 12px; color: var(--muted); }
+    .slide-counter { font-size: 12px; color: var(--muted); margin-left: auto; }
+    .narration {
+      border: 1px solid var(--line); border-radius: 12px;
+      background: rgba(12,22,38,.8); padding: 12px 16px;
+      font-size: 13px; color: var(--muted); line-height: 1.55;
+      font-style: italic; display: flex; gap: 10px; align-items: flex-start;
+    }
+    .narration-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+    @keyframes fadeSlide { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>EVICS Admin Training</h1>
+    <span class="pill" id="auto-badge">Auto-play</span>
+  </div>
+  <span class="pill" id="chapter-label">Chapter 1 of 12</span>
+  <button class="close-btn" onclick="window.close()">Close &times;</button>
+</header>
+
+<div class="player-layout">
+  <!-- CHAPTER NAV -->
+  <nav class="chapters">
+    <h2>Chapters</h2>
+    <div id="chapter-list"></div>
+  </nav>
+
+  <!-- MAIN PLAYER -->
+  <div class="viewer">
+    <div class="slide-area" id="slide-area"></div>
+    <div class="progress-bar-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+    <div class="controls">
+      <button class="ctrl-btn" id="btn-prev">&#8592; Prev</button>
+      <button class="ctrl-btn primary" id="btn-play">&#9646;&#9646; Pause</button>
+      <button class="ctrl-btn" id="btn-next">Next &#8594;</button>
+      <span class="auto-label" id="auto-timer"></span>
+      <span class="slide-counter" id="slide-counter"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const SLIDE_DURATION = 12000; // ms each slide stays in auto-play
+
+const CHAPTERS = [
+  {
+    title: "Welcome",
+    badge: "Orientation",
+    slides: [
+      {
+        title: "Welcome to EVICS",
+        subtitle: "This training walkthrough guides you through every workspace, every button, and every decision path inside the EVICS Marketing Engine.",
+        narration: "Welcome, Admin. This video-style tour takes you step by step through every part of the EVICS system. You will learn where each workspace lives, what each button does, and the correct order to operate the app from start to finish.",
+        steps: [
+          { num: "▶", title: "What you will learn", body: "Every workspace purpose, every button function, daily workflow order, VP terminal commands, and governance checkpoints.", tags: ["Complete Tour"] },
+          { num: "→", title: "How to use this player", body: "Use Prev/Next to move between slides. Click any chapter in the left list to jump there. Auto-play advances every 12 seconds. Click Pause to stop.", tags: ["Navigation"] },
+          { num: "!", title: "Golden rule", body: "Always follow workflow order: Executive Nexus → Campaign Forge → Product Intelligence → Signal Intelligence → Executive Boardroom → Intelligence Lab.", tags: ["Critical"] }
+        ]
+      }
+    ]
+  },
+  {
+    title: "System Layout",
+    badge: "Layout",
+    slides: [
+      {
+        title: "EVICS Layout Overview",
+        subtitle: "Three zones: left workflow rail, center content area, right admin actions rail.",
+        narration: "The EVICS workspace is divided into three zones. The left navigation rail is your workflow pipeline map. The center content area is the active workspace. The right rail gives you admin quick actions.",
+        steps: [
+          { num: "1", title: "Left Navigation Rail", body: "Six workflow stage buttons in sequence order. Each button represents one phase of the production lifecycle. Click to enter that phase.", tags: ["Always Visible"] },
+          { num: "2", title: "Center Content Area", body: "Displays the active workspace. Everything you work with — drafts, scans, board decisions, evidence — appears here.", tags: ["Primary Workspace"] },
+          { num: "3", title: "Right Admin Actions Rail", body: "Shows pipeline status counts and quick-action buttons for media, board, manual, and VP terminal.", tags: ["Quick Access"] },
+          { num: "4", title: "Header Bar", body: "Master Power button, EVICS title, quick links to Products / Runtime / Workspace, and timeframe selector buttons.", tags: ["Top Bar"] }
+        ]
+      }
+    ]
+  },
+  {
+    title: "Top Bar Controls",
+    badge: "Top Bar",
+    slides: [
+      {
+        title: "Top Bar — Every Control Explained",
+        subtitle: "The top bar contains global runtime controls that affect the entire workspace.",
+        narration: "Start here every shift. The Master Power button activates the operational pulse. The navigation links take you to external views. The timeframe buttons adjust how telemetry metrics are calculated.",
+        steps: [
+          { num: "1", title: "Master Power (Triangle Button)", body: "Toggles the workspace between active and standby mode. Active mode enables animated telemetry and live orchestration feeds. Standby dims all cards.", tags: ["Toggle", "Runtime"] },
+          { num: "2", title: "Products Link", body: "Opens the Products Dashboard for catalog management and product setup. Use before running Product Intelligence scans.", tags: ["External Nav"] },
+          { num: "3", title: "Runtime Link", body: "Opens /status which shows server health, database connection, and active agent worker status. Check this if anything seems slow.", tags: ["Health Check"] },
+          { num: "4", title: "Workspace Link", body: "Returns to the main executive workspace view from any external page.", tags: ["Home"] },
+          { num: "5", title: "Timeframe Buttons (Live / Hourly / Daily ...)", body: "Controls how KPI and revenue estimates are scaled in the Executive Nexus dashboard. Live = current snapshot. Lifetime = cumulative view.", tags: ["KPI Scale", "Telemetry"] }
+        ],
+        highlight: { title: "Important: Master Power", body: "Always confirm Master Power is ON at the start of every shift. An inactive state disables animated telemetry and may cause misleading 'zero' readings on KPI tiles." }
+      }
+    ]
+  },
+  {
+    title: "Executive Nexus",
+    badge: "Stage 1",
+    slides: [
+      {
+        title: "Executive Nexus — Mission Control Start",
+        subtitle: "This is your shift start point. Every operation begins here. Run your scan, review KPIs, then proceed to the next stage.",
+        narration: "The Executive Nexus is stage one. This is your command dashboard. Each shift starts here by refreshing streams, running an executive scan, and reviewing all KPI tiles before moving any assets through the pipeline.",
+        steps: [
+          { num: "1", title: "KPI Tiles (Revenue, Profit, ROI...)", body: "Eight metric cards: Revenue Velocity, Profit Acceleration, Campaign ROI, Creator Velocity, Semantic Resonance, Viral Momentum, AI Activity Rate, Market Opportunity Index. Click any tile to navigate to its workspace.", tags: ["Metrics", "Navigation"] },
+          { num: "2", title: "Run Executive Scan", body: "Triggers the scanner to check all active media and pipeline state. Run this at the start of every shift before making any publish decisions.", tags: ["Critical Action"] },
+          { num: "3", title: "Refresh Streams", body: "Reloads all telemetry, pipeline counts, mission state, and live orchestration events. Use after any major system action.", tags: ["Refresh"] },
+          { num: "4", title: "Live AI Orchestration Stream", body: "Shows real-time events from the agent orchestration layer. Each entry is a handoff, event, or lifecycle milestone from the AI system.", tags: ["Live Feed"] },
+          { num: "5", title: "Executive Auto Render Viewer", body: "Plays the most recent completed render automatically. Use to quickly review the latest produced media. Enable/Disable Autoplay, Mute, and Fullscreen controls are available.", tags: ["Media Preview"] }
+        ],
+        warning: { title: "Shift Start Rule", body: "Never skip the Run Executive Scan step. Scanner findings determine whether publish decisions are safe. Proceed only when scan shows acceptable risk." }
+      }
+    ]
+  },
+  {
+    title: "Campaign Forge",
+    badge: "Stage 2",
+    slides: [
+      {
+        title: "Campaign Forge — Create and Render",
+        subtitle: "Build your draft scripts, send them to render, and manage assets through each production lane.",
+        narration: "Campaign Forge is where all media creation happens. You enter a title, write or paste a script, attach a source viral URL for quality comparison, and send the asset to the render queue. After render, you attach the provider result and the asset moves to board review.",
+        steps: [
+          { num: "1", title: "Title Field", body: "The name of the media asset. This is what identifies the asset through every pipeline stage and appears in board review and evidence records.", tags: ["Required"] },
+          { num: "2", title: "Script Field", body: "The video script content. This drives the render provider output. Keep it aligned with the source viral narrative for high similarity scores.", tags: ["Required"] },
+          { num: "3", title: "Source Viral Video URL", body: "URL of the reference viral video. This is used for quality comparison scoring in board review. Similarity score is shown when the asset reaches the boardroom.", tags: ["Required for Scoring"] },
+          { num: "4", title: "Save Draft", body: "Saves the asset as a draft without sending to render. Use to preserve work in progress.", tags: ["Save"] },
+          { num: "5", title: "Send to Render", body: "Queues the asset for render. Moves stage from draft to queued.", tags: ["Queue"] },
+          { num: "6", title: "Generate Video (in queue)", body: "Starts the render process for a queued asset. The asset moves to rendering state and waits for provider output.", tags: ["Render Start"] },
+          { num: "7", title: "Attach Provider Result", body: "After your render provider (HeyGen, Runway etc) produces the output, paste the preview URL and download URL here. This completes the render and moves the asset to board review.", tags: ["Complete Render"] }
+        ]
+      },
+      {
+        title: "Campaign Forge — Forge Board and Settings",
+        subtitle: "The Forge Board shows all assets in each production lane. Drag and drop to move assets between stages.",
+        narration: "Below the media creation form is the Forge Board. This is a four-lane Kanban showing Queue, Production Live, Board Review, and Deployment Ready. You can drag assets between lanes. The Autonomy Mode dropdown and Budget/Automation sliders control how aggressively the AI runs campaign logic.",
+        steps: [
+          { num: "1", title: "Autonomy Mode Dropdown", body: "Sets the AI execution posture: Manual, Assisted, Autonomous, Aggressive Autonomous, or Experimental AI. Start with Assisted while learning. Use Autonomous for standard operations.", tags: ["AI Control"] },
+          { num: "2", title: "Run AI Optimize", body: "Triggers the AI to analyze and optimize the current campaign configuration. Returns a deployment confidence score.", tags: ["Optimization"] },
+          { num: "3", title: "Budget Velocity Slider", body: "Controls spend ramp velocity across active campaigns. Higher values = more aggressive budget deployment.", tags: ["Budget"] },
+          { num: "4", title: "Automation Level Slider", body: "Controls the depth of automation applied during creative generation and variant testing.", tags: ["Automation"] },
+          { num: "5", title: "Show/Hide Media Studio", body: "Toggles the full Media Creation form inside Campaign Forge. When hidden, only the Forge Board is visible for clean pipeline management.", tags: ["View Toggle"] },
+          { num: "6", title: "Forge Board Lanes (Pipeline Queue / Production Live / Board Review / Deployment Ready)", body: "Drag-and-drop asset cards between lanes to move them. Assets must follow the transition rules: Draft → Queued → Rendering → Review Pending → Approved → Published.", tags: ["Pipeline Control"] }
+        ]
+      }
+    ]
+  },
+  {
+    title: "Product Intelligence",
+    badge: "Stage 3",
+    slides: [
+      {
+        title: "Product Intelligence — Viral Signal Discovery",
+        subtitle: "Scan each product for winning viral formats and revenue patterns before building campaign drafts.",
+        narration: "Product Intelligence is your research engine. Before creating any campaign content, run a VP-assist scan to discover which viral video formats perform best for each product. Use this data to guide your script writing in Campaign Forge.",
+        steps: [
+          { num: "1", title: "VP-Assist Scan (once)", body: "Runs one complete scan pass across all products. Finds top-5 viral formats per product and records them. Use this before every new campaign creation cycle.", tags: ["Recommended", "One-time"] },
+          { num: "2", title: "Continuous Scan (auto)", body: "Keeps the scanner running in a loop. Best for active campaign periods with high creative velocity. Stop when campaign is stable.", tags: ["Ongoing"] },
+          { num: "3", title: "Stop Scanner", body: "Stops any running product scan. Appears only when a scan is active.", tags: ["Stop"] },
+          { num: "4", title: "Refresh Status", body: "Pulls the latest product intelligence state from the backend. Use after any scan completes.", tags: ["Refresh"] },
+          { num: "5", title: "Top Products by Revenue", body: "Cards showing each product's published count, revenue, and format count. Click any product to see its top viral formats.", tags: ["Revenue Data"] },
+          { num: "6", title: "Platform Performance Leaderboard", body: "Which platforms (TikTok, Meta, YouTube, etc.) are generating the most revenue and impressions. Route content to high-performing platforms first.", tags: ["Platform Strategy"] },
+          { num: "7", title: "Video Type Performance", body: "Breakdown of which video formats (UGC, demo, transformation, etc.) are performing best. Match your scripts to winning formats.", tags: ["Format Strategy"] }
+        ],
+        highlight: { title: "How to use the results", body: "After the scan, look at Top Products and note the highest-revenue product and platform. Go to Campaign Forge and write scripts that match the top video type for that product/platform combination." }
+      }
+    ]
+  },
+  {
+    title: "Signal Intelligence",
+    badge: "Stage 4",
+    slides: [
+      {
+        title: "Signal Intelligence — Scanner Risk Digest",
+        subtitle: "Run scans and read the admin digest before making any board decisions.",
+        narration: "Signal Intelligence is your risk checkpoint. Before approving or publishing any asset, you must run a scan and confirm the digest shows acceptable risk levels. The scanner looks at media readiness, storage state, and governance conditions.",
+        steps: [
+          { num: "1", title: "Pause Scanner / Enable Scanner", body: "Toggles the scanner on or off. Green = enabled. Always leave enabled during active operations.", tags: ["Toggle"] },
+          { num: "2", title: "Run Scan", body: "Immediately triggers one scan cycle. Use before each board session.", tags: ["Critical Action"] },
+          { num: "3", title: "Refresh", body: "Reloads the latest scanner state without triggering a new scan.", tags: ["Refresh"] },
+          { num: "4", title: "Interval (minutes)", body: "How often the scanner auto-runs. Default is 60 minutes. Set lower during high-velocity campaigns.", tags: ["Setting"] },
+          { num: "5", title: "Duration (seconds)", body: "How long each scan cycle runs. Default is 45 seconds. Increase if you have large asset volumes.", tags: ["Setting"] },
+          { num: "6", title: "Save Scanner Settings", body: "Saves the interval and duration values to the backend. Always save after changing settings.", tags: ["Save"] },
+          { num: "7", title: "Severity Digest (High / Medium / Low tiles)", body: "Summary count of findings by severity. High = must resolve before publishing. Medium = review but may proceed. Low = informational only.", tags: ["Risk Assessment"] },
+          { num: "8", title: "Top Scanner Themes", body: "Top 5 recurring finding messages, deduplicated and ranked by frequency. These are actionable governance signals, not noise.", tags: ["Themes"] }
+        ],
+        warning: { title: "Publish Gate Rule", body: "If High count is greater than zero and you have board-ready assets, HOLD publish decisions until the high-severity items are resolved or documented as accepted risk." }
+      }
+    ]
+  },
+  {
+    title: "Executive Boardroom",
+    badge: "Stage 5",
+    slides: [
+      {
+        title: "Executive Boardroom — Forecast and Decisions",
+        subtitle: "The board is where you approve, rework, or publish assets after reviewing quality and risk signals.",
+        narration: "The Executive Boardroom has three sections: forecast cards at the top, review decisions in the middle, and publish decisions at the bottom. Every publish action in EVICS requires a board decision. There is no way to publish an asset without going through this workspace.",
+        steps: [
+          { num: "1", title: "Telemetry Source Card (Fallback / Live)", body: "Shows whether board forecasts are derived from live telemetry or safeguard defaults. Live = healthy. Fallback = telemetry warming up.", tags: ["System Status"] },
+          { num: "2", title: "Baseline / Downside / Upside Forecast Cards", body: "Three board scenarios with confidence, projected revenue, and ROI. Use these to assess campaign risk posture before publish decisions.", tags: ["Strategic"] },
+          { num: "3", title: "Capital Allocation Recommendations", body: "Recommended budget split across Paid Social, Creator Programs, Offer Testing, and Retention Flows. Follow when uncertain about budget distribution.", tags: ["Budget Guidance"] },
+          { num: "4", title: "VP Mission Status", body: "Shows active VP automated mission status — how many videos have been published, failed, or are pending in the current mission.", tags: ["Mission Monitor"] },
+          { num: "5", title: "Review Decisions (Approve / Request Rework)", body: "Assets in review state appear here with their preview video and source viral comparison. Compare both, then Approve or Request Rework.", tags: ["Critical Decision"] },
+          { num: "6", title: "Publish Now", body: "Moves an Approved asset to Published state. This is the final production action. Confirm no scanner blocks before clicking.", tags: ["Final Action"] }
+        ],
+        warning: { title: "Compare Before Approving", body: "Always watch both the source viral video and the EVICS render before clicking Approve. The similarity score shown on the card should be above 60 for a quality publish." }
+      }
+    ]
+  },
+  {
+    title: "Intelligence Lab",
+    badge: "Stage 6",
+    slides: [
+      {
+        title: "Intelligence Lab — Evidence and Audit",
+        subtitle: "Every published asset leaves a trace. This workspace is your audit and evidence archive.",
+        narration: "Intelligence Lab is the final stage of every workflow cycle. After publishing, confirm evidence completeness here. Check that source and render proof links exist, that pipeline records were created, and that timeline events captured the key lifecycle milestones.",
+        steps: [
+          { num: "1", title: "Media Registry", body: "Lists every asset by title and stage. Confirm all expected assets appear and are in their correct stage.", tags: ["Registry"] },
+          { num: "2", title: "Source vs Render Comparison", body: "Side-by-side evidence cards showing source viral URL and EVICS render URL for each asset. These are your publishable proof links.", tags: ["Evidence"] },
+          { num: "3", title: "Pipeline Evidence Runs", body: "Records from each pipeline run including all agent twin assignments (Product, Script, Video, Review, Publisher). These are governance artifacts.", tags: ["Pipeline Records"] },
+          { num: "4", title: "Agent Timeline Evidence", body: "Chronological log of all orchestration events. Each event shows actor, lifecycle stage, and timestamp. Required for audit-grade operations.", tags: ["Timeline", "Audit"] }
+        ],
+        highlight: { title: "End-of-Shift Checklist", body: "Before closing out for the day: (1) Confirm all published assets have source+render proof links. (2) Confirm timeline has entries covering the full lifecycle. (3) Leave scanner in enabled state at standard interval." }
+      }
+    ]
+  },
+  {
+    title: "VP Terminal",
+    badge: "VP System",
+    slides: [
+      {
+        title: "VP Terminal — Voice and Directive Control",
+        subtitle: "The VP button gives you supervisory executive control over the entire pipeline through typed or voice commands.",
+        narration: "The VP terminal is the most powerful control surface in EVICS. It allows you to issue mission-level directives that trigger automated workflows across the entire system. Use it for mission launches, ops mode control, and quick navigation — not for routine single-asset tasks.",
+        steps: [
+          { num: "1", title: "VP Button (floating, draggable)", body: "The VP launcher button is always visible on the left side of the screen. Click it to open the terminal. Drag it to reposition.", tags: ["Launcher"] },
+          { num: "2", title: "Start Voice / Stop Voice", body: "Activates microphone input for voice directives. Speak naturally. The transcript is shown and processed as a command.", tags: ["Voice Mode"] },
+          { num: "3", title: "Voice Status Bar", body: "Shows current voice mode state (listening / idle), last transcript, and last response. If voice fails, the error appears here.", tags: ["Status"] },
+          { num: "4", title: "Directive Text Box", body: "Type any directive here and click Run Directive to execute it. Supports all documented VP commands.", tags: ["Text Input"] },
+          { num: "5", title: "Run Directive", body: "Executes the typed directive.", tags: ["Execute"] },
+          { num: "6", title: "Open Board Ops", body: "Shortcut that opens the Executive Boardroom with full ops mode enabled.", tags: ["Shortcut"] },
+          { num: "7", title: "Refresh Mission", body: "Refreshes the current VP automated mission status from the backend.", tags: ["Mission"] },
+          { num: "8", title: "Lock / Unlock Ops", body: "Toggles ops mode. Unlocked = all advanced workspaces visible. Locked = admin-focus workflow only.", tags: ["Ops Gate"] },
+          { num: "9", title: "Mission Tracker", body: "When a mission is active, shows real-time Published / Failed / Pending counts for the current render-and-publish mission.", tags: ["Mission Monitor"] }
+        ],
+        highlight: { title: "Key VP Directives", body: "render and publish 5 videos — launches a 5-video mission.\nopen board — opens Executive Boardroom.\nrun scan — triggers Signal Intelligence scan.\nunlock ops mode — reveals all advanced workspaces.\nlock ops mode — returns to workflow-only admin view." }
+      }
+    ]
+  },
+  {
+    title: "Advanced Workspaces",
+    badge: "Advanced",
+    slides: [
+      {
+        title: "Advanced Workspaces — Located at Command Center Bottom",
+        subtitle: "Seven advanced control surfaces moved to the bottom of Executive Nexus to reduce admin confusion.",
+        narration: "These workspaces exist for advanced tuning and diagnostic operations. They were deliberately removed from the left navigation to keep the admin view clean. Access them from the Pipeline Workflow Map section at the bottom of Executive Nexus, or via the VP unlock ops directive.",
+        steps: [
+          { num: "1", title: "Viral Dynamics", body: "VER (Viral Engagement Ratio) policy editor. Set threshold scores, semantic weight, acceleration weight, creator trust, and engagement normalization sliders. Controls what content passes viral quality gates.", tags: ["VER Tuning"] },
+          { num: "2", title: "Market Heatmaps", body: "Interactive region/platform/creator/narrative/product drilldown with revenue density heatmap. Use to identify where to concentrate campaign spend.", tags: ["Market Intel"] },
+          { num: "3", title: "Creator Intelligence", body: "Connected app grid (HeyGen, Canva, Runway, etc.) with embed and launch controls. Also contains the Prompt Console for managing orchestration prompts.", tags: ["Creator Ops"] },
+          { num: "4", title: "Semantic Memory", body: "Pattern memory reference workspace. Shows AI semantic telemetry and memory signal state.", tags: ["AI Memory"] },
+          { num: "5", title: "Autonomous Ops", body: "Agent orchestration activity workspace showing autonomous operation state and controls.", tags: ["Agent Control"] },
+          { num: "6", title: "Strategic Forecasting", body: "Stage distribution view showing how many assets are in each pipeline stage. Used for capacity planning.", tags: ["Planning"] },
+          { num: "7", title: "System Core", body: "Runtime internals view with server health, worker status, jobs, governance, and board learning loop state. Diagnostic use only.", tags: ["Diagnostics"] }
+        ]
+      }
+    ]
+  },
+  {
+    title: "Daily Playbook",
+    badge: "Playbook",
+    slides: [
+      {
+        title: "Daily Admin Operating Playbook",
+        subtitle: "Follow this exact sequence every shift. Deviation from the order creates governance gaps.",
+        narration: "Your daily operations should follow this exact sequence every single time. This is not optional — it is the governance-compliant workflow that ensures your pipeline has complete evidence trails and no unexpected publish blocks.",
+        steps: [
+          { num: "AM", title: "Morning Startup (10 min)", body: "1. Open Executive Nexus. 2. Confirm Master Power ON. 3. Refresh Streams. 4. Run Executive Scan. 5. Review KPI anomalies. 6. Open Signal Intelligence and check digest.", tags: ["Morning"] },
+          { num: "→", title: "Asset Creation", body: "7. Open Product Intelligence and run VP-assist scan. 8. Review top products and winning video types. 9. Open Campaign Forge. 10. Write draft aligned to winning format. 11. Send to render.", tags: ["Creation"] },
+          { num: "→", title: "Board Cycle", body: "12. Attach provider render output to queued assets. 13. Open Executive Boardroom. 14. Review source vs render comparison. 15. Approve or rework. 16. Publish approved assets.", tags: ["Governance"] },
+          { num: "PM", title: "Midday Control Loop", body: "17. Re-run scan and review digest. 18. Resolve any new high-severity themes. 19. Validate VP mission throughput.", tags: ["Midday"] },
+          { num: "⬤", title: "End-of-Shift Closeout", body: "20. Publish any remaining approved assets. 21. Open Intelligence Lab and confirm evidence completeness. 22. Leave scanner in enabled state at standard interval.", tags: ["Closeout", "Required"] }
+        ],
+        warning: { title: "Non-Negotiable Rules", body: "1. Never publish without a prior scan in the same session.\n2. Never approve without watching both source and render.\n3. Always confirm Intelligence Lab has evidence entries at day end.\n4. Never leave ops mode unlocked if stepping away from the workspace." }
+      }
+    ]
+  }
+];
+
+// ---- PLAYER STATE ----
+let currentChapter = 0;
+let currentSlide = 0;
+let playing = true;
+let timer = null;
+let timerStart = null;
+let timerRemaining = SLIDE_DURATION;
+
+function totalSlides() {
+  let count = 0;
+  CHAPTERS.forEach(ch => ch.slides.forEach(() => count++));
+  return count;
+}
+function globalSlideIndex() {
+  let count = 0;
+  for (let c = 0; c < currentChapter; c++) count += CHAPTERS[c].slides.length;
+  return count + currentSlide;
+}
+function goToSlide(chIdx, sIdx) {
+  currentChapter = Math.max(0, Math.min(chIdx, CHAPTERS.length - 1));
+  currentSlide = Math.max(0, Math.min(sIdx, CHAPTERS[currentChapter].slides.length - 1));
+  clearAutoTimer();
+  renderSlide();
+  if (playing) startAutoTimer();
+}
+function nextSlide() {
+  if (currentSlide + 1 < CHAPTERS[currentChapter].slides.length) {
+    goToSlide(currentChapter, currentSlide + 1);
+  } else if (currentChapter + 1 < CHAPTERS.length) {
+    goToSlide(currentChapter + 1, 0);
+  }
+}
+function prevSlide() {
+  if (currentSlide > 0) {
+    goToSlide(currentChapter, currentSlide - 1);
+  } else if (currentChapter > 0) {
+    const prevCh = currentChapter - 1;
+    goToSlide(prevCh, CHAPTERS[prevCh].slides.length - 1);
+  }
+}
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
+  document.getElementById('auto-badge').textContent = playing ? 'Auto-play' : 'Paused';
+  if (playing) startAutoTimer(); else clearAutoTimer();
+}
+function clearAutoTimer() {
+  if (timer) { clearInterval(timer); timer = null; }
+  document.getElementById('auto-timer').textContent = '';
+}
+function startAutoTimer() {
+  clearAutoTimer();
+  timerStart = Date.now();
+  timerRemaining = SLIDE_DURATION;
+  let remaining = SLIDE_DURATION;
+  timer = setInterval(() => {
+    remaining -= 250;
+    if (remaining <= 0) {
+      clearAutoTimer();
+      const isLast = currentChapter === CHAPTERS.length - 1 && currentSlide === CHAPTERS[currentChapter].slides.length - 1;
+      if (!isLast) nextSlide();
+      else { playing = false; document.getElementById('btn-play').textContent = '▶ Play'; document.getElementById('auto-badge').textContent = 'Completed'; }
+    } else {
+      const secs = Math.ceil(remaining / 1000);
+      document.getElementById('auto-timer').textContent = 'next in ' + secs + 's';
+    }
+  }, 250);
+}
+function renderSlide() {
+  const ch = CHAPTERS[currentChapter];
+  const slide = ch.slides[currentSlide];
+  const global = globalSlideIndex();
+  const total = totalSlides();
+
+  // Update chapter list
+  const chapterList = document.getElementById('chapter-list');
+  chapterList.innerHTML = CHAPTERS.map((c, i) =>
+    '<button class="chapter-btn ' + (i === currentChapter ? 'active' : '') + '" data-cidx="' + i + '">' +
+    '<span class="chapter-num">' + (i + 1) + '.</span>' + escHtml(c.title) +
+    '</button>'
+  ).join('');
+  chapterList.querySelectorAll('[data-cidx]').forEach(btn => {
+    btn.addEventListener('click', () => goToSlide(Number(btn.dataset.cidx), 0));
+  });
+
+  // Chapter label
+  document.getElementById('chapter-label').textContent = 'Chapter ' + (currentChapter + 1) + ' of ' + CHAPTERS.length;
+  document.getElementById('slide-counter').textContent = 'Slide ' + (global + 1) + ' / ' + total;
+
+  // Progress bar
+  document.getElementById('progress-fill').style.width = ((global + 1) / total * 100) + '%';
+
+  // Slide area
+  const area = document.getElementById('slide-area');
+  const stepsHtml = (slide.steps || []).map((step, i) =>
+    '<div class="step-card" style="animation-delay:' + (i * 0.06) + 's">' +
+    '<div class="step-num">' + escHtml(String(step.num)) + '</div>' +
+    '<div class="step-body"><h3>' + escHtml(step.title) + '</h3><p>' + escHtml(step.body) + '</p>' +
+    (step.tags ? '<div style="margin-top:8px">' + step.tags.map(t => '<span class="tag">' + escHtml(t) + '</span>').join('') + '</div>' : '') +
+    '</div></div>'
+  ).join('');
+
+  const highlightHtml = slide.highlight ?
+    '<div class="highlight-box"><h4>&#9432; ' + escHtml(slide.highlight.title) + '</h4><p style="white-space:pre-line">' + escHtml(slide.highlight.body) + '</p></div>' : '';
+  const warningHtml = slide.warning ?
+    '<div class="warning-box"><h4>&#9888; ' + escHtml(slide.warning.title) + '</h4><p style="white-space:pre-line">' + escHtml(slide.warning.body) + '</p></div>' : '';
+  const narrationHtml = slide.narration ?
+    '<div class="narration"><span class="narration-icon">&#127908;</span><span>' + escHtml(slide.narration) + '</span></div>' : '';
+
+  area.innerHTML =
+    '<div><span class="slide-badge"><span class="dot"></span>' + escHtml(ch.badge) + '</span></div>' +
+    '<h1 class="slide-title">' + escHtml(slide.title) + '</h1>' +
+    '<p class="slide-subtitle">' + escHtml(slide.subtitle) + '</p>' +
+    narrationHtml +
+    '<div class="slide-content">' + stepsHtml + '</div>' +
+    highlightHtml + warningHtml;
+
+  // Button states
+  document.getElementById('btn-prev').disabled = global === 0;
+  document.getElementById('btn-next').disabled = global === total - 1;
+  area.scrollTop = 0;
+}
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
+document.getElementById('btn-prev').addEventListener('click', () => { clearAutoTimer(); prevSlide(); if (playing) startAutoTimer(); });
+document.getElementById('btn-next').addEventListener('click', () => { clearAutoTimer(); nextSlide(); if (playing) startAutoTimer(); });
+document.getElementById('btn-play').addEventListener('click', togglePlay);
+
+renderSlide();
+startAutoTimer();
+</script>
+</body>
+</html>

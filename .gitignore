@@ -1,0 +1,85 @@
+# =========================
+# 🔥 NODE + PACKAGE
+# =========================
+node_modules/
+npm-cache/
+package-lock.json
+
+# =========================
+# 🔥 NEXT.JS / BUILD
+# =========================
+.next/
+out/
+build/
+dist/
+
+# =========================
+# 🔥 ENV & SECRETS (CRITICAL)
+# =========================
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Custom env files in your project
+.env.fill-me-next
+ENV_FILL_ME_NEXT.env
+
+# Secret/state configs
+secrets-vault.local.json
+shopify-oauth-token.local.json
+brand-profiles.local.json
+owner-ai-directives.local.json
+office-agent-state.local.json
+agent-runs.local.json
+media-ops-state.local.json
+media-ops-evidence.local.json
+
+# Any local-only JSON configs
+*.local.json
+
+# =========================
+# 🔥 LOGS & TEMP FILES
+# =========================
+*.log
+evics-log.txt
+logs/
+
+# =========================
+# 🔥 OS / EDITOR FILES
+# =========================
+.vscode/
+.DS_Store
+Thumbs.db
+*.lnk
+
+# =========================
+# 🔥 LOCAL BACKUPS / TUNNELS
+# =========================
+.backup-key.local
+.backups/
+ngrok.local.yml
+
+# =========================
+# 🔥 TYPESCRIPT CACHE
+# =========================
+tsconfig.tsbuildinfo
+
+# =========================
+# 🔥 RUNTIME / TEMP SYSTEMS
+# =========================
+evics-runtime/
+tmp/
+temp/
+
+# =========================
+# 🔥 TEST OUTPUT / CACHE
+# =========================
+coverage/
+.cache/
+
+# =========================
+# 🔥 OPTIONAL (if added later)
+# =========================
+.vercel/
+.firebase/

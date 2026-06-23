@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --evics-bg-900: #020617;
+  --evics-bg-800: #0b1220;
+  --evics-accent: #20c997;
+  --evics-accent-soft: #96f2d7;
+  --evics-text: #e6edf7;
+  --evics-muted: #95a3bc;
+}
+
+body {
+  margin: 0;
+  background: var(--evics-bg-900);
+  color: var(--evics-text);
+  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", "Helvetica Neue", sans-serif;
+  text-rendering: optimizeLegibility;
+}

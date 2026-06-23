@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-06-22T21:34:48.135Z",
+  "baseUrl": "http://localhost:8080",
+  "passCount": 7,
+  "failCount": 0,
+  "checks": [
+    {
+      "name": "Status endpoint",
+      "pass": true,
+      "detail": "Server status is reachable",
+      "data": null
+    },
+    {
+      "name": "Affiliate registration",
+      "pass": true,
+      "detail": "affiliateId=aff_961ebb52aa4d",
+      "data": null
+    },
+    {
+      "name": "Track switch",
+      "pass": true,
+      "detail": "track=high-commission",
+      "data": null
+    },
+    {
+      "name": "Daily digest delivery",
+      "pass": true,
+      "detail": "unreadCount=2",
+      "data": null
+    },
+    {
+      "name": "Backup create",
+      "pass": true,
+      "detail": "backupId=backup_1782164089453_26c96b78",
+      "data": null
+    },
+    {
+      "name": "Backup restore",
+      "pass": true,
+      "detail": "restoredRecords=35",
+      "data": null
+    },
+    {
+      "name": "Governance audit",
+      "pass": true,
+      "detail": "entries=5",
+      "data": null
+    }
+  ]
+}

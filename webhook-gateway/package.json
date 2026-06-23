@@ -1,0 +1,12 @@
+{
+  "name": "evics-webhook-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "main": "webhook-server.js",
+  "scripts": {
+    "start": "node webhook-server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

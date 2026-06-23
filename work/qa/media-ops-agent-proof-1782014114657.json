@@ -1,0 +1,286 @@
+{
+  "operatingMode": "auto_assist",
+  "scanner": {
+    "enabled": true,
+    "continuous": true,
+    "intervalMinutes": 60,
+    "durationSeconds": 45,
+    "scope": "all_outputs",
+    "lastRunAt": null,
+    "status": "Ready"
+  },
+  "media": [
+    {
+      "id": "media-1782014114747-0",
+      "title": "Agent Chain Proof Asset",
+      "description": "Sea Moss Capsules supports daily mineral balance and natural energy.",
+      "campaign_id": "unassigned",
+      "created_by": "owner-admin",
+      "created_source": "system",
+      "origin_section_id": "elite-executive-workspace",
+      "originating_request_id": "media-1782014114747-0",
+      "agent_orchestration_id": "",
+      "mode_at_creation": "auto_assist",
+      "media_type": "video",
+      "file_name": "agent-chain-proof-asset.mp4",
+      "mime_type": "video/mp4",
+      "file_size_bytes": 0,
+      "duration_seconds": 0,
+      "width": 0,
+      "height": 0,
+      "storage_location": "hot",
+      "playback_url": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+      "preview_url": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+      "thumbnail_url": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+      "hot_storage_reference": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+      "google_drive_file_id": "",
+      "google_drive_folder_id": "",
+      "google_drive_web_view_link": "",
+      "product_url": "https://iamgenesistech.com/products/sea-moss-capsules",
+      "buy_now_label": "Buy Now",
+      "buy_now_url": "https://iamgenesistech.com/products/sea-moss-capsules",
+      "buy_now_message": "Please click link to get all the product information you need to know",
+      "buy_now_message_lines": [
+        "Please click link to get all the",
+        "product information you need to know"
+      ],
+      "metadata_json": {
+        "sourceViralUrl": "https://example.com/source-viral.mp4",
+        "sourceViralThumbnail": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+        "productName": "Sea Moss Capsules",
+        "productImageUrl": "https://cdn.shopify.com/s/files/1/0581/4515/3461/files/SeaMossCapsulesBottle.png",
+        "spokenScript": "Sea Moss Capsules supports daily mineral balance and natural energy.",
+        "productUrl": "https://iamgenesistech.com/products/sea-moss-capsules",
+        "buyNow": {
+          "label": "Buy Now",
+          "url": "https://iamgenesistech.com/products/sea-moss-capsules",
+          "message": "Please click link to get all the product information you need to know",
+          "messageLines": [
+            "Please click link to get all the",
+            "product information you need to know"
+          ],
+          "alignment": "center",
+          "requiredForRenderedMedia": true
+        },
+        "originSectionId": "elite-executive-workspace",
+        "origin_section_id": "elite-executive-workspace",
+        "brandProfileEnforced": false,
+        "renderedMediaUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+        "renderedThumbnailUrl": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=1200",
+        "renderJobId": "proof-render-job",
+        "providerRenderJobId": "proof-provider-job",
+        "ctaWindowSeconds": 9
+      },
+      "tags_json": [],
+      "target_platforms_json": [
+        "TikTok",
+        "Instagram",
+        "YouTube"
+      ],
+      "approval_required": true,
+      "approval_status": "approved",
+      "approved_by": "review-agent",
+      "approved_at": "2026-06-21T03:55:15.953Z",
+      "rejection_reason": "",
+      "publish_status": "published",
+      "render_status": "complete",
+      "render_job_id": "proof-render-job",
+      "provider_render_job_id": "proof-provider-job",
+      "last_render_error": "",
+      "error_code": "",
+      "retry_eligible": false,
+      "rework_eligible": false,
+      "delivery_status": "partial",
+      "delivery_destinations_json": {
+        "originSection": {
+          "id": "elite-executive-workspace",
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "videoViewingArea": {
+          "delivered": true,
+          "status": "delivered",
+          "deliveredAt": "2026-06-21T03:55:15.675Z",
+          "error": ""
+        },
+        "googleWorkspace": {
+          "delivered": false,
+          "status": "failed",
+          "deliveredAt": null,
+          "reference": "proof-local",
+          "error": "Google Workspace storage did not complete; local registry retained the video."
+        }
+      },
+      "delivery_errors_json": [
+        "Google Workspace storage did not complete; local registry retained the video."
+      ],
+      "routed_to_origin_at": "2026-06-21T03:55:15.675Z",
+      "indexed_in_video_viewing_area_at": "2026-06-21T03:55:15.675Z",
+      "saved_to_google_workspace_at": null,
+      "video_viewing_area_visible": true,
+      "primary_viewing_area_visible": true,
+      "validation_status": "valid",
+      "readiness_score": 86,
+      "hot_storage_expires_at": "2026-06-22T15:55:14.747Z",
+      "migration_due_at": "2026-06-22T15:55:14.747Z",
+      "migrated_to_google_at": null,
+      "archive_status": "hot",
+      "scanner_recommended": false,
+      "created_at": "2026-06-21T03:55:14.747Z",
+      "updated_at": "2026-06-21T03:55:16.090Z",
+      "render_metadata_json": {
+        "renderJobLifecycle": "ready_for_compiler",
+        "compilerOutputId": "compiler-media-1782014114747-0",
+        "provider": "HeyGen",
+        "updatedBy": "video-twin-agent",
+        "mode": "live_provider_submit",
+        "readiness": {
+          "configured": true,
+          "ready": true,
+          "error": "",
+          "errorCode": "",
+          "missing": []
+        },
+        "note": "EVICS submits to the provider and polls until a direct playable media URL is returned."
+      },
+      "quality_score": 92,
+      "quality_status": "Approved",
+      "quality_checked_at": "2026-06-21T03:55:15.813Z",
+      "quality_json": {
+        "qualityScore": 92,
+        "status": "Approved",
+        "checkedAt": "2026-06-21T03:55:15.813Z",
+        "notes": "Agent-proof quality pass."
+      }
+    }
+  ],
+  "dispatches": [
+    {
+      "id": "dispatch-1782014116092-0",
+      "media_id": "media-1782014114747-0",
+      "platform": "TikTok",
+      "provider": "tiktok",
+      "status": "published",
+      "attempts": 1,
+      "last_error": "",
+      "queued_at": "2026-06-21T03:55:16.092Z",
+      "published_at": "2026-06-21T03:55:16.092Z",
+      "actor": "publisher-agent"
+    }
+  ],
+  "scanRuns": [],
+  "findings": [],
+  "auditEvents": [
+    {
+      "id": "audit-1782014116092-8",
+      "actor": "publisher-agent",
+      "action": "media.publish_now",
+      "mediaId": "media-1782014114747-0",
+      "detail": "",
+      "createdAt": "2026-06-21T03:55:16.092Z"
+    },
+    {
+      "id": "audit-1782014115953-7",
+      "actor": "review-agent",
+      "action": "media.approve",
+      "mediaId": "media-1782014114747-0",
+      "detail": "",
+      "createdAt": "2026-06-21T03:55:15.953Z"
+    },
+    {
+      "id": "audit-1782014115815-6",
+      "actor": "quality-agent",
+      "action": "quality.checked",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Approved / 92",
+      "createdAt": "2026-06-21T03:55:15.815Z"
+    },
+    {
+      "id": "audit-1782014115762-5",
+      "actor": "render-provider-agent",
+      "action": "render.completed.media.attached",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Rendered video URL attached to Agent Chain Proof Asset.",
+      "createdAt": "2026-06-21T03:55:15.762Z"
+    },
+    {
+      "id": "audit-1782014115588-4",
+      "actor": "video-twin-agent",
+      "action": "render.failed",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Provider request failed with 401: Unauthorized",
+      "createdAt": "2026-06-21T03:55:15.588Z"
+    },
+    {
+      "id": "audit-1782014114829-3",
+      "actor": "video-twin-agent",
+      "action": "render.queued",
+      "mediaId": "media-1782014114747-0",
+      "detail": "",
+      "createdAt": "2026-06-21T03:55:14.829Z"
+    },
+    {
+      "id": "audit-1782014114806-2",
+      "actor": "video-twin-agent",
+      "action": "render.queued",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Twin Agent accepted render submission.",
+      "createdAt": "2026-06-21T03:55:14.806Z"
+    },
+    {
+      "id": "audit-1782014114788-1",
+      "actor": "compiler-worker",
+      "action": "render.queued",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Compiler completed.",
+      "createdAt": "2026-06-21T03:55:14.788Z"
+    },
+    {
+      "id": "audit-1782014114749-0",
+      "actor": "owner-admin",
+      "action": "media.created",
+      "mediaId": "media-1782014114747-0",
+      "detail": "Agent Chain Proof Asset created in auto_assist mode.",
+      "createdAt": "2026-06-21T03:55:14.749Z"
+    }
+  ],
+  "providerJobs": [],
+  "analytics": [],
+  "complianceRules": [
+    {
+      "id": "rule-fda-disclaimer",
+      "type": "required",
+      "phrase": "These statements have not been evaluated by the Food and Drug Administration.",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-cure",
+      "type": "blocked",
+      "phrase": "cure",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-treat",
+      "type": "blocked",
+      "phrase": "treat",
+      "severity": "high"
+    },
+    {
+      "id": "rule-no-guarantee",
+      "type": "blocked",
+      "phrase": "guaranteed",
+      "severity": "medium"
+    },
+    {
+      "id": "rule-safe-supports",
+      "type": "safe",
+      "phrase": "supports daily wellness routines",
+      "severity": "low"
+    }
+  ],
+  "alerts": [],
+  "folderCache": {},
+  "updatedAt": "2026-06-21T03:55:16.133Z"
+}

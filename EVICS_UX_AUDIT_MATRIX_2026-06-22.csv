@@ -1,0 +1,45 @@
+Layer,Element,Location,CurrentState,BusinessPurpose,Disposition,Phase
+Shell,Next Workspace Shell,components/workspace/WorkspaceShell.tsx,Partially Functional,Primary executive operating surface,Rebuild,Wave1
+Shell,Stage Tabs (6 tabs),components/workspace/StageTabs.tsx,Functional,Section switching,Replace with 10-section sidebar,Wave1
+Shell,Classic EVICS link from header,components/workspace/WorkspaceShell.tsx,Functional but duplicate,Navigation to legacy ops,Move to Settings Legacy Tools,Wave1
+Shell,Strict Workflow link from header,components/workspace/WorkspaceShell.tsx,Functional but duplicate,Navigation to alternate shell,Remove from primary shell,Wave1
+Shell,VP floating toggle,components/workspace/WorkspaceShell.tsx,Functional,Open VP command panel,Keep and redesign as VP Operations module,Wave2
+Workspace,Command panel cards,components/workspace/command/CommandPanel.tsx,Partially Functional,Executive status and routing,Rebuild with backend KPIs,Wave2
+Workspace,Workspaces and Workflows legacy links grid,components/workspace/command/CommandPanel.tsx,Duplicate,Legacy deep-link shortcuts,Remove,Wave1
+Workspace,Scanner panel controls,components/workspace/scanners/ScannerPanel.tsx,Partially Functional,Run/toggle scanner and findings,Keep core and normalize telemetry,Wave2
+Workspace,Media panel split create/render,components/workspace/media/MediaPanel.tsx,Functional flow shell,Creation and render staging,Keep and absorb into Creative Studio,Wave2
+Workspace,Decision panel split review/publish,components/workspace/decisions/DecisionPanel.tsx,Functional flow shell,Governance and publishing,Merge into Publishing Center,Wave2
+Workspace,Evidence panel,components/workspace/evidence/EvidencePanel.tsx,Partially Functional,Operational evidence snapshot,Merge into Analytics,Wave1
+Workspace,Insights panel,components/workspace/insights/InsightsPanel.tsx,Partially Functional,Pipeline stage counts,Merge into Analytics,Wave1
+Workspace,Create save draft action,components/workspace/create/CreatePanel.tsx,Partially Functional,Script drafting,Keep and persist to backend,Wave2
+Workspace,Create send to render action,components/workspace/create/CreatePanel.tsx,Partially Functional,Queue render workflow,Keep and enforce backend transition,Wave2
+Workspace,Render generate video action,components/workspace/render/RenderPanel.tsx,Partially Functional,Trigger rendering,Rewire to backend provider contract,Wave2
+Workspace,Render attach provider result action,components/workspace/render/RenderPanel.tsx,Functional but manual,Complete render with returned URL,Keep admin fallback only,Wave3
+Workspace,Review approve action,components/workspace/review/ReviewPanel.tsx,Partially Functional,Approval governance,Keep and backend-hardening,Wave2
+Workspace,Review request re-render action,components/workspace/review/ReviewPanel.tsx,Partially Functional,Rework governance,Keep and backend-hardening,Wave2
+Workspace,Publish now action,components/workspace/publish/PublishPanel.tsx,Partially Functional,Distribution trigger,Keep and route through publish service,Wave2
+Workspace,Download action,components/workspace/publish/PublishPanel.tsx,Functional conditional,Asset download,Keep,Wave2
+System,Agent rail,components/system/AgentRail.tsx,Partially Functional,Right-rail telemetry,Keep and simplify to non-duplicate KPIs,Wave2
+System,Logs drawer,components/system/LogsDrawer.tsx,Functional,Operational log visibility,Keep and integrate with event feed,Wave2
+System,Status bar,components/workspace/StatusBar.tsx,Functional,At-a-glance status,Keep and align KPI semantics,Wave2
+System,VP panel directive input,components/system/VpPanel.tsx,Partially Functional,Typed/voice directives,Keep and route into VP directives ledger,Wave3
+System,VP quick legacy links,components/system/VpPanel.tsx,Duplicate,Legacy section jumps,Remove,Wave1
+Legacy,Root workspace file,workspace.html,Functional monolith,Large executive workspace runtime,Decompose and migrate features,Wave1
+Legacy,Duplicate workspace file,public/legacy/workspace.html,Duplicate,Legacy compatibility mirror,Delete after route validation,Wave4
+Legacy,Legacy dashboard monolith,app.js,Partially Functional,Legacy command center and tools,Consolidate capabilities into 10-section IA,Wave2
+Legacy,Products dashboard route,/products-dashboard in server.js,Functional,Product insights,Merge into Product Intelligence,Wave2
+Legacy,Owner AI route,/owner-ai in server.js,Functional admin utility,Directive planning,Move under Settings Admin,Wave3
+Legacy,Secret vault route,/secret-vault in server.js,Functional admin utility,Credential management,Move under Settings Security,Wave3
+Backend,Agent event ingest route,/api/agents/events in server.js,Functional,Agent telemetry ingestion,Keep,Wave1
+Backend,Agent timeline route,/api/agents/timeline in server.js,Functional,Live feed retrieval,Keep and extend filters,Wave2
+Backend,System status route,/api/agents/system-status in server.js,Functional,System health and aggregate status,Keep and expand KPI payload,Wave2
+Backend,Media create route,/api/media/create in server.js,Functional,Create media records,Keep,Wave1
+Backend,Media action route,/api/media/action in server.js,Functional,Lifecycle actions,Keep and enforce strict transitions,Wave2
+Backend,Render submit route,/api/render/:provider/submit in server.js,Functional,Render job submission,Keep,Wave1
+Backend,Render status route,/api/render/:provider/status/:jobId in server.js,Functional,Render polling,Keep,Wave1
+Backend,Render callback route,/api/render/:provider/callback in server.js,Functional,Render completion callback,Keep,Wave1
+Backend,Scanner run route,/api/scanner/run in server.js,Functional,Scanner execution,Keep and add scanner metrics projection,Wave2
+Data,Pipeline state collections,evics-persistence.js,Functional,Persistence for media/render/compiler/delivery/events,Normalize into DB tables,Wave2
+Data,Media ops local state,media-ops.js,Functional,Operational media and scanner state,Dual-write then migrate source of truth,Wave2
+Observability,Queue workers events,evics-queue-workers.js,Functional,Worker lifecycle telemetry,Keep and expose in pipeline tracker,Wave2
+Observability,Event signature handling,agent-event-bus.js,Functional with unsigned fallback,Telemetry integrity,Enforce signed events in production,Wave3
