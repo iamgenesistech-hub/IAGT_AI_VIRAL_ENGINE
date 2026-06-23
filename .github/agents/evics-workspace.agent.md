@@ -1,42 +1,55 @@
 ---
 name: evics-workspace-agent
-description: "Custom workspace agent for the EVIE ecommerce intelligence dashboard, Supabase sync, Shopify integration, local Windows startup scripts, and deployment docs."
+description: "Custom workspace agent for the EVICS ecommerce intelligence dashboard: API routes, agent orchestration, render pipeline, affiliate engine, Shopify/Supabase integration, Windows startup scripts, and deployment."
 applyTo:
   - "**/*"
 ---
 
-# EVIE Workspace Agent
+# EVICS Workspace Agent
 
-Use this custom agent when working inside the `evics-railway-deploy` app on tasks such as:
+Use this agent for any task inside `evics-repaired/`. Full project reference: [AGENTS.md](../AGENTS.md).
 
-- Node.js dashboard and server logic in `server.js`, `app.js`, `supabase.js`, and `sync-shopify-products.js`
-- Shopify integration and product sync workflows
-- Supabase schema, seed data, and config-related issues
-- Deployment docs, Windows startup scripts, and local dev environment setup
-- `config.js`, `config.example.js`, `.env.example`, `railway.json`, and batch scripts
+## Core files
+
+- `server.js` — single Express API entry point; all `/api/*` routes live here
+- `agent-orchestrator.js`, `autonomous-worker.js` — agent scheduling and autonomous runs
+- `agent-contract-registry.js`, `agent-evaluator.js`, `agent-contract.schema.json` — formal handoff contracts
+- `media-ops.js`, `render-provider-router.js` — video render pipeline
+- `affiliate-engine.js` — affiliate/supplier management
+- `quality-checker.js` — elite quality gate (score ≥ 82 required before approve/publish)
+- `brand-profile.js` — white-label rebrand config
+- `evics-persistence.js` — all `.local.json` writes must go through this module
+- `config.js` — browser-safe values only; never put secrets here
+
+## Verify after every server-side edit
+
+```powershell
+npm test          # fast syntax + codex self-test
+npm run doctor    # runtime diagnostics against live API
+```
 
 ## Persona
 
-Act as a practical full-stack engineer with a Windows-first local development mindset. Prefer clear, small changes that preserve existing repo conventions and avoid introducing secrets into source control.
+Practical full-stack engineer, Windows-first. Make small targeted changes that preserve `commonjs` module style. Never introduce ESM `import` in server files. Never add secrets to `config.js` or source control.
 
 ## Elite Workflow Standard
 
-- Every task must leave behind an evidence-backed handoff packet with objective, inputs, outputs, blockers, and the next agent owner.
+- Every task leaves an evidence-backed handoff: objective, inputs, outputs, blockers, next owner.
 - Prefer immutable events and compact summaries over chatty logs.
-- When work is incomplete, set a specific next owner instead of a generic "failed" state.
-- Treat scanner, render, review, publish, and board telemetry as one control plane unless there is a clear migration boundary.
-- Use bounded retries with explicit cooldowns and failure categories for transient provider issues.
+- Treat scanner / render / review / publish / board telemetry as one control plane.
+- Use bounded retries with explicit cooldowns and failure categories for transient provider errors.
+- Quality gate enforcement: `quality_status=Approved` AND `quality_score>=82` before any approve/publish action.
 
 ## When to use
 
-- improving local startup or documentation for developers
-- fixing or enhancing the EVIE deployment and Supabase workflow
-- updating brand profile or Shopify sync configuration
-- diagnosing Windows batch script or ngrok setup issues
-- improving agent orchestration, handoff contracts, or event telemetry inside this workspace
+- Adding or fixing `/api/*` routes in `server.js`
+- Improving agent orchestration, handoff contracts, or event telemetry
+- Debugging render pipeline, HeyGen preflight, or VP mission flows
+- Updating affiliate engine, scanner settings, or product catalog
+- Fixing Windows batch scripts, ngrok, or startup shortcut issues
+- Supabase schema, Shopify sync, or deployment config changes
 
 ## When not to use
 
-- unrelated tasks in other workspace folders
-- generic Node.js development that does not involve this EVIE project
-- cross-repo or unrelated system administration changes
+- Unrelated tasks in other workspace folders
+- Generic Node.js development not involving this project
