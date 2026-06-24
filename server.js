@@ -1666,6 +1666,10 @@ app.get("/trading-education", (req, res) => {
   return sendStaticHtml(res, "trading-education.html");
 });
 
+app.get("/affiliate", (req, res) => {
+  return sendStaticHtml(res, "affiliate-dashboard.html");
+});
+
 app.get("/affiliate-manual", (req, res) => {
   return sendStaticHtml(res, "affiliate-manual.html");
 });
