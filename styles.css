@@ -2226,6 +2226,139 @@ meter {
   background: linear-gradient(90deg, var(--gold) var(--w), rgba(255, 255, 255, 0.14) var(--w));
 }
 
+main.exec-dashboard {
+  background: radial-gradient(circle at top, rgba(212, 175, 55, 0.08), transparent 28%), #050714;
+  color: #b8c0d9;
+}
+
+main.exec-dashboard .topbar,
+main.exec-dashboard .workspace-mode,
+main.exec-dashboard .executive-simple,
+main.exec-dashboard .command-evidence,
+main.exec-dashboard .panel,
+main.exec-dashboard .metric,
+main.exec-dashboard .analytics-band,
+main.exec-dashboard .brief-grid,
+main.exec-dashboard .focus-layout,
+main.exec-dashboard .focus-layout .panel,
+main.exec-dashboard .daily-workflow,
+main.exec-dashboard .catalog-sync,
+main.exec-dashboard .autopilot,
+main.exec-dashboard .exception-rules,
+main.exec-dashboard .campaign-brief,
+main.exec-dashboard .founder-story-mode,
+main.exec-dashboard .manual-workflow,
+main.exec-dashboard .build-backlog,
+main.exec-dashboard .creative-panel,
+main.exec-dashboard .publish-panel {
+  background: #0b1024;
+  border-color: #10172f;
+  color: #b8c0d9;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+}
+
+main.exec-dashboard .topbar {
+  border: 1px solid #10172f;
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+
+main.exec-dashboard .topbar h1,
+main.exec-dashboard .panel h2,
+main.exec-dashboard .panel h3,
+main.exec-dashboard .panel strong,
+main.exec-dashboard .metric strong {
+  color: #ffffff;
+}
+
+main.exec-dashboard .topbar p,
+main.exec-dashboard .panel p,
+main.exec-dashboard .metric small,
+main.exec-dashboard .metric span,
+main.exec-dashboard .panel span,
+main.exec-dashboard .panel li,
+main.exec-dashboard .panel dt,
+main.exec-dashboard .panel dd {
+  color: #b8c0d9;
+}
+
+main.exec-dashboard .primary {
+  background: linear-gradient(135deg, #d4af37, #8f6a1e);
+  color: #050714;
+  border: 1px solid #d4af37;
+}
+
+main.exec-dashboard .ghost {
+  background: transparent;
+  color: #dce2f0;
+  border: 1px solid #10172f;
+}
+
+main.exec-dashboard .ghost:hover,
+main.exec-dashboard .primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.18);
+}
+
+main.exec-dashboard .workspace-grid,
+main.exec-dashboard .workspace-grid.secondary,
+main.exec-dashboard .focus-layout,
+main.exec-dashboard .brief-grid,
+main.exec-dashboard .evidence-grid,
+main.exec-dashboard .daily-workflow,
+main.exec-dashboard .catalog-sync,
+main.exec-dashboard .brand-settings-grid,
+main.exec-dashboard .brand-profile-toolbar,
+main.exec-dashboard .export-actions,
+main.exec-dashboard .queue-section,
+main.exec-dashboard .simple-mode-grid,
+main.exec-dashboard .simple-launch-grid,
+main.exec-dashboard .manual-steps,
+main.exec-dashboard .connection-list,
+main.exec-dashboard .analytics-band {
+  border-radius: 14px;
+}
+
+main.exec-dashboard .metric {
+  border-radius: 14px;
+}
+
+main.exec-dashboard select,
+main.exec-dashboard input,
+main.exec-dashboard textarea {
+  background: #050714;
+  color: #f7f9ff;
+  border-color: #1b2442;
+}
+
+main.exec-dashboard .workflow-actions,
+main.exec-dashboard .top-actions,
+main.exec-dashboard .workspace-mode-actions,
+main.exec-dashboard .simple-actions {
+  gap: 10px;
+}
+
+main.exec-dashboard .evidence-item,
+main.exec-dashboard .hook-card,
+main.exec-dashboard .ad-row,
+main.exec-dashboard .launcher-card,
+main.exec-dashboard .ad-panel,
+main.exec-dashboard .automation-card,
+main.exec-dashboard .brand-rule,
+main.exec-dashboard .brief-grid label,
+main.exec-dashboard .workflow-item,
+main.exec-dashboard .connection-card {
+  background: rgba(16, 23, 47, 0.92);
+  border-color: #10172f;
+}
+
+main.exec-dashboard .ad-row.selected,
+main.exec-dashboard .launcher-card:hover,
+main.exec-dashboard .evidence-item.ready {
+  border-color: #d4af37;
+}
+
 @media (max-width: 1120px) {
   #app {
     grid-template-columns: 1fr;

@@ -369,8 +369,8 @@ function activeWorkspaceFile() {
   const workspacePath = path.join(root, "workspace.html");
   const indexPath = path.join(root, "index.html");
 
-  if (safeFileExists(workspacePath)) return "workspace.html";
   if (safeFileExists(indexPath)) return "index.html";
+  if (safeFileExists(workspacePath)) return "workspace.html";
   return null;
 }
 
@@ -1651,7 +1651,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/workspace", (req, res) => {
-  return sendWorkspace(res);
+  return sendRedirect(res, "/");
 });
 
 app.get("/workspace.html", (req, res) => {
