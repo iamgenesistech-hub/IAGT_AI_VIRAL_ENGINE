@@ -1787,7 +1787,7 @@ function render() {
       </div>
     </aside>
 
-    <main class="${advancedVisible ? "" : "executive-simple-active"} ${state.activeSection === "command" ? "exec-dashboard" : ""} section-${state.activeSection}">
+    <main class="${advancedVisible ? "" : "executive-simple-active"} section-${state.activeSection}">
       <header class="topbar">
         <div>
           <h1>${sectionTitle()}</h1>
