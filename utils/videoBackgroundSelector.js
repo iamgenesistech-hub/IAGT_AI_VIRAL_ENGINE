@@ -176,7 +176,7 @@ const CATEGORY_THEMES = {
 };
 
 // Lifestyle background image URLs — free-to-use high-quality images
-// These are CDN-hosted images that work as HeyGen video backgrounds
+// Each category has MULTIPLE options so user can pick their preferred background
 const LIFESTYLE_IMAGES = {
   health:      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1920&q=90&fit=crop',
   supplements: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1920&q=90&fit=crop',
@@ -191,6 +191,56 @@ const LIFESTYLE_IMAGES = {
   education:   'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1920&q=90&fit=crop',
   default:     'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=90&fit=crop'
 };
+
+// Multiple background options per category — gives user choice
+const BACKGROUND_OPTIONS = {
+  health: [
+    { id: 'health-1', label: 'Nature Morning', url: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1920&q=90&fit=crop' },
+    { id: 'health-2', label: 'Clean Studio White', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
+    { id: 'health-3', label: 'Modern Living Room', url: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1920&q=90&fit=crop' },
+    { id: 'health-4', label: 'Outdoor Park', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=90&fit=crop' }
+  ],
+  supplements: [
+    { id: 'supps-1', label: 'Clean Kitchen', url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1920&q=90&fit=crop' },
+    { id: 'supps-2', label: 'Bright Studio', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
+    { id: 'supps-3', label: 'Natural Wood Table', url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1920&q=90&fit=crop' },
+    { id: 'supps-4', label: 'Urban Loft', url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1920&q=90&fit=crop' }
+  ],
+  fitness: [
+    { id: 'fit-1', label: 'Modern Gym', url: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1920&q=90&fit=crop' },
+    { id: 'fit-2', label: 'Outdoor Track', url: 'https://images.unsplash.com/photo-1461896836934-bd45f5db39c1?w=1920&q=90&fit=crop' },
+    { id: 'fit-3', label: 'Minimalist Studio', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
+    { id: 'fit-4', label: 'City Rooftop', url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1920&q=90&fit=crop' }
+  ],
+  default: [
+    { id: 'def-1', label: 'Professional Studio', url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=90&fit=crop' },
+    { id: 'def-2', label: 'Modern Office', url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=90&fit=crop' },
+    { id: 'def-3', label: 'Clean White Wall', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
+    { id: 'def-4', label: 'Urban Street', url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1920&q=90&fit=crop' },
+    { id: 'def-5', label: 'Luxury Interior', url: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1920&q=90&fit=crop' }
+  ]
+};
+
+/**
+ * Get background options for a product (user can choose before or after render).
+ * @param {object} product — product data
+ * @returns {Array} array of background choices with id, label, url, preview
+ */
+function getBackgroundOptions(product = {}) {
+  const category = detectCategory(product);
+  const categoryOptions = BACKGROUND_OPTIONS[category] || BACKGROUND_OPTIONS.default;
+  const defaultOptions = BACKGROUND_OPTIONS.default;
+  // Combine category-specific + general options, deduplicate by id
+  const seen = new Set();
+  const options = [];
+  for (const opt of [...categoryOptions, ...defaultOptions]) {
+    if (!seen.has(opt.id)) {
+      seen.add(opt.id);
+      options.push({ ...opt, category, preview: opt.url });
+    }
+  }
+  return options;
+}
 
 // ── Category detection ────────────────────────────────────────────────────────
 
@@ -335,6 +385,8 @@ module.exports = {
   detectCategory,
   getCategoryGradient,
   getAllThemes,
+  getBackgroundOptions,
   CATEGORY_THEMES,
-  LIFESTYLE_IMAGES
+  LIFESTYLE_IMAGES,
+  BACKGROUND_OPTIONS
 };

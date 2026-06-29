@@ -3187,7 +3187,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   const {
     avatarId, productTitle, productImageUrl, productPageUrl,
     script, affiliateCode, affiliateId, platform = 'tiktok',
-    product, backgroundMode = 'product'
+    product, backgroundMode = 'product', backgroundUrl
   } = req.body || {};
 
   const aid = avatarId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
@@ -3222,11 +3222,18 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   }
 
   // ── 3. Select dynamic background based on product category ──────────────────
-  // Use 'lifestyle' mode (real scene photos) when no product image available
-  const productObj = product || { title: productTitle, imageUrl: productImageUrl };
-  const bgMode = processedImageUrl ? 'product' : (backgroundMode === 'color' ? 'color' : 'lifestyle');
-  const bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, bgMode);
-  const heygenBg   = toHeyGenBackground(bgConfig);
+  // If user provided a specific backgroundUrl, use it directly
+  let bgConfig, heygenBg;
+  if (backgroundUrl) {
+    heygenBg = { type: 'image', url: backgroundUrl };
+    bgConfig = { type: 'image', url: backgroundUrl, mode: 'user-selected', category: 'custom' };
+  } else {
+    // Use 'lifestyle' mode (real scene photos) when no product image available
+    const productObj = product || { title: productTitle, imageUrl: productImageUrl };
+    const bgMode = processedImageUrl ? 'product' : (backgroundMode === 'color' ? 'color' : 'lifestyle');
+    bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, bgMode);
+    heygenBg   = toHeyGenBackground(bgConfig);
+  }
 
   // Demo mode when no HeyGen key
   if (!process.env.HEYGEN_API_KEY) {
@@ -3299,6 +3306,79 @@ app.get('/api/affiliate/avatar/video-status/:videoId', async (req, res) => {
 
     res.json({ success: true, status: s.status, videoUrl: s.video_url || null, video_url: s.video_url || null, thumbnailUrl: s.thumbnail_url || null });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// GET /api/affiliate/avatar/background-options — get available backgrounds for a product
+app.get('/api/affiliate/avatar/background-options', (req, res) => {
+  noStore(res);
+  const { productTitle, category } = req.query;
+  const { getBackgroundOptions } = require('../utils/videoBackgroundSelector');
+  const product = { title: productTitle || '', category: category || '' };
+  const options = getBackgroundOptions(product);
+  res.json({ success: true, options, message: 'Choose a background before rendering or re-render with a different one.' });
+});
+
+// POST /api/affiliate/avatar/re-render — re-render same script with different background
+app.post('/api/affiliate/avatar/re-render', async (req, res) => {
+  noStore(res);
+  const { videoId, backgroundUrl, backgroundId } = req.body || {};
+
+  if (!videoId) return res.status(400).json({ error: 'videoId required (original video to re-render)' });
+  if (!backgroundUrl && !backgroundId) return res.status(400).json({ error: 'Provide backgroundUrl or backgroundId' });
+
+  // Load original render metadata
+  const cf = path.join(MEDIA_CACHE_DIR, `${videoId}.json`);
+  if (!fs.existsSync(cf)) return res.status(404).json({ error: 'Original render metadata not found' });
+  const meta = JSON.parse(fs.readFileSync(cf, 'utf8'));
+
+  // Resolve background URL
+  let bgUrl = backgroundUrl;
+  if (!bgUrl && backgroundId) {
+    const { BACKGROUND_OPTIONS } = require('../utils/videoBackgroundSelector');
+    for (const opts of Object.values(BACKGROUND_OPTIONS)) {
+      const match = opts.find(o => o.id === backgroundId);
+      if (match) { bgUrl = match.url; break; }
+    }
+    if (!bgUrl) return res.status(400).json({ error: `Background ID "${backgroundId}" not found` });
+  }
+
+  const aid = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
+  const vid = process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
+  const heygenBg = { type: 'image', url: bgUrl };
+
+  try {
+    const render = await startHeyGenRender({
+      script: meta.script, avatar_id: aid, voice_id: vid,
+      config: { aspect: '9:16', background: heygenBg, caption: false, test: false }
+    });
+    // Save new render metadata with reference to original
+    fs.writeFileSync(
+      path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
+      JSON.stringify({
+        video_id: render.video_id,
+        originalVideoId: videoId,
+        productTitle: meta.productTitle,
+        productPageUrl: meta.productPageUrl,
+        script: meta.script,
+        background: { type: 'image', url: bgUrl },
+        processedImageUrl: meta.processedImageUrl,
+        affiliateCode: meta.affiliateCode || '',
+        productImageUrl: meta.productImageUrl || null,
+        status: 'rendering',
+        created_at: new Date().toISOString()
+      })
+    );
+    res.json({
+      success: true,
+      newVideoId: render.video_id,
+      originalVideoId: videoId,
+      status: 'rendering',
+      backgroundUsed: bgUrl,
+      message: 'Re-rendering with new background. Check status with /api/affiliate/avatar/video-status/' + render.video_id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // GET /api/affiliate/avatars
