@@ -184,14 +184,14 @@ function buildTemplateScript({ title, category, mood, platform, hookPattern, pri
 
   // Short script (TikTok/Instagram)
   if (spec.maxSeconds <= 25) {
-    return [hook, `[Hold up product] This is the ${title} from I AM GENESIS TECH.`, bridge, `${priceTag}`, cta].filter(Boolean).join(' ');
+    return [hook, `This is the ${title} from I AM GENESIS TECH.`, bridge, `${priceTag}`, cta].filter(Boolean).join(' ');
   }
 
   // Medium script (Facebook)
   if (spec.maxSeconds <= 35) {
     return [
       hook,
-      `Let me show you something. [Hold up product] This is the ${title} from I AM GENESIS TECH.`,
+      `Let me show you something. This is the ${title} from I AM GENESIS TECH.`,
       `I have been using this consistently and the results are real.`,
       bridge,
       `Every product at I AM GENESIS TECH is designed for people who are serious about elevating their life.${priceTag}`,
@@ -202,7 +202,7 @@ function buildTemplateScript({ title, category, mood, platform, hookPattern, pri
   // Long script (YouTube)
   return [
     hook,
-    `Let me break this down for you. [Show product] This is the ${title} from I AM GENESIS TECH.`,
+    `Let me break this down for you. This is the ${title} from I AM GENESIS TECH.`,
     `I want to be real with you — I was skeptical. I have tried a lot of products in this space and most of them overpromise and underdeliver.`,
     `But this one is different. Here is why.`,
     bridge,
@@ -235,13 +235,14 @@ ${price ? `Price: $${parseFloat(price).toFixed(0)}` : ''}
 Requirements:
 - Start with a POWERFUL hook that stops the scroll (first 3 seconds decide everything)
 - Use the ${hookPattern} pattern naturally — never forced
-- Include a product showcase moment: [Hold up product] or [Show product on screen]
+- Mention the product by name naturally in conversation (do NOT use brackets or stage directions)
 - Bridge to the emotional payoff (the ${mood} feeling they will get)
 - Weave in IAGT's spiritual/purpose-driven brand voice authentically
 - End with a clear, urgent CTA directing to iamgenesistech.com and "${PLATFORM_SPECS[platform]?.captionCTA || 'link in bio'}"
-- Write ONLY the spoken script — no stage directions except [Hold up product] or [Show product]
+- Write ONLY the words the avatar will speak out loud — absolutely NO stage directions, NO brackets like [Hold up product], NO action cues
 - Approximately ${spec.maxWords} words maximum
-- Sound like a real person sharing their genuine experience, not a commercial`;
+- Sound like a real person sharing their genuine experience, not a commercial
+- The script must be pure dialogue — every word gets spoken by the avatar`;
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',

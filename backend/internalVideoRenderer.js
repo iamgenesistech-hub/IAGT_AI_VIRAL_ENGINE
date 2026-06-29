@@ -111,7 +111,8 @@ async function heygenFetch(path, options = {}, attempt = 1) {
 }
 
 async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
-  const cleanScript = String(script || '').trim();
+  // Strip ALL stage directions (brackets) from script — avatar speaks only pure dialogue
+  const cleanScript = String(script || '').trim().replace(/\[.*?\]/g, '').replace(/\s{2,}/g, ' ').trim();
   if (!cleanScript) throw new Error('script is required.');
   if (!avatar_id) throw new Error('avatar_id is required.');
   if (!voice_id) throw new Error('voice_id is required.');
@@ -122,7 +123,8 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
       character: {
         type: 'avatar',
         avatar_id,
-        avatar_style: config.avatar_style || config.avatarStyle || 'normal'
+        avatar_style: config.avatar_style || config.avatarStyle || 'normal',
+        matting: true  // Force background segmentation so custom backgrounds work
       },
       voice: {
         type: 'text',

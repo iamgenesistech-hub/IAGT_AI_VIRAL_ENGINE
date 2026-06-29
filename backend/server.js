@@ -16,6 +16,7 @@ const { startScheduler, getSchedulerLog } = require('../utils/automationSchedule
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
 const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
+const { postProcessVideo } = require('../utils/videoPostProcessor');
 
 const app = express();
 const PORT = process.env.PORT || 4175;
@@ -79,6 +80,9 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Serve bg-removed product images (permanent cache — never re-processed)
 app.use('/processed-images', express.static(BG_CACHE_DIR));
+
+// Serve post-processed videos with product overlays and CTA
+app.use('/processed-videos', express.static(path.join(__dirname, '../processed-videos')));
 
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
 app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
@@ -3211,15 +3215,17 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
       processedImageUrl = bgResult.processedUrl || productImageUrl;
       // Convert /processed-images/xxx.png to a full URL the HeyGen API can reach
       if (processedImageUrl && processedImageUrl.startsWith('/processed-images/')) {
-        const host = process.env.HOST || `http://localhost:${process.env.PORT || 4175}`;
+        const host = process.env.EVICS_HOST || process.env.HOST || `https://evics-api-480958062306.us-central1.run.app`;
         processedImageUrl = `${host}${processedImageUrl}`;
       }
     } catch { processedImageUrl = productImageUrl; }
   }
 
   // ── 3. Select dynamic background based on product category ──────────────────
+  // Use 'lifestyle' mode (real scene photos) when no product image available
   const productObj = product || { title: productTitle, imageUrl: productImageUrl };
-  const bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, backgroundMode);
+  const bgMode = processedImageUrl ? 'product' : (backgroundMode === 'color' ? 'color' : 'lifestyle');
+  const bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, bgMode);
   const heygenBg   = toHeyGenBackground(bgConfig);
 
   // Demo mode when no HeyGen key
@@ -3238,13 +3244,15 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   try {
     const render = await startHeyGenRender({
       script: scr, avatar_id: aid, voice_id: vid,
-      config: { aspect: '9:16', background: heygenBg, caption: true, test: false }
+      config: { aspect: '9:16', background: heygenBg, caption: false, test: false }
     });
     fs.writeFileSync(
       path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
       JSON.stringify({
         video_id: render.video_id, productTitle, productPageUrl,
         script: scr, background: bgConfig, processedImageUrl,
+        affiliateCode: affiliateCode || '',
+        productImageUrl: productImageUrl || null,
         status: 'rendering', created_at: new Date().toISOString()
       })
     );
@@ -3260,6 +3268,35 @@ app.get('/api/affiliate/avatar/video-status/:videoId', async (req, res) => {
   noStore(res);
   try {
     const s = await getHeyGenVideoStatus(req.params.videoId);
+
+    // If completed, trigger post-processing (product overlay + CTA)
+    if ((s.status === 'completed' || s.status === 'done') && s.video_url) {
+      const cf = path.join(MEDIA_CACHE_DIR, `${req.params.videoId}.json`);
+      const meta = fs.existsSync(cf) ? JSON.parse(fs.readFileSync(cf, 'utf8')) : {};
+
+      // Check if already post-processed
+      if (!meta.processedVideoUrl) {
+        // Fire post-processing in background (don't block response)
+        postProcessVideo({
+          videoUrl: s.video_url,
+          videoId: req.params.videoId,
+          productImageUrl: meta.processedImageUrl || null,
+          productTitle: meta.productTitle || '',
+          affiliateCode: meta.affiliateCode || ''
+        }).then(result => {
+          if (result.success) {
+            meta.processedVideoUrl = result.processedVideoUrl;
+            meta.status = 'completed';
+            meta.video_url = s.video_url;
+            fs.writeFileSync(cf, JSON.stringify(meta));
+          }
+        }).catch(() => {});
+      }
+
+      const finalUrl = meta.processedVideoUrl || s.video_url;
+      return res.json({ success: true, status: 'completed', videoUrl: finalUrl, video_url: finalUrl, rawVideoUrl: s.video_url, thumbnailUrl: s.thumbnail_url || null });
+    }
+
     res.json({ success: true, status: s.status, videoUrl: s.video_url || null, video_url: s.video_url || null, thumbnailUrl: s.thumbnail_url || null });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
