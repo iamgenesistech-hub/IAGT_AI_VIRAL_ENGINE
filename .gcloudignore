@@ -1,0 +1,28 @@
+# .gcloudignore — IAGT AI Viral Engine
+# Files excluded from gcloud builds submit upload
+# (Speeds up build upload significantly)
+
+# Dev dependencies and large binaries
+node_modules/
+.git/
+.github/
+
+# Local generated output
+generated/
+logs/
+MEDIA_CACHE/
+*.log
+
+# Windows tools
+tools/ffmpeg.exe
+START_EVICS_NGROK.bat
+
+# Dev artifacts  
+*.bak-*
+EVICS_CODE_REVIEW.zip
+evidence/
+REPORTS/
+
+# Local env (secrets handled via Cloud Run env vars, not files)
+.env
+backend/.env

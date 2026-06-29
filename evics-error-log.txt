@@ -1,0 +1,15 @@
+[SupabaseConnector] Failed to load @supabase/supabase-js — falling back to offline no-op client: Failed to resolve package "@supabase/supabase-js": Cannot find module './version'
+Require stack:
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\node_modules\@supabase\realtime-js\dist\main\lib\constants.js
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\node_modules\@supabase\realtime-js\dist\main\RealtimeClient.js
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\node_modules\@supabase\realtime-js\dist\main\index.js
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\node_modules\@supabase\supabase-js\dist\index.cjs
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\utils\SupabaseConnector.js
+- C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\backend\server.js
+(node:8760) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[ViralScript] OpenAI failed, using template: 401 Incorrect API key provided: sk-proj-********************************************************************************************************************************************************hCUA. You can find your API key at https://platform.openai.com/account/api-keys.
+[ViralScript] OpenAI failed, using template: 401 Incorrect API key provided: sk-proj-********************************************************************************************************************************************************hCUA. You can find your API key at https://platform.openai.com/account/api-keys.
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401

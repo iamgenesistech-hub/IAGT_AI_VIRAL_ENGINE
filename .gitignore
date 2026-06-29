@@ -1,0 +1,5 @@
+﻿node_modules/
+backend/.env
+.env
+*.log
+data/processed-images/*.png

@@ -1,0 +1,66 @@
+◇ injected env (15) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (35) from backend\.env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from backend\.env // tip: ⌘ enable debugging { debug: true }
+âœ… EVICS backend running at http://127.0.0.1:4175
+âž¡ï¸  Dashboard:           http://127.0.0.1:4175/
+âž¡ï¸  Status:              http://127.0.0.1:4175/status
+[EVICS Scheduler] Starting automation scheduler…
+[EVICS Scheduler] Registered: Viral Trend Scan (4h)
+[EVICS Scheduler] Registered: Profit Audit (daily)
+[EVICS Scheduler] Registered: Library Cleanup (daily)
+[EVICS Scheduler] Registered: Auto-Promote Experiments (daily)
+[EVICS Scheduler] Registered: Executive Report (weekly)
+[EVICS Config] âœ… All key environment variables configured.
+âž¡ï¸  Products:            http://127.0.0.1:4175/api/products
+âž¡ï¸  Renders:             http://127.0.0.1:4175/api/renders
+âž¡ï¸  Campaigns:           http://127.0.0.1:4175/api/campaigns
+âž¡ï¸  Trends:              http://127.0.0.1:4175/api/trends
+âž¡ï¸  Dashboard summary:   http://127.0.0.1:4175/api/dashboard-summary
+âž¡ï¸  Shopify products:    http://127.0.0.1:4175/api/shopify/products
+âž¡ï¸  Shopify collections: http://127.0.0.1:4175/api/shopify/collections
+âž¡ï¸  Viral rescan:        POST http://127.0.0.1:4175/api/viral/rescan
+âž¡ï¸  Hook search:         POST http://127.0.0.1:4175/api/hooks/search
+âž¡ï¸  Creatives:           http://127.0.0.1:4175/api/creatives
+âž¡ï¸  Assembly drafts:     http://127.0.0.1:4175/api/assembly/drafts
+âž¡ï¸  AI suggestions:      POST http://127.0.0.1:4175/api/assembly/suggestions
+âž¡ï¸  Video generate:      POST http://127.0.0.1:4175/api/video/generate
+âž¡ï¸  Agent viral scan:    POST http://127.0.0.1:4175/api/agent/viral-scan
+âž¡ï¸  Agent reconstruct:   POST http://127.0.0.1:4175/api/agent/reconstruct
+âž¡ï¸  Agent generate ads:  POST http://127.0.0.1:4175/api/agent/generate-ads
+âž¡ï¸  Agent approve:       POST http://127.0.0.1:4175/api/agent/approve-creative
+âž¡ï¸  Agent publish:       POST http://127.0.0.1:4175/api/agent/publish
+âž¡ï¸  Agent learning loop: POST http://127.0.0.1:4175/api/agent/learning-loop
+âž¡ï¸  Agent copilot:       POST http://127.0.0.1:4175/api/agent/copilot
+âž¡ï¸  Agent profit audit:  POST http://127.0.0.1:4175/api/agent/profit-audit
+âž¡ï¸  Agent product tiers: GET  http://127.0.0.1:4175/api/agent/product-tiers
+âž¡ï¸  Agent budget alloc:  POST http://127.0.0.1:4175/api/agent/allocate-budget
+âž¡ï¸  Agent experiments:   GET  http://127.0.0.1:4175/api/agent/experiments
+âž¡ï¸  Agent lib cleanup:   POST http://127.0.0.1:4175/api/agent/library-cleanup
+âž¡ï¸  Agent exec report:   GET  http://127.0.0.1:4175/api/agent/executive-report
+âž¡ï¸  Recovery status:     GET  http://127.0.0.1:4175/api/recovery/status
+âž¡ï¸  Media types:         http://127.0.0.1:4175/api/media/types
+âž¡ï¸  Media apps:          http://127.0.0.1:4175/api/media/apps
+âž¡ï¸  Media by type:       http://127.0.0.1:4175/api/media/by-type/:type
+âž¡ï¸  Media by app:        http://127.0.0.1:4175/api/media/by-app/:app
+âž¡ï¸  Media by type+app:   http://127.0.0.1:4175/api/media/by-type/:type/by-app/:app
+âž¡ï¸  Media download:      POST http://127.0.0.1:4175/api/media/:id/download
+âž¡ï¸  Agent statuses:      http://127.0.0.1:4175/api/agents/status
+âž¡ï¸  Published media:     http://127.0.0.1:4175/api/published-media
+âž¡ï¸  Analytics summary:   http://127.0.0.1:4175/api/analytics/summary
+âž¡ï¸  Quality report:      http://127.0.0.1:4175/api/analytics/quality-report
+âž¡ï¸  Quality validate:    POST http://127.0.0.1:4175/api/quality/validate
+[EVICS Scheduler] 2026-06-29T14:15:51.928Z | viral-scan | started
+[EVICS Scheduler] 2026-06-29T14:15:51.984Z | viral-scan | success | HTTP 200
+[shopifyLiveConnector] Refreshed local cache: 179 products
+[EVICS Scheduler] 2026-06-29T14:16:01.946Z | profit-audit | started
+[shopifyLiveConnector] Refreshed local cache: 179 products
+[EVICS Scheduler] 2026-06-29T14:16:02.487Z | profit-audit | success | HTTP 200
+[EVICS Scheduler] 2026-06-29T14:16:11.937Z | library-cleanup | started
+[EVICS Scheduler] 2026-06-29T14:16:11.977Z | library-cleanup | success | HTTP 200
+[EVICS Scheduler] 2026-06-29T14:16:21.939Z | auto-promote-experiments | started
+[EVICS Scheduler] 2026-06-29T14:16:21.976Z | auto-promote-experiments | success | HTTP 200
+[EVICS Scheduler] 2026-06-29T14:16:31.933Z | executive-report | started
+[EVICS Scheduler] 2026-06-29T14:16:32.012Z | executive-report | success | HTTP 200
+[BgRemover] Batch done: 179 processed, 0 skipped/cached, 0 errors
+[BgRemover] Batch complete: 179/179 processed
