@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVICS Affiliate Workspace — I AM GENESIS TECH</title>
+  <style>
+    :root { --bg: #070b11; --card: #0f1419; --accent: #00c7f5; --accent2: #a855f7; --text: #e8eaed; --muted: #8b949e; --success: #22c55e; --border: #1e2a35; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-weight: 900; font-size: 16px; } .brand .accent { color: var(--accent); }
+    .user-info { font-size: 13px; color: var(--muted); } .user-info strong { color: var(--accent); }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); margin-bottom: 32px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 32px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .card h3 { font-size: 15px; margin-bottom: 12px; color: var(--accent); }
+    .card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .product-list { list-style: none; max-height: 300px; overflow-y: auto; }
+    .product-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 8px; transition: background .2s; }
+    .product-item:hover { background: #1a2332; }
+    .product-item.selected { background: #0d2b3d; border-color: var(--accent); }
+    .product-item img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; }
+    .product-item .name { font-size: 14px; font-weight: 600; }
+    .product-item .price { font-size: 12px; color: var(--muted); }
+    .btn { display: inline-block; padding: 12px 24px; border-radius: 10px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; transition: all .2s; text-decoration: none; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,199,245,.3); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .bg-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+    .bg-option { border: 2px solid var(--border); border-radius: 8px; padding: 8px; text-align: center; cursor: pointer; font-size: 12px; transition: all .2s; }
+    .bg-option:hover { border-color: var(--accent); }
+    .bg-option.selected { border-color: var(--accent); background: #0d2b3d; }
+    .bg-option img { width: 100%; height: 60px; object-fit: cover; border-radius: 4px; margin-bottom: 4px; }
+    select, input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 14px; width: 100%; margin-bottom: 12px; }
+    .status-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-top: 20px; }
+    .status-bar h4 { font-size: 14px; margin-bottom: 8px; }
+    .status-bar .msg { font-size: 13px; color: var(--muted); }
+    .status-bar .msg.success { color: var(--success); }
+    .status-bar .msg.error { color: #ef4444; }
+    .video-result { margin-top: 16px; }
+    .video-result video { width: 100%; max-width: 360px; border-radius: 12px; }
+    .hidden { display: none; }
+    .login-gate { text-align: center; padding: 80px 20px; }
+    .login-gate h2 { margin-bottom: 16px; }
+    .login-gate input { max-width: 300px; margin: 0 auto 12px; display: block; text-align: center; }
+    .referral-box { background: #0d2b3d; border: 1px solid var(--accent); border-radius: 10px; padding: 16px; margin-top: 20px; }
+    .referral-box .link { word-break: break-all; color: var(--accent); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">⚡ EVICS <span class="accent">Workspace</span></div>
+    <div class="user-info">Code: <strong id="headerCode">—</strong></div>
+  </div>
+
+  <!-- LOGIN GATE -->
+  <div id="loginGate" class="login-gate">
+    <h2>Enter Your Affiliate Code</h2>
+    <p style="color:#8b949e;margin-bottom:24px">Use the code you received when you registered.</p>
+    <input type="text" id="codeInput" placeholder="e.g. ROLAND787" />
+    <button class="btn btn-primary" onclick="loginWithCode()">Enter Workspace →</button>
+  </div>
+
+  <!-- WORKSPACE (hidden until login) -->
+  <div id="workspace" class="hidden">
+    <div class="container">
+      <h1>🚀 Your Affiliate Workspace</h1>
+      <p class="subtitle">Pick a product, choose a background, and generate AI videos to promote.</p>
+
+      <div class="grid">
+        <!-- PRODUCTS -->
+        <div class="card">
+          <h3>📦 Products</h3>
+          <p style="margin-bottom:12px">Select a product to promote:</p>
+          <ul id="productList" class="product-list">
+            <li class="product-item" style="color:var(--muted)">Loading products...</li>
+          </ul>
+        </div>
+
+        <!-- VIDEO GENERATOR -->
+        <div class="card">
+          <h3>🎬 Generate Video</h3>
+          <label style="font-size:12px;color:var(--muted)">Platform</label>
+          <select id="platformSelect">
+            <option value="tiktok">TikTok (9:16)</option>
+            <option value="instagram">Instagram Reels (9:16)</option>
+            <option value="youtube">YouTube Shorts (9:16)</option>
+            <option value="facebook">Facebook (16:9)</option>
+          </select>
+
+          <label style="font-size:12px;color:var(--muted)">Background</label>
+          <select id="bgModeSelect" onchange="toggleBgOptions()">
+            <option value="auto">🎲 Auto (random unique scene)</option>
+            <option value="choose">🎨 Let me choose a scene</option>
+          </select>
+
+          <div id="bgOptionsWrap" class="hidden">
+            <div id="bgOptions" class="bg-options">
+              <p style="color:var(--muted);font-size:12px">Loading scenes...</p>
+            </div>
+          </div>
+
+          <button id="generateBtn" class="btn btn-primary" style="width:100%;margin-top:12px" onclick="generateVideo()" disabled>
+            Select a product first
+          </button>
+        </div>
+
+        <!-- REFERRAL LINK -->
+        <div class="card">
+          <h3>🔗 Your Referral Links</h3>
+          <p style="margin-bottom:12px">Share these with your audience. You earn commission on every sale.</p>
+          <div id="referralLinks">
+            <p style="color:var(--muted);font-size:13px">Select a product to see your link.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUS -->
+      <div class="status-bar" id="statusBar">
+        <h4>⏳ Status</h4>
+        <div class="msg" id="statusMsg">Ready to generate. Pick a product and hit generate.</div>
+        <div class="video-result hidden" id="videoResult">
+          <video id="videoPlayer" controls></video>
+          <div style="margin-top:12px">
+            <button class="btn btn-secondary" onclick="reRender()">🔄 Re-render (new background)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = location.origin;
+    let affiliateCode = '';
+    let selectedProduct = null;
+    let selectedBgId = null;
+    let lastVideoId = null;
+
+    // Check URL params for code
+    (function init() {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code') || params.get('c');
+      if (code) {
+        document.getElementById('codeInput').value = code;
+        loginWithCode();
+      }
+    })();
+
+    function loginWithCode() {
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      if (!code) return alert('Please enter your affiliate code');
+      affiliateCode = code;
+      document.getElementById('headerCode').textContent = code;
+      document.getElementById('loginGate').classList.add('hidden');
+      document.getElementById('workspace').classList.remove('hidden');
+      loadProducts();
+    }
+
+    async function loadProducts() {
+      try {
+        const res = await fetch(`${API}/api/affiliate/workspace/products?affiliateCode=${affiliateCode}`);
+        const data = await res.json();
+        const products = data.products || data.data || [];
+        const list = document.getElementById('productList');
+        if (!products.length) {
+          list.innerHTML = '<li class="product-item" style="color:var(--muted)">No products found</li>';
+          return;
+        }
+        list.innerHTML = products.map((p, i) => `
+          <li class="product-item" data-idx="${i}" onclick="selectProduct(${i})">
+            <img src="${p.imageUrl || p.image || 'https://via.placeholder.com/48'}" alt="${p.title}" />
+            <div>
+              <div class="name">${p.title}</div>
+              <div class="price">${p.price ? '$' + p.price : ''}</div>
+            </div>
+          </li>
+        `).join('');
+        window._products = products;
+      } catch (e) {
+        document.getElementById('productList').innerHTML = `<li style="color:#ef4444">${e.message}</li>`;
+      }
+    }
+
+    function selectProduct(idx) {
+      selectedProduct = window._products[idx];
+      document.querySelectorAll('.product-item').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('.product-item')[idx].classList.add('selected');
+      document.getElementById('generateBtn').disabled = false;
+      document.getElementById('generateBtn').textContent = `Generate Video for "${selectedProduct.title}"`;
+      // Update referral link
+      const handle = selectedProduct.handle || selectedProduct.id;
+      const link = `https://iamgenesistech.com/products/${handle}?ref=${affiliateCode}`;
+      document.getElementById('referralLinks').innerHTML = `
+        <div class="referral-box">
+          <div class="link">${link}</div>
+          <button class="btn btn-secondary" style="margin-top:8px;font-size:12px" onclick="navigator.clipboard.writeText('${link}')">📋 Copy Link</button>
+        </div>`;
+      // Load background options
+      loadBackgroundOptions();
+    }
+
+    async function loadBackgroundOptions() {
+      try {
+        const res = await fetch(`${API}/api/affiliate/avatar/background-options?productTitle=${encodeURIComponent(selectedProduct.title)}`);
+        const data = await res.json();
+        const opts = data.options || [];
+        const wrap = document.getElementById('bgOptions');
+        wrap.innerHTML = opts.map(o => `
+          <div class="bg-option" data-id="${o.id}" onclick="selectBg('${o.id}')">
+            <img src="${o.preview}" alt="${o.label}" onerror="this.style.background='#1a2332'" />
+            <div>${o.label}</div>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    function selectBg(id) {
+      selectedBgId = id;
+      document.querySelectorAll('.bg-option').forEach(el => el.classList.remove('selected'));
+      const el = document.querySelector(`.bg-option[data-id="${id}"]`);
+      if (el) el.classList.add('selected');
+    }
+
+    function toggleBgOptions() {
+      const mode = document.getElementById('bgModeSelect').value;
+      document.getElementById('bgOptionsWrap').classList.toggle('hidden', mode === 'auto');
+      if (mode === 'auto') selectedBgId = null;
+    }
+
+    async function generateVideo() {
+      if (!selectedProduct) return;
+      const btn = document.getElementById('generateBtn');
+      const statusMsg = document.getElementById('statusMsg');
+      btn.disabled = true;
+      btn.textContent = '⏳ Generating...';
+      statusMsg.className = 'msg';
+      statusMsg.textContent = 'Sending to AI... this takes 1-3 minutes.';
+      document.getElementById('videoResult').classList.add('hidden');
+
+      const payload = {
+        productTitle: selectedProduct.title,
+        productPageUrl: selectedProduct.url || `https://iamgenesistech.com/products/${selectedProduct.handle || selectedProduct.id}`,
+        productImageUrl: selectedProduct.imageUrl || selectedProduct.image,
+        platform: document.getElementById('platformSelect').value,
+        affiliateCode
+      };
+
+      try {
+        const res = await fetch(`${API}/api/affiliate/avatar/generate-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Generation failed');
+        lastVideoId = data.videoId;
+        statusMsg.textContent = `✅ Rendering started! Video ID: ${data.videoId}. Checking status...`;
+        statusMsg.className = 'msg success';
+        pollStatus(data.videoId);
+      } catch (e) {
+        statusMsg.textContent = `❌ ${e.message}`;
+        statusMsg.className = 'msg error';
+        btn.disabled = false;
+        btn.textContent = `Generate Video for "${selectedProduct.title}"`;
+      }
+    }
+
+    async function pollStatus(videoId) {
+      const statusMsg = document.getElementById('statusMsg');
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await fetch(`${API}/api/affiliate/avatar/video-status/${videoId}`);
+          const data = await res.json();
+          if (data.status === 'completed' || data.status === 'complete') {
+            clearInterval(poll);
+            statusMsg.textContent = '🎉 Video ready!';
+            statusMsg.className = 'msg success';
+            if (data.videoUrl) {
+              document.getElementById('videoPlayer').src = data.videoUrl;
+              document.getElementById('videoResult').classList.remove('hidden');
+            }
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').textContent = `Generate Video for "${selectedProduct.title}"`;
+          } else if (data.status === 'failed') {
+            clearInterval(poll);
+            statusMsg.textContent = `❌ Render failed: ${data.error || 'Unknown error'}. Try again or choose a different background.`;
+            statusMsg.className = 'msg error';
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').textContent = `Generate Video for "${selectedProduct.title}"`;
+          } else {
+            statusMsg.textContent = `⏳ Rendering... (${attempts * 10}s elapsed)`;
+          }
+        } catch {}
+        if (attempts > 30) { // 5 min timeout
+          clearInterval(poll);
+          statusMsg.textContent = '⏳ Still rendering. Check back in a minute.';
+          document.getElementById('generateBtn').disabled = false;
+          document.getElementById('generateBtn').textContent = `Generate Video for "${selectedProduct.title}"`;
+        }
+      }, 10000);
+    }
+
+    async function reRender() {
+      if (!lastVideoId || !selectedProduct) return;
+      const statusMsg = document.getElementById('statusMsg');
+      statusMsg.textContent = '🔄 Re-rendering with new background...';
+      statusMsg.className = 'msg';
+      document.getElementById('videoResult').classList.add('hidden');
+      try {
+        const res = await fetch(`${API}/api/affiliate/avatar/re-render`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: lastVideoId })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Re-render failed');
+        lastVideoId = data.videoId;
+        statusMsg.textContent = `✅ Re-render started! New video ID: ${data.videoId}`;
+        statusMsg.className = 'msg success';
+        pollStatus(data.videoId);
+      } catch (e) {
+        statusMsg.textContent = `❌ ${e.message}`;
+        statusMsg.className = 'msg error';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -87,6 +87,7 @@ app.use('/processed-videos', express.static(path.join(__dirname, '../processed-v
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
 app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
 app.get('/affiliate', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html')));
+app.get('/affiliate/workspace', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/workspace.html')));
 app.get('/ref/:code', (req, res) => {
   res.redirect(`/affiliate?ref=${encodeURIComponent(req.params.code)}`);
 });
@@ -3904,7 +3905,7 @@ app.post('/api/affiliates/register', async (req, res) => {
       await SupabaseConnector.from('affiliates').insert(record);
     } catch {}
 
-    res.json({ success: true, affiliateId, code, message: `Welcome to EVICS, ${name}! Your affiliate code is ${code}.` });
+    res.json({ success: true, affiliateId, code, affiliateLink: `/affiliate/workspace?code=${code}`, message: `Welcome to EVICS, ${name}! Your affiliate code is ${code}.` });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }

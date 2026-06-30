@@ -294,9 +294,13 @@
           const data = await res.json();
           if (!res.ok || data.success === false) throw new Error(data.error || 'Registration failed');
           const code = data.affiliateCode || data.code || 'EVICS';
-          const link = data.affiliateLink || `https://iamgenesistech.myshopify.com?ref=${code}`;
+          const hubLink = data.affiliateLink || `/affiliate/workspace?code=${code}`;
+          const shopLink = `https://iamgenesistech.com?ref=${code}`;
           msg.className = 'form-msg success';
-          msg.innerHTML = `<strong>🎉 Welcome to EVICS!</strong><br>Your affiliate link:<br><a href="${link}" target="_blank">${link}</a><br><small>Your code: <strong>${code}</strong></small>`;
+          msg.innerHTML = `<strong>🎉 Welcome to EVICS!</strong><br>
+            <a href="${hubLink}" class="btn-primary" style="display:inline-block;margin:12px 0;padding:10px 20px;text-decoration:none;border-radius:8px">Open Your Workspace →</a><br>
+            <small>Your referral link for customers:<br><a href="${shopLink}" target="_blank">${shopLink}</a></small><br>
+            <small>Your code: <strong>${code}</strong></small>`;
           msg.classList.remove('hidden');
           form.reset();
         } catch (err) {
