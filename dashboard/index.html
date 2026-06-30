@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVICS — AI Viral Marketing Engine</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .bg-glow {
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at 60% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse at 30% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+      animation: drift 20s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes drift { from { transform: translate(0, 0); } to { transform: translate(30px, -20px); } }
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem;
+      max-width: 700px;
+    }
+    .logo {
+      font-size: 4rem;
+      margin-bottom: 0.5rem;
+    }
+    .brand {
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 0.3rem;
+    }
+    .brand-accent {
+      background: linear-gradient(135deg, #6366f1, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .tagline {
+      font-size: 1.1rem;
+      color: #a1a1aa;
+      margin-bottom: 2.5rem;
+      line-height: 1.6;
+    }
+    .powered {
+      font-size: 0.85rem;
+      color: #52525b;
+      margin-bottom: 3rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-decoration: none;
+      color: #fff;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    .card-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .card-desc {
+      font-size: 0.9rem;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+    .card-arrow {
+      position: absolute;
+      top: 1.2rem;
+      right: 1.2rem;
+      font-size: 1.2rem;
+      opacity: 0;
+      transform: translateX(-5px);
+      transition: all 0.3s ease;
+    }
+    .card:hover .card-arrow { opacity: 1; transform: translateX(0); }
+    .features {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #71717a;
+    }
+    .feature-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+    .footer {
+      font-size: 0.8rem;
+      color: #3f3f46;
+    }
+    .footer a {
+      color: #6366f1;
+      text-decoration: none;
+    }
+    @media (max-width: 600px) {
+      .cards { grid-template-columns: 1fr; }
+      .brand { font-size: 2rem; }
+      .logo { font-size: 3rem; }
+      .features { flex-direction: column; align-items: center; gap: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="container">
+    <div class="logo">⚡</div>
+    <h1 class="brand">EVICS <span class="brand-accent">Engine</span></h1>
+    <p class="tagline">AI-powered viral marketing platform. Generate avatar videos, track affiliate performance, and scale your brand — all automated.</p>
+    <p class="powered">Powered by I AM GENESIS TECH</p>
+
+    <div class="cards">
+      <a href="/affiliate/" class="card">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🚀</div>
+        <div class="card-title">Join as Affiliate</div>
+        <div class="card-desc">Sign up free, get your unique link, and start earning 15-30% commission on every sale.</div>
+      </a>
+      <a href="/affiliate/workspace" class="card">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🎬</div>
+        <div class="card-title">Affiliate Workspace</div>
+        <div class="card-desc">Generate AI avatar videos, choose backgrounds, track your content — all from one dashboard.</div>
+      </a>
+    </div>
+
+    <div class="features">
+      <div class="feature"><div class="feature-dot"></div>AI Video Generation</div>
+      <div class="feature"><div class="feature-dot"></div>Auto Backgrounds</div>
+      <div class="feature"><div class="feature-dot"></div>Multi-Platform</div>
+      <div class="feature"><div class="feature-dot"></div>Live Analytics</div>
+      <div class="feature"><div class="feature-dot"></div>Instant Payouts</div>
+    </div>
+
+    <div class="footer">
+      <p>© 2025 I AM GENESIS TECH LLC &nbsp;·&nbsp; <a href="https://iamgenesistech.com" target="_blank">iamgenesistech.com</a></p>
+    </div>
+  </div>
+</body>
+</html>
