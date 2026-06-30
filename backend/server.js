@@ -14,7 +14,7 @@ const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
 const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
-const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes } = require('../utils/videoBackgroundSelector');
+const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
 const { postProcessVideo } = require('../utils/videoPostProcessor');
 
@@ -3321,25 +3321,28 @@ app.get('/api/affiliate/avatar/background-options', (req, res) => {
 // POST /api/affiliate/avatar/re-render — re-render same script with different background
 app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   noStore(res);
-  const { videoId, backgroundUrl, backgroundId } = req.body || {};
+  const { videoId, backgroundUrl, scene } = req.body || {};
 
   if (!videoId) return res.status(400).json({ error: 'videoId required (original video to re-render)' });
-  if (!backgroundUrl && !backgroundId) return res.status(400).json({ error: 'Provide backgroundUrl or backgroundId' });
 
   // Load original render metadata
   const cf = path.join(MEDIA_CACHE_DIR, `${videoId}.json`);
   if (!fs.existsSync(cf)) return res.status(404).json({ error: 'Original render metadata not found' });
   const meta = JSON.parse(fs.readFileSync(cf, 'utf8'));
 
-  // Resolve background URL
+  // Resolve background URL — 3 options:
+  // 1. User provides exact backgroundUrl
+  // 2. User provides scene type (e.g. "beach") → random unique image from that scene
+  // 3. Neither → random unique image from product category
+  const { getRandomBackground, detectCategory } = require('../utils/videoBackgroundSelector');
   let bgUrl = backgroundUrl;
-  if (!bgUrl && backgroundId) {
-    const { BACKGROUND_OPTIONS } = require('../utils/videoBackgroundSelector');
-    for (const opts of Object.values(BACKGROUND_OPTIONS)) {
-      const match = opts.find(o => o.id === backgroundId);
-      if (match) { bgUrl = match.url; break; }
-    }
-    if (!bgUrl) return res.status(400).json({ error: `Background ID "${backgroundId}" not found` });
+  let bgScene = scene || 'random';
+
+  if (!bgUrl) {
+    const category = scene || detectCategory(meta) || 'default';
+    const randomBg = getRandomBackground(category);
+    bgUrl = randomBg.url;
+    bgScene = randomBg.scene;
   }
 
   const aid = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
@@ -3351,7 +3354,6 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
       script: meta.script, avatar_id: aid, voice_id: vid,
       config: { aspect: '9:16', background: heygenBg, caption: false, test: false }
     });
-    // Save new render metadata with reference to original
     fs.writeFileSync(
       path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
       JSON.stringify({
@@ -3360,7 +3362,7 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
         productTitle: meta.productTitle,
         productPageUrl: meta.productPageUrl,
         script: meta.script,
-        background: { type: 'image', url: bgUrl },
+        background: { type: 'image', url: bgUrl, scene: bgScene },
         processedImageUrl: meta.processedImageUrl,
         affiliateCode: meta.affiliateCode || '',
         productImageUrl: meta.productImageUrl || null,
@@ -3373,8 +3375,9 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
       newVideoId: render.video_id,
       originalVideoId: videoId,
       status: 'rendering',
+      scene: bgScene,
       backgroundUsed: bgUrl,
-      message: 'Re-rendering with new background. Check status with /api/affiliate/avatar/video-status/' + render.video_id
+      message: `Re-rendering with unique ${bgScene} background. Every render is different. Check status: /api/affiliate/avatar/video-status/${render.video_id}`
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

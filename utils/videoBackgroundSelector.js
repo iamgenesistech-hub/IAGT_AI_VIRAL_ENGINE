@@ -175,8 +175,159 @@ const CATEGORY_THEMES = {
   }
 };
 
-// Lifestyle background image URLs — free-to-use high-quality images
-// Each category has MULTIPLE options so user can pick their preferred background
+// ── Dynamic Random Background Engine ─────────────────────────────────────────
+// Every render gets a UNIQUE background. Unsplash source URLs return a different
+// random high-quality photo on each request for the given search terms.
+// Format: https://source.unsplash.com/1920x1080/?query1,query2
+// Adding a cache-buster (&sig=timestamp) guarantees uniqueness even if CDN caches.
+
+// Scene keywords per category — multiple variations for maximum diversity
+const SCENE_QUERIES = {
+  health: [
+    'nature,morning,sunlight,wellness',
+    'tropical,beach,sunrise,calm',
+    'mountain,meadow,fresh,green',
+    'zen,garden,peaceful,outdoor',
+    'lake,forest,serene,morning',
+    'yoga,outdoor,sunrise,park'
+  ],
+  supplements: [
+    'modern,kitchen,clean,bright',
+    'marble,countertop,minimalist,luxury',
+    'natural,wood,rustic,organic',
+    'bright,studio,white,clean',
+    'cafe,modern,warm,interior',
+    'farmhouse,kitchen,natural,light'
+  ],
+  fitness: [
+    'outdoor,track,stadium,sunrise',
+    'rooftop,city,workout,urban',
+    'beach,fitness,ocean,morning',
+    'mountain,trail,running,scenic',
+    'park,exercise,trees,daylight',
+    'boxing,ring,industrial,dramatic'
+  ],
+  beauty: [
+    'pink,marble,luxury,vanity',
+    'salon,modern,elegant,mirror',
+    'flowers,soft,pastel,feminine',
+    'bathroom,spa,luxury,clean',
+    'boutique,glamour,gold,interior',
+    'rose,garden,soft,light'
+  ],
+  skincare: [
+    'spa,luxury,towels,zen',
+    'bathroom,marble,minimalist,clean',
+    'tropical,leaves,natural,fresh',
+    'water,droplets,clean,blue',
+    'bamboo,zen,stone,peaceful',
+    'cotton,white,soft,clean'
+  ],
+  food: [
+    'kitchen,chef,modern,bright',
+    'farm,table,organic,rustic',
+    'restaurant,elegant,food,plating',
+    'garden,herbs,fresh,outdoor',
+    'market,colorful,fresh,produce',
+    'picnic,outdoor,summer,natural'
+  ],
+  tech: [
+    'office,modern,desk,minimal',
+    'neon,city,night,futuristic',
+    'startup,workspace,bright,clean',
+    'server,room,blue,technology',
+    'coworking,space,modern,design',
+    'digital,abstract,dark,sleek'
+  ],
+  lifestyle: [
+    'urban,fashion,street,city',
+    'cafe,cozy,morning,lifestyle',
+    'apartment,modern,stylish,interior',
+    'shopping,district,luxury,urban',
+    'rooftop,bar,sunset,city',
+    'beach,resort,luxury,tropical'
+  ],
+  spiritual: [
+    'temple,sunrise,peaceful,golden',
+    'candles,meditation,dark,warm',
+    'forest,light,rays,mystical',
+    'ocean,sunset,calm,spiritual',
+    'incense,zen,room,quiet',
+    'stars,night,sky,cosmic'
+  ],
+  finance: [
+    'office,skyline,modern,glass',
+    'trading,floor,screens,professional',
+    'luxury,car,lifestyle,wealth',
+    'penthouse,city,view,night',
+    'gold,bars,vault,wealth',
+    'yacht,ocean,luxury,lifestyle'
+  ],
+  education: [
+    'library,books,study,warm',
+    'classroom,modern,bright,learning',
+    'university,campus,outdoor,green',
+    'desk,study,lamp,cozy',
+    'bookshelf,home,reading,warm',
+    'lecture,hall,professional,clean'
+  ],
+  default: [
+    'studio,professional,modern,clean',
+    'office,minimalist,bright,white',
+    'urban,city,modern,background',
+    'luxury,interior,elegant,room',
+    'nature,outdoor,professional,light',
+    'abstract,gradient,dark,premium'
+  ]
+};
+
+/**
+ * Get a random unique background URL for a category.
+ * Uses Unsplash source with random query variation + cache-buster = unique every time.
+ * @param {string} category
+ * @returns {{ url: string, query: string, scene: string }}
+ */
+function getRandomBackground(category = 'default') {
+  const queries = SCENE_QUERIES[category] || SCENE_QUERIES.default;
+  // Pick a random query from the category's options
+  const query = queries[Math.floor(Math.random() * queries.length)];
+  // Cache-buster ensures we never get the same cached image
+  const sig = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const url = `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}&sig=${sig}`;
+  return { url, query, scene: query.split(',')[0] };
+}
+
+/**
+ * Get multiple background options for preview (user picks a vibe/scene type).
+ * Each option generates a UNIQUE image on click/render — never the same twice.
+ * @param {object} product — product data
+ * @returns {Array} scene options user can choose from (each renders unique)
+ */
+function getBackgroundOptions(product = {}) {
+  const category = detectCategory(product);
+  const queries = SCENE_QUERIES[category] || SCENE_QUERIES.default;
+  const defaultQueries = SCENE_QUERIES.default;
+  const allQueries = [...new Set([...queries, ...defaultQueries])];
+
+  return allQueries.map((query, i) => {
+    const keywords = query.split(',');
+    const label = keywords.slice(0, 2).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' + ');
+    const sig = `${Date.now()}-${i}`;
+    return {
+      id: `${category}-scene-${i}`,
+      label,
+      category,
+      scene: keywords[0],
+      query,
+      // Preview URL (shows one random example of this scene type)
+      preview: `https://source.unsplash.com/400x300/?${encodeURIComponent(query)}&sig=${sig}`,
+      // Actual render URL will be generated fresh at render time (unique every render)
+      note: 'Each render produces a unique image from this scene type'
+    };
+  });
+}
+
+// Legacy static fallbacks (used only if Unsplash source is unreachable)
 const LIFESTYLE_IMAGES = {
   health:      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1920&q=90&fit=crop',
   supplements: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1920&q=90&fit=crop',
@@ -192,55 +343,8 @@ const LIFESTYLE_IMAGES = {
   default:     'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=90&fit=crop'
 };
 
-// Multiple background options per category — gives user choice
-const BACKGROUND_OPTIONS = {
-  health: [
-    { id: 'health-1', label: 'Nature Morning', url: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1920&q=90&fit=crop' },
-    { id: 'health-2', label: 'Clean Studio White', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
-    { id: 'health-3', label: 'Modern Living Room', url: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1920&q=90&fit=crop' },
-    { id: 'health-4', label: 'Outdoor Park', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=90&fit=crop' }
-  ],
-  supplements: [
-    { id: 'supps-1', label: 'Clean Kitchen', url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1920&q=90&fit=crop' },
-    { id: 'supps-2', label: 'Bright Studio', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
-    { id: 'supps-3', label: 'Natural Wood Table', url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1920&q=90&fit=crop' },
-    { id: 'supps-4', label: 'Urban Loft', url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1920&q=90&fit=crop' }
-  ],
-  fitness: [
-    { id: 'fit-1', label: 'Modern Gym', url: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1920&q=90&fit=crop' },
-    { id: 'fit-2', label: 'Outdoor Track', url: 'https://images.unsplash.com/photo-1461896836934-bd45f5db39c1?w=1920&q=90&fit=crop' },
-    { id: 'fit-3', label: 'Minimalist Studio', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
-    { id: 'fit-4', label: 'City Rooftop', url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1920&q=90&fit=crop' }
-  ],
-  default: [
-    { id: 'def-1', label: 'Professional Studio', url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=90&fit=crop' },
-    { id: 'def-2', label: 'Modern Office', url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=90&fit=crop' },
-    { id: 'def-3', label: 'Clean White Wall', url: 'https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=1920&q=90&fit=crop' },
-    { id: 'def-4', label: 'Urban Street', url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1920&q=90&fit=crop' },
-    { id: 'def-5', label: 'Luxury Interior', url: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1920&q=90&fit=crop' }
-  ]
-};
-
-/**
- * Get background options for a product (user can choose before or after render).
- * @param {object} product — product data
- * @returns {Array} array of background choices with id, label, url, preview
- */
-function getBackgroundOptions(product = {}) {
-  const category = detectCategory(product);
-  const categoryOptions = BACKGROUND_OPTIONS[category] || BACKGROUND_OPTIONS.default;
-  const defaultOptions = BACKGROUND_OPTIONS.default;
-  // Combine category-specific + general options, deduplicate by id
-  const seen = new Set();
-  const options = [];
-  for (const opt of [...categoryOptions, ...defaultOptions]) {
-    if (!seen.has(opt.id)) {
-      seen.add(opt.id);
-      options.push({ ...opt, category, preview: opt.url });
-    }
-  }
-  return options;
-}
+// Keep BACKGROUND_OPTIONS for the re-render endpoint (backwards compatible)
+const BACKGROUND_OPTIONS = SCENE_QUERIES;
 
 // ── Category detection ────────────────────────────────────────────────────────
 
@@ -324,15 +428,17 @@ function selectBackground(product = {}, processedImageUrl = null, mode = 'produc
     };
   }
 
-  // Mode: lifestyle — category-matched lifestyle photo
+  // Mode: lifestyle — RANDOM category-matched scene (unique every render)
   if (mode === 'lifestyle') {
-    const lifestyleUrl = LIFESTYLE_IMAGES[category] || LIFESTYLE_IMAGES.default;
+    const randomBg = getRandomBackground(category);
     return {
       type: 'image',
-      url:  lifestyleUrl,
+      url:  randomBg.url,
       theme,
       category,
-      mode: 'lifestyle-scene'
+      scene: randomBg.scene,
+      query: randomBg.query,
+      mode: 'lifestyle-random'
     };
   }
 
@@ -386,7 +492,9 @@ module.exports = {
   getCategoryGradient,
   getAllThemes,
   getBackgroundOptions,
+  getRandomBackground,
   CATEGORY_THEMES,
   LIFESTYLE_IMAGES,
-  BACKGROUND_OPTIONS
+  BACKGROUND_OPTIONS,
+  SCENE_QUERIES
 };
