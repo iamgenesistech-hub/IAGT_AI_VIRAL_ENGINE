@@ -173,6 +173,10 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
 
+app.get('/workspace', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/live-ops.html'));
+});
+
 // -------------------------
 // Health / status
 // -------------------------
