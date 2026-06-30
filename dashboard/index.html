@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EVICS — AI Viral Marketing Engine</title>
+  <title>EVICS — Command Center</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -15,170 +15,252 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
     }
     .bg-glow {
       position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(ellipse at 60% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                  radial-gradient(ellipse at 30% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 60% 40%, rgba(99,102,241,0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse at 30% 70%, rgba(16,185,129,0.06) 0%, transparent 50%);
       animation: drift 20s ease-in-out infinite alternate;
       pointer-events: none;
     }
-    @keyframes drift { from { transform: translate(0, 0); } to { transform: translate(30px, -20px); } }
-    .container {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      padding: 2rem;
-      max-width: 700px;
+    @keyframes drift { from { transform: translate(0,0); } to { transform: translate(30px,-20px); } }
+
+    /* LOGIN GATE */
+    .gate { position: relative; z-index: 1; text-align: center; padding: 2rem; max-width: 400px; }
+    .gate-logo { font-size: 3.5rem; margin-bottom: 1rem; }
+    .gate-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .gate-accent { background: linear-gradient(135deg,#6366f1,#10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .gate-sub { color: #71717a; font-size: 0.9rem; margin-bottom: 2rem; }
+    .gate-input {
+      width: 100%; padding: 14px 18px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+      color: #fff; font-size: 1rem; margin-bottom: 1rem; outline: none;
+      transition: border-color 0.3s;
     }
-    .logo {
-      font-size: 4rem;
-      margin-bottom: 0.5rem;
+    .gate-input:focus { border-color: #6366f1; }
+    .gate-input::placeholder { color: #52525b; }
+    .gate-btn {
+      width: 100%; padding: 14px; background: linear-gradient(135deg,#6366f1,#4f46e5);
+      border: none; border-radius: 10px; color: #fff; font-size: 1rem;
+      font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
     }
-    .brand {
-      font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: -1px;
-      margin-bottom: 0.3rem;
+    .gate-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99,102,241,0.3); }
+    .gate-error { color: #ef4444; font-size: 0.85rem; margin-top: 0.8rem; display: none; }
+
+    /* ADMIN DASHBOARD */
+    .admin { display: none; position: relative; z-index: 1; padding: 2rem; width: 100%; max-width: 900px; }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 2.5rem; padding-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .brand-accent {
-      background: linear-gradient(135deg, #6366f1, #10b981);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+    .admin-brand { display: flex; align-items: center; gap: 0.8rem; }
+    .admin-brand-icon { font-size: 2rem; }
+    .admin-brand-text { font-size: 1.4rem; font-weight: 700; }
+    .admin-logout {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      color: #a1a1aa; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 0.85rem; transition: all 0.2s;
     }
-    .tagline {
-      font-size: 1.1rem;
-      color: #a1a1aa;
-      margin-bottom: 2.5rem;
-      line-height: 1.6;
+    .admin-logout:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; }
+    .admin-welcome {
+      font-size: 1.6rem; font-weight: 700; margin-bottom: 0.5rem;
     }
-    .powered {
-      font-size: 0.85rem;
-      color: #52525b;
-      margin-bottom: 3rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
+    .admin-status { color: #10b981; font-size: 0.9rem; margin-bottom: 2rem; }
+    .admin-status::before { content: '●'; margin-right: 6px; }
+
+    .admin-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.2rem; margin-bottom: 2.5rem;
     }
-    .cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 3rem;
+    .admin-card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 1.8rem; text-decoration: none; color: #fff;
+      transition: all 0.3s; position: relative; overflow: hidden;
     }
-    .card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 2rem 1.5rem;
-      text-decoration: none;
-      color: #fff;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
+    .admin-card:hover {
+      background: rgba(255,255,255,0.06); border-color: rgba(99,102,241,0.4);
+      transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0,0,0,0.3);
     }
-    .card:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(99, 102, 241, 0.4);
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    .admin-card-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+    .admin-card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .admin-card-desc { font-size: 0.85rem; color: #a1a1aa; line-height: 1.5; }
+    .admin-card-arrow {
+      position: absolute; top: 1rem; right: 1rem; font-size: 1.1rem;
+      opacity: 0; transform: translateX(-5px); transition: all 0.3s;
     }
-    .card-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-    .card-title {
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
+    .admin-card:hover .admin-card-arrow { opacity: 1; transform: translateX(0); }
+    .admin-card.disabled {
+      opacity: 0.5; pointer-events: none;
     }
-    .card-desc {
-      font-size: 0.9rem;
-      color: #a1a1aa;
-      line-height: 1.5;
+    .admin-card-badge {
+      display: inline-block; font-size: 0.7rem; background: rgba(99,102,241,0.2);
+      color: #a5b4fc; padding: 3px 8px; border-radius: 4px; margin-top: 0.5rem;
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
-    .card-arrow {
-      position: absolute;
-      top: 1.2rem;
-      right: 1.2rem;
-      font-size: 1.2rem;
-      opacity: 0;
-      transform: translateX(-5px);
-      transition: all 0.3s ease;
+
+    .admin-section-title {
+      font-size: 0.85rem; color: #52525b; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 1rem; margin-top: 1rem;
     }
-    .card:hover .card-arrow { opacity: 1; transform: translateX(0); }
-    .features {
-      display: flex;
-      gap: 2rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 3rem;
+
+    .admin-footer {
+      text-align: center; padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.8rem; color: #3f3f46;
     }
-    .feature {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: #71717a;
-    }
-    .feature-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #10b981;
-    }
-    .footer {
-      font-size: 0.8rem;
-      color: #3f3f46;
-    }
-    .footer a {
-      color: #6366f1;
-      text-decoration: none;
-    }
+
     @media (max-width: 600px) {
-      .cards { grid-template-columns: 1fr; }
-      .brand { font-size: 2rem; }
-      .logo { font-size: 3rem; }
-      .features { flex-direction: column; align-items: center; gap: 1rem; }
+      .admin-grid { grid-template-columns: 1fr; }
+      .admin-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
     }
   </style>
 </head>
 <body>
   <div class="bg-glow"></div>
-  <div class="container">
-    <div class="logo">⚡</div>
-    <h1 class="brand">EVICS <span class="brand-accent">Engine</span></h1>
-    <p class="tagline">AI-powered viral marketing platform. Generate avatar videos, track affiliate performance, and scale your brand — all automated.</p>
-    <p class="powered">Powered by I AM GENESIS TECH</p>
 
-    <div class="cards">
-      <a href="/affiliate/" class="card">
-        <span class="card-arrow">→</span>
-        <div class="card-icon">🚀</div>
-        <div class="card-title">Join as Affiliate</div>
-        <div class="card-desc">Sign up free, get your unique link, and start earning 15-30% commission on every sale.</div>
+  <!-- LOGIN GATE -->
+  <div class="gate" id="gate">
+    <div class="gate-logo">⚡</div>
+    <h1 class="gate-title">EVICS <span class="gate-accent">Engine</span></h1>
+    <p class="gate-sub">Admin Access Only</p>
+    <input type="password" class="gate-input" id="gatePin" placeholder="Enter admin PIN" autocomplete="off" />
+    <button class="gate-btn" id="gateBtn">Access Console</button>
+    <p class="gate-error" id="gateError">Invalid PIN. Access denied.</p>
+  </div>
+
+  <!-- ADMIN CONSOLE -->
+  <div class="admin" id="admin">
+    <div class="admin-header">
+      <div class="admin-brand">
+        <span class="admin-brand-icon">⚡</span>
+        <span class="admin-brand-text">EVICS <span class="gate-accent">Console</span></span>
+      </div>
+      <button class="admin-logout" id="logoutBtn">Lock Console</button>
+    </div>
+
+    <h2 class="admin-welcome">Welcome back, Roland.</h2>
+    <p class="admin-status">EVICS Engine Online — All Systems Operational</p>
+
+    <p class="admin-section-title">Core Systems</p>
+    <div class="admin-grid">
+      <a href="/affiliate/workspace?code=ROLAND787" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">🎬</div>
+        <div class="admin-card-title">Video Workspace</div>
+        <div class="admin-card-desc">Generate AI avatar videos, manage backgrounds, test renders.</div>
       </a>
-      <a href="/affiliate/workspace" class="card">
-        <span class="card-arrow">→</span>
-        <div class="card-icon">🎬</div>
-        <div class="card-title">Affiliate Workspace</div>
-        <div class="card-desc">Generate AI avatar videos, choose backgrounds, track your content — all from one dashboard.</div>
+      <a href="/affiliate/" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">🌐</div>
+        <div class="admin-card-title">Affiliate Hub</div>
+        <div class="admin-card-desc">Public signup page. View what affiliates see when they register.</div>
+      </a>
+      <a href="/api/affiliates" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">👥</div>
+        <div class="admin-card-title">Affiliate Data</div>
+        <div class="admin-card-desc">View all registered affiliates, codes, and performance metrics.</div>
       </a>
     </div>
 
-    <div class="features">
-      <div class="feature"><div class="feature-dot"></div>AI Video Generation</div>
-      <div class="feature"><div class="feature-dot"></div>Auto Backgrounds</div>
-      <div class="feature"><div class="feature-dot"></div>Multi-Platform</div>
-      <div class="feature"><div class="feature-dot"></div>Live Analytics</div>
-      <div class="feature"><div class="feature-dot"></div>Instant Payouts</div>
+    <p class="admin-section-title">Platform &amp; Tools</p>
+    <div class="admin-grid">
+      <a href="#" class="admin-card disabled">
+        <div class="admin-card-icon">📱</div>
+        <div class="admin-card-title">Phone App</div>
+        <div class="admin-card-desc">EVICS mobile app for on-the-go content creation and affiliate management.</div>
+        <span class="admin-card-badge">Coming Soon</span>
+      </a>
+      <a href="#" class="admin-card disabled">
+        <div class="admin-card-icon">📊</div>
+        <div class="admin-card-title">Analytics</div>
+        <div class="admin-card-desc">Revenue tracking, conversion funnels, affiliate leaderboard, and KPIs.</div>
+        <span class="admin-card-badge">Coming Soon</span>
+      </a>
+      <a href="#" class="admin-card disabled">
+        <div class="admin-card-icon">🏪</div>
+        <div class="admin-card-title">Multi-Store Engine</div>
+        <div class="admin-card-desc">License EVICS to other Shopify stores. White-label affiliate system.</div>
+        <span class="admin-card-badge">Future</span>
+      </a>
     </div>
 
-    <div class="footer">
-      <p>© 2025 I AM GENESIS TECH LLC &nbsp;·&nbsp; <a href="https://iamgenesistech.com" target="_blank">iamgenesistech.com</a></p>
+    <p class="admin-section-title">Quick Actions</p>
+    <div class="admin-grid">
+      <a href="/api/health" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">💚</div>
+        <div class="admin-card-title">Health Check</div>
+        <div class="admin-card-desc">Verify API is running and all services are connected.</div>
+      </a>
+      <a href="https://iamgenesistech.myshopify.com/admin" target="_blank" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">🛒</div>
+        <div class="admin-card-title">Shopify Admin</div>
+        <div class="admin-card-desc">Manage products, orders, and store settings.</div>
+      </a>
+      <a href="https://console.cloud.google.com/run?project=iagt-ai-viral-engine" target="_blank" class="admin-card">
+        <span class="admin-card-arrow">→</span>
+        <div class="admin-card-icon">☁️</div>
+        <div class="admin-card-title">Cloud Console</div>
+        <div class="admin-card-desc">Google Cloud Run dashboard, logs, and deployments.</div>
+      </a>
+    </div>
+
+    <div class="admin-footer">
+      <p>EVICS Engine v1.0 &nbsp;·&nbsp; © 2025 I AM GENESIS TECH LLC &nbsp;·&nbsp; Admin Console — Do Not Share</p>
     </div>
   </div>
+
+  <script>
+    (function() {
+      const ADMIN_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
+      const STORAGE_KEY = 'evics_admin_session';
+
+      async function sha256(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      function showAdmin() {
+        document.getElementById('gate').style.display = 'none';
+        document.getElementById('admin').style.display = 'block';
+        sessionStorage.setItem(STORAGE_KEY, '1');
+      }
+
+      function showGate() {
+        document.getElementById('gate').style.display = 'block';
+        document.getElementById('admin').style.display = 'none';
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+
+      // Auto-login if session active
+      if (sessionStorage.getItem(STORAGE_KEY) === '1') {
+        showAdmin();
+      }
+
+      // Login
+      document.getElementById('gateBtn').addEventListener('click', async () => {
+        const pin = document.getElementById('gatePin').value;
+        const hash = await sha256(pin);
+        if (hash === ADMIN_HASH) {
+          showAdmin();
+        } else {
+          document.getElementById('gateError').style.display = 'block';
+          document.getElementById('gatePin').value = '';
+        }
+      });
+
+      document.getElementById('gatePin').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('gateBtn').click();
+      });
+
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', showGate);
+    })();
+  </script>
 </body>
 </html>
