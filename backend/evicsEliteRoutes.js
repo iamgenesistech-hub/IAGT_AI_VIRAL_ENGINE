@@ -390,6 +390,32 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
     res.sendFile(path.join(controlCenterDir, 'index.html'));
   });
 
+  // Provide a services configuration endpoint expected by the EVICS workspace UI
+  app.get('/api/services/config', (_req, res) => {
+    try {
+      const services = [
+        { provider: 'heygen', configured: Boolean(process.env.HEYGEN_API_KEY), ready: Boolean(process.env.HEYGEN_API_KEY && process.env.HEYGEN_AVATAR_ID && process.env.HEYGEN_VOICE_ID), missing: [] },
+        { provider: 'runway', configured: Boolean(process.env.RUNWAY_API_KEY), ready: Boolean(process.env.RUNWAY_API_KEY), missing: [] },
+        { provider: 'kling', configured: Boolean(process.env.KLING_API_KEY), ready: Boolean(process.env.KLING_API_KEY), missing: [] },
+        { provider: 'shopify', configured: Boolean(process.env.SHOPIFY_STORE_DOMAIN && (process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN)), ready: Boolean(process.env.SHOPIFY_STORE_DOMAIN && (process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN)), missing: [] },
+        { provider: 'supabase', configured: Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)), ready: Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)), missing: [] }
+      ];
+
+      // Build a simple failover status structure that the UI expects
+      const failoverStatus = {
+        activeProvider: services.find(s => s.provider === 'heygen' && s.ready) ? 'heygen' : (services.find(s => s.ready) || services[0]).provider,
+        providers: services.reduce((acc, s) => {
+          acc[s.provider] = { configured: s.configured, ready: s.ready };
+          return acc;
+        }, {})
+      };
+
+      return sendJson(res, 200, { success: true, services, failoverStatus });
+    } catch (error) {
+      return sendJson(res, 500, { success: false, error: error.message || 'Could not build services config.' });
+    }
+  });
+
   app.get('/api/brand-profile/get', (_req, res) => {
     const state = readState();
     const profile = state.brandProfiles.find((item) => item.id === state.selectedProfileId) || state.brandProfiles[0] || DEFAULT_BRAND_PROFILE;
