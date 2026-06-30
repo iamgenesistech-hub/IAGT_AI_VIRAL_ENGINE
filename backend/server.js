@@ -85,9 +85,9 @@ app.use('/processed-images', express.static(BG_CACHE_DIR));
 app.use('/processed-videos', express.static(path.join(__dirname, '../processed-videos')));
 
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
-app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
-app.get('/affiliate', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html')));
 app.get('/affiliate/workspace', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/workspace.html')));
+app.get('/affiliate', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html')));
+app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
 app.get('/ref/:code', (req, res) => {
   res.redirect(`/affiliate?ref=${encodeURIComponent(req.params.code)}`);
 });
