@@ -14,7 +14,7 @@ const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
 const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
-const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground } = require('../utils/videoBackgroundSelector');
+const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground, resolveBackgroundUrl } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
 const { postProcessVideo } = require('../utils/videoPostProcessor');
 
@@ -3225,13 +3225,18 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   // If user provided a specific backgroundUrl, use it directly
   let bgConfig, heygenBg;
   if (backgroundUrl) {
-    heygenBg = { type: 'image', url: backgroundUrl };
-    bgConfig = { type: 'image', url: backgroundUrl, mode: 'user-selected', category: 'custom' };
+    const resolvedUrl = await resolveBackgroundUrl(backgroundUrl);
+    heygenBg = { type: 'image', url: resolvedUrl };
+    bgConfig = { type: 'image', url: resolvedUrl, mode: 'user-selected', category: 'custom' };
   } else {
     // Use 'lifestyle' mode (real scene photos) when no product image available
     const productObj = product || { title: productTitle, imageUrl: productImageUrl };
     const bgMode = processedImageUrl ? 'product' : (backgroundMode === 'color' ? 'color' : 'lifestyle');
     bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, bgMode);
+    // Resolve redirect URLs to direct image URLs (HeyGen won't follow redirects)
+    if (bgConfig.url && bgConfig.url.includes('source.unsplash.com')) {
+      bgConfig.url = await resolveBackgroundUrl(bgConfig.url);
+    }
     heygenBg   = toHeyGenBackground(bgConfig);
   }
 
@@ -3334,7 +3339,7 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   // 1. User provides exact backgroundUrl
   // 2. User provides scene type (e.g. "beach") → random unique image from that scene
   // 3. Neither → random unique image from product category
-  const { getRandomBackground, detectCategory } = require('../utils/videoBackgroundSelector');
+  const { getRandomBackground, detectCategory, resolveBackgroundUrl: resolveBg } = require('../utils/videoBackgroundSelector');
   let bgUrl = backgroundUrl;
   let bgScene = scene || 'random';
 
@@ -3344,6 +3349,9 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
     bgUrl = randomBg.url;
     bgScene = randomBg.scene;
   }
+
+  // Resolve redirect to direct image URL for HeyGen
+  bgUrl = await resolveBg(bgUrl);
 
   const aid = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
   const vid = process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';

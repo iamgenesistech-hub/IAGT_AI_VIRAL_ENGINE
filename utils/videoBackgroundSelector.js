@@ -298,6 +298,42 @@ function getRandomBackground(category = 'default') {
 }
 
 /**
+ * Resolve a source.unsplash.com redirect URL to the final direct image URL.
+ * HeyGen requires direct image URLs (won't follow 302 redirects).
+ * @param {string} sourceUrl — the source.unsplash.com URL
+ * @returns {Promise<string>} — resolved direct image URL
+ */
+async function resolveBackgroundUrl(sourceUrl) {
+  if (!sourceUrl || !sourceUrl.includes('source.unsplash.com')) {
+    return sourceUrl; // Already a direct URL
+  }
+  try {
+    const https = require('https');
+    const http = require('http');
+    const resolved = await new Promise((resolve, reject) => {
+      const doRequest = (url, redirects = 0) => {
+        if (redirects > 5) return resolve(url); // Max redirects, use what we have
+        const mod = url.startsWith('https') ? https : http;
+        const req = mod.get(url, { timeout: 8000 }, (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            doRequest(res.headers.location, redirects + 1);
+          } else {
+            resolve(url); // Final destination
+          }
+          res.resume(); // Consume response data to free memory
+        });
+        req.on('error', () => resolve(url));
+        req.on('timeout', () => { req.destroy(); resolve(url); });
+      };
+      doRequest(sourceUrl);
+    });
+    return resolved;
+  } catch {
+    return sourceUrl; // Fallback to unresolved URL
+  }
+}
+
+/**
  * Get multiple background options for preview (user picks a vibe/scene type).
  * Each option generates a UNIQUE image on click/render — never the same twice.
  * @param {object} product — product data
@@ -493,6 +529,7 @@ module.exports = {
   getAllThemes,
   getBackgroundOptions,
   getRandomBackground,
+  resolveBackgroundUrl,
   CATEGORY_THEMES,
   LIFESTYLE_IMAGES,
   BACKGROUND_OPTIONS,
