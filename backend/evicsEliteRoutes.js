@@ -385,6 +385,9 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
     res.sendFile(path.join(controlCenterDir, 'index.html'));
   });
 
+  // Serve control-center static files at /evics/* so client requests like /evics/app.js work
+  app.use('/evics', express.static(controlCenterDir));
+
   app.get('/evics/', (_req, res) => {
     noStore(res);
     res.sendFile(path.join(controlCenterDir, 'index.html'));
