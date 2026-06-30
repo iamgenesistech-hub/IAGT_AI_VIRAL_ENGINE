@@ -10,6 +10,7 @@ const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections, fetchShopifyOrders } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
+const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
 const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
@@ -331,6 +332,12 @@ app.get('/api/production-closeout/status', async (_req, res) => {
 
 registerEvicsRecoveryRoutes(app, SupabaseConnector);
 registerEvicsEvieRoutes(app);
+registerEvicsEliteRoutes(app, {
+  SupabaseConnector,
+  startHeyGenRender,
+  getHeyGenVideoStatus,
+  controlCenterDir: path.join(__dirname, '../dashboard/control-center')
+});
 registerMediaOutputRoutes(app, SupabaseConnector);
 
 // -------------------------

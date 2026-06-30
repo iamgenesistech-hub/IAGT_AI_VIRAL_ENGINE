@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node backend/server.js",
     "sync:shopify:admin": "node sync-shopify-products.js",
-    "check": "node --check backend/server.js && node --check backend/sharedEvicsEvieCore.js && node --check backend/evicsEvieRoutes.js && node --check tests/evics-evie-validation.js",
+    "check": "node --check backend/server.js && node --check backend/sharedEvicsEvieCore.js && node --check backend/evicsEvieRoutes.js && node --check backend/evicsEliteRoutes.js && node --check tests/evics-evie-validation.js",
     "test": "node tests/evics-evie-validation.js",
     "test:legacy-scraper": "node scrapers/viralScraper.js"
   },
