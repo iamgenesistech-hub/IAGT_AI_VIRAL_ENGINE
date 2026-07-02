@@ -18,7 +18,7 @@
     },
     "video_url": "https://files2.heygen.ai/aws_pacific/avatar_tmp/9ca421623079479f8dee4b0f5faffdda/a0ffed3071874ce6be3be5fe86087a56.mp4",
     "thumbnail_url": "https://files2.heygen.ai/aws_pacific/avatar_tmp/9ca421623079479f8dee4b0f5faffdda/a0ffed3071874ce6be3be5fe86087a56.jpeg",
-    "render_name": "Digestive Enzyme - Avatar Render (A+)",
+    "render_name": "Digestive Enzyme · Avatar Render (A+)",
     "product_name": "Digestive Enzyme",
     "status": "completed",
     "platform": "heygen",
@@ -41,7 +41,7 @@
       "sourceProvider": "heygen"
     },
     "video_url": "https://files2.heygen.ai/aws_pacific/avatar_tmp/9ca421623079479f8dee4b0f5faffdda/v549d45632f5f49718a111d6bc4dddae4/535469c89fb142d8a99af09ad020de81.mp4",
-    "render_name": "Eden Super Greens Pack - Avatar Render",
+    "render_name": "Eden Super Greens Pack · Avatar Render",
     "product_name": "Eden's Super Greens Pack",
     "status": "completed",
     "platform": "heygen",
@@ -65,5 +65,28 @@
     },
     "vault_destination": "/generated/evics-sea-moss-proof-render.mp4",
     "created_at": "2026-07-01T06:03:00.000Z"
+  },
+  {
+    "id": "96accf8848e44c378cea8d4919f972d6",
+    "created_at": "2026-07-02T17:40:04.454Z",
+    "render_name": "Collagen Peptides · Avatar Render (A+)",
+    "product_name": "Collagen Peptides Premium",
+    "parameters": {
+      "mediaType": "video",
+      "productUrl": "https://iamgenesistech.myshopify.com/products/collagen-peptides-premium",
+      "avatar_id": "Abigail_expressive_2024112501",
+      "voice_id": "fd407cedebcc4f29bdbd75ba45c01ea7",
+      "text_overlay_rule": "NO_TEXT_OVER_FACE enforced",
+      "duration": 5.56,
+      "storageUrl": "https://storage.googleapis.com/evics-storage-evics-api/renders/collagen-peptides-avatar-render-96accf88.mp4"
+    },
+    "status": "completed",
+    "platform": "heygen",
+    "job_id": "96accf8848e44c378cea8d4919f972d6",
+    "video_id": "96accf8848e44c378cea8d4919f972d6",
+    "vault_destination": "https://storage.googleapis.com/evics-storage-evics-api/renders/collagen-peptides-avatar-render-96accf88.mp4",
+    "gcs_bucket": "evics-storage-evics-api",
+    "gcs_path": "renders/collagen-peptides-avatar-render-96accf88.mp4",
+    "pipeline": "EVICS autonomous v2"
   }
 ]
