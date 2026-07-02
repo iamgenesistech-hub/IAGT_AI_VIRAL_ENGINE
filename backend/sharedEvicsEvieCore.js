@@ -278,6 +278,7 @@ function buildTemplateScript(prompt, ranking) {
     scenes,
     voiceover: scenes.map(scene => scene.text).join(' '),
     captions: scenes.map(scene => scene.text.slice(0, 80)),
+    qualityScores: ranking.scores,
     quality: evaluateQuality(ranking),
     compliance: evaluateCompliance(ranking),
     createdAt: nowIso(),
@@ -312,6 +313,7 @@ async function buildScript(prompt, ranking) {
         voiceover: String(llmOutput.voiceover || scenes.map(scene => scene.text).join(' ')).trim(),
         captions: Array.isArray(llmOutput.captions) && llmOutput.captions.length > 0 ? llmOutput.captions : scenes.map(scene => scene.text.slice(0, 80)),
         cta: llmOutput.cta || ranking.format.ctaPattern,
+        qualityScores: ranking.scores,
         quality: evaluateQuality(ranking),
         compliance: evaluateCompliance(ranking),
         llm: llmOutput.llm,
@@ -339,14 +341,27 @@ async function buildScript(prompt, ranking) {
 }
 
 function evaluateQuality(script) {
+  const qualityScores = script && (script.qualityScores || script.scores || script.quality || {});
   const failed = Object.entries(QUALITY_GATES)
-    .filter(([key, min]) => Number(script.qualityScores[key]) < min)
-    .map(([key, min]) => ({ key, min, actual: script.qualityScores[key] }));
+    .filter(([key, min]) => Number(qualityScores[key]) < min)
+    .map(([key, min]) => ({ key, min, actual: qualityScores[key] }));
   return {
+    ...qualityScores,
     passed: failed.length === 0,
     failed,
     gates: QUALITY_GATES
   };
+}
+
+function evaluateCompliance(ranking) {
+  const syntheticScript = {
+    hook: ranking.format.hookPattern || ranking.format.ctaPattern || '',
+    scenes: [
+      { text: ranking.product.name },
+      ...ranking.product.benefits.map((benefit) => ({ text: benefit }))
+    ]
+  };
+  return complianceFlags(ranking, syntheticScript);
 }
 
 function createRenderJob(script, ranking, options = {}) {
@@ -376,7 +391,8 @@ function createRenderJob(script, ranking, options = {}) {
 }
 
 function complianceFlags(ranking, script) {
-  const text = `${script.hook} ${script.scenes.map((scene) => scene.text).join(' ')}`.toLowerCase();
+  const scenes = Array.isArray(script.scenes) ? script.scenes : [];
+  const text = `${script.hook || ''} ${scenes.map((scene) => scene.text).join(' ')}`.toLowerCase();
   const riskyTerms = ['cure', 'treat', 'guaranteed', 'diagnose'];
   const found = riskyTerms.filter((term) => text.includes(term));
   return {
@@ -410,18 +426,44 @@ function appendCopilotLog(entry) {
   fs.appendFileSync(ORCHESTRATION_LOG, `${JSON.stringify({ ...entry, at: nowIso() })}\n`);
 }
 
-async function runActionFlow(input = {}) {
+function readOrchestrationLog() {
+  if (!fs.existsSync(ORCHESTRATION_LOG)) return [];
+
+  const raw = fs.readFileSync(ORCHESTRATION_LOG, 'utf8').trim();
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch (_error) {
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          const parsed = JSON.parse(line);
+          return Array.isArray(parsed) ? parsed : [parsed];
+        } catch (_lineError) {
+          return [];
+        }
+      });
+  }
+}
+
+function runActionFlow(input = {}) {
   const rankings = rankCandidates(input);
   const selected = input.faceless === true
     ? rankings.find((ranking) => ranking.format.faceless) || rankings[0]
     : rankings[0];
-  const prompt = buildPrompt(selected, { operatorCommand: input.command });
-  const script = buildScript(prompt, selected);
+  const prompt = buildTemplatePrompt(selected, { operatorCommand: input.command });
+  const script = buildTemplateScript(prompt, selected);
   const quality = evaluateQuality(script);
   const compliance = complianceFlags(selected, script);
   const renderJob = createRenderJob(script, selected, { provider: input.provider || 'mock' });
   const reviewReady = quality.passed && compliance.passed && renderJob.status !== 'blocked';
-  const publishReady = reviewReady && Number(script.qualityScores.overall) >= QUALITY_GATES.overall;
+  const qualityScores = script && script.qualityScores ? script.qualityScores : {};
+  const publishReady = reviewReady && Number(qualityScores.overall || 0) >= QUALITY_GATES.overall;
   const flow = {
     flowId: canonicalId('flow', { rankingId: selected.id, promptId: prompt.id, at: nowIso() }),
     status: renderJob.status === 'blocked' ? 'blocked-live-provider' : publishReady ? 'publish-ready' : 'review-ready',
@@ -492,81 +534,6 @@ function copilotOrchestrate(input = {}) {
     childAgents
   });
   return response;
-}
-
-function systemHealth() {
-  const wisdom = readWisdom();
-  return {
-    ok: true,
-    architecture: 'EVICS_EVIE_SHARED',
-    qualityGates: QUALITY_GATES,
-    dataDir: DATA_DIR,
-    wisdomVersion: wisdom.version,
-    promptVersionCount: wisdom.promptVersions.length,
-    learningCount: wisdom.learnings.length,
-    mockRenderAvailable: fs.existsSync(path.join(ROOT, 'generated', 'evics-sea-moss-proof-render.mp4')),
-    liveHeygenConfigured: Boolean(process.env.HEYGEN_API_KEY),
-    timestamp: nowIso()
-  };
-}
-
-module.exports = {
-  QUALITY_GATES,
-  DEFAULT_WEIGHTS,
-  canonicalId,
-  seedCatalog,
-  rankCandidates,
-  buildTemplatePrompt,
-  buildPrompt,
-  buildTemplateScript,
-  buildScript,
-  createRenderJob,
-  runActionFlow,
-  copilotOrchestrate,
-  systemHealth,
-  readWisdom
-};async function copilotOrchestrate(command = {}) {
-  const wisdom = readWisdom();
-  try {
-    const llmResponse = await llmProvider.generateCopilotResponse({
-      operatorCommand: command.operatorCommand || command.command || command.message || '',
-      context: command,
-      wisdom
-    });
-    const entry = {
-      id: canonicalId('copilot', { command, at: nowIso() }),
-      command,
-      response: llmResponse.response || 'I reviewed the current EVICS context and prepared next actions.',
-      actions: llmResponse.actions || ['review_rankings', 'generate_prompt', 'validate_compliance'],
-      riskFlags: llmResponse.risk_flags || [],
-      confidence: llmResponse.confidence || 'medium',
-      llm: llmResponse.llm,
-      createdAt: nowIso(),
-      source: 'llm'
-    };
-    ensureDataDir();
-    const log = fs.existsSync(ORCHESTRATION_LOG) ? JSON.parse(fs.readFileSync(ORCHESTRATION_LOG, 'utf8')) : [];
-    log.push(entry);
-    fs.writeFileSync(ORCHESTRATION_LOG, JSON.stringify(log.slice(-100), null, 2));
-    return entry;
-  } catch (error) {
-    console.warn('[EVICS Evie] LLM copilot failed, falling back to deterministic response:', error.message);
-    const entry = {
-      id: canonicalId('copilot', { command, at: nowIso() }),
-      command,
-      response: 'I reviewed the current EVICS context. Rank candidates, generate the strongest prompt/script pair, then validate quality and compliance before render handoff.',
-      actions: ['review_rankings', 'generate_prompt', 'validate_compliance'],
-      wisdomVersion: wisdom.version,
-      warning: 'LLM copilot failed; deterministic fallback used.',
-      createdAt: nowIso(),
-      source: 'template'
-    };
-    ensureDataDir();
-    const log = fs.existsSync(ORCHESTRATION_LOG) ? JSON.parse(fs.readFileSync(ORCHESTRATION_LOG, 'utf8')) : [];
-    log.push(entry);
-    fs.writeFileSync(ORCHESTRATION_LOG, JSON.stringify(log.slice(-100), null, 2));
-    return entry;
-  }
 }
 
 function systemHealth() {

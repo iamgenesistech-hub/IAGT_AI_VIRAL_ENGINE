@@ -1,0 +1,273 @@
+{
+  "timestamp": "2026-07-01T17:52:28.721Z",
+  "target": {
+    "grade": "A+",
+    "minimumScore": 95,
+    "requirement": "all build domains >= 95"
+  },
+  "overall": {
+    "score": 100,
+    "grade": "A+",
+    "achievedAPlus": true
+  },
+  "builds": {
+    "evics": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "workspace shell",
+          "passed": true
+        },
+        {
+          "name": "evics alias",
+          "passed": true
+        },
+        {
+          "name": "closeout success",
+          "passed": true
+        },
+        {
+          "name": "heygen configured",
+          "passed": true
+        }
+      ]
+    },
+    "affiliateHub": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "affiliate landing",
+          "passed": true
+        },
+        {
+          "name": "affiliate workspace",
+          "passed": true
+        },
+        {
+          "name": "affiliate store status",
+          "passed": true
+        }
+      ]
+    },
+    "phoneApp": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "phone feed endpoint",
+          "passed": true
+        },
+        {
+          "name": "phone feed has rows array",
+          "passed": true
+        }
+      ]
+    },
+    "adminWorkspace": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "executive workspace",
+          "passed": true
+        },
+        {
+          "name": "analytics workspace",
+          "passed": true
+        },
+        {
+          "name": "distribution workspace",
+          "passed": true
+        }
+      ]
+    },
+    "scannersScrapers": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "trend scout >= 90",
+          "passed": true
+        },
+        {
+          "name": "product match >= 88",
+          "passed": true
+        },
+        {
+          "name": "office agent >= 95",
+          "passed": true
+        }
+      ]
+    },
+    "learningLoop": {
+      "score": 100,
+      "grade": "A+",
+      "checks": [
+        {
+          "name": "learning loop endpoint success",
+          "passed": true
+        },
+        {
+          "name": "learning loop message",
+          "passed": true
+        }
+      ]
+    }
+  },
+  "objectiveChecks": {
+    "evics-workspace-consistency": {
+      "passed": true
+    },
+    "affiliate-hub-performance": {
+      "passed": true
+    },
+    "phone-app-observability": {
+      "passed": true
+    },
+    "scanner-scraper-excellence": {
+      "passed": true
+    },
+    "learning-loop-closed": {
+      "passed": true
+    },
+    "a-plus-validation-evidence": {
+      "passed": true
+    }
+  },
+  "evidence": {
+    "workspaceCoverage": [
+      {
+        "id": "workspace-shell",
+        "label": "EVICS Workspace Shell",
+        "path": "/workspace",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "evics-alias",
+        "label": "EVICS Alias",
+        "path": "/evics",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "viral-intelligence",
+        "label": "Viral Intelligence",
+        "path": "/workspace?section=viral-intelligence",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "ai-reconstruction",
+        "label": "AI Reconstruction",
+        "path": "/workspace?section=ai-reconstruction",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "video-generation",
+        "label": "Video Generation",
+        "path": "/workspace?section=video-generation",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "media-output",
+        "label": "Media Output",
+        "path": "/workspace?section=media-output",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "distribution",
+        "label": "Distribution",
+        "path": "/workspace?section=distribution",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "analytics",
+        "label": "Analytics",
+        "path": "/workspace?section=analytics",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "executive-workspace",
+        "label": "Executive Workspace",
+        "path": "/workspace?section=executive-workspace",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "affiliate-hub",
+        "label": "Affiliate Hub Landing",
+        "path": "/affiliate",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "affiliate-workspace",
+        "label": "Affiliate Hub Workspace",
+        "path": "/affiliate/workspace?code=ROLAND787",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "phone-app-workspace",
+        "label": "Phone App Workspace",
+        "path": "/phone-app",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "affiliate-admin-hub",
+        "label": "Affiliate AdminHub Workspace",
+        "path": "/admin-hub",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "phone-app-feed",
+        "label": "Phone App Render Feed API",
+        "path": "/api/renders/phone-app",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "id": "heygen-evidence-endpoint",
+        "label": "HeyGen Proof Evidence API",
+        "path": "/api/evidence/heygen",
+        "status": 200,
+        "passed": true
+      }
+    ],
+    "agentScores": {
+      "trendScout": 94,
+      "productMatch": 91,
+      "officeAgent": 98
+    },
+    "learningLoop": {
+      "request": {
+        "creativeId": "a-plus-audit-1782928348865",
+        "watchTime": 15.4,
+        "engagement": 11.2,
+        "ctr": 4.9,
+        "sales": 1,
+        "conversionRate": 3.2
+      },
+      "response": {
+        "success": true,
+        "message": "Performance data recorded. Patterns will update nightly."
+      },
+      "status": 200
+    },
+    "closeout": {
+      "success": true,
+      "heygenConfigured": true,
+      "liveProofAvailable": true
+    }
+  }
+}

@@ -13,3 +13,10 @@ Require stack:
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[EVICS] 404 GET /api/services/config (170ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[EVICS] 404 GET /api/services/config (6ms)
+[EVICS] 404 GET /evics/app.js (3ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401

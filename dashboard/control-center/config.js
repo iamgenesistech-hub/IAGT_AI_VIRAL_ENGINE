@@ -23,6 +23,12 @@ window.IAGT_CONFIG = {
                    _lsGet("evics_supabase_url") || "",
   supabaseAnonKey: (typeof process !== "undefined" && process.env && process.env.REACT_APP_SUPABASE_ANON_KEY) ||
                    _lsGet("evics_supabase_anon_key") || "",
+  adminAccessCode: (typeof process !== "undefined" && process.env && process.env.REACT_APP_ADMIN_ACCESS_CODE) ||
+                   _lsGet("evics_admin_access_code") || "TITANIUM-ADMIN",
+  jordanAvatarId:  (typeof process !== "undefined" && process.env && process.env.REACT_APP_JORDAN_AVATAR_ID) ||
+                   _lsGet("evics_jordan_avatar_id") || "",
+  jordanVoiceId:   (typeof process !== "undefined" && process.env && process.env.REACT_APP_JORDAN_VOICE_ID) ||
+                   _lsGet("evics_jordan_voice_id") || "",
 };
 
 // ------------------------------------------------------------------
@@ -35,7 +41,7 @@ window.IAGT_EXTERNAL_APIS = {
 
   // ── Video Generation ──────────────────────────────────────────
   heygen: {
-    endpoint:    "https://api.heygen.com/v2",
+    endpoint:    "https://api.heygen.com/v3",
     envKey:      "HEYGEN_API_KEY",
     status:      "configured",
     description: "HeyGen avatar & spokesperson video generation",

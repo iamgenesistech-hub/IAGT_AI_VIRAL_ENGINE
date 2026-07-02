@@ -19,9 +19,135 @@ async function agentGet(endpoint) {
   return res.json();
 }
 
+async function apiFetch(endpoint, options = {}) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+  return res.json();
+}
+
+function execControlClass(state) {
+  if (state === "running") return "state-running";
+  if (state === "completed") return "state-completed";
+  return "state-off";
+}
+
+const EXEC_CONTROL_STANDBY_MS = 60000;
+
+function execControlKey(el, index = 0) {
+  if (!el) return "";
+  if (el.id) return `id:${el.id}`;
+  if (el.dataset && el.dataset.execControl) return el.dataset.execControl;
+  if (el.dataset && el.dataset.mediaAction) return `media-action:${el.dataset.mediaId || "global"}:${el.dataset.mediaAction}`;
+  if (el.dataset && el.dataset.mediaReviewId) return `media-review:${el.dataset.mediaReviewId}`;
+  if (el.dataset && el.dataset.mediaFilter) return `media-filter:${el.dataset.mediaFilter}`;
+  if (el.dataset && el.dataset.select) return `select:${el.dataset.select}`;
+  if (el.dataset && el.dataset.targetSection) return `section:${el.dataset.targetSection}`;
+  const text = String(el.textContent || el.value || "control").trim().toLowerCase().replace(/\s+/g, "-");
+  return `inline:${text || "control"}:${index}`;
+}
+
+function applyExecControlState(el, state) {
+  if (!el) return;
+  el.classList.add("exec-control");
+  if (el.tagName === "SELECT") {
+    el.classList.add("exec-control-select");
+  }
+  el.classList.remove("state-running", "state-completed", "state-off");
+  el.classList.add(execControlClass(state));
+}
+
+function setExecControlState(target, controlState, autoOffMs = 0) {
+  const key = typeof target === "string" ? target : target?.dataset?.execControl;
+  if (!key) return;
+  state.execControlStates = state.execControlStates || {};
+  state.execControlTimers = state.execControlTimers || {};
+  state.execControlStates[key] = controlState;
+  if (state.execControlTimers[key]) {
+    clearTimeout(state.execControlTimers[key]);
+    delete state.execControlTimers[key];
+  }
+  const escapedKey = (window.CSS && typeof window.CSS.escape === "function")
+    ? window.CSS.escape(key)
+    : String(key).replace(/["\\]/g, "\\$&");
+  document.querySelectorAll(`[data-exec-control="${escapedKey}"]`).forEach((el) => applyExecControlState(el, controlState));
+  const effectiveAutoOffMs = controlState === "completed"
+    ? Math.max(EXEC_CONTROL_STANDBY_MS, Number(autoOffMs || 0))
+    : Number(autoOffMs || 0);
+  if (effectiveAutoOffMs > 0) {
+    state.execControlTimers[key] = setTimeout(() => {
+      state.execControlStates[key] = "off";
+      document.querySelectorAll(`[data-exec-control="${escapedKey}"]`).forEach((el) => applyExecControlState(el, "off"));
+    }, effectiveAutoOffMs);
+  }
+}
+
+function registerExecControls(root = document) {
+  const controls = root.querySelectorAll("button, select, .toggle-link, .quality-validate-btn, .media-action-btn, .media-review-action-btn");
+  controls.forEach((el, index) => {
+    if (!el.dataset.execControl) {
+      el.dataset.execControl = execControlKey(el, index);
+    }
+    const current = (state.execControlStates && state.execControlStates[el.dataset.execControl]) || "off";
+    applyExecControlState(el, current);
+  });
+}
+
+function bindExecControlLiveStates(root = document) {
+  const controls = root.querySelectorAll("button[data-exec-control], .toggle-link[data-exec-control], .quality-validate-btn[data-exec-control], .media-action-btn[data-exec-control], .media-review-action-btn[data-exec-control]");
+  controls.forEach((controlEl) => {
+    if (controlEl.dataset.execLiveBound === "true") return;
+    controlEl.dataset.execLiveBound = "true";
+    controlEl.addEventListener("click", () => {
+      const key = controlEl.dataset.execControl;
+      if (!key) return;
+      setExecControlState(controlEl, "running");
+      window.setTimeout(() => {
+        const currentState = state.execControlStates && state.execControlStates[key];
+        if (currentState === "running") {
+          setExecControlState(controlEl, "completed", EXEC_CONTROL_STANDBY_MS);
+        }
+      }, 900);
+    });
+  });
+}
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+  return state;
+}
+
+function getExecutiveAdminCode() {
+  return window.IAGT_CONFIG && typeof window.IAGT_CONFIG.adminAccessCode === "string"
+    ? window.IAGT_CONFIG.adminAccessCode
+    : "";
+}
+
+function getRequestedSectionFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    const querySection = url.searchParams.get("section");
+    const hashSection = (window.location.hash || "").replace(/^#/, "").trim();
+    return (querySection || hashSection || "").trim() || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 const state = {
   // ── Navigation ──
-  currentSection: "viral-intelligence",
+  currentSection: (() => {
+    const requestedSection = getRequestedSectionFromUrl();
+    if (requestedSection) return requestedSection;
+    try {
+      return localStorage.getItem("evics_current_section") || "viral-intelligence";
+    } catch (e) {
+      return "viral-intelligence";
+    }
+  })(),
 
   // ── Media Management ──
   selectedMediaType: "All",
@@ -70,10 +196,26 @@ const state = {
   assemblyHookFilter: "All",
   assemblyScriptFilter: "All",
   assemblyProductFilter: "All",
-  videoDuration: "30s",
+  videoDuration: "20s",
   videoStyle: "UGC",
   videoVoice: "Female",
   videoBackground: "Music",
+  videoAvatarPreset: "Jordan Avatar",
+  videoVisualBackground: "Ocean Dawn",
+  videoEffectPreset: "Ocean Reveal",
+  videoEntryTiming: "Beat 2 product entrance",
+  videoProductTreatment: "Background removed + AI ocean composite",
+  videoGovernanceMode: "AI best judgment",
+  videoEffectBrief: "",
+  videoTimingBrief: "",
+  videoBrandBrief: "",
+  videoCompanyLabel: "I AM GENESIS TECH",
+  videoProductTitle: "Sea Moss Capsules",
+  videoProductMockupUrl: "",
+  videoProductPageUrl: "https://iamgenesistech.myshopify.com/products/sea-moss-capsules",
+  videoDestinationUrl: "",
+  videoTextOverlayPosition: "bottom",
+  videoTrackingProtocol: "UTM + purchase event",
   videoAspect: "9:16",
   renderStatus: "idle",
   renderMessage: "Waiting for submitted input.",
@@ -84,6 +226,10 @@ const state = {
   renderVideoId: null,
   renderStatusUrl: null,
   exportMessage: "Generate a completed video before exporting.",
+  heygenAuthMode: "checking",
+  heygenAuthDetail: "Checking HeyGen auth route…",
+  heygenAccount: null,
+  heygenRecentSessions: [],
 
   // Legacy assembly data retained for non-video sections that still read shared creative state
   assemblyHookFilter: "All",
@@ -131,6 +277,9 @@ const state = {
   agentStatusLoading: false,
   agentStatusError: null,
   agentPipelineHealth: 98,
+  vpMission: null,
+  vpMissionLoading: false,
+  vpMissionError: null,
 
   // Published Media Gallery
   publishedMediaOpen: false,
@@ -139,6 +288,26 @@ const state = {
   publishedMediaFilter: "All",
   selectedPublishedId: null,
   publishActionStatus: null,
+
+  // Alerts / API management
+  alerts: [],
+  alertsUnread: 0,
+  servicesConfig: [],
+  servicesLoading: false,
+  failoverMode: false,
+  failoverStatus: {},
+  failoverLog: [],
+  selectedServiceId: null,
+  serviceApiKeyInput: "",
+  serviceApiKeyVisible: false,
+  apiMgmtTab: "overview",
+  addCreditsAmount: 100,
+  serviceActionStatus: null,
+  adminAccessGranted: (() => {
+    try { return sessionStorage.getItem("evics_admin_access_granted") === "true"; } catch (e) { return false; }
+  })(),
+  adminAccessCodeInput: "",
+  adminAccessError: null,
 
   // Analytics Dashboard
   analyticsOpen: false,
@@ -196,6 +365,10 @@ const state = {
   systemHealth: null,
   systemHealthLoading: false,
   systemHealthLastFetch: null,
+  excellenceStatus: null,
+  excellenceObjectives: [],
+  excellenceLoading: false,
+  excellenceError: null,
   // Distribution channel publish state (keyed by dist-ch-{idx})
   distChannelStatus: {},
   distPublishingAll: false,
@@ -222,8 +395,75 @@ const state = {
   communityStats: null,
   communityStatsLoading: false,
   communityFeed: [],
-  communityFeedLoading: false
+  communityFeedLoading: false,
+  wisdomDaily: null,
+  wisdomLoading: false,
+
+  // Viral workspace / media review runtime state
+  mediaFilter: "all",
+  mediaVideos: [],
+  mediaStats: null,
+  mediaLoading: false,
+  mediaReviewOpen: false,
+  mediaReviewVideo: null,
+  mediaSelectedIds: new Set(),
+  mediaAiSuggestions: [],
+  mediaRejectionReason: "",
+  mediaActionLoading: false,
+  mediaGalleryOpen: false,
+  mediaRenderQueue: [],
+  viralLoading: false,
+  viralScanInProgress: false,
+  viralAnalysisLoading: false,
+  viralBriefLoading: false,
+  viralProductMatchLoading: false,
+  viralFindInProgress: false,
+  viralGalleryOpen: false,
+  viralVideos: [],
+  viralAnalysis: null,
+  viralCreativeBrief: null,
+  viralProductMatches: [],
+  viralSelectedVideo: null,
+  viralFilterCategory: "All",
+  viralFilterPlatform: "All",
+  viralMemoriesLoading: false,
+  productViralMemories: [],
+  selectedProductViral: null,
+  viralScheduleResult: null,
+  liveRenders: [],
+  reproductionInProgress: false,
+  reproductionResult: null,
+  renderPollingActive: false,
+  nextScanScheduled: null,
+  lastScanDate: null,
+  inputMessage: "",
+  inputStatus: null,
+  scriptInput: "",
+  submittedScript: "",
+  uploadedScriptName: "",
+  showCopilotPanel: false,
+  copilotExplanations: [],
+  copilotOpen: false,
+  copilotQuestion: "",
+  copilotAnswer: null,
+  copilotNextActions: [],
+  copilotExplanations: [],
+  copilotExplanationsLoading: false,
+  copilotSuggestionsLoading: false,
+  copilotSuggestions: [],
+  copilotRefinements: [],
+  copilotExplanation: null
 };
+
+const WORKSPACE_SECTIONS = [
+  { id: "viral-intelligence", icon: "radar", label: "Viral Intelligence", desc: "Trend scanning, hook discovery, viral pattern analysis" },
+  { id: "ai-reconstruction", icon: "spark", label: "AI Reconstruction", desc: "AI-powered creative reconstruction from viral ads" },
+  { id: "video-generation", icon: "video", label: "Video Generation", desc: "Video rendering via HeyGen, Runway, and Kling" },
+  { id: "media-output", icon: "film", label: "Media Output", desc: "Playback, render routing, QA instructions, and approvals" },
+  { id: "distribution", icon: "send", label: "Distribution", desc: "Publishing queue and channel management" },
+  { id: "analytics", icon: "chart", label: "Analytics", desc: "Performance metrics and learning loop" },
+  { id: "executive-workspace", icon: "crown", label: "Executive Workspace", desc: "Executive controls, agent orchestration, and gated API access" }
+];
 
 window.state = state;
 
@@ -311,7 +551,7 @@ let viralAds = [
 ];
 
 let products = [
-  { name: "Sea Moss Mineral Gel", category: "Sea moss", score: 96, angle: "daily mineral ritual" },
+  { name: "Sea Moss Capsules", category: "Sea moss", score: 96, angle: "daily mineral ritual" },
   { name: "Metabolic Ignite", category: "Weight loss", score: 91, angle: "morning reset" },
   { name: "Genesis Glow Collagen", category: "Beauty", score: 88, angle: "skin confidence" },
   { name: "Apex Testosterone Support", category: "Testosterone", score: 86, angle: "training foundation" },
@@ -322,10 +562,10 @@ let creatives = [
   {
     id: "cr-001",
     status: "Ready",
-    product: "Sea Moss Mineral Gel",
+    product: "Sea Moss Capsules",
     format: "UGC TikTok",
     hook: "Nobody tells you minerals can change your whole morning.",
-    script: "Open on bathroom counter. Hand picks up Sea Moss Gel. VO: 'Nobody tells you minerals can change your whole morning. I started this ritual 30 days ago...' Cut to morning routine. Product close-up. CTA: 'Start your mineral ritual today.'",
+    script: "Open on bathroom counter. Hand picks up Sea Moss Capsules. VO: 'Nobody tells you minerals can change your whole morning. I started this ritual 30 days ago...' Cut to morning routine. Product close-up. CTA: 'Start your mineral ritual today.'",
     asset: "9:16 video, subtitles, thumbnail",
     channel: "TikTok + Reels",
     score: 94,
@@ -391,8 +631,8 @@ let winningHooks = [
 // ── Demo product viral memories ──
 let demoProductViralMemories = [
   {
-    product_id: "sea-moss-mineral-gel",
-    product_name: "Sea Moss Mineral Gel",
+    product_id: "sea-moss-capsules",
+    product_name: "Sea Moss Capsules",
     most_viral_ad_id: "ad-001",
     viral_score: 94,
     hook: "Nobody tells you minerals can change your whole morning.",
@@ -475,7 +715,7 @@ let demoProductViralMemories = [
 let workflow = [
   ["6:00 AM", "Scrape viral content", "TikTok, Reels, Shorts, Ads Library, Pinterest, X"],
   ["6:30 AM", "Analyze winning structures", "Hooks, pacing, CTAs, visual patterns, emotional tags"],
-  ["7:00 AM", "Match products", "Connect trends to IAGT supplements and offers"],
+  ["7:00 AM", "Match products", "Connect trends to EVICS supplements and offers"],
   ["7:30 AM", "Generate new ads", "Scripts, videos, captions, thumbnails, A/B versions"],
   ["8:00 AM", "Quality review", "Optional human approval before publishing"],
   ["Nightly", "Learning loop", "Update best hooks, products, channels, and formats"]
@@ -549,6 +789,40 @@ async function hydrateFromServerApi() {
     state.syncMessage = `${payload.products.length} Shopify products loaded into Product Matching.`;
   } catch (error) {
     console.warn("Shopify product API unavailable.", error);
+  }
+
+  function formatHeyGenAuthModeLabel(mode) {
+    if (!mode) return "Unknown";
+    if (mode === "cli_api_key") return "CLI API Key (Priority 1)";
+    if (mode === "oauth_bearer") return "OAuth Bearer (Priority 2)";
+    if (mode === "cli_fallback_session") return "CLI Session Fallback (Priority 3)";
+    if (mode === "not_configured") return "Not Configured";
+    return mode;
+  }
+
+  function formatHeyGenCreditsLabel(account) {
+    if (!account) return "Credits unavailable";
+    if (account.credits_remaining !== null && account.credits_remaining !== undefined) {
+      const total = account.credits_total !== null && account.credits_total !== undefined ? ` / ${account.credits_total}` : "";
+      return `${account.credits_remaining}${total} credits`;
+    }
+    return "Credits reported by HeyGen plan UI";
+  }
+
+  async function hydrateHeyGenStatus() {
+    try {
+      const account = await apiFetch("/api/heygen/account-status");
+      const sessions = await apiFetch("/api/heygen/video-agent-sessions?limit=5");
+      state.heygenAccount = account.account || null;
+      state.heygenRecentSessions = Array.isArray(sessions.sessions) ? sessions.sessions : [];
+      state.heygenAuthMode = account.auth?.mode || "unknown";
+      state.heygenAuthDetail = `${formatHeyGenAuthModeLabel(account.auth?.mode)} · ${formatHeyGenCreditsLabel(account.account)}`;
+    } catch (error) {
+      state.heygenAccount = null;
+      state.heygenRecentSessions = [];
+      state.heygenAuthMode = "error";
+      state.heygenAuthDetail = error.message || "HeyGen status unavailable";
+    }
   }
 }
 
@@ -752,14 +1026,14 @@ function mediaApprovalLabel(status) {
   return map[status] || "Pending Review";
 }
 
-function filteredMediaVideos() {
+function legacyFilteredMediaVideos() {
   const f = state.mediaFilter;
   if (f === "all") return state.mediaVideos;
   if (f === "pending") return state.mediaVideos.filter((v) => !v.approvalStatus || v.approvalStatus === "pending");
   return state.mediaVideos.filter((v) => v.approvalStatus === f);
 }
 
-function renderMediaStatusDashboard() {
+function legacyRenderMediaStatusDashboard() {
   const s = state.mediaStats;
   return `
     <div class="media-stats-row">
@@ -787,7 +1061,7 @@ function renderMediaStatusDashboard() {
   `;
 }
 
-function renderMediaCard(video) {
+function legacyRenderMediaCard(video) {
   const approvalStatus = video.approvalStatus || "pending";
   const isSelected = state.mediaSelectedIds.has(video.id);
   const params = video.parameters || {};
@@ -830,7 +1104,9 @@ function renderMediaCard(video) {
 function renderReviewPanel(video) {
   if (!video) return "";
   const approvalStatus = video.approvalStatus || "pending";
-  const params = video.parameters || {};
+  const params = typeof video.parameters === "string" ? (() => { try { return JSON.parse(video.parameters); } catch { return {}; } })() : (video.parameters || {});
+  const mediaType = String(video.mediaType || video.media_type || "video").toLowerCase();
+  const mediaUrl = video.videoUrl || video.video_url || video.previewUrl || video.preview_url || video.storageUrl || video.storage_url || null;
   const suggestions = state.mediaAiSuggestions || video.aiSuggestions;
   const isAtLimit = (video.iterationCount || 0) >= 3;
 
@@ -850,16 +1126,14 @@ function renderReviewPanel(video) {
           <!-- Video Player -->
           <div class="media-player-col">
             <div class="media-player-wrap media-player-${(params.aspect || "9:16").replace(":", "-")}">
-              ${video.videoUrl
-                ? `<video src="${video.videoUrl}" controls playsinline class="media-player-video"></video>`
-                : `<div class="media-player-placeholder">${icon("video")}<span>No video URL yet</span><small>${video.status === "queued" ? "Queued for rendering…" : video.status === "pending" ? "Awaiting render engine" : "Video unavailable"}</small></div>`
-              }
+              ${renderMediaPreviewSurface({ ...video, media_type: mediaType, video_url: mediaUrl }, "modal")}
             </div>
 
             <!-- Metadata -->
             <div class="media-meta-grid">
               <div class="media-meta-item"><dt>Platform</dt><dd>${video.platform}</dd></div>
               <div class="media-meta-item"><dt>Product</dt><dd>${video.product || "—"}</dd></div>
+              <div class="media-meta-item"><dt>Media Type</dt><dd>${mediaTypeLabel(mediaType)}</dd></div>
               <div class="media-meta-item"><dt>Style</dt><dd>${params.style || "—"}</dd></div>
               <div class="media-meta-item"><dt>Duration</dt><dd>${params.duration || "—"}</dd></div>
               <div class="media-meta-item"><dt>Aspect</dt><dd>${params.aspect || "—"}</dd></div>
@@ -965,8 +1239,8 @@ function renderReviewPanel(video) {
   `;
 }
 
-function renderMediaGallery() {
-  const filtered = filteredMediaVideos();
+function legacyRenderMediaGallery() {
+  const filtered = legacyFilteredMediaVideos();
   const hasSelection = state.mediaSelectedIds.size > 0;
 
   return `
@@ -986,13 +1260,13 @@ function renderMediaGallery() {
 
       ${state.mediaGalleryOpen ? `
 
-      ${renderMediaStatusDashboard()}
+      ${legacyRenderMediaStatusDashboard()}
 
       <div class="media-gallery-controls">
         <div class="media-filter-tabs">
           ${["all", "pending", "approved", "needs_rerender", "discarded"].map((f) => `
             <button class="media-filter-tab ${state.mediaFilter === f ? "active" : ""}" data-media-filter="${f}">
-              ${f === "all" ? "All" : f === "needs_rerender" ? "Re-render" : mediaApprovalLabel(f)}
+              ${f === "all" ? "All" : f === "needs_rerender" ? "Re-render" : legacyMediaApprovalLabel(f)}
               <span class="media-filter-count">${
                 f === "all" ? state.mediaVideos.length
                 : f === "pending" ? state.mediaStats.pending
@@ -1025,7 +1299,7 @@ function renderMediaGallery() {
         </div>
       ` : `
         <div class="media-grid">
-          ${filtered.map(renderMediaCard).join("")}
+          ${filtered.map(legacyRenderMediaCard).join("")}
         </div>
       `}
 
@@ -1049,7 +1323,7 @@ function renderMediaGallery() {
   `;
 }
 
-function formatRelativeTime(isoString) {
+function legacyFormatRelativeTime(isoString) {
   if (!isoString) return "—";
   const date = new Date(isoString);
   if (Number.isNaN(date.getTime())) return String(isoString);
@@ -1063,7 +1337,7 @@ function formatRelativeTime(isoString) {
   return `${days}d ago`;
 }
 
-async function loadMediaGallery() {
+async function legacyLoadMediaGallery() {
   state.mediaLoading = true;
   render();
   try {
@@ -1081,7 +1355,7 @@ async function loadMediaGallery() {
     }
   } catch {
     // Demo mode: populate with sample data from existing renders
-    state.mediaVideos = buildDemoMediaVideos();
+    state.mediaVideos = legacyBuildDemoMediaVideos();
     state.mediaStats = {
       total: state.mediaVideos.length,
       approved: state.mediaVideos.filter((v) => v.approvalStatus === "approved").length,
@@ -1094,7 +1368,7 @@ async function loadMediaGallery() {
   render();
 }
 
-function buildDemoMediaVideos() {
+function legacyBuildDemoMediaVideos() {
   return [
     {
       id: "demo-v-001",
@@ -1103,13 +1377,13 @@ function buildDemoMediaVideos() {
       thumbnailUrl: null,
       status: "complete",
       approvalStatus: "pending",
-      script: "Open on bathroom counter. Hand picks up Sea Moss Gel. VO: 'Nobody tells you minerals can change your whole morning.' Cut to morning routine. Product close-up. CTA: 'Start your mineral ritual today.'",
+      script: "Open on bathroom counter. Hand picks up Sea Moss Capsules. VO: 'Nobody tells you minerals can change your whole morning.' Cut to morning routine. Product close-up. CTA: 'Start your mineral ritual today.'",
       parameters: { style: "UGC", duration: "15s", voice: "Female", background: "Music", aspect: "9:16" },
       rejectionReason: "",
       aiSuggestions: null,
       iterationCount: 0,
       qualityScore: 94,
-      product: "Sea Moss Mineral Gel",
+      product: "Sea Moss Capsules",
       hook: "Nobody tells you minerals can change your whole morning.",
       createdAt: new Date(Date.now() - 3600000).toISOString(),
     },
@@ -1197,6 +1471,17 @@ function buildDemoMediaVideos() {
 
 // ── End Media Gallery helpers ──────────────────────────────────────────────
 
+const MEDIA_TYPES = [
+  { id: "All", label: "All Media" },
+  { id: "video", label: "Video" },
+  { id: "print_ad", label: "Print Ads" },
+  { id: "email", label: "Email" },
+  { id: "social_post", label: "Social Posts" },
+  { id: "landing_page", label: "Landing Pages" },
+  { id: "ugc", label: "UGC" },
+  { id: "banner", label: "Banners" }
+];
+
 function render() {
   const app = document.getElementById("app");
   const ad = selectedAd();
@@ -1221,16 +1506,16 @@ const RENDER_APPS = [
 
 // Demo media items used when Supabase is unavailable
 const DEMO_MEDIA = [
-  { id: "m-001", media_type: "video",       platform: "heygen",   status: "complete", script: "Sea Moss morning ritual — 15s UGC",          score: 94, created_at: "2025-01-15T08:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "Nobody tells you minerals can change your whole morning." },
+  { id: "m-001", media_type: "video",       platform: "heygen",   status: "complete", script: "Sea Moss morning ritual — 15s UGC",          score: 94, created_at: "2025-01-15T08:00:00Z", video_url: null, product: "Sea Moss Capsules",        hook: "Nobody tells you minerals can change your whole morning." },
   { id: "m-002", media_type: "video",       platform: "runway",   status: "complete", script: "Collagen glow lifestyle edit — 9:16",         score: 89, created_at: "2025-01-15T09:30:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "This changed my skin in 7 days." },
   { id: "m-003", media_type: "video",       platform: "kling",    status: "pending",  script: "Testosterone gym commercial — 30s",           score: 81, created_at: "2025-01-15T10:00:00Z", video_url: null, product: "Apex Testosterone Support",  hook: "Your training needs foundation, not hype." },
-  { id: "m-004", media_type: "print_ad",    platform: "canva",    status: "complete", script: "Sea Moss flatlay print — A4 portrait",        score: 87, created_at: "2025-01-14T14:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "The mineral ritual your body has been missing." },
+  { id: "m-004", media_type: "print_ad",    platform: "canva",    status: "complete", script: "Sea Moss flatlay print — A4 portrait",        score: 87, created_at: "2025-01-14T14:00:00Z", video_url: null, product: "Sea Moss Capsules",        hook: "The mineral ritual your body has been missing." },
   { id: "m-005", media_type: "print_ad",    platform: "manual",   status: "complete", script: "Collagen beauty magazine spread",             score: 83, created_at: "2025-01-14T15:30:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "Glow from within." },
   { id: "m-006", media_type: "email",       platform: "internal", status: "complete", script: "Weekly wellness newsletter — Jan 15",         score: 76, created_at: "2025-01-14T16:00:00Z", video_url: null, product: "Genesis Wellness Bundle",    hook: "Your weekly ritual starts here." },
   { id: "m-007", media_type: "email",       platform: "internal", status: "draft",    script: "Flash sale email — 48hr offer",               score: 71, created_at: "2025-01-13T11:00:00Z", video_url: null, product: "Metabolic Ignite",           hook: "48 hours. Your reset starts now." },
-  { id: "m-008", media_type: "social_post", platform: "canva",    status: "complete", script: "TikTok caption + hook card — Sea Moss",       score: 90, created_at: "2025-01-15T07:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "Nobody talks about this morning habit..." },
+  { id: "m-008", media_type: "social_post", platform: "canva",    status: "complete", script: "TikTok caption + hook card — Sea Moss",       score: 90, created_at: "2025-01-15T07:00:00Z", video_url: null, product: "Sea Moss Capsules",        hook: "Nobody talks about this morning habit..." },
   { id: "m-009", media_type: "social_post", platform: "openai",   status: "complete", script: "Instagram carousel — 5 slides, Collagen",     score: 85, created_at: "2025-01-14T12:00:00Z", video_url: null, product: "Genesis Glow Collagen",      hook: "5 reasons your skin needs collagen now." },
-  { id: "m-010", media_type: "landing_page",platform: "internal", status: "complete", script: "Sea Moss product landing page — v3",          score: 92, created_at: "2025-01-13T09:00:00Z", video_url: null, product: "Sea Moss Mineral Gel",       hook: "The mineral ritual trusted by 10,000+ customers." },
+  { id: "m-010", media_type: "landing_page",platform: "internal", status: "complete", script: "Sea Moss product landing page — v3",          score: 92, created_at: "2025-01-13T09:00:00Z", video_url: null, product: "Sea Moss Capsules",        hook: "The mineral ritual trusted by 10,000+ customers." },
   { id: "m-011", media_type: "ugc",         platform: "heygen",   status: "complete", script: "UGC testimonial — weight loss journey",       score: 88, created_at: "2025-01-12T10:00:00Z", video_url: null, product: "Metabolic Ignite",           hook: "I lost 12 lbs in 30 days with this morning reset." },
   { id: "m-012", media_type: "banner",      platform: "canva",    status: "complete", script: "Google Display banner — 728x90 + 300x250",    score: 74, created_at: "2025-01-11T13:00:00Z", video_url: null, product: "NeuroRise Focus",            hook: "Upgrade your focus stack." }
 ];
@@ -1244,7 +1529,7 @@ const DEMO_PUBLISHED_MEDIA = [
     publishedTo: ["TikTok", "Instagram Reels"],
     status: "live",
     videoUrl: null,
-    product: "Sea Moss Mineral Gel",
+    product: "Sea Moss Capsules",
     hook: "Nobody tells you minerals can change your whole morning.",
     score: 94,
     views: 48200,
@@ -1324,7 +1609,7 @@ const DEMO_PUBLISHED_MEDIA = [
     publishedTo: ["TikTok"],
     status: "live",
     videoUrl: null,
-    product: "Sea Moss Mineral Gel",
+    product: "Sea Moss Capsules",
     hook: "Nobody talks about this morning habit...",
     score: 90,
     views: 61400,
@@ -1419,11 +1704,11 @@ const DEMO_AGENT_STATUSES = [
   {
     id: "product-match",
     name: "Product Match Agent",
-    role: "Matching trending content patterns to IAGT product catalog",
+    role: "Matching trending content patterns to EVICS product catalog",
     status: "active",
     currentTask: "Matching Sea Moss + Collagen to top 5 viral structures",
     processingTime: "1.1s avg",
-    lastResult: "Sea Moss Mineral Gel matched to 3 viral hooks — confidence: High",
+    lastResult: "Sea Moss Capsules matched to 3 viral hooks — confidence: High",
     qualityScore: 91,
     nextAction: "Re-match after next viral scan",
     icon: "filter"
@@ -1534,7 +1819,8 @@ async function loadAnalyticsData() {
   render();
 }
 
-async function validateQuality() {
+async function validateQuality(controlEl = document.getElementById("quality-validate-btn")) {
+  if (controlEl) setExecControlState(controlEl, "running");
   state.qualityValidating = true;
   state.qualityResult = null;
   render();
@@ -1554,6 +1840,7 @@ async function validateQuality() {
     state.qualityResult = enforceEliteStandards(state.qualityScores);
   }
   state.qualityValidating = false;
+  if (controlEl) setExecControlState(controlEl, "completed", 1800);
   render();
 }
 
@@ -1612,6 +1899,101 @@ function renderAppLabel(id) {
   return a ? a.label : id;
 }
 
+function mediaAssetUrl(item) {
+  return item?.video_url || item?.videoUrl || item?.preview_url || item?.previewUrl || item?.storage_url || item?.storageUrl || "";
+}
+
+function mediaAssetType(item) {
+  return String(item?.media_type || item?.mediaType || "video").toLowerCase();
+}
+
+function renderMediaPreviewSurface(item, mode = "detail") {
+  const mediaType = mediaAssetType(item);
+  const source = mediaAssetUrl(item);
+  const title = item?.script || item?.title || "Media preview";
+  const isVideo = mediaType === "video" || mediaType === "ugc";
+  const isDocument = mediaType === "print_ad" || mediaType === "banner";
+  const isLanding = mediaType === "landing_page";
+  const isEmail = mediaType === "email";
+  const wrapperClass = mode === "modal" ? "media-review-surface" : "media-preview-surface";
+
+  if (source) {
+    if (isVideo) {
+      return `<video class="${mode === "modal" ? "media-review-video-player" : "media-video-player"}" src="${source}" controls playsinline></video>`;
+    }
+    if (isLanding || isEmail || /\.html?(?:$|\?)/i.test(source)) {
+      return `<iframe class="media-html-viewer" src="${source}" title="${title}"></iframe>`;
+    }
+    if (/\.pdf(?:$|\?)/i.test(source) || isDocument) {
+      return `<iframe class="media-doc-viewer" src="${source}" title="${title}"></iframe>`;
+    }
+    return `<img class="${mode === "modal" ? "media-review-image-viewer" : "media-image-viewer"}" src="${source}" alt="${title}" />`;
+  }
+
+  const heading = isDocument
+    ? "Print / Banner proof surface"
+    : isLanding
+      ? "Landing page review surface"
+      : isEmail
+        ? "Email review surface"
+        : isVideo
+          ? "Video proof surface"
+          : "Social media review surface";
+  const score = item.score || item.qualityScore || "—";
+  const proofBlurb = isVideo
+    ? "No playback URL is attached yet, so the executive review shell is showing the creative metadata and approval actions instead of an empty box."
+    : "This asset is being reviewed without a live source link, so the proof shell highlights the title, score, platform, and notes.";
+  const primaryAction = item.storageUrl
+    ? `<button class="media-preview-open" type="button" data-open-url="${escapeHtml(item.storageUrl)}">Open storage copy</button>`
+    : "";
+  const secondaryAction = item.videoUrl
+    ? `<button class="media-preview-open secondary" type="button" data-open-url="${escapeHtml(item.videoUrl)}">Open playback copy</button>`
+    : "";
+  return `<div class="${wrapperClass} media-preview-fallback">
+    <div class="media-surface-label">${heading}</div>
+    <div class="media-preview-fallback-hero ${isVideo ? "is-video" : "is-static"}">
+      <div class="media-preview-fallback-icon">${mediaTypeIcon(mediaType)}</div>
+      <div class="media-preview-fallback-copy">
+        <h4>${item.product || "Creative Asset"}</h4>
+        <p>${proofBlurb}</p>
+      </div>
+    </div>
+    ${isVideo ? `<div class="media-preview-placeholder"><p>Visible player shell ready for review.</p></div>` : ""}
+    <div class="media-surface-footer">
+      <span>${mediaTypeLabel(mediaType)}</span>
+      <span>${renderAppLabel(item.platform || "internal")}</span>
+      <span>Score ${score}</span>
+    </div>
+    <div class="media-preview-actions">
+      ${primaryAction}
+      ${secondaryAction}
+    </div>
+  </div>`;
+}
+
+function openMediaReviewModal(item) {
+  if (!item) return;
+  const normalized = {
+    ...item,
+    mediaType: mediaAssetType(item),
+    platform: item.platform || "internal",
+    status: item.status || "pending",
+    product: item.product || "Media Asset",
+    hook: item.hook || "",
+    script: item.script || item.title || "",
+    videoUrl: mediaAssetUrl(item),
+    createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+    approvalStatus: item.approvalStatus || (item.status === "approved" ? "approved" : item.status === "rejected" ? "discarded" : "pending"),
+    parameters: item.parameters || { aspect: "9:16", style: mediaTypeLabel(mediaAssetType(item)), duration: "n/a", voice: "n/a" },
+    iterationCount: Number(item.iterationCount || 0),
+    qualityScore: item.score || item.qualityScore || 0
+  };
+  state.mediaReviewVideo = normalized;
+  state.mediaReviewOpen = true;
+  state.mediaRejectionReason = "";
+  state.mediaAiSuggestions = null;
+}
+
 function statusBadgeClass(status) {
   if (!status) return "";
   const s = status.toLowerCase();
@@ -1620,17 +2002,6 @@ function statusBadgeClass(status) {
   if (s === "draft"    || s === "failed")    return "status-draft";
   return "";
 }
-
-// ── Section definitions ──
-const SECTIONS = [
-  { id: "viral-intelligence", icon: "radar",  label: "Viral Intelligence",  desc: "Trend scanning, hook discovery, viral pattern analysis" },
-  { id: "ai-reconstruction",  icon: "spark",  label: "AI Reconstruction",   desc: "AI-powered creative reconstruction from viral ads" },
-  { id: "video-generation",   icon: "video",  label: "Video Generation",    desc: "Video rendering via HeyGen, Runway, and Kling" },
-  { id: "distribution",       icon: "send",   label: "Distribution",        desc: "Publishing queue and channel management" },
-  { id: "analytics",          icon: "chart",  label: "Analytics",           desc: "Performance metrics and learning loop" },
-  { id: "twin-automation",    icon: "gear",   label: "Twin Automation",     desc: "Agent orchestration and auto-generate pipeline" },
-  { id: "api-management",     icon: "shield", label: "API Management",      desc: "API keys, token tracking, failover, and alerts" }
-];
 
 // ── Media viewing area (shared across sections) ──
 function renderMediaArea(sectionId) {
@@ -1672,8 +2043,8 @@ function renderMediaArea(sectionId) {
               : items.map((item) => `
                 <button class="media-card ${item.id === state.selectedMediaId ? "media-card-selected" : ""}" data-media-id="${item.id}">
                   <div class="media-card-thumb media-thumb-${item.media_type}">
-                    ${item.video_url
-                      ? `<img src="${item.video_url}" alt="" />`
+                    ${mediaAssetUrl(item)
+                      ? `<img src="${mediaAssetUrl(item)}" alt="" />`
                       : `<div class="media-thumb-placeholder">${mediaTypeIcon(item.media_type)}</div>`
                     }
                     <span class="media-type-badge">${mediaTypeLabel(item.media_type)}</span>
@@ -1685,6 +2056,10 @@ function renderMediaArea(sectionId) {
                       <span class="media-status-tag ${statusBadgeClass(item.status)}">${item.status}</span>
                     </div>
                     <div class="media-card-score">Score <b>${item.score}</b></div>
+                    <div class="media-card-actions">
+                      <span class="media-card-open-hint">Click to open panel</span>
+                      <span class="media-card-open-link" data-media-review-id="${item.id}" role="button" tabindex="0">Open review</span>
+                    </div>
                   </div>
                 </button>
               `).join("")
@@ -1732,15 +2107,7 @@ function renderMediaDetail(item) {
 
       <!-- Preview -->
       <div class="media-preview-area">
-        ${item.video_url
-          ? (item.media_type === "video" || item.media_type === "ugc"
-              ? `<video class="media-video-player" src="${item.video_url}" controls></video>`
-              : `<img class="media-image-viewer" src="${item.video_url}" alt="${item.script}" />`)
-          : `<div class="media-preview-placeholder">
-               <div class="media-preview-icon">${mediaTypeIcon(item.media_type)}</div>
-               <p>${item.media_type === "video" || item.media_type === "ugc" ? "Video preview not yet available" : "Preview not yet available"}</p>
-             </div>`
-        }
+        ${renderMediaPreviewSurface(item)}
       </div>
 
       <!-- Metadata -->
@@ -1789,6 +2156,9 @@ function renderMediaDetail(item) {
 
       <!-- Action Buttons -->
       <div class="media-detail-actions">
+        <button class="media-action-btn media-action-review" data-media-review-id="${item.id}">
+          ${icon("video")} Open Review Surface
+        </button>
         <button class="media-action-btn media-action-approve" data-media-action="approve" data-media-id="${item.id}">
           ${icon("check")} Approve
         </button>
@@ -2672,7 +3042,7 @@ function renderAiReconstruction() {
             ${[
               ["Step 1", "Scan viral ad", "Identify hook, structure, emotion, and CTA pattern"],
               ["Step 2", "Deconstruct", "Extract reusable components and winning formulas"],
-              ["Step 3", "Match product", "Pair structure with best-fit IAGT product"],
+              ["Step 3", "Match product", "Pair structure with best-fit EVICS product"],
               ["Step 4", "Reconstruct", "Generate new creative using AI with your brand voice"],
               ["Step 5", "Score & review", "Quality score assigned, sent to approval queue"]
             ].map(([time, title, desc]) => `
@@ -2689,6 +3059,51 @@ function renderAiReconstruction() {
       ${renderMediaArea("ai-reconstruction")}
     </div>
   `;
+}
+
+const ELITE_BACKGROUND_SCENES = {
+  "Ocean Dawn": "ocean,sunrise,blue water,luxury,mist",
+  "Ocean Glow": "ocean,glow,blue water,premium,sunrise",
+  "Deep Sea": "deep ocean,sea foam,rich blue,premium",
+  "Tropical Tide": "tropical ocean,shoreline,light,brand film"
+};
+
+function buildEliteSeaMossScript() {
+  return [
+    "Jordan Avatar enters on a quiet ocean pulse with a premium lens bloom.",
+    "Jordan says: 'Sea Moss Capsules are not just a product. They're a mineral ritual.'",
+    "On beat two, trigger the splash-wipe and liquid-gold shimmer as the product enters frame.",
+    "The Sea Moss packshot arrives background-removed and floats over an AI ocean composite for a clean hero reveal.",
+    "Jordan continues: 'If your routine needs more energy, this is the clean reset from I AM GENESIS TECH.'",
+    "End on the brand lockup and CTA: 'Start your ocean-level ritual today.'"
+  ].join(" ");
+}
+
+function getEliteAvatarId() {
+  return (window.IAGT_CONFIG && window.IAGT_CONFIG.jordanAvatarId) || "";
+}
+
+function getEliteVoiceId() {
+  return (window.IAGT_CONFIG && window.IAGT_CONFIG.jordanVoiceId) || "";
+}
+
+function buildEliteBackgroundConfig(scene = state.videoVisualBackground) {
+  const query = ELITE_BACKGROUND_SCENES[scene] || ELITE_BACKGROUND_SCENES["Ocean Dawn"];
+  const sig = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    type: "image",
+    url: `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}&sig=${sig}`
+  };
+}
+
+function getEliteRenderSequence() {
+  return [
+    { time: "0.0s", title: "Cold open", detail: "Jordan Avatar on a calm ocean-grade ambient bed." },
+    { time: "1.2s", title: "Product cue", detail: "Name Sea Moss Capsules while the product silhouette begins to enter." },
+    { time: "2.0s", title: "Elite entrance", detail: "Splash wipe + shimmer burst + product entrance on beat 2." },
+    { time: "3.5s", title: "Hero reveal", detail: "Background-removed packshot lands on the AI ocean composite." },
+    { time: "6.0s", title: "Brand lock", detail: "Jordan closes with value statement and CTA." }
+  ];
 }
 
 function renderVideoGeneration() {
@@ -2939,14 +3354,14 @@ function renderVideoGeneration() {
               <!-- Send to Renderer -->
               <div class="render-actions">
                 <button class="render-btn heygen" id="send-heygen" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to HeyGen
+                  ${icon("video")} Render A+ HeyGen Video
                 </button>
-                <button class="render-btn runway" id="send-runway" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to Runway
-                </button>
-                <button class="render-btn kling" id="send-kling" ${state.assemblyComponents.length === 0 ? "disabled" : ""}>
-                  ${icon("video")} Send to Kling
-                </button>
+                <span class="render-quality-note">A+ gate: script quality, CTA clarity, compliance, and HeyGen v3 output proof.</span>
+              </div>
+              <div class="render-auth-note">
+                <strong>HeyGen Auth</strong>
+                <span>${escapeHtml(state.heygenAuthDetail)}</span>
+                ${state.heygenRecentSessions.length ? `<small>Recent Video Agent sessions: ${state.heygenRecentSessions.length}</small>` : ""}
               </div>
             </div>
 
@@ -2956,7 +3371,7 @@ function renderVideoGeneration() {
           ${state.renderStatus ? `
           <div class="render-status-panel">
             <div class="render-status-head">
-              <h3>Rendering Status</h3>
+              <h3>Current Render Status</h3>
               <span class="render-badge render-badge-${state.renderStatus.toLowerCase().replace(/\s/g, "-")}">${state.renderStatus}</span>
             </div>
             ${state.renderStatus === "Rendering" ? `
@@ -2965,7 +3380,7 @@ function renderVideoGeneration() {
             ` : ""}
             ${state.renderUrl ? `
               <div class="render-result">
-                <a href="${state.renderUrl}" target="_blank" class="render-url-link">${icon("video")} View Rendered Video</a>
+                <button type="button" class="render-url-link ghost" data-open-url="${escapeHtml(state.renderUrl)}">${icon("video")} View Rendered Video</button>
                 <div class="render-result-actions">
                   <button class="ghost" id="approve-render">✓ Approve &amp; Publish</button>
                   <button class="ghost" id="reject-render">✕ Reject</button>
@@ -2979,7 +3394,7 @@ function renderVideoGeneration() {
           <!-- Live Renders Status Panel (always visible, auto-refreshes) -->
           <div class="render-status-panel" style="margin-top:12px">
             <div class="render-status-head">
-              <h3>Rendering Status</h3>
+              <h3>Live Render Queue</h3>
               <div style="display:flex;gap:8px;align-items:center">
                 ${state.renderPollingActive ? `<span class="render-badge render-badge-rendering">● Polling</span>` : ""}
                 <span class="render-badge render-badge-${state.liveRenders.length > 0 ? "complete" : "pending"}">${state.liveRenders.length} jobs</span>
@@ -3038,13 +3453,28 @@ function renderVideoGeneration() {
         ` : ""}
       </section>
 
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>${icon("film")} Media Results &amp; Review</h2>
+              <p>See created media, open the video preview, edit QA notes, route renders, and re-render with admin directives.</p>
+            </div>
+          </div>
+          <div class="empty" style="margin-bottom:12px">
+            This is the live review surface for all generated media. Use the Media Output Center controls below to approve, reject, reroute, or send items back through the pipeline.
+          </div>
+          ${renderSection("renderMediaOutputCenter")}
+        </div>
+      </section>
+
       <!-- ── PRODUCT MATCHING ── -->
       <section class="workspace-grid secondary">
         <div class="panel">
           <div class="panel-head">
             <div>
               <h2>Product Matching</h2>
-              <p>Pairs viral structures with IAGT products and positioning angles.</p>
+              <p>Pairs viral structures with EVICS products and positioning angles.</p>
             </div>
             <div class="product-toggle-row">
               <button class="metric-btn ${state.matchingProducts ? "scanning" : ""}" id="match-products-btn" ${state.matchingProducts ? "disabled" : ""}>
@@ -3156,7 +3586,7 @@ function renderVideoGeneration() {
             ${[
               ["Step 1", "Scan viral ad", "Identify hook, structure, emotion, and CTA pattern"],
               ["Step 2", "Deconstruct", "Extract reusable components and winning formulas"],
-              ["Step 3", "Match product", "Pair structure with best-fit IAGT product"],
+              ["Step 3", "Match product", "Pair structure with best-fit EVICS product"],
               ["Step 4", "Reconstruct", "Generate new creative using AI with your brand voice"],
               ["Step 5", "Score & review", "Quality score assigned, sent to approval queue"]
             ].map(([time, title, desc]) => `
@@ -3226,9 +3656,7 @@ function renderVideoGeneration() {
           <div class="auto-result-actions">
             <span class="auto-result-label">Send to Platform</span>
             <div class="render-actions" style="margin-top:8px">
-              <button class="render-btn heygen" data-auto-send="heygen">${icon("video")} Send to HeyGen</button>
-              <button class="render-btn runway" data-auto-send="runway">${icon("video")} Send to Runway</button>
-              <button class="render-btn kling" data-auto-send="kling">${icon("video")} Send to Kling</button>
+              <button class="render-btn heygen" data-auto-send="heygen">${icon("video")} Render A+ HeyGen Video</button>
             </div>
           </div>
         </div>
@@ -3255,16 +3683,106 @@ function renderVideoGeneration() {
 
 function renderVideoGeneration() {
   const hasInput = Boolean(state.submittedScript.trim());
+  const hasVideoPackage = Boolean(state.videoProductTitle.trim())
+    && Boolean(state.videoProductPageUrl.trim())
+    && Boolean(state.videoCompanyLabel.trim());
   const isProcessing = state.renderStatus === "processing";
-  const canGenerate = hasInput && !isProcessing;
+  const canGenerate = hasInput && hasVideoPackage && !isProcessing;
   const canExport = Boolean(state.renderUrl) && state.renderStatus === "complete";
+  const eliteSequence = getEliteRenderSequence();
+  const eliteAvatarId = getEliteAvatarId();
+  const eliteVoiceId = getEliteVoiceId();
 
   return `
     <div class="section-content video-pipeline-content">
       <div class="section-intro">
         <h2>Video Generation Pipeline</h2>
-        <p>A single linear workflow: submit a real script, generate one video render, preview the completed video, then export the same output.</p>
+        <p>Elite linear workflow: submit the script, lock the real product mockup and brand label, define the Sea Moss Capsules Jordan brief, then preview and export the exact output.</p>
       </div>
+
+      <article class="pipeline-card elite-director-card">
+        <div class="pipeline-step-label">0 · DIRECTOR'S BRIEF</div>
+        <div class="elite-director-head">
+          <div>
+            <h3>Sea Moss Capsules + Jordan Avatar Render Brief</h3>
+            <p>Admin describes the brand intent and the AI turns that direction into the final render path, effect stack, timing decisions, and the exact product mockup to be shown.</p>
+          </div>
+        </div>
+        <div class="elite-director-grid">
+          <label class="param-label">Company Label
+            <input data-state-key="videoCompanyLabel" type="text" placeholder="I AM GENESIS TECH" value="${escapeHtml(state.videoCompanyLabel)}" />
+          </label>
+          <label class="param-label">Product Name
+            <input data-state-key="videoProductTitle" type="text" placeholder="Sea Moss Capsules" value="${escapeHtml(state.videoProductTitle)}" />
+          </label>
+          <label class="param-label">Product Mockup URL
+            <input data-state-key="videoProductMockupUrl" type="url" placeholder="Auto-resolved from Shopify primary image at render time" value="${escapeHtml(state.videoProductMockupUrl)}" />
+          </label>
+          <label class="param-label">Product Page URL
+            <input data-state-key="videoProductPageUrl" type="url" placeholder="https://...store-product-or-landing-page" value="${escapeHtml(state.videoProductPageUrl)}" />
+          </label>
+          <label class="param-label">Avatar
+            <select data-state-key="videoAvatarPreset">
+              ${["Jordan Avatar","Jordan Hero Avatar","Jordan Closeup Avatar"].map((v) => `<option ${state.videoAvatarPreset === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Voice File
+            <select data-state-key="videoVoice">
+              ${["Jordan Voice File","Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Visual Background
+            <select data-state-key="videoVisualBackground">
+              ${Object.keys(ELITE_BACKGROUND_SCENES).map((v) => `<option ${state.videoVisualBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Special Effects
+            <select data-state-key="videoEffectPreset">
+              ${["Ocean Reveal","Splash Wipe","Liquid Gold Shimmer","Premium Lens Bloom","AI Best Judgment"].map((v) => `<option ${state.videoEffectPreset === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Entry Timing
+            <select data-state-key="videoEntryTiming">
+              ${["Beat 1 cold open","Beat 2 product entrance","After trust line","AI Best Judgment"].map((v) => `<option ${state.videoEntryTiming === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Text Overlay Position
+            <select data-state-key="videoTextOverlayPosition">
+              ${["bottom","top"].map((v) => `<option value="${v}" ${state.videoTextOverlayPosition === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Product Treatment
+            <select data-state-key="videoProductTreatment">
+              ${["Background removed + AI ocean composite","Premium hero packshot","Macro splash reveal","Floating reflective reveal"].map((v) => `<option ${state.videoProductTreatment === v ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="param-label">Brand Direction
+            <textarea data-state-key="videoBrandBrief" rows="3" placeholder="Describe the brand feeling, tone, and hero story...">${escapeHtml(state.videoBrandBrief)}</textarea>
+          </label>
+          <label class="param-label">Effect Direction
+            <textarea data-state-key="videoEffectBrief" rows="3" placeholder="Describe the special effects to interpret or create...">${escapeHtml(state.videoEffectBrief)}</textarea>
+          </label>
+          <label class="param-label">Timing Direction
+            <textarea data-state-key="videoTimingBrief" rows="3" placeholder="Describe timing, pacing, and entry moments...">${escapeHtml(state.videoTimingBrief)}</textarea>
+          </label>
+          <label class="param-label">CTA Destination
+            <input data-state-key="videoDestinationUrl" type="url" placeholder="https://...landing-page-or-product-url" value="${escapeHtml(state.videoDestinationUrl)}" />
+          </label>
+          <label class="param-label">Tracking Protocol
+            <textarea data-state-key="videoTrackingProtocol" rows="3" placeholder="Describe landing-page, shopify, and purchase tracking rules...">${escapeHtml(state.videoTrackingProtocol)}</textarea>
+          </label>
+        </div>
+        <div class="elite-director-note">
+          <strong>Governance:</strong> ${state.videoGovernanceMode} · <strong>Avatar ID:</strong> ${eliteAvatarId || "env fallback"} · <strong>Voice ID:</strong> ${eliteVoiceId || "env fallback"}
+        </div>
+        <div class="elite-render-summary">
+          <strong>Package lock</strong>
+          <p>Render only when the exact product mockup, page link, company label, and script are all present. No generated substitute products.</p>
+        </div>
+        <div class="elite-sequence-list">
+          ${eliteSequence.map((step) => `<div class="elite-sequence-step"><span>${step.time}</span><strong>${step.title}</strong><p>${step.detail}</p></div>`).join("")}
+        </div>
+      </article>
 
       <section class="video-pipeline">
         <article class="pipeline-card input-layer">
@@ -3278,6 +3796,10 @@ function renderVideoGeneration() {
             <input id="script-file-input" type="file" accept=".txt,text/plain" />
             <span>${state.uploadedScriptName ? escapeHtml(state.uploadedScriptName) : "No file selected"}</span>
           </div>
+          <div class="elite-brief-summary">
+            <strong>Brief intent</strong>
+            <p>Sea Moss Capsules, Jordan Avatar, ocean visuals, elite product entrance, and the actual product mockup with company branding described by the operator.</p>
+          </div>
           <button class="primary pipeline-action" id="submit-video-input" ${state.scriptInput.trim() ? "" : "disabled"}>Use Script</button>
           <div class="pipeline-feedback ${state.inputStatus}">${escapeHtml(state.inputMessage)}</div>
         </article>
@@ -3289,7 +3811,7 @@ function renderVideoGeneration() {
           <div class="params-grid pipeline-params">
             <label class="param-label">Duration
               <select data-state-key="videoDuration" ${isProcessing ? "disabled" : ""}>
-                ${["5s","10s","15s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
+                ${["5s","10s","15s","20s","30s"].map((v) => `<option ${state.videoDuration === v ? "selected" : ""}>${v}</option>`).join("")}
               </select>
             </label>
             <label class="param-label">Style
@@ -3299,12 +3821,32 @@ function renderVideoGeneration() {
             </label>
             <label class="param-label">Voice
               <select data-state-key="videoVoice" ${isProcessing ? "disabled" : ""}>
-                ${["Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
+                ${["Jordan Voice File","Male","Female","Narrator"].map((v) => `<option ${state.videoVoice === v ? "selected" : ""}>${v}</option>`).join("")}
               </select>
             </label>
-            <label class="param-label">Background
+            <label class="param-label">Audio Bed
               <select data-state-key="videoBackground" ${isProcessing ? "disabled" : ""}>
                 ${["None","Music","Ambient"].map((v) => `<option ${state.videoBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Visual Background
+              <select data-state-key="videoVisualBackground" ${isProcessing ? "disabled" : ""}>
+                ${Object.keys(ELITE_BACKGROUND_SCENES).map((v) => `<option ${state.videoVisualBackground === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Special Effects
+              <select data-state-key="videoEffectPreset" ${isProcessing ? "disabled" : ""}>
+                ${["Ocean Reveal","Splash Wipe","Liquid Gold Shimmer","Premium Lens Bloom","AI Best Judgment"].map((v) => `<option ${state.videoEffectPreset === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Entry Timing
+              <select data-state-key="videoEntryTiming" ${isProcessing ? "disabled" : ""}>
+                ${["Beat 1 cold open","Beat 2 product entrance","After trust line","AI Best Judgment"].map((v) => `<option ${state.videoEntryTiming === v ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label class="param-label">Product Treatment
+              <select data-state-key="videoProductTreatment" ${isProcessing ? "disabled" : ""}>
+                ${["Background removed + AI ocean composite","Premium hero packshot","Macro splash reveal","Floating reflective reveal"].map((v) => `<option ${state.videoProductTreatment === v ? "selected" : ""}>${v}</option>`).join("")}
               </select>
             </label>
             <label class="param-label">Aspect Ratio
@@ -3313,8 +3855,14 @@ function renderVideoGeneration() {
               </select>
             </label>
           </div>
+          <div class="elite-governance-line">AI governance: ${state.videoGovernanceMode} · sequence tuned for elite brand impact and learning-loop improvements.</div>
+          <div class="elite-governance-line">Facebook-ready target: ${state.videoDuration} · ${state.videoAspect} · destination ${escapeHtml(state.videoProductPageUrl || state.videoDestinationUrl || "unset")}.</div>
+          <div class="elite-timing-intel">
+            <strong>Timing intelligence</strong>
+            <p>AI can align product entrance, shimmer, and pacing to the strongest available timing signals from analytics, watch-time, engagement, and completion metrics.</p>
+          </div>
           <button class="primary pipeline-action generate-video-action" id="generate-video-btn" ${canGenerate ? "" : "disabled"}>
-            ${isProcessing ? `${icon("radar")} Generating Video…` : `${icon("video")} Generate Video`}
+            ${isProcessing ? `${icon("radar")} Generating Elite Render…` : `${icon("video")} Generate Elite Video`}
           </button>
           <div class="render-status-card ${state.renderStatus}">
             <div>
@@ -3328,6 +3876,10 @@ function renderVideoGeneration() {
               <small>${state.renderProgress}% complete</small>
             ` : ""}
           </div>
+          <div class="elite-render-summary">
+            <strong>Elite render intent</strong>
+            <p>Sea Moss Capsules product with background removed, ocean composite placed behind it, Jordan Avatar leading, and the product entering on the strongest beat with premium shimmer timing. CTA should land on ${escapeHtml(state.videoProductPageUrl || state.videoDestinationUrl || "the approved destination")}.</p>
+          </div>
         </article>
 
         <article class="pipeline-card output-layer">
@@ -3335,7 +3887,7 @@ function renderVideoGeneration() {
           <h3>Preview Completed Video</h3>
           ${state.renderUrl ? `
             <video class="pipeline-video-player" src="${escapeHtml(state.renderUrl)}" controls preload="metadata"></video>
-            <a class="render-url-link" href="${escapeHtml(state.renderUrl)}" target="_blank" rel="noopener">Open direct video URL</a>
+            <button type="button" class="render-url-link ghost" data-open-url="${escapeHtml(state.renderUrl)}">Open direct video URL</button>
           ` : `
             <div class="empty-output-state">
               <strong>No completed video output.</strong>
@@ -3349,7 +3901,7 @@ function renderVideoGeneration() {
           <h3>Download Output</h3>
           <p>Exports the exact video URL returned by the completed render. Download is disabled until a real output exists.</p>
           ${canExport ? `
-            <a class="primary pipeline-action export-download" href="${escapeHtml(state.renderUrl)}" download="iagt-generated-video.mp4">Download Video</a>
+            <button type="button" class="primary pipeline-action export-download" data-download-url="${escapeHtml(state.renderUrl)}" data-download-name="iagt-generated-video.mp4">Download Video</button>
           ` : `
             <button class="primary pipeline-action" disabled>Download Video</button>
           `}
@@ -3639,7 +4191,7 @@ function renderAnalytics() {
                     <span>${r.status} · ${r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</span>
                     ${r.affiliate_email ? `<span class="render-affiliate">Affiliate: ${r.affiliate_email}</span>` : ''}
                   </div>
-                  ${r.video_url ? `<a class="ghost" href="${r.video_url}" target="_blank" rel="noopener">▶ Watch</a>` : ''}
+                  ${r.video_url ? `<button type="button" class="ghost" data-open-url="${escapeHtml(r.video_url)}">▶ Watch</button>` : ''}
                   ${r.local_mp4 ? `<span class="render-local-badge">📁 Cached</span>` : ''}
                 </div>`;
               }).join('')}
@@ -3726,7 +4278,7 @@ function renderAnalytics() {
         <div class="agent-orch-title-row">
           <div>
             <h2>${icon("gear")} Agent Orchestration Dashboard</h2>
-            <p>Real-time Twin Agents + Office Agent workings — live pipeline status and task visibility.</p>
+            <p>Real-time executive board agents and office operations — live pipeline status and task visibility.</p>
           </div>
           <div class="agent-orch-controls">
             <div class="agent-health-badge ${health >= 95 ? "health-excellent" : health >= 80 ? "health-good" : "health-warn"}">
@@ -4046,6 +4598,11 @@ function renderAnalyticsDashboard() {
             <small>all time</small>
           </div>
           <div class="analytics-kpi-card">
+            <span>Media Telemetry</span>
+            <strong>${data.mediaTelemetryEvents || 0}</strong>
+            <small>tracked actions</small>
+          </div>
+          <div class="analytics-kpi-card">
             <span>Approval Rate</span>
             <strong>${data.approvalRate || 68}%</strong>
             <small>of all creatives</small>
@@ -4331,50 +4888,176 @@ function renderQualityValidator() {
   `;
 }
 
-function renderTwinAutomation() {
+function renderExecutiveWorkspace() {
   const pa = state.profitAuditResult;
   const pt = state.productTiersResult;
   const ba = state.budgetAllocResult;
   const lc = state.libraryCleanupResult;
+  const adminCode = getExecutiveAdminCode();
+  const vpMission = state.vpMission;
+  const mediaSurface = (window.__evicsRenderers && typeof window.__evicsRenderers.renderMediaOutputCenter === "function")
+    ? window.__evicsRenderers.renderMediaOutputCenter()
+    : "";
+  const latestMediaCount = Array.isArray(state.publishedMedia) ? state.publishedMedia.length : 0;
+  const queuedRenders = Array.isArray(state.mediaRenderQueue) ? state.mediaRenderQueue.length : 0;
 
   return `
     <div class="section-content">
       <div class="section-intro">
-        <h2>Twin Automation</h2>
-        <p>Agent orchestration, auto-generate pipeline, and 24/7 marketing system management.</p>
+        <h2>Executive Workspace</h2>
+        <p>Executive orchestration, governed media review, board oversight, and restricted API management access.</p>
       </div>
 
       <section class="metrics-grid">
-        ${metric("Agent runs today", "6", "automated pipeline cycles")}
-        ${metric("Ads auto-generated", creatives.length.toString(), "this cycle")}
-        ${metric("Automation health", "98%", "daily loop active")}
-        ${metric("Next scan", "6:00 AM", "viral intelligence")}
+        ${metric("Board health", "98%", "governed decision layer")}
+        ${metric("VP mission", vpMission ? (vpMission.status || "running") : "Idle", vpMission ? `mission ${vpMission.missionId}` : "ready to launch")}
+        ${metric("Media outputs", String(latestMediaCount), "available for review")}
+        ${metric("Queued renders", String(queuedRenders), "awaiting action")}
+        ${metric("Learning loop", "Active", "telemetry and improvement")}
       </section>
 
       <section class="workspace-grid secondary">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h2>Daily Automation Pipeline</h2>
-              <p>Twin-ready workflow stages for the 24/7 marketing system.</p>
+              <h2>${icon("chart")} A+ Build Program</h2>
+              <p>Cross-build objective tracking for EVICS, Affiliate Hub, Phone App, scanners/scrapers, and learning loops.</p>
             </div>
           </div>
-          <div class="timeline">
-            ${workflow.map(([time, title, desc]) => `
-              <div>
-                <time>${time}</time>
-                <span></span>
-                <div><strong>${title}</strong><p>${desc}</p></div>
+          <div class="agent-controls-grid">
+            <button class="agent-ctrl-btn primary ${state.excellenceLoading ? "generating" : ""}" id="run-excellence-audit-btn" ${state.excellenceLoading ? "disabled" : ""}>
+              ${state.excellenceLoading ? `${icon("radar")} Auditing…` : `${icon("spark")} Run A+ Audit`}
+            </button>
+            <button class="agent-ctrl-btn" id="refresh-excellence-status-btn" ${state.excellenceLoading ? "disabled" : ""}>
+              ${icon("radar")} Refresh A+ Status
+            </button>
+          </div>
+          ${state.excellenceError ? `<div class="executive-gate-error" style="margin-top:10px">${escapeHtml(state.excellenceError)}</div>` : ""}
+          ${state.excellenceStatus && state.excellenceStatus.report ? `
+          <div class="agent-status-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top:12px;">
+            <article class="agent-status-card"><span>Overall</span><strong>${escapeHtml(state.excellenceStatus.report.overall.grade || "N/A")}</strong><p>${Number(state.excellenceStatus.report.overall.score || 0)}/100</p></article>
+            <article class="agent-status-card"><span>EVICS</span><strong>${escapeHtml((state.excellenceStatus.report.builds.evics || {}).grade || "N/A")}</strong><p>${Number((state.excellenceStatus.report.builds.evics || {}).score || 0)}/100</p></article>
+            <article class="agent-status-card"><span>Affiliate</span><strong>${escapeHtml((state.excellenceStatus.report.builds.affiliateHub || {}).grade || "N/A")}</strong><p>${Number((state.excellenceStatus.report.builds.affiliateHub || {}).score || 0)}/100</p></article>
+            <article class="agent-status-card"><span>Phone</span><strong>${escapeHtml((state.excellenceStatus.report.builds.phoneApp || {}).grade || "N/A")}</strong><p>${Number((state.excellenceStatus.report.builds.phoneApp || {}).score || 0)}/100</p></article>
+          </div>
+          <div class="automation-status-card" style="margin-top:12px">
+            <div class="pulse-row"><i></i> ${state.excellenceStatus.report.overall.achievedAPlus ? "A+ objective achieved across all builds." : "A+ objective in progress — resolve remaining checks."}</div>
+            <div style="margin-top:8px;font-size:0.9em;display:grid;gap:4px">
+              <div><strong>Scanners/Scrapers:</strong> ${Number((state.excellenceStatus.report.builds.scannersScrapers || {}).score || 0)}/100</div>
+              <div><strong>Learning Loop:</strong> ${Number((state.excellenceStatus.report.builds.learningLoop || {}).score || 0)}/100</div>
+              <div><strong>Last Audit:</strong> ${escapeHtml(new Date(state.excellenceStatus.report.timestamp).toLocaleString())}</div>
+            </div>
+          </div>
+          ` : `<div class="automation-status-card" style="margin-top:12px"><div class="pulse-row"><i></i> Run A+ Audit to generate cross-build score evidence.</div></div>`}
+          ${state.excellenceObjectives && state.excellenceObjectives.length ? `
+          <div class="agent-result-card" style="margin-top:12px">
+            <strong>Priority Objectives</strong>
+            <div style="margin-top:6px;font-size:0.85em;opacity:0.9;display:grid;gap:4px">
+              ${state.excellenceObjectives.slice(0, 6).map((o) => `<div><b>P${o.priority}</b> · ${escapeHtml(o.title)} — <span style="text-transform:capitalize">${escapeHtml(o.status || "pending")}</span></div>`).join("")}
+            </div>
+          </div>
+          ` : ""}
+        </div>
+      </section>
+
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>${icon("crown")} VP Mission Control</h2>
+              <p>Launch and monitor governed VP missions for product, media, and distribution execution.</p>
+            </div>
+          </div>
+          <div class="agent-controls-grid">
+            <button class="agent-ctrl-btn primary ${state.vpMissionLoading ? "generating" : ""}" id="launch-vp-mission-btn" ${state.vpMissionLoading ? "disabled" : ""}>
+              ${state.vpMissionLoading ? `${icon("radar")} Launching…` : `${icon("spark")} Launch VP Mission`}
+            </button>
+            <button class="agent-ctrl-btn" id="refresh-vp-mission-btn" ${vpMission ? "" : "disabled"}>
+              ${icon("radar")} Refresh Mission
+            </button>
+            <button class="agent-ctrl-btn" id="open-media-output-btn">
+              ${icon("video")} Open Media Review
+            </button>
+          </div>
+          <div class="automation-status-card" style="margin-top:12px">
+            ${vpMission ? `
+              <div class="pulse-row"><i></i> ${escapeHtml(vpMission.status || "running")} · ${escapeHtml(vpMission.originSectionId || "executive-workspace")}</div>
+              <div style="margin-top:8px;font-size:0.9em;display:grid;gap:4px">
+                <div><strong>Mission ID:</strong> ${escapeHtml(vpMission.missionId || "")}</div>
+                <div><strong>Target Count:</strong> ${Number(vpMission.targetCount || 0)}</div>
+                <div><strong>Published Count:</strong> ${Number(vpMission.publishedCount || 0)}</div>
               </div>
-            `).join("")}
+            ` : `
+              <div class="pulse-row"><i></i> No active mission. Launch a VP mission to begin executive oversight.</div>
+            `}
+            ${state.vpMissionError ? `<div class="executive-gate-error" style="margin-top:10px">${escapeHtml(state.vpMissionError)}</div>` : ""}
           </div>
         </div>
 
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h2>Agent Controls</h2>
-              <p>Manually trigger pipeline stages or override automation.</p>
+              <h2>${icon("shield")} Board of Directors</h2>
+              <p>Governance, approvals, and purpose checks for the executive workspace.</p>
+            </div>
+          </div>
+          <div class="agent-status-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+            <article class="agent-status-card">
+              <span>Approve</span>
+              <strong>Media Quality Gate</strong>
+              <p>Approve, reject, or reroute the latest media from the review workspace.</p>
+            </article>
+            <article class="agent-status-card">
+              <span>Govern</span>
+              <strong>API Access Lock</strong>
+              <p>Keep API Management invisible until the executive admin code is accepted.</p>
+            </article>
+            <article class="agent-status-card">
+              <span>Learn</span>
+              <strong>Telemetry Loop</strong>
+              <p>Feed analytics and render metrics back into future decisions.</p>
+            </article>
+            <article class="agent-status-card">
+              <span>Direct</span>
+              <strong>Board Oversight</strong>
+              <p>Use weighted executive judgment, not duplicate buttons or redundant flows.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Executive Intelligence &amp; Telemetry</h2>
+              <p>Board scoring, media feedback, and improvement loops for elite workflow control.</p>
+            </div>
+          </div>
+          <div class="agent-status-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <article class="agent-status-card">
+              <span>Signals</span>
+              <strong>${Number(state.scanCount || 0).toLocaleString()} scans</strong>
+              <p>Feeds viral intelligence and creative discovery.</p>
+            </article>
+            <article class="agent-status-card">
+              <span>Output</span>
+              <strong>${queuedRenders} queued</strong>
+              <p>Tracks media waiting to render, review, or publish.</p>
+            </article>
+            <article class="agent-status-card">
+              <span>Closeout</span>
+              <strong>${state.systemHealth && (state.systemHealth.status || state.systemHealth.state) ? String(state.systemHealth.status || state.systemHealth.state) : "Monitoring"}</strong>
+              <p>Monitors the service posture before executive approval.</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Executive Actions</h2>
+              <p>Trigger governed actions without duplicate or outdated controls.</p>
             </div>
           </div>
           <div class="agent-controls-grid">
@@ -4403,7 +5086,6 @@ function renderTwinAutomation() {
         </div>
       </section>
 
-      <!-- ── Phase 2 Intelligence Engines ── -->
       <section class="workspace-grid secondary" style="margin-top:16px">
         <div class="panel">
           <div class="panel-head">
@@ -4474,81 +5156,53 @@ function renderTwinAutomation() {
         </div>
       </section>
 
-      <!-- ── Phase 4 External Integration Controls ── -->
+      <section class="workspace-grid secondary executive-gate-section" style="margin-top:16px">
+        <div class="panel executive-gate-panel">
+          <div class="panel-head">
+            <div>
+              <h2>${icon("shield")} API Management Access</h2>
+              <p>Admin code entry is required before API Management becomes visible in this workspace.</p>
+            </div>
+          </div>
+          ${state.adminAccessGranted ? `
+            <div class="executive-gate-unlocked">
+              <div class="executive-gate-status">${icon("check")} Admin access granted</div>
+              <p>API Management is now unlocked for this Executive workspace session.</p>
+              <button class="toggle-link" id="lock-admin-access-btn">Lock access</button>
+            </div>
+            <div class="executive-api-wrapper">
+              ${renderApiManagementSummary()}
+            </div>
+          ` : `
+            <div class="executive-gate-form">
+              <label for="executive-admin-code">Admin access code</label>
+              <div class="executive-gate-input-row">
+                <input
+                  id="executive-admin-code"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="Enter admin access code"
+                  value="${state.adminAccessCodeInput.replace(/"/g, "&quot;")}"
+                />
+                <button class="primary" id="unlock-admin-access-btn">Unlock API Management</button>
+              </div>
+              ${state.adminAccessError ? `<p class="executive-gate-error">${state.adminAccessError}</p>` : `<p class="executive-gate-hint">API Management stays hidden everywhere else until the code is accepted.</p>`}
+            </div>
+          `}
+        </div>
+      </section>
+
       <section class="workspace-grid secondary" style="margin-top:16px">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h2>${icon("video")} Video Repurposing</h2>
-              <p>Vizard AI repurposes renders into TikTok, Reels, and Shorts automatically.</p>
+              <h2>${icon("film")} Media Review Workspace</h2>
+              <p>Open the live review surface for every rendered media item, with preview, QA, approval, and rerender controls.</p>
             </div>
           </div>
-          <div class="agent-controls-grid">
-            <button class="agent-ctrl-btn ${state.vizardRunning ? "generating" : ""}" id="vizard-repurpose-btn" ${state.vizardRunning ? "disabled" : ""} ${!state.renderUrl ? "disabled title='Generate a video render first'" : ""}>
-              ${state.vizardRunning ? `${icon("radar")} Repurposing…` : `${icon("spark")} Repurpose Latest Video`}
-            </button>
-            <button class="agent-ctrl-btn ${state.predisRunning ? "generating" : ""}" id="predis-predict-btn" ${state.predisRunning ? "disabled" : ""}>
-              ${state.predisRunning ? `${icon("radar")} Predicting…` : `${icon("chart")} Predict Performance`}
-            </button>
-          </div>
-          ${state.vizardResult ? `
-          <div class="agent-result-card" style="margin-top:12px">
-            <strong>Video Repurposing</strong> — ${state.vizardResult.live ? "Live Vizard API" : "Stub preview"}
-            <div style="margin-top:4px;font-size:0.85em;opacity:0.8">
-              ${(state.vizardResult.clips || []).map((c) => `<div>${c.platform}: ${c.estimated_clips} clips (${c.aspect_ratio})</div>`).join("")}
-            </div>
-          </div>
-          ` : ""}
-          ${state.predisResult ? `
-          <div class="agent-result-card" style="margin-top:12px">
-            <strong>Performance Prediction</strong>
-            <div style="margin-top:4px;font-size:0.85em;opacity:0.8">
-              <div>Engagement est: <b>${state.predisResult.prediction.engagement_rate_estimate}</b></div>
-              <div>Reach est: <b>${(state.predisResult.prediction.reach_estimate || 0).toLocaleString()}</b></div>
-              <div>${state.predisResult.prediction.recommendation}</div>
-            </div>
-          </div>
-          ` : ""}
-        </div>
-
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>${icon("gear")} Creative Intelligence</h2>
-              <p>Canva static ad generation and Gemini Omni video analysis.</p>
-            </div>
-          </div>
-          <div class="agent-controls-grid">
-            <button class="agent-ctrl-btn ${state.canvaRunning ? "generating" : ""}" id="canva-generate-btn" ${state.canvaRunning ? "disabled" : ""}>
-              ${state.canvaRunning ? `${icon("radar")} Generating…` : `${icon("spark")} Generate Static Ads`}
-            </button>
-            <button class="agent-ctrl-btn ${state.geminiRunning ? "generating" : ""}" id="gemini-analyze-btn" ${state.geminiRunning ? "disabled" : ""} ${!state.renderUrl ? "disabled title='Generate a video render first'" : ""}>
-              ${state.geminiRunning ? `${icon("radar")} Analyzing…` : `${icon("chart")} Gemini Video Analysis`}
-            </button>
-          </div>
-          ${state.canvaResult ? `
-          <div class="agent-result-card" style="margin-top:12px">
-            <strong>Canva Static Ads</strong> — ${state.canvaResult.live ? "Live Canva API" : "Stub preview"}
-            <div style="margin-top:4px;font-size:0.85em;opacity:0.8">
-              ${(state.canvaResult.design.formats_available || []).slice(0,2).map((f) => `<div>• ${f}</div>`).join("")}
-            </div>
-          </div>
-          ` : ""}
-          ${state.geminiResult ? `
-          <div class="agent-result-card" style="margin-top:12px">
-            <strong>Gemini Analysis</strong> — ${state.geminiResult.live ? "Live Gemini API" : "Stub preview"}
-            <div style="margin-top:4px;font-size:0.85em;opacity:0.8">
-              ${typeof state.geminiResult.analysis === 'string'
-                ? `<div>${escapeHtml(state.geminiResult.analysis.slice(0, 200))}…</div>`
-                : `<div>Hook: ${escapeHtml(state.geminiResult.analysis.hook_effectiveness || '')}</div>`
-              }
-            </div>
-          </div>
-          ` : ""}
+          ${mediaSurface}
         </div>
       </section>
-
-      ${renderMediaArea("twin-automation")}
     </div>
   `;
 }
@@ -4597,6 +5251,14 @@ function renderApiManagement() {
   const categories = Object.keys(CATEGORY_LABELS);
   const unread = state.alerts.filter((a) => !a.acknowledged).length;
   const selectedSvc = services.find((s) => s.id === state.selectedServiceId) || null;
+  const sectionContent = (() => {
+    if (state.currentSection === "ai-reconstruction") return renderAiReconstruction();
+    if (state.currentSection === "video-generation") return renderVideoGeneration();
+    if (state.currentSection === "distribution") return renderDistribution();
+    if (state.currentSection === "analytics") return renderAnalytics();
+    if (state.currentSection === "executive-workspace") return renderExecutiveWorkspace();
+    return renderViralIntelligence();
+  })();
 
   return `
     <div class="section-content">
@@ -5024,80 +5686,30 @@ function renderApiManagement() {
     </main>
   `;
 
-          ${state.alerts.length === 0 ? `
-          <div class="api-alerts-empty">
-            ${icon("check")}
-            <p>No alerts. All services are operating normally.</p>
-          </div>
-          ` : `
-          <div class="api-alerts-list">
-            ${state.alerts.slice().reverse().map((alert) => `
-              <div class="api-alert-item api-alert-${alert.level} ${alert.acknowledged ? "api-alert-read" : ""}">
-                <div class="api-alert-icon">
-                  ${alert.level === "critical" ? "🔴" : alert.level === "warning" ? "🟡" : "🔵"}
-                </div>
-                <div class="api-alert-body">
-                  <div class="api-alert-head">
-                    <strong>${alert.serviceName}</strong>
-                    <span class="api-alert-level api-alert-level-${alert.level}">${alert.level.toUpperCase()}</span>
-                    <span class="api-alert-time">${new Date(alert.timestamp).toLocaleString()}</span>
-                  </div>
-                  <p>${alert.message}</p>
-                  <div class="api-alert-actions">
-                    ${!alert.acknowledged ? `
-                      <button class="api-card-btn" data-ack-alert="${alert.id}">Mark Read</button>
-                    ` : `<span class="api-alert-acked">✓ Acknowledged</span>`}
-                    <button class="api-card-btn" data-select-service="${alert.serviceId}" data-open-config="true" data-switch-tab="config">
-                      Configure Service
-                    </button>
-                    ${alert.level === "critical" || alert.level === "warning" ? `
-                      <button class="api-card-btn api-card-btn-credits" data-add-credits="${alert.serviceId}">
-                        + Add Credits
-                      </button>
-                    ` : ""}
-                  </div>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          `}
-        </div>
-
-        <!-- Usage summary for all services -->
-        <div class="panel">
-          <div class="panel-head compact">
-            <h2>Monthly Usage Summary</h2>
-          </div>
-          <div class="api-usage-summary">
-            ${services.filter((s) => s.limit !== null).map((svc) => `
-              <div class="api-usage-row">
-                <span class="api-usage-name">${svc.name}</span>
-                <div class="api-usage-bar-wrap">
-                  ${tokenBar(svc.pct, svc.status)}
-                </div>
-                <span class="api-usage-pct ${svc.status === "critical" ? "text-critical" : svc.status === "warning" ? "text-warning" : ""}">${svc.pct}%</span>
-                <span class="api-usage-detail">${svc.used.toLocaleString()} / ${svc.limit.toLocaleString()} ${svc.unit}</span>
-                <span class="api-usage-cost">${svc.estimatedCost}</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      </div>
-      ` : ""}
-
-      ${state.serviceActionStatus && state.apiMgmtTab !== "config" ? `
-      <div class="api-global-feedback api-action-feedback ${state.serviceActionStatus.type}">
-        ${state.serviceActionStatus.message}
-        <button class="api-feedback-close" id="dismiss-service-action">✕</button>
-      </div>
-      ` : ""}
-    </div>
-  `;
 }
 
-// ── Media Gallery helpers ──
+  window.__evicsRenderers = {
+    renderViralIntelligence,
+    renderAiReconstruction,
+    renderVideoGeneration,
+    renderMediaOutputCenter: () => (typeof window.renderMediaOutputCenter === "function" ? window.renderMediaOutputCenter() : renderMediaArea("media-output")),
+    renderDistribution,
+    renderAnalytics,
+    renderExecutiveWorkspace,
+    renderAgentOrchestration,
+    renderPublishedMediaGallery,
+    renderAnalyticsDashboard,
+    renderQualityValidator,
+    serviceStatusBadge,
+    tokenBar
+  };
+  return "";
+}
 
-function mediaApprovalLabel(status) {
+// ── Legacy Media Gallery helpers ──
+// Retained only for backward compatibility while the newer media output center is the active surface.
+
+function legacyMediaApprovalLabel(status) {
   const map = {
     approved: "Approved",
     rejected: "Rejected",
@@ -5109,12 +5721,12 @@ function mediaApprovalLabel(status) {
   return map[status] || status || "Pending";
 }
 
-function filteredMediaVideos() {
+function legacyFilteredMediaVideos() {
   if (state.mediaFilter === "all") return state.mediaVideos;
   return state.mediaVideos.filter((v) => (v.status || "pending") === state.mediaFilter);
 }
 
-function formatRelativeTime(isoString) {
+function legacyFormatRelativeTime(isoString) {
   if (!isoString) return "Unknown";
   const diff = Date.now() - new Date(isoString).getTime();
   const mins = Math.floor(diff / 60000);
@@ -5126,7 +5738,7 @@ function formatRelativeTime(isoString) {
   return `${days}d ago`;
 }
 
-function buildDemoMediaVideos() {
+function legacyBuildDemoMediaVideos() {
   return [
     {
       id: "mv-001",
@@ -5188,7 +5800,90 @@ function buildDemoMediaVideos() {
   ];
 }
 
-async function loadMediaGallery() {
+function buildDemoServices() {
+  const planTemplates = {
+    basic: { limit: 500000, unit: "tokens", costPerUnit: "$0.001" },
+    pro: { limit: 2000000, unit: "tokens", costPerUnit: "$0.0008" },
+    enterprise: { limit: null, unit: "requests", costPerUnit: "$0.0005" }
+  };
+
+  const services = [
+    { id: "video-primary", name: "Titan Video Core", category: "video", isPrimary: true, enabled: true, hasKey: true, plan: "pro", used: 1480000, limit: 2000000, unit: "tokens", daysUntilReset: 9, estimatedCost: "$1,184", backups: ["video-backup"], status: "warning" },
+    { id: "video-backup", name: "Runway Backup", category: "video", isPrimary: false, enabled: true, hasKey: true, plan: "basic", used: 122000, limit: 500000, unit: "tokens", daysUntilReset: 13, estimatedCost: "$122", backups: ["video-primary"], status: "healthy" },
+    { id: "image-primary", name: "Image Forge", category: "image", isPrimary: true, enabled: true, hasKey: false, plan: "pro", used: 930000, limit: 1000000, unit: "tokens", daysUntilReset: 6, estimatedCost: "$744", backups: ["image-backup"], status: "no-key" },
+    { id: "image-backup", name: "DALL·E Backup", category: "image", isPrimary: false, enabled: true, hasKey: true, plan: "basic", used: 166000, limit: 500000, unit: "tokens", daysUntilReset: 17, estimatedCost: "$133", backups: ["image-primary"], status: "healthy" },
+    { id: "social-primary", name: "Social AutoPilot", category: "social", isPrimary: true, enabled: true, hasKey: true, plan: "enterprise", used: 8800, limit: null, unit: "requests", daysUntilReset: 30, estimatedCost: "$58", backups: ["social-backup"], status: "healthy" },
+    { id: "social-backup", name: "Buffer Relay", category: "social", isPrimary: false, enabled: true, hasKey: true, plan: "basic", used: 214000, limit: 500000, unit: "tokens", daysUntilReset: 21, estimatedCost: "$171", backups: ["social-primary"], status: "healthy" },
+    { id: "ai-primary", name: "LLM Command Core", category: "ai", isPrimary: true, enabled: true, hasKey: true, plan: "pro", used: 1960000, limit: 2000000, unit: "tokens", daysUntilReset: 4, estimatedCost: "$1,568", backups: ["ai-backup"], status: "critical" },
+    { id: "ai-backup", name: "Claude Backup", category: "ai", isPrimary: false, enabled: true, hasKey: true, plan: "basic", used: 118000, limit: 500000, unit: "tokens", daysUntilReset: 14, estimatedCost: "$94", backups: ["ai-primary"], status: "healthy" },
+    { id: "analytics-primary", name: "Metrics Core", category: "analytics", isPrimary: true, enabled: true, hasKey: true, plan: "enterprise", used: 4200, limit: null, unit: "requests", daysUntilReset: 30, estimatedCost: "$21", backups: ["analytics-backup"], status: "healthy" },
+    { id: "analytics-backup", name: "Supabase Analytics", category: "analytics", isPrimary: false, enabled: true, hasKey: false, plan: "basic", used: 64000, limit: 500000, unit: "tokens", daysUntilReset: 19, estimatedCost: "$51", backups: ["analytics-primary"], status: "no-key" }
+  ].map((svc) => {
+    const pct = svc.limit ? Math.min(100, Math.round((svc.used / svc.limit) * 100)) : 0;
+    const remaining = svc.limit ? Math.max(0, svc.limit - svc.used) : null;
+    return {
+      ...svc,
+      pct,
+      remaining,
+      plans: planTemplates
+    };
+  });
+
+  return services;
+}
+
+function buildDemoFailoverStatus(services = []) {
+  const status = {};
+  ["video", "image", "social", "ai", "analytics"].forEach((category) => {
+    const categoryServices = services.filter((svc) => svc.category === category);
+    const primary = categoryServices.find((svc) => svc.isPrimary) || categoryServices[0];
+    if (!primary) return;
+    status[category] = {
+      name: primary.name,
+      status: primary.status,
+      limit: primary.limit,
+      pct: primary.pct,
+      daysUntilReset: primary.daysUntilReset
+    };
+  });
+  return status;
+}
+
+async function loadServicesConfig() {
+  state.servicesLoading = true;
+  render();
+
+  try {
+    const res = await fetch("/api/services/config");
+    if (!res.ok) throw new Error(`services/config returned ${res.status}`);
+    const data = await res.json();
+    const services = Array.isArray(data.services) && data.services.length > 0 ? data.services : buildDemoServices();
+    state.servicesConfig = services;
+    state.failoverMode = typeof data.autoFailover === "boolean" ? data.autoFailover : state.failoverMode;
+    state.failoverLog = Array.isArray(data.failoverLog) ? data.failoverLog : state.failoverLog;
+    state.failoverStatus = data.activeServices || data.failoverStatus || buildDemoFailoverStatus(state.servicesConfig);
+    state.alerts = Array.isArray(data.alerts) ? data.alerts : state.alerts;
+    state.alertsUnread = typeof data.alertsUnread === "number" ? data.alertsUnread : state.alerts.filter((a) => !a.acknowledged).length;
+  } catch {
+    state.servicesConfig = buildDemoServices();
+    state.failoverStatus = buildDemoFailoverStatus(state.servicesConfig);
+    state.failoverMode = true;
+    state.alerts = [
+      { id: "alert-001", type: "warning", title: "API usage approaching threshold", acknowledged: false },
+      { id: "alert-002", type: "info", title: "Backup routes healthy", acknowledged: true }
+    ];
+    state.alertsUnread = state.alerts.filter((a) => !a.acknowledged).length;
+  }
+
+  if (!state.selectedServiceId && state.servicesConfig.length > 0) {
+    state.selectedServiceId = state.servicesConfig[0].id;
+  }
+
+  state.servicesLoading = false;
+  render();
+}
+
+async function legacyLoadMediaGallery() {
   state.mediaLoading = true;
   render();
   try {
@@ -5201,10 +5896,10 @@ async function loadMediaGallery() {
       if (galleryData.success && galleryData.videos && galleryData.videos.length > 0) {
         state.mediaVideos = galleryData.videos;
       } else {
-        state.mediaVideos = buildDemoMediaVideos();
+        state.mediaVideos = legacyBuildDemoMediaVideos();
       }
     } else {
-      state.mediaVideos = buildDemoMediaVideos();
+      state.mediaVideos = legacyBuildDemoMediaVideos();
     }
     if (statsRes.ok) {
       const statsData = await statsRes.json();
@@ -5217,7 +5912,7 @@ async function loadMediaGallery() {
   render();
 }
 
-function renderMediaStatusDashboard() {
+function legacyRenderMediaStatusDashboard() {
   const s = state.mediaStats;
   if (!s) return "";
   return `
@@ -5238,7 +5933,7 @@ function renderMediaStatusDashboard() {
   </div>`;
 }
 
-function renderMediaCard(video) {
+function legacyRenderMediaCard(video) {
   const params = (() => { try { return JSON.parse(video.parameters || "{}"); } catch { return {}; } })();
   const isSelected = state.mediaSelectedIds.has(video.id);
   const statusCls = (video.status || "pending").toLowerCase();
@@ -5252,13 +5947,13 @@ function renderMediaCard(video) {
       <div class="media-card-overlay">
         <button class="media-review-btn" data-review-id="${video.id}">▶ Review</button>
       </div>
-      <span class="media-status-badge media-status-${statusCls}">${mediaApprovalLabel(video.status)}</span>
+      <span class="media-status-badge media-status-${statusCls}">${legacyMediaApprovalLabel(video.status)}</span>
       <input type="checkbox" class="media-card-checkbox" data-media-checkbox="${video.id}" ${isSelected ? "checked" : ""} />
     </div>
     <div class="media-card-body">
       <div class="media-card-meta">
         <span class="media-platform-tag">${video.platform || "Unknown"}</span>
-        <span class="media-time">${formatRelativeTime(video.created_at)}</span>
+        <span class="media-time">${legacyFormatRelativeTime(video.created_at)}</span>
       </div>
       <p class="media-card-script">${(video.script || "").length > 80 ? video.script.slice(0, 80) + "…" : (video.script || "No script")}</p>
       <div class="media-card-params">
@@ -5271,7 +5966,7 @@ function renderMediaCard(video) {
   </div>`;
 }
 
-function renderReviewPanel() {
+function legacyRenderReviewPanel() {
   const v = state.mediaReviewVideo;
   if (!v) return "";
   const params = (() => { try { return JSON.parse(v.parameters || "{}"); } catch { return {}; } })();
@@ -5282,7 +5977,7 @@ function renderReviewPanel() {
       <div class="media-review-header">
         <div>
           <h2>Review Video</h2>
-          <span class="media-status-badge media-status-${statusCls}">${mediaApprovalLabel(v.status)}</span>
+          <span class="media-status-badge media-status-${statusCls}">${legacyMediaApprovalLabel(v.status)}</span>
         </div>
         <button class="toggle-link" id="close-review-panel">✕ Close</button>
       </div>
@@ -5302,7 +5997,7 @@ function renderReviewPanel() {
             <div><dt>Style</dt><dd>${params.style || "—"}</dd></div>
             <div><dt>Aspect</dt><dd>${params.aspect || "—"}</dd></div>
             <div><dt>Voice</dt><dd>${params.voice || "—"}</dd></div>
-            <div><dt>Created</dt><dd>${formatRelativeTime(v.created_at)}</dd></div>
+            <div><dt>Created</dt><dd>${legacyFormatRelativeTime(v.created_at)}</dd></div>
           </div>
 
           <div class="media-script-block">
@@ -5343,8 +6038,8 @@ function renderReviewPanel() {
   </div>`;
 }
 
-function renderMediaGallery() {
-  const filtered = filteredMediaVideos();
+function legacyRenderMediaGallery() {
+  const filtered = legacyFilteredMediaVideos();
   const filterTabs = ["all", "pending", "approved", "rejected", "discarded", "requeued", "complete"];
   const hasSelection = state.mediaSelectedIds.size > 0;
 
@@ -5369,7 +6064,7 @@ function renderMediaGallery() {
 
     ${state.mediaGalleryOpen ? `
     <div class="media-gallery-body">
-      ${renderMediaStatusDashboard()}
+      ${legacyRenderMediaStatusDashboard()}
 
       <div class="media-filter-tabs">
         ${filterTabs.map((tab) => `
@@ -5385,7 +6080,7 @@ function renderMediaGallery() {
         <div class="empty">No videos found for this filter. Generate some ads to get started.</div>
       ` : `
         <div class="media-grid">
-          ${filtered.map(renderMediaCard).join("")}
+          ${filtered.map(legacyRenderMediaCard).join("")}
         </div>
       `}
 
@@ -5399,7 +6094,7 @@ function renderMediaGallery() {
     ` : ""}
   </section>
 
-  ${state.mediaReviewOpen ? renderReviewPanel() : ""}`;
+  ${state.mediaReviewOpen ? legacyRenderReviewPanel() : ""}`;
 }
 
 function generateAiSuggestions(video) {
@@ -5484,8 +6179,9 @@ function sectionWithBoundary(rendererFn, sectionId) {
           <button class="ghost" style="margin-top:8px" onclick="window.location.reload()">Reload Dashboard</button>
         </div>
       </div>`;
+
   }
-}
+  }
 
 function demoBanner() {
   if (state.dataSource !== "Demo") return "";
@@ -5495,129 +6191,6 @@ function demoBanner() {
       <button class="ghost demo-connect-btn" id="demo-connect-btn" style="padding:4px 12px;font-size:12px">Connect Sources</button>
       <button class="demo-banner-dismiss" id="demo-banner-dismiss" title="Dismiss">✕</button>
     </div>`;
-}
-
-function render() {
-  const app = document.getElementById("app");
-
-  // Determine which section content to render
-  const sectionRenderers = {
-    "viral-intelligence": renderViralIntelligence,
-    "ai-reconstruction":  renderAiReconstruction,
-    "video-generation":   renderVideoGeneration,
-    "distribution":       renderDistribution,
-    "analytics":          renderAnalytics,
-    "twin-automation":    renderTwinAutomation,
-    "api-management":     renderApiManagement
-  };
-  const renderer = sectionRenderers[state.currentSection] || renderViralIntelligence;
-  const sectionContent = sectionWithBoundary(renderer, state.currentSection);
-
-  app.innerHTML = `
-    ${demoBanner()}
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">IG</div>
-        <div>
-          <strong>I AM GENESIS TECH</strong>
-          <span>AI Viral Engine</span>
-        </div>
-      </div>
-      <nav>
-        ${SECTIONS.map((s) => `
-          <button class="nav-btn ${state.currentSection === s.id ? "active" : ""}" data-section="${s.id}">
-            ${icon(s.icon)}<span>${s.label}</span>
-          </button>
-        `).join("")}
-      </nav>
-      <div class="automation-card">
-        <span>Automation Health</span>
-        <strong>Daily loop active</strong>
-        <div class="pulse-row"><i></i> Next scan at 6:00 AM</div>
-      </div>
-    </aside>
-
-    <main>
-      <header class="topbar">
-        <div>
-          <h1>Elite AI E-Commerce Workspace</h1>
-          <p>Viral ad intelligence, AI creative reconstruction, distribution, and learning loop for supplement growth.</p>
-        </div>
-        <div class="top-actions">
-          <div class="sync-status ${state.syncLevel}">
-            <b>${state.dataSource}</b>
-            <span>${state.syncMessage}</span>
-          </div>
-          <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} Copilot</button>
-          <button class="ghost" id="connect-sources-btn">${icon("key")} Connect Sources</button>
-        </div>
-      </header>
-
-      <!-- ── Section nav breadcrumb ── -->
-      <div class="section-nav-tabs">
-        ${SECTIONS.map((s) => `
-          <button class="section-tab ${state.currentSection === s.id ? "section-tab-active" : ""}" data-section="${s.id}">
-            ${icon(s.icon)} ${s.label}
-          </button>
-        `).join("")}
-      </div>
-
-      ${state.copilotOpen ? `
-      <section class="copilot-panel panel">
-        <div class="panel-head compact">
-          <h2>${icon("spark")} AI Copilot</h2>
-          <button class="toggle-link" id="close-copilot">✕ Close</button>
-        </div>
-        <p class="copilot-desc">Ask the AI anything about your workspace — trends, creatives, products, or next steps.</p>
-        <div class="copilot-input-row">
-          <input type="text" id="copilot-input" class="copilot-input" placeholder="e.g. What should I focus on today?" value="${state.copilotQuestion.replace(/"/g, "&quot;")}" />
-          <button class="primary" id="copilot-ask-btn" ${state.copilotLoading ? "disabled" : ""}>
-            ${state.copilotLoading ? "Thinking…" : "Ask"}
-          </button>
-        </div>
-        ${state.copilotAnswer ? `
-        <div class="copilot-answer">
-          <div class="copilot-answer-text">${state.copilotAnswer}</div>
-          ${state.copilotNextActions.length > 0 ? `
-          <div class="copilot-next-actions">
-            <strong>Suggested next actions:</strong>
-            <ul>${state.copilotNextActions.map((a) => `<li>${a}</li>`).join("")}</ul>
-          </div>
-          ` : ""}
-        </div>
-        ` : ""}
-      </section>
-      ` : ""}
-
-      ${sectionContent}
-
-      ${renderMediaGallery()}
-    </main>
-    ${renderConnectSourcesModal()}
-  `;
-
-  bindEvents();
-  if (state.currentSection === "media-output" && window.bindMediaOutputCenter) {
-    window.bindMediaOutputCenter();
-  }
-
-  // Demo banner bindings (after innerHTML set)
-  const demoBannerDismiss = document.getElementById("demo-banner-dismiss");
-  if (demoBannerDismiss) {
-    demoBannerDismiss.addEventListener("click", () => {
-      const banner = document.getElementById("demo-mode-banner");
-      if (banner) banner.style.display = "none";
-    });
-  }
-  const demoConnectBtn = document.getElementById("demo-connect-btn");
-  if (demoConnectBtn) {
-    demoConnectBtn.addEventListener("click", () => {
-      state.connectSourcesOpen = true;
-      state.connectSourcesSaved = false;
-      state.connectSourcesError = null;
-      render();
-    });
-  }
 }
 
 function metric(label, value, delta) {
@@ -5668,6 +6241,38 @@ async function pollRenderStatus(statusUrl) {
   }
 }
 
+function resolveSpecialEffectsFromPreset() {
+  const preset = String(state.videoEffectPreset || "").trim().toLowerCase();
+  if (!preset || preset === "ai best judgment") return [];
+  return ["product-entrance-fade"];
+}
+
+async function resolvePrimaryProductMockup() {
+  const params = new URLSearchParams();
+  if (state.videoProductTitle.trim()) params.set("productTitle", state.videoProductTitle.trim());
+  if (state.videoProductPageUrl.trim()) params.set("productPageUrl", state.videoProductPageUrl.trim());
+  const endpoint = `/api/products/mockup-library/resolve?${params.toString()}`;
+  const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+  const data = await response.json();
+  if (!response.ok || data.success === false || !data.product) {
+    throw new Error(data.error || "Unable to resolve primary product mockup from product library.");
+  }
+  const product = data.product;
+  if (!product.primaryImageUrl) {
+    throw new Error("Primary product image missing in mockup library for selected product.");
+  }
+  if (!state.videoProductMockupUrl || !state.videoProductMockupUrl.trim()) {
+    state.videoProductMockupUrl = product.primaryImageUrl;
+  }
+  if (!state.videoProductPageUrl || !state.videoProductPageUrl.trim()) {
+    state.videoProductPageUrl = product.productPageUrl || "";
+  }
+  if (!state.videoProductTitle || !state.videoProductTitle.trim()) {
+    state.videoProductTitle = product.title || "";
+  }
+  return product;
+}
+
 async function generateVideoFromSubmittedScript() {
   if (!state.submittedScript.trim() || state.renderStatus === "processing") return;
 
@@ -5686,16 +6291,54 @@ async function generateVideoFromSubmittedScript() {
   render();
 
   try {
+    const resolvedProduct = await resolvePrimaryProductMockup();
+    const visualBackground = buildEliteBackgroundConfig();
+    const specialEffects = resolveSpecialEffectsFromPreset();
     const response = await fetch("/api/video/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        render_mode: "avatar-video",
         script: state.submittedScript,
+        avatar_id: getEliteAvatarId() || undefined,
+        voice_id: getEliteVoiceId() || undefined,
+        avatar_preset: state.videoAvatarPreset || undefined,
+        voice_preset: state.videoVoice || undefined,
         duration: state.videoDuration,
         style: state.videoStyle,
-        background: state.videoBackground,
+        background: visualBackground,
         aspect: state.videoAspect,
-        config: { display_voice: state.videoVoice }
+        productTitle: (resolvedProduct && resolvedProduct.title) || state.videoProductTitle || undefined,
+        productImageUrl: (resolvedProduct && resolvedProduct.primaryImageUrl) || state.videoProductMockupUrl || undefined,
+        productPageUrl: (resolvedProduct && resolvedProduct.productPageUrl) || state.videoProductPageUrl || state.videoDestinationUrl || undefined,
+        companyLabel: state.videoCompanyLabel || undefined,
+        cta_url: state.videoProductPageUrl || state.videoDestinationUrl || undefined,
+        special_effects: specialEffects,
+        text_overlay_position: state.videoTextOverlayPosition || "bottom",
+        tracking_protocol: state.videoTrackingProtocol || undefined,
+        config: {
+          display_voice: state.videoVoice,
+          avatar_preset: state.videoAvatarPreset || "",
+          voice_preset: state.videoVoice || "",
+          audio_bed: state.videoBackground,
+          background: visualBackground,
+          visual_background: state.videoVisualBackground,
+          effect_preset: state.videoEffectPreset,
+          entry_timing: state.videoEntryTiming,
+          product_treatment: state.videoProductTreatment,
+          brand_brief: state.videoBrandBrief,
+          effect_brief: state.videoEffectBrief,
+          timing_brief: state.videoTimingBrief,
+          governance: state.videoGovernanceMode,
+          productTitle: state.videoProductTitle || "",
+          productImageUrl: ((resolvedProduct && resolvedProduct.primaryImageUrl) || state.videoProductMockupUrl || ""),
+          productPageUrl: ((resolvedProduct && resolvedProduct.productPageUrl) || state.videoProductPageUrl || state.videoDestinationUrl || ""),
+          companyLabel: state.videoCompanyLabel || "I AM GENESIS TECH",
+          special_effects: specialEffects,
+          text_overlay_position: state.videoTextOverlayPosition || "bottom",
+          cta_destination_url: state.videoProductPageUrl || state.videoDestinationUrl || "",
+          tracking_protocol: state.videoTrackingProtocol || ""
+        }
       })
     });
     const data = await response.json();
@@ -5707,6 +6350,7 @@ async function generateVideoFromSubmittedScript() {
     state.renderVideoId = data.video_id || null;
     state.renderStatusUrl = data.status_url || null;
     state.renderUrl = data.video_url || data.videoUrl || null;
+    state.videoProductMockupUrl = data.product_image_url || state.videoProductMockupUrl;
     state.renderStatus = mapBackendRenderStatus(data.status);
     state.renderProgress = state.renderStatus === "complete" ? 100 : 30;
     state.renderMessage = state.renderStatus === "complete"
@@ -5728,17 +6372,98 @@ async function generateVideoFromSubmittedScript() {
   }
 }
 
+function setCurrentSection(sectionId, options = {}) {
+  const sectionExists = WORKSPACE_SECTIONS.some((section) => section.id === sectionId);
+  if (!sectionExists) return;
+  const {
+    resetMediaSelection = true,
+    scrollToTop = true,
+    skipRender = false
+  } = options;
+  state.currentSection = sectionId;
+  if (resetMediaSelection) {
+    state.selectedMediaId = null;
+    state.mediaActionStatus = null;
+  }
+  try {
+    localStorage.setItem("evics_current_section", sectionId);
+  } catch (e) {
+    // ignore storage errors
+  }
+  syncSectionInUrl(sectionId);
+  if (scrollToTop && typeof window.scrollTo === "function") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  if (sectionId === "media-output" && typeof window.loadMediaOutputs === "function") {
+    window.loadMediaOutputs();
+  }
+  if (!skipRender) {
+    render();
+  }
+}
+
+function syncSectionInUrl(sectionId) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", sectionId);
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, "", next);
+  } catch (e) {
+    // ignore URL sync errors
+  }
+}
+
 function bindEvents() {
   // ── Navigation: sidebar nav buttons ──
   document.querySelectorAll("[data-section]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.currentSection = btn.dataset.section;
-      // Reset media selection when switching sections
-      state.selectedMediaId = null;
-      state.mediaActionStatus = null;
-      render();
+      setCurrentSection(btn.dataset.section);
     });
   });
+
+  const navPrevSection = document.getElementById("nav-prev-section");
+  if (navPrevSection) {
+    navPrevSection.addEventListener("click", () => {
+      const target = navPrevSection.dataset.targetSection;
+      if (target) setCurrentSection(target);
+    });
+  }
+
+  const navNextSection = document.getElementById("nav-next-section");
+  if (navNextSection) {
+    navNextSection.addEventListener("click", () => {
+      const target = navNextSection.dataset.targetSection;
+      if (target) setCurrentSection(target);
+    });
+  }
+
+  const pipelineAutonomousRun = document.getElementById("pipeline-autonomous-run");
+  if (pipelineAutonomousRun) {
+    pipelineAutonomousRun.addEventListener("click", async () => {
+      if (state.vpMissionLoading) return;
+      state.vpMissionLoading = true;
+      state.vpMissionError = null;
+      state.syncMessage = "Launching autonomous mission across pipeline stages...";
+      render();
+      try {
+        const res = await fetch("/api/agents/vp-mission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetCount: 3, originSectionId: state.currentSection || "workspace-shell" })
+        });
+        if (!res.ok) throw new Error("Autonomous mission launch failed.");
+        const data = await res.json();
+        state.vpMission = data.mission || null;
+        state.syncMessage = "Autonomous mission launched. VP agent now coordinating end-to-end pipeline.";
+        state.syncLevel = "connected";
+      } catch (error) {
+        state.vpMissionError = error.message || "Autonomous mission launch failed.";
+        state.syncMessage = state.vpMissionError;
+      }
+      state.vpMissionLoading = false;
+      render();
+    });
+  }
 
   // ── Video pipeline input layer ──
   const scriptInput = document.getElementById("script-input");
@@ -5803,6 +6528,14 @@ function bindEvents() {
     generateVideoBtn.addEventListener("click", generateVideoFromSubmittedScript);
   }
 
+  document.querySelectorAll("[data-state-key]").forEach((controlEl) => {
+    const handler = () => {
+      state[controlEl.dataset.stateKey] = controlEl.value;
+    };
+    controlEl.addEventListener("input", handler);
+    controlEl.addEventListener("change", handler);
+  });
+
   // ── Media type filter ──
   const mediaTypeFilter = document.getElementById("media-type-filter");
   if (mediaTypeFilter) {
@@ -5850,9 +6583,27 @@ function bindEvents() {
   document.querySelectorAll("[data-media-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.mediaId;
-      state.selectedMediaId = state.selectedMediaId === id ? null : id;
+      state.selectedMediaId = id;
       state.mediaActionStatus = null;
       render();
+    });
+  });
+
+  document.querySelectorAll("[data-media-review-id]").forEach((btn) => {
+    const openReview = (event) => {
+      event.stopPropagation();
+      const id = btn.dataset.mediaReviewId;
+      const item = DEMO_MEDIA.find((entry) => String(entry.id) === String(id));
+      if (!item) return;
+      state.selectedMediaId = id;
+      openMediaReviewModal(item);
+      render();
+    };
+    btn.addEventListener("click", openReview);
+    btn.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        openReview(event);
+      }
     });
   });
 
@@ -6109,21 +6860,7 @@ function bindEvents() {
   }
 
   // ── Load all memories from API on section entry ──
-  if (state.currentSection === "product-viral-intel" && !state.viralMemoriesLoading && state.productViralMemories.length === 0) {
-    state.viralMemoriesLoading = true;
-    fetch("/api/viral/products/all-memories")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data && data.memories && data.memories.length > 0) {
-          state.productViralMemories = data.memories;
-          render();
-        }
-      })
-      .catch(() => { /* demo mode */ })
-      .finally(() => { state.viralMemoriesLoading = false; });
-  }
-
-  // ── Agent controls (Twin Automation section) ──
+  // ── Agent controls (Executive Workspace section) ──
   const agentViralScanBtn = document.getElementById("agent-viral-scan-btn");
   if (agentViralScanBtn) {
     agentViralScanBtn.addEventListener("click", async () => {
@@ -6176,6 +6913,44 @@ function bindEvents() {
       await new Promise((r) => setTimeout(r, 1000));
       agentLearningLoopBtn.textContent = "✓ Loop complete";
       setTimeout(() => render(), 1000);
+    });
+  }
+
+  const runExcellenceAuditBtn = document.getElementById("run-excellence-audit-btn");
+  if (runExcellenceAuditBtn) {
+    runExcellenceAuditBtn.addEventListener("click", async () => {
+      state.excellenceLoading = true;
+      state.excellenceError = null;
+      render();
+      try {
+        const data = await apiFetch("/api/excellence/audit", { method: "POST" });
+        state.excellenceStatus = data;
+        state.excellenceObjectives = Array.isArray(data.objectives) ? data.objectives : [];
+      } catch (error) {
+        state.excellenceError = error.message || "A+ audit failed";
+      } finally {
+        state.excellenceLoading = false;
+        render();
+      }
+    });
+  }
+
+  const refreshExcellenceStatusBtn = document.getElementById("refresh-excellence-status-btn");
+  if (refreshExcellenceStatusBtn) {
+    refreshExcellenceStatusBtn.addEventListener("click", async () => {
+      state.excellenceLoading = true;
+      state.excellenceError = null;
+      render();
+      try {
+        const data = await apiFetch("/api/excellence/status");
+        state.excellenceStatus = data;
+        state.excellenceObjectives = Array.isArray(data.objectives) ? data.objectives : [];
+      } catch (error) {
+        state.excellenceError = error.message || "A+ status unavailable";
+      } finally {
+        state.excellenceLoading = false;
+        render();
+      }
     });
   }
 
@@ -6286,7 +7061,7 @@ function bindEvents() {
         state.syncLevel = "connected";
         state.syncMessage = `Trend Scout scanned ${state.scanCount.toLocaleString()} ads.`;
       } catch (err) {
-        // Fallback: try legacy endpoint
+        // Fallback: try backup endpoint
         try {
           const res = await fetch(`${API_BASE}/api/viral/rescan`, {
             method: "POST",
@@ -6349,7 +7124,7 @@ function bindEvents() {
         state.syncMessage = `Found ${state.hooksFound} hooks via Trend Scout.`;
         state.showHooksList = true;
       } catch {
-        // Fallback: legacy hooks/search endpoint
+        // Fallback: backup hooks/search endpoint
         try {
           const res = await fetch(`${API_BASE}/api/hooks/search`, {
             method: "POST",
@@ -6433,7 +7208,7 @@ function bindEvents() {
   }
 
   // ── Copy buttons ──
-  document.querySelectorAll(".copy-btn").forEach((btn) => {
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const text = btn.dataset.copy;
       navigator.clipboard.writeText(text).then(() => {
@@ -6545,7 +7320,7 @@ function bindEvents() {
         state.syncLevel = "connected";
         state.syncMessage = `Copilot generated ${state.copilotSuggestions.length} suggestions.`;
       } catch {
-        // Fallback: try legacy assembly/suggestions for component auto-fill
+        // Fallback: try backup assembly/suggestions for component auto-fill
         try {
           const res = await fetch(`${API_BASE}/api/assembly/suggestions`, {
             method: "POST",
@@ -6760,27 +7535,41 @@ function bindEvents() {
     }, 600);
 
     try {
+      const assembledScript = state.assemblyComponents.map((component) => component.text).filter(Boolean).join("\n\n");
       const res = await fetch(`${API_BASE}/api/video/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           platform,
+          render_mode: "video-agent",
+          prompt: `Create a premium portrait social commerce video from this script and product context. Keep the presenter natural and direct-to-camera, with a strong hook, clean product reveal, and clear CTA.\n\n${assembledScript}`,
           components: state.assemblyComponents,
           duration: state.videoDuration,
           style: state.videoStyle,
           voice: state.videoVoice,
           background: state.videoBackground,
-          aspect: state.videoAspect
+          aspect: state.videoAspect,
+          productTitle: state.videoProductTitle || undefined,
+          productImageUrl: state.videoProductMockupUrl || undefined,
+          productPageUrl: state.videoProductPageUrl || state.videoDestinationUrl || undefined,
+          companyLabel: state.videoCompanyLabel || undefined,
+          cta_url: state.videoProductPageUrl || state.videoDestinationUrl || undefined
         })
       });
       clearInterval(progressInterval);
       if (res.ok) {
         const data = await res.json();
         state.renderProgress = 100;
-        state.renderStatus = data.status === "complete" ? "Complete" : "Pending";
-        state.renderUrl = data.url || data.videoUrl || null;
-        state.renderJobId = data.jobId || null;
-        state.renderRenderId = data.renderId || null;
+        const backendStatus = String(data.status || "").toLowerCase();
+        state.renderStatus = backendStatus === "complete" || backendStatus === "completed" ? "Complete" : "Pending";
+        state.renderUrl = data.url || data.videoUrl || data.video_url || null;
+        state.renderJobId = data.jobId || data.video_id || data.renderId || null;
+        state.renderRenderId = data.renderId || data.video_id || null;
+        state.renderVideoId = data.video_id || data.renderId || null;
+        state.renderStatusUrl = data.status_url || (state.renderVideoId ? `/api/video/status/${state.renderVideoId}` : null);
+        if (data.quality) {
+          state.renderMessage = `A+ quality gate: ${data.quality.score}/100 (${data.quality.tier})${data.script_upgraded ? " · script upgraded" : ""}.`;
+        }
         if (state.renderStatus === "Pending" && !state.renderPollingActive) {
           startRenderPolling();
         }
@@ -6804,8 +7593,12 @@ function bindEvents() {
   const sendHeyGen = document.getElementById("send-heygen");
   if (sendHeyGen) sendHeyGen.addEventListener("click", () => sendToRenderer("heygen"));
 
-  const sendRunway = document.getElementById("send-runway");
-  if (sendRunway) sendRunway.addEventListener("click", () => sendToRenderer("runway"));
+  document.querySelectorAll("[data-auto-send]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const platform = btn.dataset.autoSend;
+      if (platform) sendToRenderer(platform);
+    });
+  });
 
   // ── Generate Today's Ads ──
   const generateTodayBtn = document.getElementById("generate-today-btn");
@@ -6965,6 +7758,54 @@ function bindEvents() {
   if (toggleKeyVisibility) {
     toggleKeyVisibility.addEventListener("click", () => {
       state.serviceApiKeyVisible = !state.serviceApiKeyVisible;
+      render();
+    });
+  }
+
+  // ── Executive admin access ──
+  const executiveAdminCode = document.getElementById("executive-admin-code");
+  if (executiveAdminCode) {
+    executiveAdminCode.addEventListener("input", () => {
+      state.adminAccessCodeInput = executiveAdminCode.value;
+      state.adminAccessError = null;
+    });
+    executiveAdminCode.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const unlockButton = document.getElementById("unlock-admin-access-btn");
+        if (unlockButton) unlockButton.click();
+      }
+    });
+  }
+
+  const unlockAdminAccessBtn = document.getElementById("unlock-admin-access-btn");
+  if (unlockAdminAccessBtn) {
+    unlockAdminAccessBtn.addEventListener("click", () => {
+      const enteredCode = state.adminAccessCodeInput.trim();
+      const expectedCode = getExecutiveAdminCode().trim();
+      if (!expectedCode) {
+        state.adminAccessError = "Admin access code is not configured.";
+        render();
+        return;
+      }
+      if (enteredCode && enteredCode === expectedCode) {
+        state.adminAccessGranted = true;
+        state.adminAccessError = null;
+        try { sessionStorage.setItem("evics_admin_access_granted", "true"); } catch (e) { /* ignore */ }
+      } else {
+        state.adminAccessGranted = false;
+        state.adminAccessError = "Invalid admin access code.";
+      }
+      render();
+    });
+  }
+
+  const lockAdminAccessBtn = document.getElementById("lock-admin-access-btn");
+  if (lockAdminAccessBtn) {
+    lockAdminAccessBtn.addEventListener("click", () => {
+      state.adminAccessGranted = false;
+      state.adminAccessCodeInput = "";
+      state.adminAccessError = null;
+      try { sessionStorage.removeItem("evics_admin_access_granted"); } catch (e) { /* ignore */ }
       render();
     });
   }
@@ -7282,28 +8123,34 @@ function bindEvents() {
   const mediaGalleryToggle = document.getElementById("media-gallery-toggle");
   if (mediaGalleryToggle) {
     mediaGalleryToggle.addEventListener("click", () => {
+      setExecControlState(mediaGalleryToggle, "running");
       state.mediaGalleryOpen = !state.mediaGalleryOpen;
       if (state.mediaGalleryOpen && state.mediaVideos.length === 0) {
-        loadMediaGallery();
+        legacyLoadMediaGallery();
       } else {
         render();
       }
+      setExecControlState(mediaGalleryToggle, "completed", 1200);
     });
   }
 
   // Refresh gallery
-  const mediaRefreshBtn = document.getElementById("media-refresh-btn");
-  if (mediaRefreshBtn) {
-    mediaRefreshBtn.addEventListener("click", () => {
-      loadMediaGallery();
+  const mediaGalleryRefreshBtn = document.getElementById("media-refresh-btn");
+  if (mediaGalleryRefreshBtn) {
+    mediaGalleryRefreshBtn.addEventListener("click", () => {
+      setExecControlState(mediaGalleryRefreshBtn, "running");
+      legacyLoadMediaGallery();
+      setExecControlState(mediaGalleryRefreshBtn, "completed", 1600);
     });
   }
 
   // Filter tabs
   document.querySelectorAll("[data-media-filter]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      setExecControlState(btn, "running");
       state.mediaFilter = btn.dataset.mediaFilter;
       render();
+      setExecControlState(btn, "completed", 1000);
     });
   });
 
@@ -7322,6 +8169,7 @@ function bindEvents() {
   const mediaClearSelection = document.getElementById("media-clear-selection");
   if (mediaClearSelection) {
     mediaClearSelection.addEventListener("click", () => {
+      setExecControlState(mediaClearSelection, "completed", 700);
       state.mediaSelectedIds = new Set();
       render();
     });
@@ -7333,6 +8181,7 @@ function bindEvents() {
     mediaBulkApprove.addEventListener("click", async () => {
       const ids = [...state.mediaSelectedIds];
       if (!ids.length) return;
+      setExecControlState(mediaBulkApprove, "running");
       try {
         const res = await fetch("/api/media/bulk", {
           method: "POST",
@@ -7355,20 +8204,20 @@ function bindEvents() {
         });
       }
       state.mediaSelectedIds = new Set();
+      setExecControlState(mediaBulkApprove, "completed", 1200);
       render();
     });
   }
 
   // Bulk discard
-  const mediaBulkDiscard = document.getElementById("media-bulk-discard");
+  const mediaBulkDiscard =
+    document.getElementById("media-bulk-discard") ||
+    document.getElementById("bulk-discard-btn");
   if (mediaBulkDiscard) {
     mediaBulkDiscard.addEventListener("click", async () => {
-  // ── Bulk discard ──
-  const bulkDiscardBtn = document.getElementById("bulk-discard-btn");
-  if (bulkDiscardBtn) {
-    bulkDiscardBtn.addEventListener("click", async () => {
       const ids = [...state.mediaSelectedIds];
       if (!ids.length) return;
+      setExecControlState(mediaBulkDiscard, "running");
       try {
         const res = await fetch("/api/media/bulk", {
           method: "POST",
@@ -7388,6 +8237,7 @@ function bindEvents() {
         });
       }
       state.mediaSelectedIds = new Set();
+      setExecControlState(mediaBulkDiscard, "completed", 1200);
       render();
     });
   }
@@ -7412,6 +8262,7 @@ function bindEvents() {
   const mediaReviewClose = document.getElementById("media-review-close");
   if (mediaReviewClose) {
     mediaReviewClose.addEventListener("click", () => {
+      setExecControlState(mediaReviewClose, "completed", 700);
       state.mediaReviewOpen = false;
       state.mediaReviewVideo = null;
       state.mediaAiSuggestions = null;
@@ -7425,6 +8276,7 @@ function bindEvents() {
   if (mediaReviewOverlay) {
     mediaReviewOverlay.addEventListener("click", (e) => {
       if (e.target === mediaReviewOverlay) {
+        setExecControlState(mediaReviewOverlay, "completed", 700);
         state.mediaReviewOpen = false;
         state.mediaReviewVideo = null;
         state.mediaAiSuggestions = null;
@@ -7448,6 +8300,7 @@ function bindEvents() {
     mediaBtnApprove.addEventListener("click", async () => {
       if (!state.mediaReviewVideo) return;
       const id = state.mediaReviewVideo.id;
+      setExecControlState(mediaBtnApprove, "running");
       state.mediaActionLoading = true;
       render();
       try {
@@ -7466,6 +8319,7 @@ function bindEvents() {
         if (state.mediaReviewVideo) state.mediaReviewVideo.approvalStatus = "approved";
       }
       state.mediaActionLoading = false;
+      setExecControlState(mediaBtnApprove, "completed", 1600);
       render();
     });
   }
@@ -7477,6 +8331,7 @@ function bindEvents() {
       if (!state.mediaReviewVideo) return;
       const id = state.mediaReviewVideo.id;
       const reason = state.mediaRejectionReason || "";
+      setExecControlState(mediaBtnRerender, "running");
       state.mediaActionLoading = true;
       render();
       try {
@@ -7531,6 +8386,7 @@ function bindEvents() {
         state.mediaAiSuggestions = demoSuggestions;
       }
       state.mediaActionLoading = false;
+      setExecControlState(mediaBtnRerender, "completed", 1600);
       render();
     });
   }
@@ -7541,6 +8397,7 @@ function bindEvents() {
     mediaBtnDiscard.addEventListener("click", async () => {
       if (!state.mediaReviewVideo) return;
       const id = state.mediaReviewVideo.id;
+      setExecControlState(mediaBtnDiscard, "running");
       state.mediaActionLoading = true;
       render();
       try {
@@ -7552,6 +8409,7 @@ function bindEvents() {
       state.mediaStats.discarded = (state.mediaStats.discarded || 0) + 1;
       state.mediaStats.pending = Math.max(0, (state.mediaStats.pending || 0) - 1);
       state.mediaActionLoading = false;
+      setExecControlState(mediaBtnDiscard, "completed", 1600);
       render();
     });
   }
@@ -7562,6 +8420,7 @@ function bindEvents() {
     mediaBtnRequeue.addEventListener("click", async () => {
       if (!state.mediaReviewVideo) return;
       const id = state.mediaReviewVideo.id;
+      setExecControlState(mediaBtnRequeue, "running");
       state.mediaActionLoading = true;
       render();
       try {
@@ -7609,6 +8468,7 @@ function bindEvents() {
         state.mediaAiSuggestions = null;
       }
       state.mediaActionLoading = false;
+      setExecControlState(mediaBtnRequeue, "completed", 1600);
       render();
     });
   }
@@ -7893,6 +8753,61 @@ function bindEvents() {
     });
   }
 
+  const launchVpMissionBtn = document.getElementById("launch-vp-mission-btn");
+  if (launchVpMissionBtn) {
+    launchVpMissionBtn.addEventListener("click", async () => {
+      state.vpMissionLoading = true;
+      state.vpMissionError = null;
+      render();
+      try {
+        const res = await fetch("/api/agents/vp-mission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetCount: 3, originSectionId: "executive-workspace" })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.vpMission = data.mission || null;
+          state.syncMessage = "VP mission launched from Executive Workspace.";
+          state.syncLevel = "connected";
+        } else {
+          state.vpMissionError = "VP mission launch failed.";
+        }
+      } catch (error) {
+        state.vpMissionError = error.message || "VP mission launch failed.";
+      }
+      state.vpMissionLoading = false;
+      render();
+    });
+  }
+
+  const openMediaOutputBtn = document.getElementById("open-media-output-btn");
+  if (openMediaOutputBtn) {
+    openMediaOutputBtn.addEventListener("click", () => {
+      setCurrentSection("media-output");
+    });
+  }
+
+  const refreshVpMissionBtn = document.getElementById("refresh-vp-mission-btn");
+  if (refreshVpMissionBtn) {
+    refreshVpMissionBtn.addEventListener("click", async () => {
+      if (!state.vpMission || !state.vpMission.missionId) return;
+      refreshVpMissionBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/agents/vp-mission/${state.vpMission.missionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          state.vpMission = data.mission || state.vpMission;
+          state.vpMissionError = null;
+        }
+      } catch (error) {
+        state.vpMissionError = error.message || "Could not refresh VP mission.";
+      }
+      refreshVpMissionBtn.disabled = false;
+      render();
+    });
+  }
+
   // ── Agent Orchestration Dashboard ──
   const toggleAgentStatus = document.getElementById("toggle-agent-status");
   if (toggleAgentStatus) {
@@ -8065,13 +8980,14 @@ function bindEvents() {
   const qualityValidateBtn = document.getElementById("quality-validate-btn");
   if (qualityValidateBtn) {
     qualityValidateBtn.addEventListener("click", () => {
-      validateQuality();
+      validateQuality(qualityValidateBtn);
     });
   }
 
   const qualityClearResult = document.getElementById("quality-clear-result");
   if (qualityClearResult) {
     qualityClearResult.addEventListener("click", () => {
+      setExecControlState(qualityClearResult, "completed", 700);
       state.qualityResult = null;
       render();
     });
@@ -8126,6 +9042,57 @@ function bindEvents() {
     });
   }
 
+  document.querySelectorAll("[data-open-url]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = btn.dataset.openUrl;
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    });
+  });
+
+  if (!window.__evicsKeyboardBound) {
+    window.__evicsKeyboardBound = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      let changed = false;
+      if (state.mediaReviewOpen) {
+        state.mediaReviewOpen = false;
+        state.mediaReviewVideo = null;
+        state.mediaAiSuggestions = null;
+        state.mediaRejectionReason = "";
+        changed = true;
+      }
+      if (state.connectSourcesOpen) {
+        state.connectSourcesOpen = false;
+        state.connectSourcesSaved = false;
+        state.connectSourcesError = null;
+        changed = true;
+      }
+      if (state.showCopilotPanel || state.copilotOpen || state.showCopilot) {
+        state.showCopilotPanel = false;
+        state.copilotOpen = false;
+        state.showCopilot = false;
+        changed = true;
+      }
+      if (changed) render();
+    });
+  }
+
+  document.querySelectorAll("[data-download-url]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = btn.dataset.downloadUrl;
+      if (!url) return;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = btn.dataset.downloadName || "";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+  });
+
   const saveConnectSources = document.getElementById("connect-sources-save");
   if (saveConnectSources) {
     saveConnectSources.addEventListener("click", async () => {
@@ -8165,6 +9132,7 @@ function bindEvents() {
         setTimeout(async () => {
           await hydrateFromSupabase();
           await hydrateFromServerApi();
+          await hydrateHeyGenStatus();
           state.connectSourcesOpen = false;
           state.connectSourcesSaved = false;
           render();
@@ -8369,7 +9337,7 @@ function bindEvents() {
       try {
         const res = await fetch("/api/canva/generate", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ product: topProduct.name || "IAGT Product", format: "square" })
+          body: JSON.stringify({ product: topProduct.name || "EVICS Product", format: "square" })
         });
         if (res.ok) {
           state.canvaResult = await res.json();
@@ -8403,77 +9371,89 @@ function bindEvents() {
   }
 
   // ── Creative card bulk select (event delegation) ──
-  document.addEventListener("change", (e) => {
-    const cb = e.target.closest(".creative-select-cb");
-    if (!cb) return;
-    const id = Number(cb.dataset.creativeId);
-    if (!id) return;
-    if (cb.checked) {
-      state.selectedCreativeIds.add(id);
-    } else {
-      state.selectedCreativeIds.delete(id);
-    }
-    render();
-  });
+  if (!window.__evicsCreativeDelegatesBound) {
+    document.addEventListener("change", (e) => {
+      const cb = e.target.closest(".creative-select-cb");
+      if (!cb) return;
+      const id = Number(cb.dataset.creativeId);
+      if (!id) return;
+      if (cb.checked) {
+        state.selectedCreativeIds.add(id);
+      } else {
+        state.selectedCreativeIds.delete(id);
+      }
+      render();
+    });
 
-  // ── Bulk action toolbar buttons ──
-  document.addEventListener("click", async (e) => {
-    if (e.target.id === "bulk-approve-btn") {
-      const ids = [...state.selectedCreativeIds];
-      state.bulkActionStatus = "approving";
-      render();
-      for (const id of ids) {
-        state.approvals.add(id);
+    // ── Bulk action toolbar buttons ──
+    document.addEventListener("click", async (e) => {
+      if (e.target.id === "bulk-approve-btn") {
+        const ids = [...state.selectedCreativeIds];
+        state.bulkActionStatus = "approving";
+        render();
+        for (const id of ids) {
+          state.approvals.add(id);
+          try {
+            await fetch(`${API_BASE}/api/agent/approve-creative`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ creativeId: id })
+            });
+          } catch { /* demo mode ok */ }
+        }
+        state.selectedCreativeIds.clear();
+        state.bulkActionStatus = `${ids.length} creatives approved.`;
+        render();
+      } else if (e.target.id === "bulk-queue-btn") {
+        const ids = [...state.selectedCreativeIds];
+        state.bulkActionStatus = "queueing";
+        render();
+        for (const id of ids) {
+          try {
+            await fetch(`${API_BASE}/api/agent/publish`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ creativeId: id })
+            });
+          } catch { /* demo mode ok */ }
+        }
+        state.selectedCreativeIds.clear();
+        state.bulkActionStatus = `${ids.length} creatives queued.`;
+        render();
+      } else if (e.target.id === "bulk-archive-btn") {
+        const ids = [...state.selectedCreativeIds];
+        state.bulkActionStatus = "archiving";
+        render();
         try {
-          await fetch(`${API_BASE}/api/agent/approve-creative`, {
+          await fetch(`${API_BASE}/api/agent/library-cleanup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ creativeId: id })
+            body: JSON.stringify({ explicitIds: ids })
           });
         } catch { /* demo mode ok */ }
+        state.selectedCreativeIds.clear();
+        state.bulkActionStatus = `${ids.length} creatives archived.`;
+        render();
+      } else if (e.target.id === "bulk-clear-btn") {
+        state.selectedCreativeIds.clear();
+        state.bulkActionStatus = null;
+        render();
       }
-      state.selectedCreativeIds.clear();
-      state.bulkActionStatus = `${ids.length} creatives approved.`;
-      render();
-    } else if (e.target.id === "bulk-queue-btn") {
-      const ids = [...state.selectedCreativeIds];
-      state.bulkActionStatus = "queueing";
-      render();
-      for (const id of ids) {
-        try {
-          await fetch(`${API_BASE}/api/agent/publish`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ creativeId: id })
-          });
-        } catch { /* demo mode ok */ }
-      }
-      state.selectedCreativeIds.clear();
-      state.bulkActionStatus = `${ids.length} creatives queued.`;
-      render();
-    } else if (e.target.id === "bulk-archive-btn") {
-      const ids = [...state.selectedCreativeIds];
-      state.bulkActionStatus = "archiving";
-      render();
-      try {
-        await fetch(`${API_BASE}/api/agent/library-cleanup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ explicitIds: ids })
-        });
-      } catch { /* demo mode ok */ }
-      state.selectedCreativeIds.clear();
-      state.bulkActionStatus = `${ids.length} creatives archived.`;
-      render();
-    } else if (e.target.id === "bulk-clear-btn") {
-      state.selectedCreativeIds.clear();
-      state.bulkActionStatus = null;
-      render();
-    }
-  });
+    });
+    window.__evicsCreativeDelegatesBound = true;
+  }
 }
 
 async function boot() {
+  if (!WORKSPACE_SECTIONS.some((section) => section.id === state.currentSection)) {
+    state.currentSection = "viral-intelligence";
+    try {
+      localStorage.setItem("evics_current_section", state.currentSection);
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+  syncSectionInUrl(state.currentSection);
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
@@ -8513,6 +9493,22 @@ async function boot() {
   }
   fetchSystemHealth();
   setInterval(fetchSystemHealth, 60000);
+  setInterval(hydrateHeyGenStatus, 90000);
+
+  async function fetchExcellenceStatus() {
+    try {
+      const data = await apiFetch("/api/excellence/status");
+      state.excellenceStatus = data;
+      state.excellenceObjectives = Array.isArray(data.objectives) ? data.objectives : [];
+      state.excellenceError = null;
+    } catch (error) {
+      state.excellenceError = error.message || "A+ status unavailable";
+    } finally {
+      render();
+    }
+  }
+  fetchExcellenceStatus();
+  setInterval(fetchExcellenceStatus, 120000);
 
   // Fetch scheduler activity log on boot and every 60s
   async function fetchSchedulerLog() {
@@ -8582,12 +9578,248 @@ async function boot() {
   setInterval(fetchCommunityFeed, 120000);
 
   // Wire manual refresh buttons (delegated — panels may not exist yet)
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'refresh-scheduler-log-btn') fetchSchedulerLog();
-    if (e.target.id === 'refresh-phone-renders-btn') fetchPhoneRenders();
-    if (e.target.id === 'refresh-wisdom-btn') fetchWisdomDaily();
-    if (e.target.id === 'refresh-community-btn') { fetchCommunityStats(); fetchCommunityFeed(); }
-  });
+  if (!window.__evicsRefreshDelegatesBound) {
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'refresh-scheduler-log-btn') fetchSchedulerLog();
+      if (e.target.id === 'refresh-phone-renders-btn') fetchPhoneRenders();
+      if (e.target.id === 'refresh-wisdom-btn') fetchWisdomDaily();
+      if (e.target.id === 'refresh-community-btn') { fetchCommunityStats(); fetchCommunityFeed(); }
+    });
+    window.__evicsRefreshDelegatesBound = true;
+  }
 }
+
+function renderAgentOrchestration() {
+  const agents = state.agentStatuses.length > 0 ? state.agentStatuses : [
+    { name: "Trend Scout", status: "online", task: "Scanning viral signals", health: 98 },
+    { name: "Creative Builder", status: "ready", task: "Waiting for approved hooks", health: 96 },
+    { name: "Learning Loop", status: "online", task: "Updating performance memory", health: 94 }
+  ];
+  const health = state.agentPipelineHealth || 98;
+
+  return `
+    <section class="agent-orch-section panel">
+      <div class="panel-head compact">
+        <div>
+          <h2>${icon("gear")} Executive Agent Operations</h2>
+          <p>Titanium command layer for scan, build, render, distribute, learn, and improve loops.</p>
+        </div>
+        <div class="agent-health-badge ${health >= 95 ? "health-excellent" : health >= 80 ? "health-good" : "health-warn"}">
+          <i></i> Pipeline Health: <strong>${health}%</strong>
+        </div>
+      </div>
+      <div class="agent-status-grid">
+        ${agents.slice(0, 6).map((agent) => `
+          <article class="agent-status-card">
+            <span>${escapeHtml(agent.status || "ready")}</span>
+            <strong>${escapeHtml(agent.name || agent.id || "EVICS Agent")}</strong>
+            <p>${escapeHtml(agent.task || agent.currentTask || "Standing by for operator command.")}</p>
+            <small>${Number(agent.health || health || 98)}% readiness</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderApiManagementSummary() {
+  const services = (Array.isArray(state.servicesConfig) && state.servicesConfig.length > 0)
+    ? state.servicesConfig
+    : buildDemoServices();
+  const statusBadge = window.__evicsRenderers?.serviceStatusBadge || ((status) => `<span class="svc-status-badge">${status || "Unknown"}</span>`);
+  const usageBar = window.__evicsRenderers?.tokenBar || ((pct) => `<div class="token-bar-track"><div class="token-bar-fill" style="width:${Math.min(100, pct || 0)}%"></div></div>`);
+  const active = services.filter((svc) => svc.enabled).length;
+  const missingKeys = services.filter((svc) => !svc.hasKey).length;
+  const healthy = services.filter((svc) => svc.status === "healthy").length;
+  const alerts = Array.isArray(state.alerts) ? state.alerts.filter((a) => !a.acknowledged).length : 0;
+  const failoverCount = Array.isArray(state.failoverLog) ? state.failoverLog.length : 0;
+
+  return `
+    <div class="section-content">
+      <div class="section-intro">
+        <h2>${icon("shield")} API Management</h2>
+        <p>Track keys, token posture, and failover readiness across every connected service.</p>
+      </div>
+
+      <section class="metrics-grid">
+        ${metric("Connected APIs", String(active), `${services.length} configured`)}
+        ${metric("Missing keys", String(missingKeys), missingKeys > 0 ? "needs attention" : "all keys present")}
+        ${metric("Healthy services", String(healthy), "primary routes ready")}
+        ${metric("Open alerts", String(alerts), alerts > 0 ? "review soon" : "all clear")}
+      </section>
+
+      <section class="workspace-grid secondary">
+        <div class="panel">
+          <div class="panel-head compact">
+            <div>
+              <h2>Service Health Snapshot</h2>
+              <p>Primary and backup providers at a glance.</p>
+            </div>
+          </div>
+          <div class="api-snapshot-list">
+            ${services.slice(0, 6).map((svc) => `
+              <div class="api-snapshot-row">
+                <div>
+                  <strong>${svc.name}</strong>
+                  <span>${svc.category}</span>
+                </div>
+                <div class="api-snapshot-status">
+                  ${statusBadge(svc.status)}
+                  ${svc.limit !== null ? usageBar(svc.pct || 0, svc.status) : `<span class="api-snapshot-unlimited">Unlimited</span>`}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head compact">
+            <div>
+              <h2>Failover Posture</h2>
+              <p>${state.failoverMode ? "Auto-failover is armed." : "Manual oversight is active."}</p>
+            </div>
+          </div>
+          <div class="api-posture-grid">
+            ${metric("Mode", state.failoverMode ? "Armed" : "Off", state.failoverMode ? "automatic fallback live" : "operator-controlled")}
+            ${metric("Switches", String(failoverCount), "tracked handoffs")}
+          </div>
+          <div class="empty" style="margin-top:12px">${escapeHtml(state.syncMessage || "Connect sources to unlock live API telemetry.")}</div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderWorkspaceShell() {
+  const renderers = window.__evicsRenderers || {};
+  const renderSection = (name) => {
+    const renderer = renderers[name];
+    if (typeof renderer === "function") return renderer();
+    return `
+      <div class="section-content">
+        <div class="panel">
+          <div class="section-intro">
+            <h2>${icon("radar")} Workspace module loading</h2>
+            <p>The Titanium workspace is initializing this module. Refresh if this persists.</p>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+  const sections = WORKSPACE_SECTIONS;
+  const sectionIds = sections.map((section) => section.id);
+  const activeSection = sectionIds.includes(state.currentSection) ? state.currentSection : "viral-intelligence";
+  const sectionDef = sections.find((section) => section.id === activeSection) || sections[0];
+  const sectionIndex = sections.findIndex((section) => section.id === activeSection);
+  const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
+  const nextSection = sectionIndex < sections.length - 1 ? sections[sectionIndex + 1] : null;
+  const sectionContent = (() => {
+    if (activeSection === "viral-intelligence") return renderSection("renderViralIntelligence");
+    if (activeSection === "ai-reconstruction") return renderSection("renderAiReconstruction");
+    if (activeSection === "video-generation") return renderSection("renderVideoGeneration");
+    if (activeSection === "media-output") return renderSection("renderMediaOutputCenter");
+    if (activeSection === "distribution") return renderSection("renderDistribution");
+    if (activeSection === "analytics") return renderSection("renderAnalytics");
+    if (activeSection === "executive-workspace") return renderSection("renderExecutiveWorkspace");
+    return renderSection("renderViralIntelligence");
+  })();
+
+  return `
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">EVICS</div>
+        <div>
+          <strong>I AM GENESIS TECH</strong>
+          <span>ELITE VIRAL INTELLIGENCE CONTROL SYSTEM</span>
+        </div>
+      </div>
+
+      <nav>
+        ${sections.map((section) => `
+          <button data-section="${section.id}" class="${section.id === activeSection ? "active" : ""}" title="${section.desc}">
+            ${icon(section.icon)}
+            <div>
+              <strong>${section.label}</strong>
+              <small>${section.desc}</small>
+            </div>
+          </button>
+        `).join("")}
+      </nav>
+
+      <div class="automation-card">
+        <span>Workspace posture</span>
+        <strong>${state.dataSource === "Demo" ? "Demo intelligence stack" : "Live intelligence stack"}</strong>
+        <div class="pulse-row">
+          <i></i>
+          <span>${escapeHtml(state.syncMessage || "Ready for operator input.")}</span>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div class="workspace-hero">
+          <p class="workspace-eyebrow">ELITE VIRAL INTELLIGENCE CONTROL SYSTEM</p>
+          <h1>${sectionDef.label}</h1>
+          <p>${sectionDef.desc}</p>
+        </div>
+
+        <div class="top-actions">
+          <div class="filters">
+            <button class="ghost" id="nav-prev-section" ${prevSection ? `data-target-section="${prevSection.id}"` : "disabled"}>← Prev</button>
+            <button class="ghost" id="nav-next-section" ${nextSection ? `data-target-section="${nextSection.id}"` : "disabled"}>Next →</button>
+            <button class="ghost" id="pipeline-autonomous-run">${icon("gear")} Autonomous Run</button>
+          </div>
+          <div class="sync-status ${state.syncLevel || "demo"}">
+            <b>${state.syncLevel === "connected" ? "Live sync" : state.syncLevel === "loading" ? "Syncing" : "Demo mode"}</b>
+            <span>${escapeHtml(state.syncMessage || "Workspace ready.")}</span>
+          </div>
+          <button class="ghost" id="connect-sources-btn">${icon("key")} Connect Sources</button>
+        </div>
+      </div>
+
+      ${activeSection === "viral-intelligence" ? `
+      <section class="metrics-grid shell-metrics">
+        ${metric("Source", state.dataSource || "Demo", state.syncLevel === "connected" ? "live data online" : "sample intelligence")}
+        ${metric("Viral scans", Number(state.scanCount || 0).toLocaleString(), "ads processed")}
+        ${metric("Creative queue", String((state.mediaRenderQueue && state.mediaRenderQueue.length) || 0), "awaiting render")}
+      </section>
+      ` : ""}
+
+      ${sectionContent}
+
+      ${activeSection === "viral-intelligence" ? `
+        ${renderSection("renderAgentOrchestration")}
+        ${renderSection("renderPublishedMediaGallery")}
+        ${renderSection("renderAnalyticsDashboard")}
+        ${renderSection("renderQualityValidator")}
+      ` : ""}
+    </main>
+  `;
+}
+
+const __evicsOriginalRender = render;
+render = function () {
+  __evicsOriginalRender();
+  const result = renderWorkspaceShell();
+  const app = document.getElementById("app");
+  if (app && typeof result === "string") {
+    app.innerHTML = result;
+    registerExecControls(app);
+    bindExecControlLiveStates(app);
+  }
+  bindEvents();
+  if (state.currentSection === "media-output" && typeof window.loadMediaOutputs === "function") {
+    const mediaState = window.mocState || {};
+    const items = Array.isArray(mediaState.items) ? mediaState.items : [];
+    if (!mediaState.loading && items.length === 0) {
+      window.loadMediaOutputs();
+    }
+  }
+  if ((state.currentSection === "media-output" || state.currentSection === "video-generation" || state.currentSection === "executive-workspace") && typeof window.bindMediaOutputCenter === "function") {
+    window.bindMediaOutputCenter();
+  }
+  return result;
+};
 
 boot();

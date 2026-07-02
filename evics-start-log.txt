@@ -72,3 +72,5 @@
 [EVICS Scheduler] 2026-06-30T02:43:19.879Z | viral-scan | success | HTTP 200
 [EVICS Scheduler] 2026-06-30T06:43:19.616Z | viral-scan | started
 [EVICS Scheduler] 2026-06-30T06:43:19.817Z | viral-scan | success | HTTP 200
+[shopifyLiveConnector] Refreshed local cache: 179 products
+[shopifyLiveConnector] Refreshed local cache: 179 products

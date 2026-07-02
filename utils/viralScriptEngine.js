@@ -18,6 +18,19 @@
 
 'use strict';
 
+const PROHIBITED_MARKETING_CLAIMS = [
+  /\bmilitary\s+owned\s+(and|&)\s+operated\b/gi,
+  /\bmilitary\s+operated\b/gi,
+  /\bmilitary\s+owned\b/gi
+];
+
+function sanitizeGeneratedCopy(text) {
+  const input = String(text || '');
+  if (!input) return '';
+  const stripped = PROHIBITED_MARKETING_CLAIMS.reduce((next, pattern) => next.replace(pattern, ''), input);
+  return stripped.replace(/\s+/g, ' ').trim();
+}
+
 // ── Platform specs ────────────────────────────────────────────────────────────
 
 const PLATFORM_SPECS = {
@@ -222,7 +235,8 @@ async function buildOpenAIScript({ title, category, mood, platform, hookPattern,
   const systemPrompt = `You are an elite viral video ad scriptwriter specializing in authentic, high-converting social media ads. 
 You write scripts that feel REAL — not salesy. You speak to the soul, not just the wallet.
 The brand is I AM GENESIS TECH (iamgenesistech.com) — a spiritually-aligned wellness, education, and abundance platform.
-Core values: God-consciousness, self-improvement, wealth as spiritual birthright, community, love, purpose.`;
+Core values: God-consciousness, self-improvement, wealth as spiritual birthright, community, love, purpose.
+Never include unverified military-affiliation claims unless explicit legal authorization is provided (it is not authorized by default).`;
 
   const userPrompt = `Write a ${spec.maxSeconds}-second viral ${platform} video ad script for: "${title}"
 
@@ -254,7 +268,7 @@ Requirements:
     temperature:  0.82
   });
 
-  return completion.choices[0]?.message?.content?.trim() || null;
+  return sanitizeGeneratedCopy(completion.choices[0]?.message?.content?.trim() || null);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -348,6 +362,7 @@ async function generateViralScript({
   if (affiliateCode && !scriptText.includes(affiliateCode)) {
     scriptText = scriptText.replace('iamgenesistech.com', `iamgenesistech.com/?ref=${affiliateCode}`);
   }
+  scriptText = sanitizeGeneratedCopy(scriptText);
 
   const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.tiktok;
   const hook = scriptText.split('.')[0].replace(/\[.*?\]/g, '').trim();

@@ -36,6 +36,13 @@ const CATEGORY_THEMES = {
     label: 'Nutrition',
     mood: 'transformative'
   },
+  ocean: {
+    colorHex: '#061827',
+    gradient: 'linear-gradient(135deg, #061827 0%, #0b3653 50%, #04111d 100%)',
+    sceneQuery: 'ocean luxury blue water sunlight',
+    label: 'Ocean',
+    mood: 'premium'
+  },
   vitamins: {
     colorHex: '#0d1f2a',
     gradient: 'linear-gradient(135deg, #0d1f2a 0%, #1a3d55 50%, #0a1825 100%)',
@@ -197,7 +204,17 @@ const SCENE_QUERIES = {
     'natural,wood,rustic,organic',
     'bright,studio,white,clean',
     'cafe,modern,warm,interior',
-    'farmhouse,kitchen,natural,light'
+    'farmhouse,kitchen,natural,light',
+    'ocean,blue water,luxury,clean',
+    'ocean,sunlight,white foam,premium'
+  ],
+  ocean: [
+    'ocean,blue water,luxury,sunrise',
+    'ocean,white foam,premium,clean',
+    'ocean,glass water,calm,luxury',
+    'beach,blue water,high-end,clean',
+    'sea,reflection,soft light,premium',
+    'coastal,blue gradient,luxury,modern'
   ],
   fitness: [
     'outdoor,track,stadium,sunrise',
@@ -371,6 +388,7 @@ const LIFESTYLE_IMAGES = {
   beauty:      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1920&q=90&fit=crop',
   skincare:    'https://images.unsplash.com/photo-1556228852-6d35a585d566?w=1920&q=90&fit=crop',
   food:        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1920&q=90&fit=crop',
+  ocean:       'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1920&q=90&fit=crop',
   tech:        'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=90&fit=crop',
   lifestyle:   'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1920&q=90&fit=crop',
   spiritual:   'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=1920&q=90&fit=crop',
@@ -405,6 +423,7 @@ function detectCategory(product = {}) {
     ['personal-development', /mindset|develop|success|confident|growth|self.improve|transform/],
     ['education', /educat|learn|course|train|certif|study|knowledge|class/],
     ['finance', /bitcoin|btc|crypto|wealth|invest|money|financ|income|earn/],
+    ['ocean', /sea.?moss|ocean|marine|seaweed|kelp|aquatic/],
     ['supplements', /supplement|protein|collagen|omega|probiotic|vitamin|nutrient|powder|sea.?moss|superfood|greens|capsule|tincture|extract|blend/],
     ['vitamins', /vitamin|mineral|zinc|magnes|iron|b12|d3/],
     ['skincare', /skin|moistur|serum|cleanser|toner|glow|radiant|acne|retinol|spf/],

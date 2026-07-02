@@ -9,4 +9,4 @@
 - Verified Shopify reconnect is app-side ready but requires store owner authorization because the current Admin token is rejected.
 - Verified Shopify reconnect routes to the primary store OAuth authorization page and records the active client fingerprint without exposing secrets.
 - Verified Supabase shared tables and legacy render evidence logging are ready.
-- Verified live HeyGen proof is blocked only by the missing HEYGEN_API_KEY credential.
+- Verified live HeyGen proof is available when production-closeout reports a completed HeyGen artifact.

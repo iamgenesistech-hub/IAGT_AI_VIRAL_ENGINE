@@ -3,7 +3,8 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 
-function loadEnvFile(file) {
+function loadEnvFile(file, options = {}) {
+  const override = options.override === true;
   if (!fs.existsSync(file)) return;
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
   for (const line of lines) {
@@ -12,12 +13,13 @@ function loadEnvFile(file) {
     if (index < 0) continue;
     const key = line.slice(0, index).trim();
     const value = line.slice(index + 1).trim();
-    if (key && !process.env[key]) process.env[key] = value;
+    if (!key) continue;
+    if (override || !process.env[key]) process.env[key] = value;
   }
 }
 
 loadEnvFile(path.join(ROOT, '.env'));
-loadEnvFile(path.join(ROOT, 'backend', '.env'));
+loadEnvFile(path.join(ROOT, 'backend', '.env'), { override: true });
 
 const {
   rankCandidates,
@@ -74,6 +76,7 @@ async function run() {
   const startedAt = new Date().toISOString();
   const matrix = [];
   const blockers = [];
+  const base = process.env.EVICS_BASE_URL || 'http://localhost:4175';
   const commands = [
     'node --check backend/server.js',
     'node --check backend/sharedEvicsEvieCore.js',
@@ -114,10 +117,23 @@ async function run() {
   try {
     const liveProofUrl = process.env.HEYGEN_LIVE_PROOF_URL;
     const liveFlow = runActionFlow({ provider: 'heygen', command: 'Verify live provider path' });
-    if (liveProofUrl) {
-      matrix.push(pass('live-heygen-provider', { jobId: liveFlow.renderJob.id, videoUrl: liveProofUrl }));
+    const { response, body } = await httpJson(`${base}/api/production-closeout/status`);
+    const liveProof = response.ok ? body.checks?.heygen?.proof : null;
+    if (liveProof) {
+      matrix.push(pass('live-heygen-provider', {
+        jobId: liveFlow.renderJob.id,
+        videoId: liveProof.video_id || null,
+        proofSource: liveProof.source || 'production-closeout',
+        renderGrade: liveProof.render_grade || null,
+        tier: liveProof.tier || null,
+        duration: liveProof.duration || null
+      }));
+    } else if (liveProofUrl) {
+      matrix.push(pass('live-heygen-provider', { jobId: liveFlow.renderJob.id, proofSource: 'env' }));
     } else if (process.env.HEYGEN_API_KEY) {
-      const blocker = 'HEYGEN_API_KEY is configured, but live HeyGen artifact is not available yet. Last activation attempt reached HeyGen and failed provider-side with insufficient API credits.';
+      const blocker = response.ok && body.checks?.heygen?.blocker
+        ? body.checks.heygen.blocker
+        : 'HEYGEN_API_KEY is configured, but live HeyGen artifact is not available yet. Verify /api/heygen/account-status for current auth and credits.';
       blockers.push(blocker);
       matrix.push(pass('live-heygen-external-blocker-documented', { blocker }));
     } else if (liveFlow.renderJob.blocker) {
@@ -148,7 +164,6 @@ async function run() {
     matrix.push(fail('local-system-health', error));
   }
 
-  const base = process.env.EVICS_BASE_URL || 'http://localhost:4175';
   try {
     const { response, body } = await httpJson(`${base}/api/evics-evie/health`);
     if (!response.ok || !body.ok) throw new Error(`Health endpoint failed: ${response.status}`);
@@ -187,6 +202,11 @@ async function run() {
         duration: 10,
         aspect: '9:16',
         style: 'UGC testimonial',
+        productTitle: 'Sea Moss Capsules',
+        productImageUrl: 'https://example.com/sea-moss-capsules.png',
+        productPageUrl: 'https://example.com/products/sea-moss-capsules',
+        companyLabel: 'I AM GENESIS TECH',
+        cta_url: 'https://example.com/products/sea-moss-capsules',
         components: [
           { type: 'hook', text: 'Nobody tells you minerals can change your whole morning.' },
           { type: 'product', text: 'Sea Moss Complex' }
@@ -248,7 +268,7 @@ async function run() {
   const summary = {
     startedAt,
     completedAt,
-    verdict: failed.length ? 'blocked' : 'pass-with-external-blockers',
+    verdict: failed.length ? 'blocked' : blockers.length ? 'pass-with-external-blockers' : 'pass',
     passCount: matrix.length - failed.length,
     failCount: failed.length,
     blockers,
@@ -281,7 +301,7 @@ async function run() {
     '## Production Closeout',
     '',
     closeoutStatus ? [
-      `- Production-closeout GO: ${failed.length ? 'no' : 'yes, with external-only live blockers documented'}`,
+      `- Production-closeout GO: ${failed.length ? 'no' : blockers.length ? 'yes, with external-only blockers documented' : 'yes'}`,
       '- Copilot routes: yes',
       '- Twin executes: yes',
       '- Office manages: yes',
@@ -294,10 +314,10 @@ async function run() {
       `- Supabase render table: ${closeoutStatus.checks.supabase.renderTable.ok ? 'ready' : 'blocked'}`,
       `- Supabase shared tables: ${(closeoutStatus.checks.supabase.sharedTables || []).every((table) => table.ok) ? 'ready' : 'blocked'}`,
       `- HeyGen configured: ${closeoutStatus.checks.heygen.configured ? 'yes' : 'no'}`,
-      `- EVICS production-ready: ${failed.length ? 'no' : 'yes, application-side with external-only blockers documented'}`,
-      `- EVIE production-ready: ${failed.length ? 'no' : 'yes, application-side with external-only blockers documented'}`,
+      `- EVICS production-ready: ${failed.length ? 'no' : blockers.length ? 'yes, application-side with external-only blockers documented' : 'yes'}`,
+      `- EVIE production-ready: ${failed.length ? 'no' : blockers.length ? 'yes, application-side with external-only blockers documented' : 'yes'}`,
       `- Live HeyGen proof succeeded: ${closeoutStatus.checks.heygen.liveProofAvailable ? 'yes' : 'no'}`,
-      '- Activation verdict: System is production-ready pending external credentials'
+      `- Activation verdict: ${failed.length ? 'blocked' : blockers.length ? 'System is production-ready pending external blockers' : 'System is production-ready'}`
     ].join('\n') : '- Closeout status unavailable',
     '',
     '## Test Results',
@@ -317,22 +337,30 @@ async function run() {
     '- Verified Shopify reconnect is app-side ready but requires store owner authorization because the current Admin token is rejected.',
     '- Verified Shopify reconnect routes to the primary store OAuth authorization page and records the active client fingerprint without exposing secrets.',
     '- Verified Supabase shared tables and legacy render evidence logging are ready.',
-    '- Verified live HeyGen proof is blocked only by the missing HEYGEN_API_KEY credential.',
+    '- Verified live HeyGen proof is available when production-closeout reports a completed HeyGen artifact.',
     ''
   ].join('\n'));
   writeMd(path.join(EVIDENCE_DIR, 'heygen-evidence.md'), [
     '# HeyGen Evidence',
     '',
     process.env.HEYGEN_API_KEY
-      ? '- HEYGEN_API_KEY is configured. Live activation reached HeyGen, but final artifact proof is not available yet.'
+      ? (closeoutStatus?.checks?.heygen?.liveProofAvailable
+        ? `- HEYGEN_API_KEY is configured and live proof is available. Video ID: ${closeoutStatus.checks.heygen.proof?.video_id || 'available'}.`
+        : '- HEYGEN_API_KEY is configured. Live activation reached HeyGen, but final artifact proof is not available yet.')
       : '- HEYGEN_API_KEY is not configured in the local environment. Live HeyGen rendering is blocked until a valid key is present.',
     '- The app-side render abstraction and /api/video/generate path are verified with the internal/mocked provider.',
     process.env.HEYGEN_API_KEY
-      ? '- Live HeyGen job submitted during activation; provider returned insufficient API credits before producing a video artifact.'
+      ? (closeoutStatus?.checks?.heygen?.liveProofAvailable
+        ? `- Live HeyGen artifact grade: ${closeoutStatus.checks.heygen.proof?.render_grade || 'available'} ${closeoutStatus.checks.heygen.proof?.tier || ''}.`
+        : '- Live HeyGen artifact is still pending. Use /api/heygen/account-status to verify active account auth and credits before rerunning proof render.')
       : '- No live HeyGen render was attempted because no credential is loaded; this is an external credential blocker, not a local route blocker.',
     '- Mocked/internal provider path validated with /generated/evics-sea-moss-proof-render.mp4.',
-    '- Production-closeout status: GO for application-side readiness, NO claim of live HeyGen success until HeyGen produces a provider artifact.',
-    '- Activation status: System is production-ready pending external provider credits and a completed HeyGen artifact.',
+    closeoutStatus?.checks?.heygen?.liveProofAvailable
+      ? '- Production-closeout status: GO with completed live HeyGen provider artifact.'
+      : '- Production-closeout status: GO for application-side readiness, NO claim of live HeyGen success until HeyGen produces a provider artifact.',
+    closeoutStatus?.checks?.heygen?.liveProofAvailable
+      ? '- Activation status: System is production-ready with live HeyGen proof.'
+      : '- Activation status: System is production-ready pending external provider credits and a completed HeyGen artifact.',
     ''
   ].join('\n'));
 

@@ -301,7 +301,7 @@ create policy "evics read shopify_collections"
 
 insert into public.evics_products (name, category, sku, score, angle, goals, benefits, is_bundle)
 values
-  ('Sea Moss Mineral Gel', 'Sea moss', 'SEAMOSS-GEL-001', 96, 'daily mineral ritual', '{"energy","immunity","skin"}', '{"92 trace minerals","thyroid support","gut health"}', false),
+  ('Sea Moss Capsules', 'Sea moss', 'SEAMOSS-CAPS-001', 96, 'daily mineral ritual', '{"energy","immunity","skin"}', '{"92 trace minerals","thyroid support","gut health"}', false),
   ('Metabolic Ignite', 'Weight loss', 'MET-IGNITE-001', 91, 'morning reset', '{"fat loss","energy","metabolism"}', '{"thermogenic blend","appetite control","energy boost"}', false),
   ('Genesis Glow Collagen', 'Beauty', 'GLOW-COLL-001', 88, 'skin confidence', '{"glowing skin","anti-aging","hair growth"}', '{"marine collagen","hyaluronic acid","biotin"}', false),
   ('Focus Formula', 'Cognitive', 'FOCUS-001', 84, 'mental clarity', '{"focus","memory","productivity"}', '{"lions mane","bacopa","alpha gpc"}', false),

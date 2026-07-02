@@ -58,7 +58,11 @@ async function postProcessVideo({
   videoId,
   productImageUrl,
   productTitle = '',
+  productPageUrl = '',
+  companyLabel = 'I AM GENESIS TECH',
   affiliateCode = '',
+   specialEffects = [],
+   textOverlayPosition = 'bottom',
   ctaText
 }) {
   const inputPath = path.join(MEDIA_CACHE_DIR, `${videoId}_raw.mp4`);
@@ -72,7 +76,20 @@ async function postProcessVideo({
   const inputs = ['-i', inputPath];
   let filterComplex = '';
 
-  const cta = ctaText || `Shop Now — iamgenesistech.com${affiliateCode ? '/?ref=' + affiliateCode : ''}`;
+  const brand = escapeFFmpegText(companyLabel || 'I AM GENESIS TECH');
+  const productName = escapeFFmpegText(productTitle || 'Featured Product');
+  const destination = escapeFFmpegText(productPageUrl || `Shop Now — iamgenesistech.com${affiliateCode ? '/?ref=' + affiliateCode : ''}`);
+  const cta = ctaText || destination;
+  const overlayPlacement = resolveFaceSafeTextPlacement(textOverlayPosition);
+  const ctaX = overlayPlacement.x;
+  const ctaY = overlayPlacement.y;
+  const normalizedEffects = Array.isArray(specialEffects)
+    ? specialEffects.map((effect) => String(effect || '').trim().toLowerCase())
+    : [];
+  const withProductEntranceFade = normalizedEffects.includes('product-entrance-fade');
+  const productLayerFilter = withProductEntranceFade
+    ? '[1:v]scale=200:-1,format=rgba,fade=t=in:st=0:d=0.65:alpha=1[prod]'
+    : '[1:v]scale=200:-1[prod]';
 
   if (productImageUrl) {
     // Download product image
@@ -83,14 +100,14 @@ async function postProcessVideo({
       inputs.push('-i', productPath);
       // Overlay product image at bottom-right, scaled to 20% of video width
       // Video is 1080x1920 (9:16), so product = ~200px wide
-      filterComplex = `[1:v]scale=200:-1[prod];[0:v][prod]overlay=W-w-40:H-h-280[withprod];[withprod]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-80:font=Sans[out]`;
+      filterComplex = `${productLayerFilter};[0:v][prod]overlay=W-w-40:H-h-280[withprod];[withprod]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     } catch {
       // If product download fails, just add CTA text
-      filterComplex = `[0:v]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-80:font=Sans[out]`;
+      filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     }
   } else {
     // No product image — just add CTA text overlay
-    filterComplex = `[0:v]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-80:font=Sans[out]`;
+    filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
   }
 
   // Run ffmpeg
@@ -128,6 +145,12 @@ async function postProcessVideo({
 
 function escapeFFmpegText(text) {
   return text.replace(/'/g, "'\\''").replace(/:/g, '\\:').replace(/\\/g, '\\\\');
+}
+
+function resolveFaceSafeTextPlacement(textOverlayPosition) {
+  const pos = String(textOverlayPosition || '').trim().toLowerCase();
+  if (pos === 'top') return { x: 'w-text_w-40', y: '48' };
+  return { x: '40', y: 'h-text_h-92' };
 }
 
 module.exports = { postProcessVideo, downloadFile };

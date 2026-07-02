@@ -1,0 +1,173 @@
+{
+  "media": [],
+  "findings": [],
+  "timeline": [
+    {
+      "id": "evt-1782952938061-dea948",
+      "actor": "evics-elite-workspace",
+      "source": "evics-api",
+      "type": "vp_mission_started",
+      "lifecycle": "vp_mission_started",
+      "status": "ok",
+      "message": "VP mission started.",
+      "details": {
+        "missionId": "vp-1782952938056",
+        "targetCount": 3
+      },
+      "createdAt": "2026-07-02T00:42:18.061Z"
+    },
+    {
+      "id": "evt-1782939085267-7e80d3",
+      "actor": "evics-elite-workspace",
+      "source": "evics-api",
+      "type": "vp_mission_started",
+      "lifecycle": "vp_mission_started",
+      "status": "ok",
+      "message": "VP mission started.",
+      "details": {
+        "missionId": "vp-1782939085255",
+        "targetCount": 3
+      },
+      "createdAt": "2026-07-01T20:51:25.267Z"
+    },
+    {
+      "id": "evt-1782935784448-3141aa",
+      "actor": "evics-elite-workspace",
+      "source": "evics-api",
+      "type": "vp_mission_started",
+      "lifecycle": "vp_mission_started",
+      "status": "ok",
+      "message": "VP mission started.",
+      "details": {
+        "missionId": "vp-1782935784439",
+        "targetCount": 3
+      },
+      "createdAt": "2026-07-01T19:56:24.448Z"
+    },
+    {
+      "id": "evt-1782879779324-de4be3",
+      "actor": "evics-elite-workspace",
+      "source": "evics-api",
+      "type": "vp_mission_started",
+      "lifecycle": "vp_mission_started",
+      "status": "ok",
+      "message": "VP mission started.",
+      "details": {
+        "missionId": "vp-1782879779314",
+        "targetCount": 3
+      },
+      "createdAt": "2026-07-01T04:22:59.325Z"
+    }
+  ],
+  "renderJobs": {},
+  "vpMissions": {
+    "vp-1782879779314": {
+      "missionId": "vp-1782879779314",
+      "status": "running",
+      "targetCount": 3,
+      "publishedCount": 0,
+      "mediaIds": [],
+      "originSectionId": "executive-workspace",
+      "logs": [
+        {
+          "level": "info",
+          "message": "VP mission initialized.",
+          "createdAt": "2026-07-01T04:22:59.315Z"
+        }
+      ],
+      "createdAt": "2026-07-01T04:22:59.315Z",
+      "updatedAt": "2026-07-01T04:22:59.315Z"
+    },
+    "vp-1782935784439": {
+      "missionId": "vp-1782935784439",
+      "status": "running",
+      "targetCount": 3,
+      "publishedCount": 0,
+      "mediaIds": [],
+      "originSectionId": "video-generation",
+      "logs": [
+        {
+          "level": "info",
+          "message": "VP mission initialized.",
+          "createdAt": "2026-07-01T19:56:24.439Z"
+        }
+      ],
+      "createdAt": "2026-07-01T19:56:24.439Z",
+      "updatedAt": "2026-07-01T19:56:24.439Z"
+    },
+    "vp-1782939085255": {
+      "missionId": "vp-1782939085255",
+      "status": "running",
+      "targetCount": 3,
+      "publishedCount": 0,
+      "mediaIds": [],
+      "originSectionId": "ai-reconstruction",
+      "logs": [
+        {
+          "level": "info",
+          "message": "VP mission initialized.",
+          "createdAt": "2026-07-01T20:51:25.255Z"
+        }
+      ],
+      "createdAt": "2026-07-01T20:51:25.255Z",
+      "updatedAt": "2026-07-01T20:51:25.255Z"
+    },
+    "vp-1782952938056": {
+      "missionId": "vp-1782952938056",
+      "status": "running",
+      "targetCount": 3,
+      "publishedCount": 0,
+      "mediaIds": [],
+      "originSectionId": "viral-intelligence",
+      "logs": [
+        {
+          "level": "info",
+          "message": "VP mission initialized.",
+          "createdAt": "2026-07-02T00:42:18.056Z"
+        }
+      ],
+      "createdAt": "2026-07-02T00:42:18.056Z",
+      "updatedAt": "2026-07-02T00:42:18.056Z"
+    }
+  },
+  "scanner": {
+    "enabled": true,
+    "status": "idle",
+    "intervalMinutes": 60,
+    "durationSeconds": 45,
+    "lastRunAt": "",
+    "lastError": ""
+  },
+  "productScan": {
+    "running": false,
+    "mode": "off",
+    "jobId": "",
+    "startedAt": "",
+    "stoppedAt": "",
+    "progressLog": [],
+    "boardSummary": null
+  },
+  "verPolicy": {
+    "category": "elite_default",
+    "viralWeight": 35,
+    "evidenceWeight": 25,
+    "renderQualityWeight": 25,
+    "complianceWeight": 15,
+    "minimumApprovalScore": 82,
+    "updatedAt": "2026-07-01T04:22:59.319Z"
+  },
+  "brandProfiles": [
+    {
+      "id": "iagt-elite-default",
+      "profileName": "I AM GENESIS TECH Elite",
+      "companyName": "I AM GENESIS TECH",
+      "publicBrandName": "I AM GENESIS TECH",
+      "brandTagline": "AI-powered viral commerce for mission-driven creators.",
+      "brandMission": "Turn product intelligence, viral creative, and executive governance into a repeatable content engine.",
+      "brandVoice": "Executive, premium, clear, conviction-driven, and faith-forward.",
+      "primaryAudience": "Founders, affiliates, creators, and operators building digital product distribution."
+    }
+  ],
+  "selectedProfileId": "iagt-elite-default",
+  "updatedAt": "2026-07-02T00:42:18.067Z"
+}

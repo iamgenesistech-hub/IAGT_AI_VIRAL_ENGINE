@@ -6,43 +6,54 @@
     <title>EVICS Live Operations</title>
     <style>
       :root {
-        --bg: #f6f7f2;
-        --ink: #17201b;
-        --muted: #68736c;
-        --panel: #ffffff;
-        --line: #dfe4dc;
-        --green: #1f6b4b;
-        --danger: #b94b4b;
+        --bg: #070b11;
+        --ink: #eff5fb;
+        --muted: #90a4bb;
+        --panel: #171f2b;
+        --panel2: #1d2735;
+        --line: #33465c;
+        --accent: #00c7f5;
+        --accent2: #63e5ff;
+        --green: #1fd695;
+        --danger: #ff5a68;
       }
       * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, Segoe UI, Arial, sans-serif; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 0%, rgba(0, 199, 245, 0.12), transparent 30%),
+          radial-gradient(circle at 88% 0%, rgba(217, 191, 122, 0.1), transparent 28%),
+          var(--bg);
+        color: var(--ink);
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+      }
       main { max-width: 1180px; margin: 0 auto; padding: 28px; }
       header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
       h1 { margin: 0; font-size: 34px; line-height: 1; }
       p { margin: 6px 0 0; color: var(--muted); line-height: 1.5; }
       .grid { display: grid; grid-template-columns: 360px 1fr; gap: 14px; align-items: start; }
-      .panel { background: var(--panel); border: 1px solid var(--line); padding: 18px; box-shadow: 0 14px 34px rgba(23,32,27,.08); }
+      .panel { background: linear-gradient(180deg, var(--panel), var(--panel2)); border: 1px solid var(--line); padding: 18px; box-shadow: 0 14px 34px rgba(0,0,0,.28); }
       .panel h2 { margin: 0 0 12px; font-size: 18px; }
       .status { display: grid; gap: 8px; margin-bottom: 14px; }
       .status div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 7px; font-size: 13px; }
       .status strong { color: var(--ink); }
       label { display: grid; gap: 5px; font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
-      input { min-height: 38px; border: 1px solid var(--line); padding: 0 10px; font: inherit; }
+      input { min-height: 38px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); padding: 0 10px; font: inherit; }
       button { min-height: 40px; border: 0; padding: 0 14px; font: inherit; font-weight: 800; cursor: pointer; }
-      .primary { background: var(--green); color: #fff; }
-      .secondary { background: #e7ece5; color: var(--ink); }
+      .primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06202b; }
+      .secondary { background: rgba(255,255,255,.08); color: var(--ink); border: 1px solid var(--line); }
       .danger { background: var(--danger); color: #fff; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .message { margin-top: 12px; padding: 10px; background: #eef4ea; border-left: 4px solid var(--green); font-size: 13px; }
+      .message { margin-top: 12px; padding: 10px; background: rgba(0,199,245,.08); border-left: 4px solid var(--accent); font-size: 13px; }
       .products { display: grid; gap: 10px; }
-      .card { border: 1px solid var(--line); padding: 14px; display: grid; gap: 8px; background: #fff; }
+      .card { border: 1px solid var(--line); padding: 14px; display: grid; gap: 8px; background: var(--panel2); }
       .card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
-      .score { min-width: 42px; height: 42px; display: grid; place-items: center; background: var(--green); color: #fff; font-weight: 900; }
+      .score { min-width: 42px; height: 42px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06202b; font-weight: 900; }
       .hook { font-weight: 800; }
       .meta { color: var(--muted); font-size: 12px; }
       .script { white-space: pre-wrap; background: #17201b; color: #e8f0eb; padding: 12px; font-size: 12px; line-height: 1.45; display: none; }
       .card.open .script { display: block; }
-      .toplink { color: var(--green); font-weight: 800; text-decoration: none; }
+      .toplink { color: var(--accent2); font-weight: 800; text-decoration: none; }
       @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } header { flex-direction: column; } }
     </style>
   </head>

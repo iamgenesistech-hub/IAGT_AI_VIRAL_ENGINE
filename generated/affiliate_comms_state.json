@@ -1,0 +1,76 @@
+{
+  "sessions": {
+    "sess_1782938840735_n4qn5x": {
+      "sessionId": "sess_1782938840735_n4qn5x",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-01T20:47:20.735Z",
+      "lastSeenAt": "2026-07-01T20:51:06.014Z",
+      "lastSeenAtMs": 1782939066014,
+      "endedAt": "2026-07-02T00:36:32.516Z",
+      "endedReason": "manual-logoff"
+    },
+    "sess_1782952310831_t6h7j3": {
+      "sessionId": "sess_1782952310831_t6h7j3",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-02T00:31:50.831Z",
+      "lastSeenAt": "2026-07-02T00:33:21.128Z",
+      "lastSeenAtMs": 1782952401128,
+      "endedAt": "2026-07-02T00:38:38.968Z",
+      "endedReason": "manual-logoff"
+    },
+    "sess_1782952466733_nvivt6": {
+      "sessionId": "sess_1782952466733_nvivt6",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-02T00:34:26.733Z",
+      "lastSeenAt": "2026-07-02T00:36:11.740Z",
+      "lastSeenAtMs": 1782952571740,
+      "endedAt": "2026-07-02T00:36:18.531Z",
+      "endedReason": "manual-logoff"
+    },
+    "sess_1782952549879_ik6rhl": {
+      "sessionId": "sess_1782952549879_ik6rhl",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-02T00:35:49.879Z",
+      "lastSeenAt": "2026-07-02T00:37:34.892Z",
+      "lastSeenAtMs": 1782952654892,
+      "endedAt": "2026-07-02T00:37:35.150Z",
+      "endedReason": "manual-logoff"
+    },
+    "sess_1782952605369_6qo5iu": {
+      "sessionId": "sess_1782952605369_6qo5iu",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-02T00:36:45.369Z",
+      "lastSeenAt": "2026-07-02T00:40:16.013Z",
+      "lastSeenAtMs": 1782952816013,
+      "endedAt": "2026-07-02T00:41:06.509Z",
+      "endedReason": "heartbeat-timeout"
+    }
+  },
+  "conversations": {
+    "ROLAND787": {
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "escalated": false,
+      "escalationReason": null,
+      "lastMessageAt": null,
+      "lastSenderRole": null
+    }
+  },
+  "messages": [],
+  "lastSequence": 0
+}

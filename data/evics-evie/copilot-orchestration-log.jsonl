@@ -1,29 +1,623 @@
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_5fe8eb43c899c127","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:35:00.298Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_cfcac8123e34a17a","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:35:00.535Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_71d1a4d8a39fcf7a","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:35:30.419Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_6d1696a27b0c7762","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:35:30.544Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_7a83620ea59f788b","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:36:29.928Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_2f70edccc3becee4","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:36:30.079Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_fd6fa7585325053d","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:51:45.471Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_bfffc18534840c68","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:51:45.714Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_222d74f725dfa4c8","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:52:38.683Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_00a6158f1fb5d8df","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:52:38.793Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_88a77accaf42fb11","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:54:11.062Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_c37549c8115cc6cf","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:54:11.189Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_7aa841d741963ee7","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:55:08.334Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_095bd68d723f9c16","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T07:55:08.443Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_1dd9d0b2a5e82af1","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:04:59.117Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_0c14b6f437c31667","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:04:59.296Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_63dfcee9d5bce3d2","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:06:12.871Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_915c7756eae22257","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:06:13.002Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_4272f5827e71075f","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:14:10.639Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_4ffd3fe5ce9bf82e","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:14:10.766Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_05e3ede8b4a8a242","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:18:55.174Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_2d7231bfc7aa49f2","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:20:50.045Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_4a3af7f16913ea26","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:20:50.163Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_f0a10a55cf34a5ce","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:23:58.296Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_1db38bbd9de18d1c","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:23:58.866Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_17a29359852262e6","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:54:59.795Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_78e5569194de6c21","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:54:59.943Z"}
-{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_e147c21cbf3ff6a0","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:57:02.949Z"}
-{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_d3d64f46b6288819","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-05-30T08:57:03.094Z"}
+[
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_5fe8eb43c899c127",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:35:00.298Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_cfcac8123e34a17a",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:35:00.535Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_71d1a4d8a39fcf7a",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:35:30.419Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_6d1696a27b0c7762",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:35:30.544Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_7a83620ea59f788b",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:36:29.928Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_2f70edccc3becee4",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:36:30.079Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_fd6fa7585325053d",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:51:45.471Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_bfffc18534840c68",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:51:45.714Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_222d74f725dfa4c8",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:52:38.683Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_00a6158f1fb5d8df",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:52:38.793Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_88a77accaf42fb11",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:54:11.062Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_c37549c8115cc6cf",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:54:11.189Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_7aa841d741963ee7",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:55:08.334Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_095bd68d723f9c16",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T07:55:08.443Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_1dd9d0b2a5e82af1",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:04:59.117Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_0c14b6f437c31667",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:04:59.296Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_63dfcee9d5bce3d2",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:06:12.871Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_915c7756eae22257",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:06:13.002Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_4272f5827e71075f",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:14:10.639Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_4ffd3fe5ce9bf82e",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:14:10.766Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_05e3ede8b4a8a242",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:18:55.174Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_2d7231bfc7aa49f2",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:20:50.045Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_4a3af7f16913ea26",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:20:50.163Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_f0a10a55cf34a5ce",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:23:58.296Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_1db38bbd9de18d1c",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:23:58.866Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_17a29359852262e6",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:54:59.795Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_78e5569194de6c21",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:54:59.943Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "Route EVIE faceless product video to publish-ready state",
+    "flowId": "flow_e147c21cbf3ff6a0",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:57:02.949Z"
+  },
+  {
+    "route": "EVIE",
+    "directive": "API validation Copilot route",
+    "flowId": "flow_d3d64f46b6288819",
+    "status": "publish-ready",
+    "childAgents": [
+      "Creator Intelligence",
+      "Faceless Intelligence",
+      "Ranking",
+      "Prompt Forge",
+      "Wisdom Memory",
+      "Script",
+      "Render",
+      "QA/Evidence",
+      "Observability"
+    ],
+    "at": "2026-05-30T08:57:03.094Z"
+  },
+  {
+    "id": "copilot_84b275576f28f1e3",
+    "command": {
+      "command": "Route EVIE faceless product video to publish-ready state",
+      "domain": "evie",
+      "faceless": true
+    },
+    "response": "I reviewed the current EVICS context. Rank candidates, generate the strongest prompt/script pair, then validate quality and compliance before render handoff.",
+    "actions": [
+      "review_rankings",
+      "generate_prompt",
+      "validate_compliance"
+    ],
+    "wisdomVersion": 179,
+    "warning": "LLM copilot failed; deterministic fallback used.",
+    "createdAt": "2026-07-01T01:00:37.942Z",
+    "source": "template"
+  },
+  {
+    "id": "copilot_9691fedf9d040583",
+    "command": {
+      "provider": "mock",
+      "domain": "evie",
+      "faceless": true,
+      "command": "API validation Copilot route"
+    },
+    "response": "I reviewed the current EVICS context. Rank candidates, generate the strongest prompt/script pair, then validate quality and compliance before render handoff.",
+    "actions": [
+      "review_rankings",
+      "generate_prompt",
+      "validate_compliance"
+    ],
+    "wisdomVersion": 179,
+    "warning": "LLM copilot failed; deterministic fallback used.",
+    "createdAt": "2026-07-01T01:00:38.138Z",
+    "source": "template"
+  },
+  {
+    "id": "copilot_a40619d06433e743",
+    "command": {
+      "command": "Route EVIE faceless product video to publish-ready state",
+      "domain": "evie",
+      "faceless": true
+    },
+    "response": "I reviewed the current EVICS context. Rank candidates, generate the strongest prompt/script pair, then validate quality and compliance before render handoff.",
+    "actions": [
+      "review_rankings",
+      "generate_prompt",
+      "validate_compliance"
+    ],
+    "wisdomVersion": 183,
+    "warning": "LLM copilot failed; deterministic fallback used.",
+    "createdAt": "2026-07-01T01:01:22.057Z",
+    "source": "template"
+  }
+]{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_71f459d453fc6915","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T01:03:32.373Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_433890c021b489a6","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T01:04:25.095Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_e79c974bd3318936","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T01:04:25.284Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_b73568260ce83653","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:13:06.491Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_123f13fe18e7e7d0","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:13:06.793Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_478bfeacb95c770c","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:40:58.987Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_0fc46a04f218224f","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:40:59.377Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_d955b47ff612c926","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:46:45.874Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_bc80f7ee35bb2c5c","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:46:46.162Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_d611f9033c5108b7","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:51:35.498Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_e658477395c26ec2","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T14:51:35.799Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_be1b7d3672073a22","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:12:17.393Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_b3af8aaa2505d91a","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:12:17.666Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_ef488e68d77887a9","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:35:20.834Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_a967fe03ced307e9","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:35:21.029Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_70e3bd4448a06361","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:35:37.317Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_b49dad9466b99a0b","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T15:35:37.506Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_e8e11a1250e80d6f","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:04:09.496Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_1d486a5600145aed","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:04:10.394Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_5e7f4ea8cdb84059","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:14:27.666Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_854fbbd3d2b743f2","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:14:28.057Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_4db14792045b8dbd","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:15:03.343Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_ccd340c1bacd2d86","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:15:03.440Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_6c94fcc8d4f05fb9","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:19:02.595Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_a53efb84d172c632","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:19:02.825Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_ffa2e7a0b44adb46","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:33:56.758Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_739e2543daf12ce4","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:34:16.665Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_3b3deaefe4f0058a","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:34:16.821Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_8463054169166597","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:48:24.783Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_d12bc679c2d9c97d","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:48:24.919Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_ad3eb7dc5b28c015","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T16:57:24.265Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_76e08cbc0472a375","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:03:46.034Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_76a2ebc63082743f","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:05:00.056Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_034d27d0b4716ec2","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:05:00.167Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_2d5ebc298912e4e7","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:47:30.192Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_f1db5648d5e56f43","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:50:09.208Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_e1c16182fe9e7c5b","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:53:24.692Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_fc72878e68a606b4","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T17:53:24.898Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_de433fd91384fb96","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:15:59.012Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_b684b2f4ac50e34e","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:15:59.195Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_64760dc95fb38a52","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:21:08.305Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_2fc41e2ff9c83d39","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:21:08.558Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_bf678a302345719b","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:35:45.078Z"}
+{"route":"EVIE","directive":"API validation Copilot route","flowId":"flow_30c25a98e614b562","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T18:35:45.350Z"}
+{"route":"EVIE","directive":"Route EVIE faceless product video to publish-ready state","flowId":"flow_3abcca371121d50e","status":"publish-ready","childAgents":["Creator Intelligence","Faceless Intelligence","Ranking","Prompt Forge","Wisdom Memory","Script","Render","QA/Evidence","Observability"],"at":"2026-07-01T19:01:10.446Z"}

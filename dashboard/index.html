@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVICS Executive Workspace Launcher</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      background: radial-gradient(circle at 15% -10%, rgba(0, 199, 245, .2), transparent 30%),
+                  radial-gradient(circle at 90% 0%, rgba(217, 191, 122, .2), transparent 35%), #050910;
+      color: #ecf3fa;
+      padding: 28px;
+    }
+    .frame { max-width: 1240px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+    .title h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); margin-bottom: 8px; }
+    .title p { color: #95acc3; max-width: 640px; }
+    .pulse {
+      align-self: start;
+      border: 1px solid rgba(0, 199, 245, .35);
+      border-radius: 999px;
+      padding: 8px 14px;
+      color: #63e5ff;
+      font-weight: 600;
+      font-size: .9rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .card {
+      display: block;
+      text-decoration: none;
+      border-radius: 16px;
+      border: 1px solid rgba(126, 161, 204, .35);
+      background: linear-gradient(165deg, rgba(22, 31, 45, .96), rgba(11, 17, 28, .96));
+      padding: 18px;
+      color: inherit;
+      min-height: 190px;
+      transition: .2s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgba(99, 229, 255, .65); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+    .card h2 { margin: 10px 0 8px; font-size: 1.1rem; }
+    .card p { color: #9cb1c5; font-size: .92rem; line-height: 1.45; }
+    .badge { display: inline-block; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; font-weight: 700; }
+    .evics { background: rgba(0, 199, 245, .16); color: #76e9ff; }
+    .affiliate { background: rgba(117, 96, 255, .16); color: #c8beff; }
+    .phone { background: rgba(31, 214, 149, .14); color: #84efcb; }
+    .admin { background: rgba(217, 191, 122, .18); color: #f1dbab; }
+    .monitor {
+      border: 1px solid rgba(126, 161, 204, .28);
+      border-radius: 16px;
+      background: rgba(10, 15, 25, .9);
+      padding: 14px 16px;
+    }
+    .monitor h3 { font-size: .86rem; text-transform: uppercase; letter-spacing: .09em; color: #d9bf7a; margin-bottom: 8px; }
+    .monitor p { color: #b8c8d8; font-size: .92rem; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title">
+        <h1>EVICS Executive Workspace Launcher</h1>
+        <p>Four independent builds, four distinct operating contexts. Zero merged workspaces.</p>
+      </div>
+      <div class="pulse" id="launcherPulse">Booting monitors…</div>
+    </div>
+
+    <div class="grid">
+      <a class="card" href="/workspace">
+        <span class="badge evics">Build 01</span>
+        <h2>EVICS Workspace</h2>
+        <p>Executive control center for core AI orchestration, media output, and mission-critical operations.</p>
+      </a>
+      <a class="card" href="/affiliate">
+        <span class="badge affiliate">Build 02</span>
+        <h2>Affiliate Hub Workspace</h2>
+        <p>Public-facing growth engine for enrollment, referral conversion, and affiliate onboarding velocity.</p>
+      </a>
+      <a class="card" href="/phone-app">
+        <span class="badge phone">Build 03</span>
+        <h2>Phone App Workspace</h2>
+        <p>Mobile operations console for render feed flow, field posting readiness, and on-device campaign tempo.</p>
+      </a>
+      <a class="card" href="/admin-hub">
+        <span class="badge admin">Build 04</span>
+        <h2>Affiliate AdminHub Workspace</h2>
+        <p>Corporate governance layer for affiliate leadership, quality control, and high-level execution audits.</p>
+      </a>
+    </div>
+
+    <section class="monitor">
+      <h3>Unified evidence monitor</h3>
+      <p id="launcherHealth">Checking /api/health…</p>
+      <p id="launcherProof">Checking /api/evidence/heygen…</p>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const pulse = document.getElementById('launcherPulse');
+      const health = document.getElementById('launcherHealth');
+      const proof = document.getElementById('launcherProof');
+      async function refresh() {
+        try {
+          const [healthRes, proofRes] = await Promise.all([
+            fetch('/api/health', { headers: { Accept: 'application/json' } }),
+            fetch('/api/evidence/heygen', { headers: { Accept: 'application/json' } })
+          ]);
+          const healthPayload = await healthRes.json();
+          const proofPayload = await proofRes.json();
+          health.textContent = `Backend: ${(healthPayload.status || 'unknown').toUpperCase()} · Integrations: ${healthPayload.connected_integrations || 0}/${healthPayload.total_integrations || 0}`;
+          if (proofPayload.available && proofPayload.latest) {
+            const video = proofPayload.latest.videoUrl || proofPayload.latest.video_url || proofPayload.latest.proofUrl || proofPayload.latest.proof_url || '/generated/evics-sea-moss-proof-render.mp4';
+            proof.innerHTML = `HeyGen proof ready · <a href="${video}" target="_blank" rel="noopener" style="color:#63e5ff">open evidence render</a>`;
+          } else {
+            proof.textContent = 'HeyGen proof not yet available in live payload.';
+          }
+          pulse.textContent = `Live ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          pulse.textContent = 'Monitor degraded';
+          health.textContent = `Health check error: ${err.message}`;
+          proof.textContent = `Proof check error: ${err.message}`;
+        }
+      }
+      refresh();
+      setInterval(refresh, 30000);
+    })();
+  </script>
+</body>
+</html>

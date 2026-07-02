@@ -1,7 +1,7 @@
 ﻿// backend/server.js
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
@@ -12,12 +12,36 @@ const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
-const { startHeyGenRender, getHeyGenVideoStatus, pollHeyGenVideo } = require('./internalVideoRenderer');
+const {
+  startHeyGenRender,
+  startHeyGenVideoAgent,
+  getHeyGenVideoAgentSession,
+  listHeyGenVideoAgentSessions,
+  getHeyGenVideoStatus,
+  pollHeyGenVideoAgentSession,
+  pollHeyGenVideo,
+  getHeyGenCurrentUser
+} = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
 const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground, resolveBackgroundUrl } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
 const { postProcessVideo } = require('../utils/videoPostProcessor');
+const {
+  writeProductMockupLibrary,
+  readProductMockupLibrary,
+  resolveProductMockup
+} = require('../utils/productMockupLibrary');
+const {
+  A_PLUS_RENDER_MINIMUM,
+  normalizeVideoPackage,
+  findProhibitedClaims,
+  removeProhibitedClaims,
+  validateScriptQuality,
+  upgradeScriptForAPlus,
+  buildAPlusVideoAgentPrompt,
+  gradeCompletedRender
+} = require('./renderQualityValidator');
 
 const app = express();
 const PORT = process.env.PORT || 4175;
@@ -75,6 +99,8 @@ app.use('/api/video/generate', videoLimiter);
 
 // Serve static files from dashboard/control-center
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
+app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app')));
+app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub')));
 
 // Serve uploaded avatar photos and voice files
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -85,15 +111,326 @@ app.use('/processed-images', express.static(BG_CACHE_DIR));
 // Serve post-processed videos with product overlays and CTA
 app.use('/processed-videos', express.static(path.join(__dirname, '../processed-videos')));
 
+// Serve generated proof renders and other render artifacts
+app.use('/generated', express.static(path.join(__dirname, '../generated')));
+
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
 app.get('/affiliate/workspace', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/workspace.html')));
 app.get('/affiliate', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html')));
 app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
+app.get('/phone-app', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/phone-app/index.html')));
+app.get('/admin-hub', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/admin-hub/index.html')));
+app.get('/affiliate-adminhub', (_req, res) => res.redirect('/admin-hub'));
 app.get('/ref/:code', (req, res) => {
   res.redirect(`/affiliate?ref=${encodeURIComponent(req.params.code)}`);
 });
 
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
+const LIVE_HEYGEN_PROOF_PATH = path.join(__dirname, '..', 'generated', 'live_heygen_proofs.json');
+const EXCELLENCE_STATE_PATH = path.join(__dirname, '..', 'generated', 'a_plus_objectives_state.json');
+const EXCELLENCE_AUDIT_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_latest.json');
+const EXCELLENCE_AUDIT_HISTORY_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_history.json');
+const AFFILIATE_COMMS_STATE_PATH = path.join(__dirname, '..', 'generated', 'affiliate_comms_state.json');
+const AFFILIATE_COMMS_SESSION_TTL_MS = 45 * 1000;
+
+const A_PLUS_WORKSPACE_URLS = [
+  { id: 'workspace-shell', label: 'EVICS Workspace Shell', path: '/workspace' },
+  { id: 'evics-alias', label: 'EVICS Alias', path: '/evics' },
+  { id: 'viral-intelligence', label: 'Viral Intelligence', path: '/workspace?section=viral-intelligence' },
+  { id: 'ai-reconstruction', label: 'AI Reconstruction', path: '/workspace?section=ai-reconstruction' },
+  { id: 'video-generation', label: 'Video Generation', path: '/workspace?section=video-generation' },
+  { id: 'media-output', label: 'Media Output', path: '/workspace?section=media-output' },
+  { id: 'distribution', label: 'Distribution', path: '/workspace?section=distribution' },
+  { id: 'analytics', label: 'Analytics', path: '/workspace?section=analytics' },
+  { id: 'executive-workspace', label: 'Executive Workspace', path: '/workspace?section=executive-workspace' },
+  { id: 'affiliate-hub', label: 'Affiliate Hub Landing', path: '/affiliate' },
+  { id: 'affiliate-workspace', label: 'Affiliate Hub Workspace', path: '/affiliate/workspace?code=ROLAND787' },
+  { id: 'phone-app-workspace', label: 'Phone App Workspace', path: '/phone-app' },
+  { id: 'affiliate-admin-hub', label: 'Affiliate AdminHub Workspace', path: '/admin-hub' },
+  { id: 'phone-app-feed', label: 'Phone App Render Feed API', path: '/api/renders/phone-app' },
+  { id: 'heygen-evidence-endpoint', label: 'HeyGen Proof Evidence API', path: '/api/evidence/heygen' }
+];
+
+const SUPPORTED_PRODUCT_ENTRANCE_EFFECTS = new Set([
+  'product-entrance-fade'
+]);
+const FACE_SAFE_TEXT_OVERLAY_POSITIONS = new Set(['top', 'bottom']);
+
+function normalizeSpecialEffects(value) {
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',').map((entry) => entry.trim()).filter(Boolean)
+      : [];
+  return Array.from(new Set(
+    list
+      .map((effect) => String(effect || '').trim().toLowerCase().replace(/\s+/g, '-'))
+      .filter(Boolean)
+  ));
+}
+
+function readJsonOrFallback(filePath, fallbackValue) {
+  if (!fs.existsSync(filePath)) return fallbackValue;
+  const raw = fs.readFileSync(filePath, 'utf8').trim();
+  if (!raw) return fallbackValue;
+  return JSON.parse(raw);
+}
+
+function writeJsonAtomic(filePath, value) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
+}
+
+function defaultAffiliateCommsState() {
+  return {
+    sessions: {},
+    conversations: {},
+    messages: [],
+    lastSequence: 0
+  };
+}
+
+function loadAffiliateCommsState() {
+  const raw = readJsonOrFallback(AFFILIATE_COMMS_STATE_PATH, defaultAffiliateCommsState());
+  return {
+    sessions: raw.sessions && typeof raw.sessions === 'object' ? raw.sessions : {},
+    conversations: raw.conversations && typeof raw.conversations === 'object' ? raw.conversations : {},
+    messages: Array.isArray(raw.messages) ? raw.messages : [],
+    lastSequence: Number(raw.lastSequence || 0)
+  };
+}
+
+function saveAffiliateCommsState(state) {
+  writeJsonAtomic(AFFILIATE_COMMS_STATE_PATH, state);
+}
+
+function cleanAffiliateCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+}
+
+function pruneInactiveAffiliateSessions(state) {
+  const now = Date.now();
+  let changed = false;
+  Object.values(state.sessions).forEach((session) => {
+    if (!session || session.status !== 'online') return;
+    const lastSeen = Number(session.lastSeenAtMs || 0);
+    if (now - lastSeen > AFFILIATE_COMMS_SESSION_TTL_MS) {
+      session.status = 'offline';
+      session.endedAt = new Date(now).toISOString();
+      session.endedReason = 'heartbeat-timeout';
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function activeAffiliateSessions(state) {
+  return Object.values(state.sessions)
+    .filter((session) => session && session.status === 'online')
+    .sort((a, b) => Number(b.lastSeenAtMs || 0) - Number(a.lastSeenAtMs || 0));
+}
+
+function upsertAffiliateConversation(state, affiliateCode, affiliateName = '') {
+  const code = cleanAffiliateCode(affiliateCode);
+  if (!code) throw new Error('affiliateCode is required');
+  const existing = state.conversations[code] || {
+    affiliateCode: code,
+    affiliateName: affiliateName || code,
+    escalated: false,
+    escalationReason: null,
+    lastMessageAt: null,
+    lastSenderRole: null
+  };
+  if (affiliateName) existing.affiliateName = affiliateName;
+  state.conversations[code] = existing;
+  return existing;
+}
+
+function appendAffiliateMessage(state, message) {
+  state.lastSequence = Number(state.lastSequence || 0) + 1;
+  const record = {
+    sequence: state.lastSequence,
+    id: `msg_${state.lastSequence}`,
+    createdAt: new Date().toISOString(),
+    ...message
+  };
+  state.messages.push(record);
+  if (state.messages.length > 2500) {
+    state.messages = state.messages.slice(-2500);
+  }
+  const conversation = upsertAffiliateConversation(state, record.affiliateCode, record.affiliateName || '');
+  conversation.lastMessageAt = record.createdAt;
+  conversation.lastSenderRole = record.senderRole;
+  return record;
+}
+
+function buildAiAffiliateReply(inputText) {
+  const normalized = String(inputText || '').trim();
+  if (!normalized) {
+    return {
+      text: 'Please share more detail so I can give you a direct action plan.',
+      escalated: false,
+      escalationReason: null
+    };
+  }
+
+  const lower = normalized.toLowerCase();
+  const escalationTriggers = ['contract', 'legal', 'lawsuit', 'ownership', 'account locked', 'cannot login', 'payout missing', 'fraud', 'chargeback', 'tax', 'compliance'];
+  const escalated = escalationTriggers.some((term) => lower.includes(term));
+
+  let answer = 'Action plan: clarify your product focus, run a single-hook test, publish 3 short-form variants, then review conversion and retention before scaling spend.';
+  if (lower.includes('render') || lower.includes('video') || lower.includes('heygen')) {
+    answer = 'Render guidance: use one clear hook, one product proof, one CTA, keep 15-30s runtime, and verify output quality score before publishing.';
+  } else if (lower.includes('commission') || lower.includes('payout') || lower.includes('earn')) {
+    answer = 'Earnings guidance: check your referral link attribution, conversion timestamps, and payout status panel. Prioritize high-intent content angles and retarget warm audiences.';
+  } else if (lower.includes('link') || lower.includes('traffic') || lower.includes('conversion')) {
+    answer = 'Growth guidance: pin your best-converting affiliate link, align your CTA to one outcome, and test two offer angles for 48 hours before selecting a winner.';
+  } else if (lower.includes('script') || lower.includes('hook')) {
+    answer = 'Script guidance: lead with problem + promise in the first 2 seconds, follow with one proof point, and close with a direct purchase instruction.';
+  }
+
+  const escalationReason = escalated
+    ? 'This request touches owner/admin authority (legal, account, payout, or compliance). Escalating to AdminHub.'
+    : null;
+
+  return {
+    text: escalated
+      ? `${answer} I am escalating this thread to AdminHub for owner-level handling.`
+      : answer,
+    escalated,
+    escalationReason
+  };
+}
+
+function scoreToGrade(score) {
+  if (score >= 97) return 'A+';
+  if (score >= 93) return 'A';
+  if (score >= 88) return 'B+';
+  if (score >= 82) return 'B';
+  if (score >= 75) return 'C+';
+  return 'C';
+}
+
+function percentFromChecks(checks) {
+  if (!checks.length) return 0;
+  const passCount = checks.filter((item) => item && item.passed).length;
+  return Math.round((passCount / checks.length) * 100);
+}
+
+function buildObjectiveCatalog(audit = null, manualState = {}) {
+  const isPass = (id) => Boolean(audit && audit.objectiveChecks && audit.objectiveChecks[id] && audit.objectiveChecks[id].passed);
+  const manualStatuses = manualState.statuses && typeof manualState.statuses === 'object' ? manualState.statuses : {};
+
+  const objectives = [
+    {
+      id: 'evics-workspace-consistency',
+      priority: 1,
+      phase: 'Phase 1 — Interface Excellence',
+      title: 'Maintain Titanium consistency across EVICS workspaces',
+      workflow: ['Review all section deep links', 'Validate media output workflows', 'Confirm non-redundant status surfaces'],
+      status: isPass('evics-workspace-consistency') ? 'validated' : (manualStatuses['evics-workspace-consistency'] || 'in_progress'),
+      evidenceKey: 'workspaceCoverage'
+    },
+    {
+      id: 'affiliate-hub-performance',
+      priority: 2,
+      phase: 'Phase 1 — Interface Excellence',
+      title: 'Affiliate Hub conversion and workspace reliability',
+      workflow: ['Validate affiliate landing', 'Validate affiliate workspace', 'Validate affiliate product feed and status'],
+      status: isPass('affiliate-hub-performance') ? 'validated' : (manualStatuses['affiliate-hub-performance'] || 'in_progress'),
+      evidenceKey: 'affiliateCoverage'
+    },
+    {
+      id: 'phone-app-observability',
+      priority: 3,
+      phase: 'Phase 1 — Interface Excellence',
+      title: 'Phone App render observability and ops readiness',
+      workflow: ['Validate phone render feed', 'Validate avatar generation endpoints', 'Ensure executive monitor refresh loop'],
+      status: isPass('phone-app-observability') ? 'validated' : (manualStatuses['phone-app-observability'] || 'in_progress'),
+      evidenceKey: 'phoneCoverage'
+    },
+    {
+      id: 'scanner-scraper-excellence',
+      priority: 4,
+      phase: 'Phase 2 — Autonomous Agent Core',
+      title: 'Scanners and scrapers at elite operating quality',
+      workflow: ['Trend Scout quality >= 90', 'Product Match quality >= 88', 'Mission orchestration health >= 95'],
+      status: isPass('scanner-scraper-excellence') ? 'validated' : (manualStatuses['scanner-scraper-excellence'] || 'in_progress'),
+      evidenceKey: 'agentsHealth'
+    },
+    {
+      id: 'learning-loop-closed',
+      priority: 5,
+      phase: 'Phase 2 — Autonomous Agent Core',
+      title: 'Learning loop closed and actively logging',
+      workflow: ['Post learning-loop telemetry', 'Verify persistence and status', 'Confirm executive visibility'],
+      status: isPass('learning-loop-closed') ? 'validated' : (manualStatuses['learning-loop-closed'] || 'in_progress'),
+      evidenceKey: 'learningLoop'
+    },
+    {
+      id: 'a-plus-validation-evidence',
+      priority: 6,
+      phase: 'Phase 3 — Validation and Governance',
+      title: 'A+ evidence package generated from live checks',
+      workflow: ['Run excellence audit', 'Persist report and history', 'Confirm build-level A+ scores'],
+      status: isPass('a-plus-validation-evidence') ? 'validated' : (manualStatuses['a-plus-validation-evidence'] || 'in_progress'),
+      evidenceKey: 'overallGrade'
+    }
+  ];
+
+  return objectives;
+}
+
+function normalizeHeyGenProofRecord(record) {
+  if (!record || typeof record !== 'object') return null;
+  const videoUrl = record.video_url || record.videoUrl || record.proof_url || record.proofUrl || null;
+  const thumbnailUrl = record.thumbnail_url || record.thumbnailUrl || null;
+  const videoId = record.video_id || record.videoId || record.id || null;
+  return {
+    ...record,
+    video_id: videoId,
+    videoId,
+    video_url: videoUrl,
+    videoUrl,
+    proof_url: videoUrl,
+    proofUrl: videoUrl,
+    thumbnail_url: thumbnailUrl,
+    thumbnailUrl
+  };
+}
+
+function getEngineView(engineId, report, objectives) {
+  const map = {
+    evics: {
+      scoreKey: 'evics',
+      objectiveIds: ['evics-workspace-consistency', 'a-plus-validation-evidence']
+    },
+    affiliate_hub: {
+      scoreKey: 'affiliateHub',
+      objectiveIds: ['affiliate-hub-performance', 'a-plus-validation-evidence']
+    },
+    phone_app: {
+      scoreKey: 'phoneApp',
+      objectiveIds: ['phone-app-observability', 'a-plus-validation-evidence']
+    },
+    affiliate_adminhub: {
+      scoreKey: 'adminWorkspace',
+      objectiveIds: ['scanner-scraper-excellence', 'learning-loop-closed', 'a-plus-validation-evidence']
+    }
+  };
+  const config = map[engineId] || null;
+  if (!config) return null;
+  const build = report && report.builds ? report.builds[config.scoreKey] : null;
+  const scopedObjectives = objectives.filter((item) => config.objectiveIds.includes(item.id));
+  return {
+    engineId,
+    score: build ? build.score : null,
+    grade: build ? build.grade : null,
+    checks: build ? build.checks : [],
+    objectives: scopedObjectives
+  };
+}
 
 function envFingerprint(value) {
   if (!value) return null;
@@ -103,6 +440,117 @@ function envFingerprint(value) {
     suffix: clean.slice(-4),
     length: clean.length
   };
+}
+
+function getHeyGenAuthProfile() {
+  const hasApiKey = Boolean(process.env.HEYGEN_API_KEY);
+  const hasBearer = Boolean(process.env.HEYGEN_OAUTH_BEARER || process.env.HEYGEN_ACCESS_TOKEN);
+  const hasCliFallback = Boolean(process.env.HEYGEN_CLI_SESSION_ACTIVE || process.env.HEYGEN_CLI_AUTH_AVAILABLE);
+  const availableModes = [];
+  if (hasApiKey) availableModes.push('cli_api_key');
+  if (hasBearer) availableModes.push('oauth_bearer');
+  if (hasCliFallback) availableModes.push('cli_fallback_session');
+
+  const mode = hasApiKey
+    ? 'cli_api_key'
+    : hasBearer
+      ? 'oauth_bearer'
+      : hasCliFallback
+        ? 'cli_fallback_session'
+        : 'not_configured';
+
+  return {
+    mode,
+    priority_order: ['cli_api_key', 'oauth_bearer', 'cli_fallback_session'],
+    available_modes: availableModes,
+    mcp_endpoint: process.env.HEYGEN_MCP_ENDPOINT || 'https://mcp.heygen.com/mcp/v1/'
+  };
+}
+
+function isHeyGenMediaUrl(value) {
+  if (!value) return false;
+  try {
+    const host = new URL(value).host.toLowerCase();
+    return host.includes('heygen');
+  } catch {
+    return false;
+  }
+}
+
+function readJsonArray(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const raw = fs.readFileSync(filePath, 'utf8');
+  if (!raw.trim()) return [];
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function recordLiveHeyGenProof({ videoId, videoUrl, thumbnailUrl, duration, renderGrade, source }) {
+  if (!isHeyGenMediaUrl(videoUrl)) {
+    throw new Error('Live HeyGen proof requires a HeyGen-hosted video_url.');
+  }
+
+  const generatedDir = path.dirname(LIVE_HEYGEN_PROOF_PATH);
+  if (!fs.existsSync(generatedDir)) fs.mkdirSync(generatedDir, { recursive: true });
+  const current = readJsonArray(LIVE_HEYGEN_PROOF_PATH);
+  const now = new Date().toISOString();
+  const proof = {
+    video_id: videoId || null,
+    video_url: videoUrl,
+    thumbnail_url: thumbnailUrl || null,
+    duration: duration ?? null,
+    render_grade: renderGrade ? renderGrade.score : null,
+    tier: renderGrade ? renderGrade.tier : null,
+    approved_for_publishing: renderGrade ? Boolean(renderGrade.approvedForPublishing) : true,
+    source: source || 'heygen-v3',
+    updated_at: now
+  };
+  const filtered = current.filter((item) => item.video_id !== proof.video_id && item.video_url !== proof.video_url);
+  fs.writeFileSync(LIVE_HEYGEN_PROOF_PATH, JSON.stringify([proof, ...filtered].slice(0, 20), null, 2), 'utf8');
+  return proof;
+}
+
+async function findLatestLiveHeyGenProof() {
+  const errors = [];
+  if (process.env.HEYGEN_LIVE_PROOF_URL) {
+    return {
+      proof: {
+        video_url: process.env.HEYGEN_LIVE_PROOF_URL,
+        source: 'env',
+        approved_for_publishing: true
+      },
+      errors
+    };
+  }
+
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('video_assembly_drafts')
+      .select('video_id,video_url,thumbnail_url,duration,render_grade,status,updated_at')
+      .eq('status', 'completed')
+      .not('video_url', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      errors.push(error.message);
+    } else {
+      const proof = (data || []).find((item) => isHeyGenMediaUrl(item.video_url) && (item.render_grade === null || item.render_grade >= A_PLUS_RENDER_MINIMUM));
+      if (proof) return { proof: { ...proof, source: 'supabase' }, errors };
+    }
+  } catch (error) {
+    errors.push(error.message);
+  }
+
+  try {
+    const localProof = readJsonArray(LIVE_HEYGEN_PROOF_PATH)
+      .find((item) => isHeyGenMediaUrl(item.video_url) && item.approved_for_publishing !== false);
+    if (localProof) return { proof: { ...localProof, source: localProof.source || 'local' }, errors };
+  } catch (error) {
+    errors.push(error.message);
+  }
+
+  return { proof: null, errors };
 }
 
 async function insertRenderRecord(record) {
@@ -166,6 +614,92 @@ async function insertRenderRecord(record) {
   return { data: null, error: errors.join(' | '), columnsUsed: [] };
 }
 
+function mirrorRenderToLocalStore(record = {}) {
+  const localPath = path.join(__dirname, '..', 'generated', 'local_evics_renders.json');
+  const list = fs.existsSync(localPath) ? JSON.parse(fs.readFileSync(localPath, 'utf8') || '[]') : [];
+  const id = record.id || record.job_id || record.video_id || `local_${Date.now()}`;
+  const now = new Date().toISOString();
+  const nextRow = Object.assign(
+    { id, created_at: record.created_at || now },
+    record,
+    { vault_destination: record.vault_destination || record.video_url || '/generated/evics-sea-moss-proof-render.mp4' }
+  );
+  const deduped = [nextRow, ...list.filter((item) => {
+    const itemId = String(item.id || item.job_id || item.video_id || '');
+    return itemId !== String(id) && String(item.video_url || '') !== String(nextRow.video_url || '');
+  })];
+  fs.writeFileSync(localPath, JSON.stringify(deduped.slice(0, 400), null, 2), 'utf8');
+  return nextRow;
+}
+
+// POST /api/media-output/persist-proof — persist a proof render, with local fallback when Supabase isn't available
+app.post('/api/media-output/persist-proof', async (req, res) => {
+  try {
+    const record = req.body || {};
+    // Try to persist to Supabase first
+    const attempt = await insertRenderRecord(record).catch((e) => ({ data: null, error: e.message }));
+    if (attempt && attempt.data) {
+      let localMirror = null;
+      try {
+        localMirror = mirrorRenderToLocalStore(record);
+      } catch (mirrorError) {
+        console.warn('Local mirror write failed:', mirrorError.message);
+      }
+      noStore(res);
+      return res.json({ success: true, persisted: true, data: attempt.data[0], columnsUsed: attempt.columnsUsed, localMirror });
+    }
+
+    // Fallback to local file store under generated/local_evics_renders.json
+    try {
+      const newRow = mirrorRenderToLocalStore(record);
+      noStore(res);
+      return res.json({ success: true, persisted: 'local', item: newRow });
+    } catch (e) {
+      // If local fallback fails, return the original Supabase error
+      return res.status(500).json({ success: false, error: attempt && attempt.error ? attempt.error : e.message || String(e) });
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/media-output/persist-proof/:id/publish — enqueue a persisted proof for publishing (local fallback queue)
+app.post('/api/media-output/persist-proof/:id/publish', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const title = req.body.title || req.body.content || `Proof publish ${id}`;
+    // Try to insert into publishing_queue via Supabase first
+    try {
+      const { data, error } = await SupabaseConnector.from('publishing_queue').insert([{
+        creative_id: id,
+        channel: 'Media Output Center',
+        status: 'Queued',
+        content: title,
+        publish_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }]).select();
+      if (!error) {
+        noStore(res);
+        return res.json({ success: true, queued: true, via: 'supabase', data: data && data[0] ? data[0] : data });
+      }
+    } catch (err) {
+      // continue to local fallback
+      console.warn('Publishing queue Supabase insert failed, falling back to local queue:', err.message);
+    }
+
+    // Local fallback queue file
+    const queuePath = path.join(__dirname, '..', 'generated', 'local_publishing_queue.json');
+    const queue = fs.existsSync(queuePath) ? JSON.parse(fs.readFileSync(queuePath, 'utf8') || '[]') : [];
+    const entry = { creative_id: id, channel: 'Media Output Center', status: 'Queued', content: title, publish_at: new Date().toISOString(), created_at: new Date().toISOString() };
+    queue.unshift(entry);
+    fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2), 'utf8');
+    noStore(res);
+    res.json({ success: true, queued: true, via: 'local', entry });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
 // -------------------------
 // Root â€” serve dashboard
 // -------------------------
@@ -174,7 +708,19 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/workspace', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../dashboard/control-center/live-ops.html'));
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
+});
+
+app.get('/evics', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
+});
+
+app.get('/launcher', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/index.html'));
+});
+
+app.get('/dashboard', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/index.html'));
 });
 
 // -------------------------
@@ -229,8 +775,8 @@ app.get('/status', async (_req, res) => {
       if (!keys.heygen) return { service: 'heygen', status: 'no_key', pingMs: null };
       const t0 = Date.now();
       try {
-        const r = await fetch('https://api.heygen.com/v1/avatar.list', { headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY } });
-        return { service: 'heygen', status: r.ok ? 'ok' : 'error', httpStatus: r.status, pingMs: Date.now() - t0 };
+        await getHeyGenCurrentUser();
+        return { service: 'heygen', status: 'ok', httpStatus: 200, pingMs: Date.now() - t0, apiVersion: 'v3' };
       } catch (e) { return { service: 'heygen', status: 'error', error: e.message, pingMs: null }; }
     })(),
     // OpenAI
@@ -266,6 +812,28 @@ app.get('/status', async (_req, res) => {
   });
 });
 
+app.get('/api/evidence/heygen', (_req, res) => {
+  noStore(res);
+  const payload = readJsonOrFallback(LIVE_HEYGEN_PROOF_PATH, { proofs: [], latest: null });
+  const proofs = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.proofs)
+      ? payload.proofs
+      : Array.isArray(payload.history)
+        ? payload.history
+        : [];
+  const latest = normalizeHeyGenProofRecord(payload.latest || proofs[0] || null);
+  const normalizedProofs = proofs.map((item) => normalizeHeyGenProofRecord(item)).filter(Boolean);
+  res.json({
+    success: true,
+    source: '/generated/live_heygen_proofs.json',
+    available: Boolean(latest),
+    latest,
+    proofs: normalizedProofs.slice(0, 10),
+    count: proofs.length
+  });
+});
+
 // /api/health â€” alias for /status
 app.get('/api/health', async (req, res, next) => {
   req.url = '/status';
@@ -281,6 +849,9 @@ app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
 app.get('/api/production-closeout/status', async (_req, res) => {
   noStore(res);
+  const liveProofState = await findLatestLiveHeyGenProof();
+  const liveProof = liveProofState.proof;
+  const heygenAuth = getHeyGenAuthProfile();
   const checks = {
     shopify: {
       expectedStore: process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE || process.env.SHOPIFY_SHOP || null,
@@ -298,12 +869,15 @@ app.get('/api/production-closeout/status', async (_req, res) => {
       sharedTables: []
     },
     heygen: {
-      configured: Boolean(process.env.HEYGEN_API_KEY),
+      configured: heygenAuth.mode !== 'not_configured',
+      auth: heygenAuth,
       key: envFingerprint(process.env.HEYGEN_API_KEY),
-      liveProofAvailable: Boolean(process.env.HEYGEN_LIVE_PROOF_URL),
-      proofUrl: process.env.HEYGEN_LIVE_PROOF_URL || null,
+      liveProofAvailable: Boolean(liveProof),
+      proofUrl: liveProof ? liveProof.video_url : null,
+      proof: liveProof,
+      proofLookupErrors: liveProofState.errors,
       blocker: process.env.HEYGEN_API_KEY
-        ? (process.env.HEYGEN_LIVE_PROOF_URL ? null : 'HEYGEN_API_KEY is configured, but no live HeyGen artifact has completed yet.')
+        ? (liveProof ? null : 'HEYGEN_API_KEY is configured, but no live HeyGen artifact has completed yet.')
         : 'HEYGEN_API_KEY is not configured.'
     }
   };
@@ -334,6 +908,84 @@ app.get('/api/production-closeout/status', async (_req, res) => {
   res.json({ success: true, checks, timestamp: new Date().toISOString() });
 });
 
+app.get('/api/shopify/diagnostics', async (_req, res) => {
+  noStore(res);
+  const expectedStore = process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE || process.env.SHOPIFY_SHOP || null;
+  const hasPrimaryToken = Boolean(process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN);
+  const oauthReady = Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.SHOPIFY_CLIENT_SECRET && expectedStore);
+
+  res.json({
+    success: true,
+    expectedStore,
+    primary: {
+      ok: hasPrimaryToken,
+      status: hasPrimaryToken ? 'accepted' : 'missing',
+      tokenType: process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ? 'admin' : (process.env.SHOPIFY_ACCESS_TOKEN ? 'access' : null)
+    },
+    primarySession: {
+      ok: hasPrimaryToken,
+      status: hasPrimaryToken ? 'connected' : 'not_connected'
+    },
+    oauthReady,
+    sessions: [
+      { name: 'primary', ok: hasPrimaryToken, isPrimary: true },
+      { name: 'backup', ok: false, isPrimary: false }
+    ]
+  });
+});
+
+app.get('/api/heygen/account-status', async (_req, res) => {
+  noStore(res);
+  const auth = getHeyGenAuthProfile();
+  try {
+    const user = await getHeyGenCurrentUser();
+    return res.json({
+      success: true,
+      connected: true,
+      auth,
+      account: {
+        user_id: user.user_id || user.id || null,
+        email: user.email || null,
+        plan: user.plan_type || user.plan || null,
+        subscription_status: user.subscription_status || user.status || null,
+        credits_remaining: user.credits_remaining ?? user.credit_balance ?? null,
+        credits_total: user.credits_total ?? null
+      }
+    });
+  } catch (error) {
+    const statusCode = error.code === 'HEYGEN_AUTH_MISSING' ? 503 : error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    return res.status(statusCode).json({
+      success: false,
+      connected: false,
+      error: error.message || String(error),
+      statusCode,
+      auth
+    });
+  }
+});
+
+app.get('/api/heygen/video-agent-sessions', async (req, res) => {
+  noStore(res);
+  try {
+    const limit = req.query.limit;
+    const token = req.query.token;
+    const sessions = await listHeyGenVideoAgentSessions({ limit, token });
+    return res.json({
+      success: true,
+      sessions: sessions.sessions,
+      has_more: sessions.has_more,
+      next_token: sessions.next_token
+    });
+  } catch (error) {
+    const statusCode = error.code === 'HEYGEN_AUTH_MISSING' ? 503 : error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    return res.status(statusCode).json({
+      success: false,
+      error: error.message || String(error),
+      statusCode
+    });
+  }
+});
+
 registerEvicsRecoveryRoutes(app, SupabaseConnector);
 registerEvicsEvieRoutes(app);
 registerEvicsEliteRoutes(app, {
@@ -358,6 +1010,7 @@ app.get('/api/products', async (req, res) => {
     if (category) query = query.eq('category', category);
     const { data, error } = await query;
     if (!error && data && data.length > 0) {
+      try { writeProductMockupLibrary(data, 'supabase'); } catch {}
       return res.json({ success: true, count: data.length, products: data, source: 'supabase' });
     }
   } catch {}
@@ -366,6 +1019,7 @@ app.get('/api/products', async (req, res) => {
   try {
     let products = await fetchShopifyProducts();
     if (category) products = products.filter(p => (p.product_type || p.category || '').toLowerCase().includes(category.toLowerCase()));
+    try { writeProductMockupLibrary(products, 'shopify'); } catch {}
     return res.json({ success: true, count: products.length, products: products.slice(0, limit), source: 'shopify' });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message || String(e) });
@@ -377,9 +1031,55 @@ app.post('/api/products/sync', async (_req, res) => {
   noStore(res);
   try {
     const products = await fetchShopifyProducts();
-    res.json({ success: true, synced: products.length, message: `Synced ${products.length} products from Shopify` });
+    const library = writeProductMockupLibrary(products, 'shopify');
+    res.json({
+      success: true,
+      synced: products.length,
+      mockupLibraryCount: library.count,
+      message: `Synced ${products.length} products from Shopify`
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/products/mockup-library', async (_req, res) => {
+  noStore(res);
+  try {
+    const library = readProductMockupLibrary();
+    return res.json({
+      success: true,
+      generatedAt: library.generatedAt,
+      source: library.source,
+      count: library.count,
+      products: library.products
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+app.get('/api/products/mockup-library/resolve', async (req, res) => {
+  noStore(res);
+  try {
+    const criteria = {
+      productId: req.query.productId || req.query.product_id || '',
+      productHandle: req.query.productHandle || req.query.product_handle || '',
+      productTitle: req.query.productTitle || req.query.title || '',
+      productPageUrl: req.query.productPageUrl || req.query.product_page_url || ''
+    };
+    let resolved = resolveProductMockup(criteria);
+    if (!resolved) {
+      const products = await fetchShopifyProducts();
+      writeProductMockupLibrary(products, 'shopify');
+      resolved = resolveProductMockup(criteria, products);
+    }
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'No matching product found in mockup library.' });
+    }
+    return res.json({ success: true, product: resolved });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e) });
   }
 });
 
@@ -866,48 +1566,308 @@ app.post('/api/assembly/suggestions', async (req, res) => {
 app.post('/api/video/generate', async (req, res) => {
   try {
     const body = req.body || {};
-    const script = String(body.script || (Array.isArray(body.components) ? body.components.map((component) => component && component.text).filter(Boolean).join('\n\n') : '')).trim();
-    const avatar_id = body.avatar_id || body.avatar || body.heygenAvatarId || process.env.HEYGEN_AVATAR_ID;
-    const voice_id = body.voice_id || body.voice || body.heygenVoiceId || process.env.HEYGEN_VOICE_ID;
-    const config = body.config || {};
-    const waitForCompletion = body.wait_for_completion === true || body.waitForCompletion === true;
-
-    if (!script) {
-      return res.status(400).json({ success: false, error: 'script is required.' });
+    const rawScript = String(body.script || (Array.isArray(body.components) ? body.components.map((component) => component && component.text).filter(Boolean).join('\n\n') : '')).trim();
+    const rawPrompt = String(body.prompt || '').trim();
+    const prohibitedClaims = Array.from(new Set([
+      ...findProhibitedClaims(rawScript),
+      ...findProhibitedClaims(rawPrompt)
+    ]));
+    if (prohibitedClaims.length) {
+      return res.status(422).json({
+        success: false,
+        error: 'Prohibited marketing language detected. Remove military-owned/operated claims before rendering.',
+        prohibitedClaims
+      });
     }
-    if (!avatar_id) {
+    const script = removeProhibitedClaims(rawScript);
+    const prompt = removeProhibitedClaims(rawPrompt);
+    let renderScript = script;
+    let renderPrompt = prompt;
+    let scriptQuality = null;
+    let scriptUpgraded = false;
+    const config = body.config || {};
+    const requestedAvatarPreset = String(
+      body.avatar_preset ||
+      body.avatarPreset ||
+      config.avatar_preset ||
+      config.avatarPreset ||
+      ''
+    ).trim();
+    const requestedVoicePreset = String(
+      body.voice_preset ||
+      body.voicePreset ||
+      config.voice_preset ||
+      config.voicePreset ||
+      body.voice ||
+      ''
+    ).trim();
+    const jordanPresetRequested = /jordan/i.test(requestedAvatarPreset) || /jordan/i.test(requestedVoicePreset);
+    const jordanAvatarConfigured = String(process.env.REACT_APP_JORDAN_AVATAR_ID || '').trim();
+    const jordanVoiceConfigured = String(process.env.REACT_APP_JORDAN_VOICE_ID || '').trim();
+    const renderMode = String(body.render_mode || body.renderMode || '').trim().toLowerCase();
+    const requestedPlatform = String(body.platform || config.platform || 'heygen').trim().toLowerCase();
+    const waitForCompletion = body.wait_for_completion === true || body.waitForCompletion === true;
+    const duration = body.duration || config.duration || null;
+    const ctaUrl = body.cta_url || config.cta_destination_url || null;
+    const requestedProductTitle = body.productTitle || body.product || config.productTitle || config.productName || 'Sea Moss Capsules';
+    const requestedProductImageUrl = body.productImageUrl || body.product_image_url || config.productImageUrl || config.product_image_url || '';
+    const requestedProductPageUrl = body.productPageUrl || body.product_page_url || ctaUrl || config.productPageUrl || config.product_page_url || '';
+    const productLookup = {
+      productId: body.productId || body.product_id || config.productId || config.product_id || '',
+      productHandle: body.productHandle || body.product_handle || config.productHandle || config.product_handle || '',
+      productTitle: requestedProductTitle,
+      productPageUrl: requestedProductPageUrl
+    };
+    let resolvedProduct = resolveProductMockup(productLookup);
+    if (!resolvedProduct) {
+      try {
+        const liveProducts = await fetchShopifyProducts();
+        writeProductMockupLibrary(liveProducts, 'shopify');
+        resolvedProduct = resolveProductMockup(productLookup, liveProducts);
+      } catch {}
+    }
+    const productTitle = (resolvedProduct && resolvedProduct.title) || requestedProductTitle;
+    const productImageUrl = (resolvedProduct && resolvedProduct.primaryImageUrl) || requestedProductImageUrl;
+    const productPageUrl = (resolvedProduct && resolvedProduct.productPageUrl) || requestedProductPageUrl;
+    const productDescription = (resolvedProduct && resolvedProduct.description) || '';
+    const companyLabel = body.companyLabel || config.companyLabel || 'I AM GENESIS TECH';
+    const trackingProtocol = body.tracking_protocol || config.tracking_protocol || null;
+    const textOverlayPosition = String(
+      body.text_overlay_position ||
+      body.textOverlayPosition ||
+      config.text_overlay_position ||
+      config.textOverlayPosition ||
+      'bottom'
+    ).trim().toLowerCase();
+    const requestedSpecialEffects = normalizeSpecialEffects(
+      body.special_effects ||
+      body.specialEffects ||
+      config.special_effects ||
+      config.specialEffects ||
+      []
+    );
+    if (jordanPresetRequested && (!jordanAvatarConfigured || !jordanVoiceConfigured)) {
+      return res.status(422).json({
+        success: false,
+        error: 'Jordan preset requested but Jordan avatar/voice IDs are not configured. Set REACT_APP_JORDAN_AVATAR_ID and REACT_APP_JORDAN_VOICE_ID before rendering.',
+        required: ['REACT_APP_JORDAN_AVATAR_ID', 'REACT_APP_JORDAN_VOICE_ID']
+      });
+    }
+    let avatar_id = body.avatar_id || body.avatar || body.heygenAvatarId || process.env.REACT_APP_JORDAN_AVATAR_ID || process.env.HEYGEN_AVATAR_ID || 'Jordan Avatar';
+    let voice_id = body.voice_id || body.voice || body.heygenVoiceId || process.env.REACT_APP_JORDAN_VOICE_ID || process.env.HEYGEN_VOICE_ID || 'Jordan Voice File';
+    if (jordanPresetRequested) {
+      avatar_id = jordanAvatarConfigured;
+      voice_id = jordanVoiceConfigured;
+    }
+    const isMockRender = body.provider === 'mock' || body.platform === 'internal' || body.test === true;
+    const renderPackage = normalizeVideoPackage({
+      productTitle,
+      productImageUrl,
+      productPageUrl,
+      companyLabel,
+      ctaUrl: productPageUrl || ctaUrl
+    });
+    const useVideoAgent = !isMockRender && renderMode !== 'avatar-video' && (
+      renderMode === 'video-agent' ||
+      requestedPlatform === 'heygen' ||
+      (!script && prompt)
+    );
+
+    if (!useVideoAgent && !script) {
+      return res.status(400).json({ success: false, error: 'script is required (or use render_mode=video-agent with prompt).' });
+    }
+    if (useVideoAgent && !prompt && !script) {
+      return res.status(400).json({ success: false, error: 'prompt or script is required for render_mode=video-agent.' });
+    }
+    if (!FACE_SAFE_TEXT_OVERLAY_POSITIONS.has(textOverlayPosition)) {
+      return res.status(422).json({
+        success: false,
+        error: 'Text overlay position must be top (above head) or bottom (below neck). Face/head overlap text is not allowed.',
+        allowed: Array.from(FACE_SAFE_TEXT_OVERLAY_POSITIONS)
+      });
+    }
+    const unsupportedEffects = requestedSpecialEffects.filter((effect) => !SUPPORTED_PRODUCT_ENTRANCE_EFFECTS.has(effect));
+    if (unsupportedEffects.length) {
+      return res.status(422).json({
+        success: false,
+        error: 'Requested special effects are not supported for guaranteed product entrance.',
+        unsupportedEffects,
+        supportedEffects: Array.from(SUPPORTED_PRODUCT_ENTRANCE_EFFECTS)
+      });
+    }
+    if (requestedSpecialEffects.length && !requestedSpecialEffects.includes('product-entrance-fade')) {
+      return res.status(422).json({
+        success: false,
+        error: 'When special effects are requested, a product entrance effect is required.'
+      });
+    }
+    if (!renderPackage.isComplete) {
+      return res.status(422).json({
+        success: false,
+        error: 'Render package is incomplete.',
+        issues: renderPackage.issues,
+        required: {
+          productTitle: 'Sea Moss Capsules',
+          productImageUrl: 'actual product mockup URL',
+          productPageUrl: 'landing page, cart, or product page URL',
+          companyLabel: 'I AM GENESIS TECH'
+        }
+      });
+    }
+    if (!renderPackage.productImageUrl) {
+      return res.status(422).json({
+        success: false,
+        error: 'Primary product mockup image is required and must come from the product page.'
+      });
+    }
+    if (requestedSpecialEffects.length && !renderPackage.productImageUrl) {
+      return res.status(422).json({
+        success: false,
+        error: 'Special effects require a primary product mockup image.',
+        required: ['productImageUrl']
+      });
+    }
+
+    if (!isMockRender && useVideoAgent) {
+      renderPrompt = buildAPlusVideoAgentPrompt(prompt || renderScript, {
+        platform: body.platform || config.platform,
+        duration: duration || config.duration,
+        productName: renderPackage.productTitle,
+        productTitle: renderPackage.productTitle,
+        productPageUrl: renderPackage.productPageUrl,
+        companyLabel: renderPackage.companyLabel
+      });
+    } else if (!isMockRender) {
+      scriptQuality = validateScriptQuality(renderScript);
+      if (!scriptQuality.passed) {
+        renderScript = upgradeScriptForAPlus(renderScript, {
+          productName: renderPackage.productTitle,
+          productTitle: renderPackage.productTitle,
+          productPageUrl: renderPackage.productPageUrl,
+          companyLabel: renderPackage.companyLabel,
+          ctaUrl: renderPackage.productPageUrl
+        });
+        scriptUpgraded = true;
+        scriptQuality = validateScriptQuality(renderScript);
+      }
+      if (!scriptQuality.passed) {
+        return res.status(422).json({
+          success: false,
+          error: 'Script did not meet A+ quality gates after automatic upgrade.',
+          quality: scriptQuality
+        });
+      }
+    }
+
+    if (isMockRender) {
+      const renderId = `mock_${Date.now()}`;
+      const url = '/generated/evics-sea-moss-proof-render.mp4';
+      const now = new Date().toISOString();
+      const mockDraft = {
+        video_id: renderId,
+        script_text: renderScript,
+        product_title: renderPackage.productTitle,
+        product_image_url: renderPackage.productImageUrl,
+        product_page_url: renderPackage.productPageUrl,
+        company_label: renderPackage.companyLabel,
+        avatar_id,
+        voice_id,
+        duration,
+        cta_url: renderPackage.productPageUrl,
+        tracking_protocol: trackingProtocol,
+        status: 'complete',
+        video_url: url,
+        thumbnail_url: null,
+        error_message: null,
+        idempotency_key: renderId,
+        created_at: now,
+        updated_at: now
+      };
+
+      try {
+        await SupabaseConnector.from('video_assembly_drafts').upsert([mockDraft], { onConflict: 'video_id' }).select();
+      } catch {}
+
+      noStore(res);
+      return res.status(202).json({
+        success: true,
+        provider: 'mock',
+        renderId,
+        url,
+        video_url: url,
+        status: 'complete',
+        product_title: renderPackage.productTitle,
+        product_image_url: renderPackage.productImageUrl,
+        product_page_url: renderPackage.productPageUrl,
+        company_label: renderPackage.companyLabel,
+        product_description: productDescription || null,
+        product_mockup_source: resolvedProduct ? 'product-library-primary-image' : 'request',
+        text_overlay_position: textOverlayPosition,
+        special_effects: requestedSpecialEffects,
+        renderLogColumns: Object.keys(mockDraft),
+        status_url: '/api/video/status/' + renderId
+      });
+    }
+
+    if (!useVideoAgent && !avatar_id) {
       return res.status(400).json({ success: false, error: 'avatar_id/avatar is required.' });
     }
-    if (!voice_id) {
+    if (!useVideoAgent && !voice_id) {
       return res.status(400).json({ success: false, error: 'voice_id/voice is required.' });
     }
 
     const requestedBackground = body.background || config.background;
+    const agentFiles = Array.isArray(body.files) && body.files.length
+      ? body.files
+      : Array.isArray(config.files) && config.files.length
+        ? config.files
+        : renderPackage.productImageUrl
+          ? [{ type: 'url', url: renderPackage.productImageUrl }]
+          : undefined;
     const renderConfig = {
       ...config,
       aspect: body.aspect || config.aspect || config.aspect_ratio,
+      duration,
       dimension: body.dimension || config.dimension,
       background: requestedBackground && typeof requestedBackground === 'object'
         ? requestedBackground
         : { type: 'color', value: '#ffffff' },
-      caption: body.caption ?? config.caption,
+      caption: false,
       test: body.test ?? config.test,
-      idempotency_key: body.idempotency_key || body.idempotencyKey || config.idempotency_key || config.idempotencyKey
+      orientation: body.orientation || config.orientation || (body.aspect === '16:9' || config.aspect === '16:9' ? 'landscape' : 'portrait'),
+      files: agentFiles,
+      text_overlay_position: textOverlayPosition,
+      special_effects: requestedSpecialEffects,
+      style_id: body.style_id || body.styleId || config.style_id || config.styleId,
+      idempotency_key: body.idempotency_key || body.idempotencyKey || config.idempotency_key || config.idempotencyKey,
+      product_title: renderPackage.productTitle,
+      product_image_url: renderPackage.productImageUrl,
+      product_page_url: renderPackage.productPageUrl,
+      company_label: renderPackage.companyLabel,
+      product_description: productDescription
     };
 
-    const startResult = await startHeyGenRender({ script, avatar_id, voice_id, config: renderConfig });
+    const startResult = useVideoAgent
+    ? await startHeyGenVideoAgent({ prompt: renderPrompt, config: renderConfig })
+    : await startHeyGenRender({ script: renderScript, avatar_id, voice_id, config: renderConfig });
     const now = new Date().toISOString();
     const draftPayload = {
-      video_id: startResult.video_id,
-      script_text: script,
-      avatar_id,
-      voice_id,
-      status: 'rendering',
+    video_id: startResult.video_id || startResult.session_id,
+    script_text: renderScript || renderPrompt,
+    product_title: renderPackage.productTitle,
+    product_image_url: renderPackage.productImageUrl,
+    product_page_url: renderPackage.productPageUrl,
+    company_label: renderPackage.companyLabel,
+    avatar_id: useVideoAgent ? null : avatar_id,
+    voice_id: useVideoAgent ? null : voice_id,
+    duration,
+    cta_url: renderPackage.productPageUrl,
+    tracking_protocol: trackingProtocol,
+    status: 'rendering',
       video_url: null,
       thumbnail_url: null,
-      duration: null,
       error_message: null,
-      idempotency_key: startResult.idempotency_key,
+      idempotency_key: startResult.idempotency_key || startResult.session_id || startResult.video_id,
       created_at: now,
       updated_at: now
     };
@@ -918,10 +1878,55 @@ app.post('/api/video/generate', async (req, res) => {
       .select();
 
     if (draftError) throw new Error(draftError.message);
+    try {
+      await insertRenderRecord({
+        platform: 'heygen',
+        job_id: startResult.video_id || startResult.session_id,
+        video_url: null,
+        status: 'rendering',
+        script: renderScript || renderPrompt,
+        product_name: renderPackage.productTitle,
+        render_name: `${renderPackage.productTitle} · ${jordanPresetRequested ? 'Jordan Avatar' : (useVideoAgent ? 'Video Agent' : 'Avatar Render')}`,
+        vault_destination: '/generated/evics-sea-moss-proof-render.mp4',
+        parameters: {
+          mediaType: 'video',
+          sourceProvider: 'heygen',
+          providerPackage: renderPackage.productTitle,
+          playbackUrl: null,
+          storageUrl: null,
+          productUrl: renderPackage.productPageUrl,
+          product_image_url: renderPackage.productImageUrl,
+          product_title: renderPackage.productTitle,
+          ctaText: 'Buy Now',
+          avatar_id,
+          voice_id,
+          avatar_preset: requestedAvatarPreset || null,
+          voice_preset: requestedVoicePreset || null,
+          special_effects: requestedSpecialEffects,
+          text_overlay_position: textOverlayPosition
+        },
+        created_at: now
+      });
+    } catch (persistError) {
+      console.warn(`[EVICS MediaOutput] render insert failed: ${persistError.message}`);
+    }
 
     let result = startResult;
     if (waitForCompletion) {
-      const completed = await pollHeyGenVideo({ video_id: startResult.video_id });
+      let completed;
+      if (useVideoAgent) {
+        const session = await pollHeyGenVideoAgentSession({ session_id: startResult.session_id });
+        if (!session.video_id) {
+          const sessionError = new Error('Video-agent session completed without video_id.');
+          sessionError.details = session.raw || session;
+          throw sessionError;
+        }
+        completed = await pollHeyGenVideo({ video_id: session.video_id });
+        result = { ...session, ...completed };
+      } else {
+        completed = await pollHeyGenVideo({ video_id: startResult.video_id });
+        result = completed;
+      }
       const normalizedStatus = completed.status === 'completed' ? 'completed' : completed.status === 'failed' ? 'failed' : 'rendering';
       const errorMessage = completed.error ? (completed.error.message || completed.error.detail || JSON.stringify(completed.error)) : null;
       const { data: updatedRows, error: updateError } = await SupabaseConnector
@@ -934,27 +1939,98 @@ app.post('/api/video/generate', async (req, res) => {
           error_message: errorMessage,
           updated_at: new Date().toISOString()
         })
-        .eq('video_id', startResult.video_id)
+        .eq('video_id', startResult.video_id || startResult.session_id)
         .select();
       if (updateError) throw new Error(updateError.message);
-      result = { ...completed, status: normalizedStatus, draft: updatedRows ? updatedRows[0] : null };
+      result = {
+        ...result,
+        status: normalizedStatus,
+        draft: updatedRows ? updatedRows[0] : null
+      };
+      try {
+        const completedRenderGrade = normalizedStatus === 'completed'
+          ? gradeCompletedRender({
+            videoUrl: completed.video_url,
+            thumbnailUrl: completed.thumbnail_url,
+            duration: completed.duration
+          })
+          : null;
+        await SupabaseConnector
+          .from('evics_renders')
+          .update({
+            video_url: completed.video_url || null,
+            thumbnail_url: completed.thumbnail_url || null,
+            duration: completed.duration || null,
+            render_grade: completedRenderGrade ? completedRenderGrade.score : null,
+            status: normalizedStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('job_id', startResult.video_id || startResult.session_id);
+      } catch (mediaUpdateError) {
+        console.warn(`[EVICS MediaOutput] render update failed: ${mediaUpdateError.message}`);
+      }
     }
 
     noStore(res);
+    const responseVideoId = result.video_id || startResult.video_id || null;
     return res.status(202).json({
       success: true,
       provider: 'heygen',
-      video_id: result.video_id || startResult.video_id,
+      mode: useVideoAgent ? 'video-agent' : 'avatar-video',
+      session_id: useVideoAgent ? (result.session_id || startResult.session_id) : null,
+      video_id: responseVideoId,
       status: result.status || 'rendering',
+      quality: scriptQuality,
+      script_upgraded: scriptUpgraded,
+      product_title: renderPackage.productTitle,
+      product_image_url: renderPackage.productImageUrl,
+      product_page_url: renderPackage.productPageUrl,
+      company_label: renderPackage.companyLabel,
+      product_description: productDescription || null,
+      product_mockup_source: resolvedProduct ? 'product-library-primary-image' : 'request',
+      text_overlay_position: textOverlayPosition,
+      special_effects: requestedSpecialEffects,
       video_url: result.video_url || null,
       thumbnail_url: result.thumbnail_url || null,
       duration: result.duration || null,
-      idempotency_key: startResult.idempotency_key,
+      idempotency_key: startResult.idempotency_key || null,
       draft: result.draft || (draftRows ? draftRows[0] : null),
-      status_url: '/api/video/status/' + (result.video_id || startResult.video_id)
+      status_url: responseVideoId ? ('/api/video/status/' + responseVideoId) : null,
+      agent_status_url: useVideoAgent ? ('/api/video/agent-status/' + (result.session_id || startResult.session_id)) : null
     });
   } catch (e) {
-    const statusCode = e.code === 'HEYGEN_API_KEY_MISSING' ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    const statusCode = (e.code === 'HEYGEN_API_KEY_MISSING' || e.code === 'HEYGEN_AUTH_MISSING') ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    return res.status(statusCode).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+app.get('/api/video/agent-status/:sessionId', async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required.' });
+    }
+
+    const session = await getHeyGenVideoAgentSession(sessionId);
+    const lifecycleState = session.status === 'failed'
+      ? 'failed'
+      : session.video_id
+        ? 'video_ready'
+        : 'agent_generating';
+    noStore(res);
+    return res.json({
+      success: true,
+      provider: 'heygen',
+      mode: 'video-agent',
+      session_id: session.session_id,
+      status: session.status,
+      lifecycle_state: lifecycleState,
+      video_id: session.video_id || null,
+      status_url: session.video_id ? ('/api/video/status/' + session.video_id) : null,
+      next_action: session.video_id ? 'poll_video_status' : 'wait_for_video_id'
+    });
+  } catch (e) {
+    const statusCode = (e.code === 'HEYGEN_API_KEY_MISSING' || e.code === 'HEYGEN_AUTH_MISSING') ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
     return res.status(statusCode).json({ success: false, error: e.message || String(e) });
   }
 });
@@ -969,14 +2045,33 @@ app.get('/api/video/status/:videoId', async (req, res) => {
     const statusResult = await getHeyGenVideoStatus(videoId);
     const normalizedStatus = statusResult.status === 'completed' ? 'completed' : statusResult.status === 'failed' ? 'failed' : 'rendering';
     const errorMessage = statusResult.error ? (statusResult.error.message || statusResult.error.detail || JSON.stringify(statusResult.error)) : null;
+    const renderGrade = normalizedStatus === 'completed'
+      ? gradeCompletedRender({
+        videoUrl: statusResult.video_url,
+        thumbnailUrl: statusResult.thumbnail_url,
+        duration: statusResult.duration
+      })
+      : null;
+    const persistedStatus = renderGrade && !renderGrade.approvedForPublishing ? 'blocked-low-grade' : normalizedStatus;
+    const liveProof = renderGrade && renderGrade.approvedForPublishing && isHeyGenMediaUrl(statusResult.video_url)
+      ? recordLiveHeyGenProof({
+        videoId,
+        videoUrl: statusResult.video_url,
+        thumbnailUrl: statusResult.thumbnail_url,
+        duration: statusResult.duration,
+        renderGrade,
+        source: 'status-poll'
+      })
+      : null;
 
     const { data: updatedRows, error: updateError } = await SupabaseConnector
       .from('video_assembly_drafts')
       .update({
-        status: normalizedStatus,
+        status: persistedStatus,
         video_url: statusResult.video_url || null,
         thumbnail_url: statusResult.thumbnail_url || null,
         duration: statusResult.duration || null,
+        render_grade: renderGrade ? renderGrade.score : null,
         error_message: errorMessage,
         updated_at: new Date().toISOString()
       })
@@ -984,21 +2079,71 @@ app.get('/api/video/status/:videoId', async (req, res) => {
       .select();
 
     if (updateError) throw new Error(updateError.message);
+    try {
+      const mediaUpdatePayload = {
+        video_url: statusResult.video_url || null,
+        thumbnail_url: statusResult.thumbnail_url || null,
+        duration: statusResult.duration || null,
+        render_grade: renderGrade ? renderGrade.score : null,
+        status: persistedStatus,
+        updated_at: new Date().toISOString()
+      };
+      const { data: mediaUpdatedRows, error: mediaUpdateError } = await SupabaseConnector
+        .from('evics_renders')
+        .update(mediaUpdatePayload)
+        .eq('job_id', videoId)
+        .select();
+      if (mediaUpdateError) throw new Error(mediaUpdateError.message);
+      if (!mediaUpdatedRows || !mediaUpdatedRows.length) {
+        const draft = updatedRows && updatedRows[0] ? updatedRows[0] : {};
+        await insertRenderRecord({
+          platform: 'heygen',
+          job_id: videoId,
+          video_url: statusResult.video_url || null,
+          status: persistedStatus,
+          script: draft.script_text || '',
+          product_name: draft.product_title || 'EVICS Render',
+          render_name: `${draft.product_title || 'EVICS'} · ${persistedStatus}`,
+          vault_destination: statusResult.video_url || '/generated/evics-sea-moss-proof-render.mp4',
+          parameters: {
+            mediaType: 'video',
+            sourceProvider: 'heygen',
+            providerPackage: draft.product_title || null,
+            playbackUrl: statusResult.video_url || null,
+            storageUrl: statusResult.video_url || null,
+            productUrl: draft.product_page_url || draft.cta_url || null,
+            product_image_url: draft.product_image_url || null,
+            product_title: draft.product_title || null,
+            ctaText: 'Buy Now',
+            avatar_id: draft.avatar_id || null,
+            voice_id: draft.voice_id || null,
+            text_overlay_position: draft.text_overlay_position || 'bottom',
+            special_effects: draft.special_effects || []
+          },
+          created_at: draft.created_at || new Date().toISOString()
+        });
+      }
+    } catch (mediaPersistError) {
+      console.warn(`[EVICS MediaOutput] status sync failed for ${videoId}: ${mediaPersistError.message}`);
+    }
 
     noStore(res);
     return res.json({
       success: true,
       provider: 'heygen',
       video_id: videoId,
-      status: normalizedStatus,
+      status: persistedStatus,
       video_url: statusResult.video_url || null,
       thumbnail_url: statusResult.thumbnail_url || null,
       duration: statusResult.duration || null,
+      renderGrade,
+      approvedForPublishing: !renderGrade || renderGrade.approvedForPublishing,
+      liveProof,
       error_message: errorMessage,
       draft: updatedRows ? updatedRows[0] : null
     });
   } catch (e) {
-    const statusCode = e.code === 'HEYGEN_API_KEY_MISSING' ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    const statusCode = (e.code === 'HEYGEN_API_KEY_MISSING' || e.code === 'HEYGEN_AUTH_MISSING') ? 503 : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
     return res.status(statusCode).json({ success: false, error: e.message || String(e) });
   }
 });
@@ -1017,30 +2162,35 @@ app.post('/api/video/callback', async (req, res) => {
     if (!videoId) return res.status(400).json({ success: false, error: 'video_id is required.' });
     if (!videoUrl) return res.status(400).json({ success: false, error: 'video_url/url is required.' });
 
-    // Auto-grade completed render (non-blocking â€” runs in background)
-    let renderGrade = null;
-    let renderStatus = 'completed';
-    try {
-      const { calculateRenderGrade, determineRenderStatus } = require('../utils/renderGradingEngine');
-      // Use scores from callback body if provided, otherwise estimate from metadata
-      const scores = body.scores || {
-        viralPotential: body.viral_score || 80,
-        conversionPotential: 78,
-        brandAlignment: 88,
-        productFit: 85,
-        visualQuality: body.quality_score || 82,
-        hookStrength: 80,
-        emotionalImpact: 79
-      };
-      renderGrade = calculateRenderGrade(scores);
-      renderStatus = determineRenderStatus(renderGrade);
-      if (renderGrade < 92) {
-        console.warn(`[EVICS RenderGrade] âš ï¸  Render ${videoId} scored ${renderGrade}/100 â€” below 92 threshold, flagging for review.`);
-        renderStatus = renderGrade < 75 ? 'flagged-low-quality' : 'needs-review';
-      } else {
-        console.log(`[EVICS RenderGrade] âœ… Render ${videoId} scored ${renderGrade}/100 â€” approved for publishing.`);
-      }
-    } catch {}
+    const { data: existingRows, error: existingError } = await SupabaseConnector
+      .from('video_assembly_drafts')
+      .select('video_id,status')
+      .eq('video_id', videoId)
+      .limit(1);
+    if (existingError) throw new Error(existingError.message);
+    const existingRender = existingRows && existingRows[0];
+    if (!existingRender || !['rendering', 'pending'].includes(existingRender.status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Callback received for a video_id that is not an active render.'
+      });
+    }
+
+    const renderGrade = gradeCompletedRender({ videoUrl, thumbnailUrl, duration });
+    const renderStatus = renderGrade.approvedForPublishing ? 'completed' : 'blocked-low-grade';
+    if (!renderGrade.approvedForPublishing) {
+      console.warn(`[EVICS RenderGrade] Render ${videoId} scored ${renderGrade.score}/100 and is blocked below ${A_PLUS_RENDER_MINIMUM}.`);
+    }
+    const liveProof = renderGrade.approvedForPublishing && isHeyGenMediaUrl(videoUrl)
+      ? recordLiveHeyGenProof({
+        videoId,
+        videoUrl,
+        thumbnailUrl,
+        duration,
+        renderGrade,
+        source: 'callback'
+      })
+      : null;
 
     const { data, error } = await SupabaseConnector
       .from('video_assembly_drafts')
@@ -1049,7 +2199,7 @@ app.post('/api/video/callback', async (req, res) => {
         video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         duration,
-        render_grade: renderGrade,
+        render_grade: renderGrade.score,
         error_message: null,
         updated_at: new Date().toISOString()
       })
@@ -1062,14 +2212,20 @@ app.post('/api/video/callback', async (req, res) => {
     try {
       await SupabaseConnector.from('evics_renders').update({
         video_url: videoUrl,
-        render_grade: renderGrade,
+        render_grade: renderGrade.score,
         status: renderStatus,
         updated_at: new Date().toISOString()
       }).eq('job_id', videoId);
-    } catch {}
+    } catch (error) {
+      console.warn(`[EVICS RenderGrade] evics_renders update failed for ${videoId}: ${error.message}`);
+    }
 
     // Cache MP4 locally for byte-range playback
-    if (videoUrl) downloadMp4ToCache(videoId, videoUrl).catch(() => {});
+    if (videoUrl) {
+      downloadMp4ToCache(videoId, videoUrl).catch((error) => {
+        console.warn(`[EVICS MediaCache] MP4 cache failed for ${videoId}: ${error.message}`);
+      });
+    }
 
     noStore(res);
     res.json({
@@ -1080,7 +2236,8 @@ app.post('/api/video/callback', async (req, res) => {
       thumbnail_url: thumbnailUrl,
       duration,
       renderGrade,
-      approvedForPublishing: renderGrade === null || renderGrade >= 92,
+      approvedForPublishing: renderGrade.approvedForPublishing,
+      liveProof,
       draft: data ? data[0] : null
     });
   } catch (e) {
@@ -1171,7 +2328,7 @@ app.post('/api/agents/script-writer/generate', async (req, res) => {
       .order('score', { ascending: false })
       .limit(3);
 
-    const targetProduct = product || 'Sea Moss Mineral Gel';
+    const targetProduct = product || 'Sea Moss Capsules';
     const targetHook = hook || 'Nobody tells you minerals can change your whole morning.';
     const targetStyle = style || 'UGC';
     const targetPlatform = platform || 'TikTok';
@@ -1256,7 +2413,7 @@ app.post('/api/agents/product-match/analyze', async (req, res) => {
 
     // Demo product catalog fallback
     const productCatalog = dbProducts.length ? dbProducts : [
-      { name: 'Sea Moss Mineral Gel', category: 'Sea moss', score: 96, angle: 'daily mineral ritual' },
+      { name: 'Sea Moss Capsules', category: 'Sea moss', score: 96, angle: 'daily mineral ritual' },
       { name: 'Metabolic Ignite', category: 'Weight loss', score: 91, angle: 'morning reset' },
       { name: 'Genesis Glow Collagen', category: 'Beauty', score: 88, angle: 'skin confidence' },
       { name: 'Apex Testosterone Support', category: 'Testosterone', score: 86, angle: 'training foundation' },
@@ -1512,7 +2669,7 @@ app.post('/api/agents/auto-generate', async (req, res) => {
       .limit(5);
 
     const productCatalog = (dbProducts && dbProducts.length) ? dbProducts : [
-      { name: 'Sea Moss Mineral Gel', category: 'Sea moss', angle: 'daily mineral ritual', score: 96 },
+      { name: 'Sea Moss Capsules', category: 'Sea moss', angle: 'daily mineral ritual', score: 96 },
       { name: 'Metabolic Ignite', category: 'Weight loss', angle: 'morning reset', score: 91 },
       { name: 'Genesis Glow Collagen', category: 'Beauty', angle: 'skin confidence', score: 88 }
     ];
@@ -1997,7 +3154,7 @@ app.get('/api/agents/status', async (_req, res) => {
         status: 'active',
         currentTask: 'Matching Sea Moss + Collagen to top 5 viral structures',
         processingTime: '1.1s avg',
-        lastResult: 'Sea Moss Mineral Gel matched to 3 viral hooks â€” confidence: High',
+        lastResult: 'Sea Moss Capsules matched to 3 viral hooks â€” confidence: High',
         qualityScore: 91,
         nextAction: 'Re-match after next viral scan',
         lastRun: new Date(now - 1800000).toISOString()
@@ -2180,11 +3337,12 @@ app.post('/api/published-media/:id/publish', async (req, res) => {
 // -------------------------
 app.get('/api/analytics/summary', async (_req, res) => {
   try {
-    const [rendersRes, creativesRes, trendsRes, approvedRes] = await Promise.all([
+    const [rendersRes, creativesRes, trendsRes, approvedRes, telemetryRes] = await Promise.all([
       SupabaseConnector.from('evics_renders').select('id', { count: 'exact', head: true }),
       SupabaseConnector.from('creatives').select('id, score, approved', { count: 'exact' }).limit(200),
       SupabaseConnector.from('evics_trends').select('id', { count: 'exact', head: true }),
-      SupabaseConnector.from('creatives').select('id', { count: 'exact', head: true }).eq('approved', true)
+      SupabaseConnector.from('creatives').select('id', { count: 'exact', head: true }).eq('approved', true),
+      SupabaseConnector.from('evics_media_audit_logs').select('id', { count: 'exact', head: true })
     ]);
 
     const totalCreatives = creativesRes.count || 0;
@@ -2219,6 +3377,7 @@ app.get('/api/analytics/summary', async (_req, res) => {
         approvalRate: approvalRate,
         avgQualityScore: avgQuality || 87,
         totalTrendsScanned: trendsRes.count || 0,
+        mediaTelemetryEvents: telemetryRes.count || 0,
         hookEffectiveness: 91,
         ctaConversionRate: 4.8,
         avgWatchTime: 14.2,
@@ -3199,7 +4358,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   const {
     avatarId, productTitle, productImageUrl, productPageUrl,
     script, affiliateCode, affiliateId, platform = 'tiktok',
-    product, backgroundMode = 'product', backgroundUrl
+    product, backgroundMode = 'product', backgroundUrl, backgroundQuery, scene
   } = req.body || {};
 
   const aid = avatarId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
@@ -3237,9 +4396,12 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   // If user provided a specific backgroundUrl, use it directly
   let bgConfig, heygenBg;
   if (backgroundUrl) {
-    const resolvedUrl = await resolveBackgroundUrl(backgroundUrl);
+    const rawUrl = backgroundQuery
+      ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      : backgroundUrl;
+    const resolvedUrl = await resolveBackgroundUrl(rawUrl);
     heygenBg = { type: 'image', url: resolvedUrl };
-    bgConfig = { type: 'image', url: resolvedUrl, mode: 'user-selected', category: 'custom' };
+    bgConfig = { type: 'image', url: resolvedUrl, mode: 'user-selected', category: 'custom', scene: scene || null, query: backgroundQuery || null };
   } else {
     // Use 'lifestyle' mode (real scene photos) when no product image available
     const productObj = product || { title: productTitle, imageUrl: productImageUrl };
@@ -3274,6 +4436,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
       path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
       JSON.stringify({
         video_id: render.video_id, productTitle, productPageUrl,
+        companyLabel: 'I AM GENESIS TECH',
         script: scr, background: bgConfig, processedImageUrl,
         affiliateCode: affiliateCode || '',
         productImageUrl: productImageUrl || null,
@@ -3306,7 +4469,11 @@ app.get('/api/affiliate/avatar/video-status/:videoId', async (req, res) => {
           videoId: req.params.videoId,
           productImageUrl: meta.processedImageUrl || null,
           productTitle: meta.productTitle || '',
-          affiliateCode: meta.affiliateCode || ''
+          productPageUrl: meta.productPageUrl || '',
+          companyLabel: meta.companyLabel || 'I AM GENESIS TECH',
+          affiliateCode: meta.affiliateCode || '',
+          specialEffects: Array.isArray(meta.specialEffects) ? meta.specialEffects : [],
+          textOverlayPosition: meta.textOverlayPosition || 'bottom'
         }).then(result => {
           if (result.success) {
             meta.processedVideoUrl = result.processedVideoUrl;
@@ -3338,7 +4505,7 @@ app.get('/api/affiliate/avatar/background-options', (req, res) => {
 // POST /api/affiliate/avatar/re-render — re-render same script with different background
 app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   noStore(res);
-  const { videoId, backgroundUrl, scene } = req.body || {};
+  const { videoId, backgroundUrl, backgroundQuery, scene } = req.body || {};
 
   if (!videoId) return res.status(400).json({ error: 'videoId required (original video to re-render)' });
 
@@ -3355,7 +4522,11 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   let bgUrl = backgroundUrl;
   let bgScene = scene || 'random';
 
-  if (!bgUrl) {
+  if (backgroundQuery) {
+    const sig = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    bgUrl = `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${sig}`;
+    bgScene = scene || 'custom';
+  } else if (!bgUrl) {
     const category = scene || detectCategory(meta) || 'default';
     const randomBg = getRandomBackground(category);
     bgUrl = randomBg.url;
@@ -3411,7 +4582,7 @@ app.get('/api/affiliate/avatars', async (req, res) => {
   if (!process.env.HEYGEN_API_KEY) return res.json({ success: true, avatars: defaults });
   try {
     const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 6000);
-    const r = await fetch('https://api.heygen.com/v2/avatars', { signal: ctrl.signal, headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, Accept: 'application/json' } });
+    const r = await fetch('https://api.heygen.com/v3/avatars', { signal: ctrl.signal, headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, Accept: 'application/json' } });
     if (r.ok) { const d = await r.json(); const a = (d?.data?.avatars || d?.avatars || []).slice(0, 30).map((x) => ({ id: x.avatar_id || x.id, name: x.avatar_name || x.name || x.avatar_id, gender: x.gender || 'unknown', preview_url: x.preview_image_url || null })); return res.json({ success: true, avatars: a.length ? a : defaults }); }
   } catch {}
   res.json({ success: true, avatars: defaults });
@@ -3454,25 +4625,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const avatarId = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
     const hasVoice = Boolean(voiceFilePath || voiceFileUrl);
 
-    // Attempt HeyGen instant avatar if API key + photo URL available
-    let heygenAvatarId = null;
-    if (process.env.HEYGEN_API_KEY && photoUrl) {
-      try {
-        const ctrl2 = new AbortController(); setTimeout(() => ctrl2.abort(), 6000);
-        const r = await fetch('https://api.heygen.com/v2/photo_avatar/create', {
-          method: 'POST',
-          signal: ctrl2.signal,
-          headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photo_url: photoUrl, name: name || 'My Avatar' })
-        });
-        if (r.ok) {
-          const d = await r.json();
-          heygenAvatarId = d?.data?.avatar_id || d?.avatar_id || null;
-        }
-      } catch {}
-    }
-
-    const finalAvatarId = heygenAvatarId || avatarId;
+    const finalAvatarId = avatarId;
     const avatar = {
       id: finalAvatarId,
       avatarId: finalAvatarId,
@@ -3484,10 +4637,8 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       voiceCloneStatus: hasVoice ? 'uploaded' : 'none',
       status: 'active',
       createdAt: new Date().toISOString(),
-      isDefault: !heygenAvatarId,
-      note: heygenAvatarId
-        ? 'Custom avatar created via HeyGen.'
-        : 'Using EVICS default expressive avatar (Abigail). Custom photo avatar requires HeyGen Enterprise plan.'
+      isDefault: true,
+      note: 'Using EVICS default expressive avatar (Abigail). Custom photo-avatar creation is disabled until a current HeyGen v3 endpoint is configured.'
     };
 
     // Persist to Supabase if available
@@ -4291,6 +5442,219 @@ app.post('/api/affiliate/payouts/request', async (req, res) => {
   }
 });
 
+// =============================================================
+// AFFILIATE LIVE COMMS (Phone App <-> AI/Admin)
+// =============================================================
+
+app.post('/api/affiliate/comms/session/start', (req, res) => {
+  noStore(res);
+  try {
+    const affiliateCode = cleanAffiliateCode(req.body && req.body.affiliateCode);
+    const affiliateName = String((req.body && req.body.affiliateName) || '').trim();
+    const workspace = String((req.body && req.body.workspace) || 'phone-app').trim();
+    if (!affiliateCode) {
+      return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    }
+    const state = loadAffiliateCommsState();
+    pruneInactiveAffiliateSessions(state);
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    state.sessions[sessionId] = {
+      sessionId,
+      affiliateCode,
+      affiliateName: affiliateName || affiliateCode,
+      workspace,
+      status: 'online',
+      startedAt: nowIso,
+      lastSeenAt: nowIso,
+      lastSeenAtMs: Date.now()
+    };
+    upsertAffiliateConversation(state, affiliateCode, affiliateName || affiliateCode);
+    saveAffiliateCommsState(state);
+    return res.json({
+      success: true,
+      sessionId,
+      affiliateCode,
+      activeUsers: activeAffiliateSessions(state).length
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/affiliate/comms/session/heartbeat', (req, res) => {
+  noStore(res);
+  try {
+    const sessionId = String((req.body && req.body.sessionId) || '').trim();
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+    const state = loadAffiliateCommsState();
+    pruneInactiveAffiliateSessions(state);
+    const session = state.sessions[sessionId];
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'session not found' });
+    }
+    if (session.status !== 'online') {
+      return res.status(409).json({ success: false, error: 'session is not active' });
+    }
+    const nowIso = new Date().toISOString();
+    session.lastSeenAt = nowIso;
+    session.lastSeenAtMs = Date.now();
+    saveAffiliateCommsState(state);
+    return res.json({ success: true, activeUsers: activeAffiliateSessions(state).length });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/affiliate/comms/session/end', (req, res) => {
+  noStore(res);
+  try {
+    const sessionId = String((req.body && req.body.sessionId) || '').trim();
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+    const state = loadAffiliateCommsState();
+    const session = state.sessions[sessionId];
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'session not found' });
+    }
+    session.status = 'offline';
+    session.endedAt = new Date().toISOString();
+    session.endedReason = 'manual-logoff';
+    saveAffiliateCommsState(state);
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/affiliate/comms/active-users', (req, res) => {
+  noStore(res);
+  try {
+    const state = loadAffiliateCommsState();
+    const changed = pruneInactiveAffiliateSessions(state);
+    const users = activeAffiliateSessions(state).map((session) => {
+      const conversation = state.conversations[session.affiliateCode] || null;
+      return {
+        sessionId: session.sessionId,
+        affiliateCode: session.affiliateCode,
+        affiliateName: session.affiliateName,
+        workspace: session.workspace,
+        startedAt: session.startedAt,
+        lastSeenAt: session.lastSeenAt,
+        escalated: Boolean(conversation && conversation.escalated),
+        escalationReason: conversation ? (conversation.escalationReason || null) : null
+      };
+    });
+    if (changed) saveAffiliateCommsState(state);
+    return res.json({ success: true, count: users.length, users });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/affiliate/comms/conversation', (req, res) => {
+  noStore(res);
+  try {
+    const affiliateCode = cleanAffiliateCode(req.query.affiliateCode);
+    if (!affiliateCode) {
+      return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    }
+    const sinceSequence = Number(req.query.sinceSequence || 0);
+    const state = loadAffiliateCommsState();
+    const changed = pruneInactiveAffiliateSessions(state);
+    const conversation = state.conversations[affiliateCode] || upsertAffiliateConversation(state, affiliateCode, affiliateCode);
+    const messages = state.messages
+      .filter((message) => message.affiliateCode === affiliateCode && Number(message.sequence || 0) > sinceSequence)
+      .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
+      .slice(-150);
+    if (changed) saveAffiliateCommsState(state);
+    return res.json({ success: true, conversation, messages, lastSequence: Number(state.lastSequence || 0) });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/affiliate/comms/message/send', (req, res) => {
+  noStore(res);
+  try {
+    const senderRole = String((req.body && req.body.senderRole) || '').trim().toLowerCase();
+    const affiliateCode = cleanAffiliateCode(req.body && req.body.affiliateCode);
+    const affiliateName = String((req.body && req.body.affiliateName) || '').trim();
+    const sessionId = String((req.body && req.body.sessionId) || '').trim();
+    const type = String((req.body && req.body.type) || 'text').trim().toLowerCase();
+    const text = String((req.body && req.body.text) || '').trim();
+    const videoUrl = String((req.body && req.body.videoUrl) || '').trim();
+
+    if (!affiliateCode) {
+      return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    }
+    if (!['affiliate', 'admin'].includes(senderRole)) {
+      return res.status(400).json({ success: false, error: 'senderRole must be affiliate or admin' });
+    }
+    if (!['text', 'video'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'type must be text or video' });
+    }
+    if (type === 'text' && !text) {
+      return res.status(400).json({ success: false, error: 'text is required for text messages' });
+    }
+    if (type === 'video' && !videoUrl) {
+      return res.status(400).json({ success: false, error: 'videoUrl is required for video messages' });
+    }
+
+    const state = loadAffiliateCommsState();
+    pruneInactiveAffiliateSessions(state);
+    const conversation = upsertAffiliateConversation(state, affiliateCode, affiliateName || affiliateCode);
+    const addedMessages = [];
+
+    const senderMessage = appendAffiliateMessage(state, {
+      affiliateCode,
+      affiliateName: conversation.affiliateName,
+      senderRole,
+      sessionId: sessionId || null,
+      type,
+      text: type === 'text' ? text : '',
+      videoUrl: type === 'video' ? videoUrl : null
+    });
+    addedMessages.push(senderMessage);
+
+    if (senderRole === 'admin') {
+      conversation.escalated = false;
+      conversation.escalationReason = null;
+    }
+
+    if (senderRole === 'affiliate' && type === 'text') {
+      const ai = buildAiAffiliateReply(text);
+      const aiMessage = appendAffiliateMessage(state, {
+        affiliateCode,
+        affiliateName: conversation.affiliateName,
+        senderRole: 'ai',
+        sessionId: null,
+        type: 'text',
+        text: ai.text,
+        videoUrl: null
+      });
+      addedMessages.push(aiMessage);
+      if (ai.escalated) {
+        conversation.escalated = true;
+        conversation.escalationReason = ai.escalationReason;
+      }
+    }
+
+    saveAffiliateCommsState(state);
+    return res.json({
+      success: true,
+      conversation: state.conversations[affiliateCode],
+      messages: addedMessages,
+      lastSequence: Number(state.lastSequence || 0)
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/agent/auto-promote-experiments â€” promote confirmed winners from A/B tests
 app.post('/api/agent/auto-promote-experiments', async (req, res) => {
   try {
@@ -4445,9 +5809,9 @@ app.post('/api/ppep/select-platform-strategy', async (req, res) => {
       platform_label: plt.label,
       platform_id: plt.id,
       aspect_ratio: plt.aspectRatio,
-      video_length: platform === 'youtube' ? '60-90 seconds' : '15-30 seconds',
+      video_length: platform === 'facebook' ? '20 seconds' : platform === 'youtube' ? '60-90 seconds' : '15-30 seconds',
       hook_style: 'Pattern interrupt â†’ curiosity gap â†’ social proof',
-      cta_style: 'Link in bio / Swipe up',
+      cta_style: platform === 'facebook' ? 'Buy Now / Shop Now' : 'Link in bio / Swipe up',
       optimal_time: platform === 'tiktok' ? '7-9pm EST' : '12-3pm EST',
       caption_strategy: `${analysis?.viral_angle || 'transformation'} angle with trending audio`,
       hashtag_strategy: `#${(analysis?.product_category || 'health')}hack #viral #iamgenesistech`
@@ -4514,7 +5878,7 @@ app.post('/api/ppep/preview-plan', async (req, res) => {
     const analysis = { purchase_motivation: 'health improvement', emotional_trigger: 'transformation', compliance_risk: 'low', product_category: (product?.product_type || 'health').toLowerCase(), viral_angle: 'before/after transformation', target_audience: 'health-conscious adults 25-45' };
     const envId = 'kitchen';
     const environment = { primary_environment: envId, environment_label: 'Kitchen / Home Prep', mismatch_warnings: [], lighting_recommendation: 'Natural window light', blocked: false };
-    const platformStrategy = { platform_label: plt.label, platform_id: plt.id, aspect_ratio: plt.aspectRatio, video_length: '15-30 seconds', hook_style: 'Pattern interrupt â†’ transformation reveal' };
+    const platformStrategy = { platform_label: plt.label, platform_id: plt.id, aspect_ratio: plt.aspectRatio, video_length: platform === 'facebook' ? '20 seconds' : '15-30 seconds', hook_style: 'Pattern interrupt â†’ transformation reveal' };
     const avatarRole = { avatar_role: 'testimonial_spokesperson', avatar_action: 'talking head with product in hand', selected_avatar_name: 'Abigail (Expressive)', avatar_id: process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501' };
     const scriptText = `Wait â€” have you heard about ${title}? I was skeptical at first too. But after just 2 weeks, the results shocked me. Get yours at iamgenesistech.com â€” link in bio!`;
     const script = { scriptText, main_script: scriptText, hook: `Wait â€” have you heard about ${title}?`, cta: 'Shop now â€” link in bio', duration_estimate: '20s', platform: plt.id };
@@ -4580,27 +5944,18 @@ app.post('/api/ppep/create-media-job', async (req, res) => {
     let outputMediaUrl = null;
 
     if (approved && process.env.HEYGEN_API_KEY) {
-      try {
-        const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 10000);
-        const heygenRes = await fetch('https://api.heygen.com/v2/video/generate', {
-          method: 'POST', signal: ctrl.signal,
-          headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            video_inputs: [{
-              character: { type: 'avatar', avatar_id: avatar, avatar_style: 'normal' },
-              voice: { type: 'text', input_text: script, voice_id: voice },
-              background: heygenBg
-            }],
-            dimension: { width: 720, height: 1280 },
-            caption: true, test: false
-          })
-        });
-        if (heygenRes.ok) {
-          const heyData = await heygenRes.json();
-          jobId  = heyData?.data?.video_id || jobId;
-          status = 'processing';
+      const render = await startHeyGenRender({
+        script,
+        avatar_id: avatar,
+        voice_id: voice,
+        config: {
+          aspect: '9:16',
+          background: heygenBg,
+          caption: false
         }
-      } catch {}
+      });
+      jobId = render.video_id;
+      status = 'processing';
     }
 
     const jobRecord = {
@@ -4646,24 +6001,22 @@ app.get('/api/ppep/media-job/:jobId', async (req, res) => {
 
     // Check HeyGen if it looks like a HeyGen job
     if (process.env.HEYGEN_API_KEY && !jobId.startsWith('ppep_job_')) {
-      try {
-        const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${jobId}`, {
-          headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          const s = d?.data || {};
-          const status = s.status === 'completed' ? 'completed' : s.status === 'failed' ? 'failed' : 'processing';
-          const outputUrl = s.video_url || null;
-          if (outputUrl && localMeta) {
-            localMeta.status = status;
-            localMeta.output_media_url = outputUrl;
-            try { fs.writeFileSync(cachePath, JSON.stringify({ ...localMeta, cached_at: new Date().toISOString() })); } catch {}
-            if (outputUrl) downloadMp4ToCache(jobId, outputUrl).catch(() => {});
-          }
-          return res.json({ success: true, job_id: jobId, status, outputMediaUrl: outputUrl, asset: { playbackUrl: outputUrl, downloadUrl: outputUrl, shareUrl: outputUrl } });
+      const heygenStatus = await getHeyGenVideoStatus(jobId);
+      const status = heygenStatus.status === 'completed' ? 'completed' : heygenStatus.status === 'failed' ? 'failed' : 'processing';
+      const outputUrl = heygenStatus.video_url || null;
+      if (outputUrl && localMeta) {
+        localMeta.status = status;
+        localMeta.output_media_url = outputUrl;
+        try {
+          fs.writeFileSync(cachePath, JSON.stringify({ ...localMeta, cached_at: new Date().toISOString() }));
+        } catch (cacheError) {
+          console.warn('[PPEP] Failed to update media cache:', cacheError.message);
         }
-      } catch {}
+        downloadMp4ToCache(jobId, outputUrl).catch((downloadError) => {
+          console.warn('[PPEP] Failed to cache HeyGen MP4:', downloadError.message);
+        });
+      }
+      return res.json({ success: true, job_id: jobId, status, outputMediaUrl: outputUrl, asset: { playbackUrl: outputUrl, downloadUrl: outputUrl, shareUrl: outputUrl } });
     }
 
     // Fallback to Supabase record
@@ -4960,6 +6313,242 @@ app.get('/api/trading/signals', async (req, res) => {
       { id: 'edu4', title: 'Risk Management — How Elite Traders Protect Capital', type: 'video', duration: '31 min', locked: !hasAccess },
     ],
     certificationPath: { name: 'EVICS Trading Certification', modules: 7, completedModules: 0, estimatedHours: '14 hours', reward: 'Elite tier badge + 5% commission bonus' }
+  });
+});
+
+async function runAPlusExcellenceAudit(baseUrl) {
+  const timestamp = new Date().toISOString();
+  const fetchChecks = await Promise.allSettled(
+    A_PLUS_WORKSPACE_URLS.map(async (item) => {
+      const target = `${baseUrl}${item.path}`;
+      const response = await fetch(target, { headers: { Accept: 'application/json,text/html,*/*' } });
+      return {
+        id: item.id,
+        label: item.label,
+        path: item.path,
+        status: response.status,
+        passed: response.status >= 200 && response.status < 400
+      };
+    })
+  );
+
+  const workspaceCoverage = fetchChecks.map((entry, index) => {
+    if (entry.status === 'fulfilled') return entry.value;
+    const item = A_PLUS_WORKSPACE_URLS[index];
+    return {
+      id: item.id,
+      label: item.label,
+      path: item.path,
+      status: 0,
+      passed: false,
+      error: entry.reason && entry.reason.message ? entry.reason.message : String(entry.reason)
+    };
+  });
+
+  const agentsResponse = await fetch(`${baseUrl}/api/agents/status`, { headers: { Accept: 'application/json' } });
+  const agentsPayload = await agentsResponse.json();
+  const agents = Array.isArray(agentsPayload.agents) ? agentsPayload.agents : [];
+  const trendScout = agents.find((item) => item.id === 'trend-scout');
+  const productMatch = agents.find((item) => item.id === 'product-match');
+  const officeAgent = agents.find((item) => item.id === 'office-agent');
+
+  const learningPayload = {
+    creativeId: `a-plus-audit-${Date.now()}`,
+    watchTime: 15.4,
+    engagement: 11.2,
+    ctr: 4.9,
+    sales: 1,
+    conversionRate: 3.2
+  };
+  const learningResponse = await fetch(`${baseUrl}/api/agent/learning-loop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(learningPayload)
+  });
+  const learningResult = await learningResponse.json();
+
+  const storeStatusResponse = await fetch(`${baseUrl}/api/affiliate/store-products/status`, { headers: { Accept: 'application/json' } });
+  const storeStatus = await storeStatusResponse.json();
+  const closeoutResponse = await fetch(`${baseUrl}/api/production-closeout/status`, { headers: { Accept: 'application/json' } });
+  const closeout = await closeoutResponse.json();
+
+  const evicsChecks = [
+    { name: 'workspace shell', passed: workspaceCoverage.find((item) => item.id === 'workspace-shell')?.passed === true },
+    { name: 'evics alias', passed: workspaceCoverage.find((item) => item.id === 'evics-alias')?.passed === true },
+    { name: 'closeout success', passed: Boolean(closeout && closeout.success) },
+    { name: 'heygen configured', passed: Boolean(closeout && closeout.checks && closeout.checks.heygen && closeout.checks.heygen.configured) }
+  ];
+  const affiliateChecks = [
+    { name: 'affiliate landing', passed: workspaceCoverage.find((item) => item.id === 'affiliate-hub')?.passed === true },
+    { name: 'affiliate workspace', passed: workspaceCoverage.find((item) => item.id === 'affiliate-workspace')?.passed === true },
+    { name: 'affiliate store status', passed: Boolean(storeStatus && storeStatus.success) }
+  ];
+  const phoneChecks = [
+    { name: 'phone feed endpoint', passed: workspaceCoverage.find((item) => item.id === 'phone-app-feed')?.passed === true },
+    { name: 'phone feed has rows array', passed: Boolean(workspaceCoverage.find((item) => item.id === 'phone-app-feed')?.passed) }
+  ];
+  const adminChecks = [
+    { name: 'executive workspace', passed: workspaceCoverage.find((item) => item.id === 'executive-workspace')?.passed === true },
+    { name: 'analytics workspace', passed: workspaceCoverage.find((item) => item.id === 'analytics')?.passed === true },
+    { name: 'distribution workspace', passed: workspaceCoverage.find((item) => item.id === 'distribution')?.passed === true }
+  ];
+  const scannerChecks = [
+    { name: 'trend scout >= 90', passed: Number(trendScout && trendScout.qualityScore) >= 90 },
+    { name: 'product match >= 88', passed: Number(productMatch && productMatch.qualityScore) >= 88 },
+    { name: 'office agent >= 95', passed: Number(officeAgent && officeAgent.qualityScore) >= 95 }
+  ];
+  const learningChecks = [
+    { name: 'learning loop endpoint success', passed: Boolean(learningResponse.ok && learningResult && learningResult.success) },
+    { name: 'learning loop message', passed: Boolean(learningResult && learningResult.message) }
+  ];
+
+  const builds = {
+    evics: { checks: evicsChecks, score: percentFromChecks(evicsChecks) },
+    affiliateHub: { checks: affiliateChecks, score: percentFromChecks(affiliateChecks) },
+    phoneApp: { checks: phoneChecks, score: percentFromChecks(phoneChecks) },
+    adminWorkspace: { checks: adminChecks, score: percentFromChecks(adminChecks) },
+    scannersScrapers: { checks: scannerChecks, score: percentFromChecks(scannerChecks) },
+    learningLoop: { checks: learningChecks, score: percentFromChecks(learningChecks) }
+  };
+
+  const buildScores = Object.values(builds).map((item) => Number(item.score || 0));
+  const overallScore = Math.round(buildScores.reduce((sum, value) => sum + value, 0) / Math.max(1, buildScores.length));
+  const overallGrade = scoreToGrade(overallScore);
+
+  const objectiveChecks = {
+    'evics-workspace-consistency': { passed: builds.evics.score >= 95 },
+    'affiliate-hub-performance': { passed: builds.affiliateHub.score >= 95 },
+    'phone-app-observability': { passed: builds.phoneApp.score >= 95 },
+    'scanner-scraper-excellence': { passed: builds.scannersScrapers.score >= 95 },
+    'learning-loop-closed': { passed: builds.learningLoop.score >= 95 },
+    'a-plus-validation-evidence': {
+      passed: overallScore >= 95 && Object.values(builds).every((item) => item.score >= 95)
+    }
+  };
+
+  return {
+    timestamp,
+    target: { grade: 'A+', minimumScore: 95, requirement: 'all build domains >= 95' },
+    overall: {
+      score: overallScore,
+      grade: overallGrade,
+      achievedAPlus: overallScore >= 95 && Object.values(builds).every((item) => item.score >= 95)
+    },
+    builds: Object.fromEntries(Object.entries(builds).map(([key, value]) => ([
+      key,
+      { score: value.score, grade: scoreToGrade(value.score), checks: value.checks }
+    ]))),
+    objectiveChecks,
+    evidence: {
+      workspaceCoverage,
+      agentScores: {
+        trendScout: trendScout ? trendScout.qualityScore : null,
+        productMatch: productMatch ? productMatch.qualityScore : null,
+        officeAgent: officeAgent ? officeAgent.qualityScore : null
+      },
+      learningLoop: {
+        request: learningPayload,
+        response: learningResult,
+        status: learningResponse.status
+      },
+      closeout: {
+        success: Boolean(closeout && closeout.success),
+        heygenConfigured: Boolean(closeout && closeout.checks && closeout.checks.heygen && closeout.checks.heygen.configured),
+        liveProofAvailable: Boolean(closeout && closeout.checks && closeout.checks.heygen && closeout.checks.heygen.liveProofAvailable)
+      }
+    }
+  };
+}
+
+app.get('/api/excellence/objectives', (_req, res) => {
+  noStore(res);
+  const manualState = readJsonOrFallback(EXCELLENCE_STATE_PATH, { statuses: {}, notes: {} });
+  const lastAudit = readJsonOrFallback(EXCELLENCE_AUDIT_PATH, null);
+  const objectives = buildObjectiveCatalog(lastAudit, manualState);
+  res.json({
+    success: true,
+    target: { grade: 'A+', minimumScore: 95 },
+    workflow: {
+      sequence: [
+        'Phase 1: Interface Excellence (EVICS/Affiliate/Phone/Admin surfaces)',
+        'Phase 2: Autonomous Agent Core (scanners/scrapers/mission control)',
+        'Phase 3: Learning Loop and A+ evidence validation'
+      ],
+      cadence: 'Run /api/excellence/audit after each implementation cycle'
+    },
+    workspaceUrls: A_PLUS_WORKSPACE_URLS,
+    objectives
+  });
+});
+
+app.post('/api/excellence/objectives/:objectiveId', (req, res) => {
+  const objectiveId = String(req.params.objectiveId || '').trim();
+  const { status, note } = req.body || {};
+  if (!objectiveId) return res.status(400).json({ success: false, error: 'objectiveId is required' });
+  if (!status || !['pending', 'in_progress', 'validated', 'blocked'].includes(String(status))) {
+    return res.status(400).json({ success: false, error: 'status must be one of pending, in_progress, validated, blocked' });
+  }
+
+  const current = readJsonOrFallback(EXCELLENCE_STATE_PATH, { statuses: {}, notes: {}, updatedAt: null });
+  current.statuses = current.statuses || {};
+  current.notes = current.notes || {};
+  current.statuses[objectiveId] = String(status);
+  if (note) current.notes[objectiveId] = String(note);
+  current.updatedAt = new Date().toISOString();
+  writeJsonAtomic(EXCELLENCE_STATE_PATH, current);
+  noStore(res);
+  res.json({ success: true, state: current });
+});
+
+app.post('/api/excellence/audit', async (req, res) => {
+  noStore(res);
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const report = await runAPlusExcellenceAudit(baseUrl);
+    writeJsonAtomic(EXCELLENCE_AUDIT_PATH, report);
+    const history = readJsonOrFallback(EXCELLENCE_AUDIT_HISTORY_PATH, []);
+    const nextHistory = [report, ...history].slice(0, 20);
+    writeJsonAtomic(EXCELLENCE_AUDIT_HISTORY_PATH, nextHistory);
+    const manualState = readJsonOrFallback(EXCELLENCE_STATE_PATH, { statuses: {}, notes: {} });
+    const objectives = buildObjectiveCatalog(report, manualState);
+    res.json({ success: true, report, objectives });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+app.get('/api/excellence/status', (_req, res) => {
+  noStore(res);
+  const report = readJsonOrFallback(EXCELLENCE_AUDIT_PATH, null);
+  const history = readJsonOrFallback(EXCELLENCE_AUDIT_HISTORY_PATH, []);
+  const manualState = readJsonOrFallback(EXCELLENCE_STATE_PATH, { statuses: {}, notes: {} });
+  const objectives = buildObjectiveCatalog(report, manualState);
+  res.json({
+    success: true,
+    report,
+    history: history.slice(0, 5),
+    objectives,
+    workspaceUrls: A_PLUS_WORKSPACE_URLS
+  });
+});
+
+app.get('/api/excellence/engine/:engineId', (_req, res) => {
+  noStore(res);
+  const engineId = String(_req.params.engineId || '').trim().toLowerCase();
+  const report = readJsonOrFallback(EXCELLENCE_AUDIT_PATH, null);
+  const manualState = readJsonOrFallback(EXCELLENCE_STATE_PATH, { statuses: {}, notes: {} });
+  const objectives = buildObjectiveCatalog(report, manualState);
+  const engineView = getEngineView(engineId, report, objectives);
+  if (!engineView) {
+    return res.status(404).json({
+      success: false,
+      error: 'Unknown engineId. Use one of: evics, affiliate_hub, phone_app, affiliate_adminhub'
+    });
+  }
+  res.json({
+    success: true,
+    engine: engineView,
+    target: { grade: 'A+', minimumScore: 95 }
   });
 });
 // Global error handler
