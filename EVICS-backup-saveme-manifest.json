@@ -1,0 +1,24 @@
+{
+  "backup_name": "EVICS-backup-saveme",
+  "created_at": "2026-07-02T17:33:30Z",
+  "builds": [
+    {
+      "name": "IAGT_AI_VIRAL_ENGINE",
+      "path": "GitHub For I AM GENESIS TECH/GenesisAI folder/IAGT_AI_VIRAL_ENGINE",
+      "git_commit": "017daf7",
+      "status": "backed_up"
+    },
+    {
+      "name": "IAGT_Full_File_System",
+      "path": "I AM GENESIS TECH New shopify folder/IAGT_Full_File_System",
+      "status": "included_as_zip"
+    }
+  ],
+  "desktop_zip": "Desktop/EVICS-backup-saveme.zip",
+  "gcs_vault": "gs://evics-storage-evics-api/renders/",
+  "latest_render": {
+    "video_id": "a0ffed3071874ce6be3be5fe86087a56",
+    "product": "Digestive Enzyme (ROC303)",
+    "gcs_url": "https://storage.googleapis.com/evics-storage-evics-api/renders/digestive-enzyme-avatar-render-a0ffed30.mp4"
+  }
+}
