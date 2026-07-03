@@ -44,6 +44,16 @@ const {
   gradeCompletedRender
 } = require('./renderQualityValidator');
 
+// OpenAI client — initialised lazily so missing key only affects copilot routes
+let _openaiClient = null;
+function getOpenAI() {
+  if (_openaiClient) return _openaiClient;
+  if (!process.env.OPENAI_API_KEY) return null;
+  const { OpenAI } = require('openai');
+  _openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openaiClient;
+}
+
 const app = express();
 const PORT = process.env.PORT || 4175;
 const fs = require('fs');
@@ -100,6 +110,11 @@ app.use('/api/video/generate', videoLimiter);
 
 // Serve static files from dashboard/control-center
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
+app.use('/dashboard/viral-media', express.static(path.join(__dirname, '../dashboard/viral-media'), {
+  setHeaders: function (res) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app')));
 app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub')));
 
@@ -2451,7 +2466,7 @@ app.post('/api/agents/product-match/analyze', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/copilot/suggest â€” AI copilot suggestions
+// /api/agents/copilot/suggest — AI copilot suggestions (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/suggest', async (req, res) => {
   try {
@@ -2466,6 +2481,62 @@ app.post('/api/agents/copilot/suggest', async (req, res) => {
     const topTrends = trendsRes.data || [];
     const topCreatives = creativesRes.data || [];
 
+    const openai = getOpenAI();
+    if (openai) {
+      const systemPrompt = `You are EVICS Copilot, the AI marketing intelligence engine for I AM GENESIS TECH (IAGT), a health and wellness e-commerce brand selling products like Sea Moss Capsules, Collagen, Superfood blends, and herbal supplements at iamgenesistech.myshopify.com.
+
+Your role: Generate 4 precise, actionable strategic suggestions for viral short-form video ads. You understand TikTok, Instagram Reels, YouTube Shorts, Pinterest, and Facebook ad formats. You know IAGT products deeply.
+
+Rules:
+- Always prioritize profit-driving insights over generic advice
+- Reference specific IAGT products when possible
+- Suggestions must be immediately actionable
+- Each suggestion must have: type, priority (High/Medium/Low), suggestion text, rationale, and action label
+- Return ONLY a JSON array of 4 suggestion objects
+
+Top trends context: ${JSON.stringify(topTrends.slice(0, 3))}
+Top creatives context: ${JSON.stringify(topCreatives.slice(0, 2))}`;
+
+      const userMsg = [
+        context && `Context: ${context}`,
+        product && `Product: ${product}`,
+        hook && `Current hook: "${hook}"`,
+        platform && `Target platform: ${platform}`
+      ].filter(Boolean).join('\n') || 'Generate strategic suggestions for the IAGT workspace.';
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+        temperature: 0.7,
+        max_tokens: 900,
+        response_format: { type: 'json_object' }
+      });
+
+      let suggestions;
+      try {
+        const parsed = JSON.parse(completion.choices[0].message.content);
+        suggestions = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.data || Object.values(parsed)[0]);
+      } catch {
+        suggestions = null;
+      }
+
+      if (Array.isArray(suggestions) && suggestions.length > 0) {
+        noStore(res);
+        return res.json({
+          success: true,
+          agent: 'copilot',
+          action: 'suggest',
+          context: context || 'general',
+          suggestions,
+          trendContext: topTrends.slice(0, 3),
+          model: 'gpt-4o',
+          message: `Copilot (GPT-4o) generated ${suggestions.length} strategic suggestions.`
+        });
+      }
+      // Fall through to rule-based if GPT response was malformed
+    }
+
+    // Rule-based fallback
     const suggestions = [
       {
         type: 'hook',
@@ -2479,7 +2550,7 @@ app.post('/api/agents/copilot/suggest', async (req, res) => {
       {
         type: 'structure',
         priority: 'High',
-        suggestion: `Use the 5-beat structure: Hook (0-3s) â†’ Problem (3-7s) â†’ Personal proof (7-12s) â†’ Product ritual (12-18s) â†’ CTA (18-20s).`,
+        suggestion: `Use the 5-beat structure: Hook (0-3s) → Problem (3-7s) → Personal proof (7-12s) → Product ritual (12-18s) → CTA (18-20s).`,
         rationale: `This structure matches the top ${topCreatives.length || 3} performing creatives in your workspace.`,
         action: 'Generate script'
       },
@@ -2518,8 +2589,7 @@ app.post('/api/agents/copilot/suggest', async (req, res) => {
   }
 });
 
-// -------------------------
-// /api/agents/copilot/refine â€” refine a hook or script
+// /api/agents/copilot/refine — refine a hook or script (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/refine', async (req, res) => {
   try {
@@ -2533,12 +2603,64 @@ app.post('/api/agents/copilot/refine', async (req, res) => {
     const targetGoal = goal || 'increase engagement';
     const targetPlatform = platform || 'TikTok';
 
-    // Generate refined variants
+    const openai = getOpenAI();
+    if (openai) {
+      const systemPrompt = `You are EVICS Copilot, the AI creative refinement engine for I AM GENESIS TECH (IAGT), a health and wellness brand. You refine hooks and video scripts to maximize conversion for short-form video ads on ${targetPlatform}.
+
+Goal: ${targetGoal}
+Input type: ${inputType}
+
+Generate exactly 3 refined variants. Each variant must have:
+- variant: variant name (e.g. "Urgency", "Specificity", "Emotional")
+- refined: the rewritten ${inputType}
+- improvement: what was changed and why
+- expectedLift: estimated metric improvement (e.g. "+15% CTR")
+
+Return ONLY a JSON object with a "refinements" array.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Refine this ${inputType}: "${input}"` }
+        ],
+        temperature: 0.8,
+        max_tokens: 700,
+        response_format: { type: 'json_object' }
+      });
+
+      let refinements;
+      try {
+        const parsed = JSON.parse(completion.choices[0].message.content);
+        refinements = parsed.refinements || parsed.variants || Object.values(parsed)[0];
+      } catch {
+        refinements = null;
+      }
+
+      if (Array.isArray(refinements) && refinements.length > 0) {
+        noStore(res);
+        return res.json({
+          success: true,
+          agent: 'copilot',
+          action: 'refine',
+          original: input,
+          type: inputType,
+          goal: targetGoal,
+          platform: targetPlatform,
+          refinements,
+          recommended: refinements[1] || refinements[0],
+          model: 'gpt-4o',
+          message: `Copilot (GPT-4o) generated ${refinements.length} refined variants for your ${inputType}.`
+        });
+      }
+    }
+
+    // Rule-based fallback
     const refinements = [
       {
         variant: 'Urgency',
         refined: inputType === 'hook'
-          ? input.replace(/\.\.\.$/, ' â€” and most people miss it.')
+          ? input.replace(/\.\.\.$/, ' — and most people miss it.')
           : input + '\n\n[URGENCY CUT] Flash to result. VO: "Don\'t wait. Start today."',
         improvement: 'Added urgency trigger to increase immediate action.',
         expectedLift: '+12% CTR'
@@ -2580,7 +2702,7 @@ app.post('/api/agents/copilot/refine', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/copilot/explain â€” explain an AI decision
+// /api/agents/copilot/explain — explain an AI decision (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/explain', async (req, res) => {
   try {
@@ -2598,6 +2720,49 @@ app.post('/api/agents/copilot/explain', async (req, res) => {
 
     const targetDecision = decision || 'creative scoring';
 
+    const openai = getOpenAI();
+    if (openai) {
+      const systemPrompt = `You are EVICS Copilot, the AI decision-explainer for I AM GENESIS TECH (IAGT). You explain AI decisions in the EVICS viral marketing intelligence system with precision and clarity.
+
+Explain decisions using weighted factors. Return ONLY a JSON object with:
+- decision: string
+- summary: string (2-3 sentences)
+- factors: array of {factor, weight (%), score (0-100), explanation}
+- rejectionReason: string or null
+- recommendation: string
+- confidence: "High" | "Medium" | "Low"`;
+
+      const userMsg = `Explain this decision: "${targetDecision}"${creativeContext ? `\n\nCreative data: ${JSON.stringify(creativeContext)}` : ''}${context ? `\nContext: ${context}` : ''}`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+        temperature: 0.5,
+        max_tokens: 600,
+        response_format: { type: 'json_object' }
+      });
+
+      let explanation;
+      try {
+        explanation = JSON.parse(completion.choices[0].message.content);
+      } catch {
+        explanation = null;
+      }
+
+      if (explanation && explanation.factors) {
+        noStore(res);
+        return res.json({
+          success: true,
+          agent: 'copilot',
+          action: 'explain',
+          explanation,
+          model: 'gpt-4o',
+          message: `Copilot (GPT-4o) explained the decision with ${explanation.factors.length} weighted factors.`
+        });
+      }
+    }
+
+    // Rule-based fallback
     const explanation = {
       decision: targetDecision,
       summary: creativeContext
@@ -2614,7 +2779,7 @@ app.post('/api/agents/copilot/explain', async (req, res) => {
           factor: 'Structural clarity',
           weight: '25%',
           score: creativeContext ? (creativeContext.score || 80) : 82,
-          explanation: 'The 5-beat structure (Hook â†’ Problem â†’ Proof â†’ Product â†’ CTA) is present and well-paced.'
+          explanation: 'The 5-beat structure (Hook → Problem → Proof → Product → CTA) is present and well-paced.'
         },
         {
           factor: 'Platform fit',
@@ -2918,11 +3083,10 @@ app.post('/api/agent/copilot', async (req, res) => {
     const topProduct = (productsRes.data && productsRes.data[0]) ? productsRes.data[0].name : 'your top product';
     const topHook = (trendsRes.data && trendsRes.data[0]) ? trendsRes.data[0].hook : null;
 
-    // GPT-4o path â€” use when OPENAI_API_KEY is configured
-    if (process.env.OPENAI_API_KEY) {
+    // GPT-4o path — use when OPENAI_API_KEY is configured
+    const openai = getOpenAI();
+    if (openai) {
       try {
-        const OpenAI = require('openai');
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
         const systemPrompt = `You are the EVICS AI Copilot for I AM GENESIS TECH â€” an elite AI marketing intelligence system for a health supplement e-commerce store.
 
