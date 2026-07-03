@@ -12,6 +12,7 @@ const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
+const { createViralMediaRouter } = require('./viralMediaRoutesClean');
 const {
   startHeyGenRender,
   startHeyGenVideoAgent,
@@ -995,6 +996,11 @@ registerEvicsEliteRoutes(app, {
   controlCenterDir: path.join(__dirname, '../dashboard/control-center')
 });
 registerMediaOutputRoutes(app, SupabaseConnector);
+
+// ===== REGISTER VIRAL MEDIA ROUTES =====
+const viralMediaRouter = createViralMediaRouter();
+app.use('/api/viral-media', viralMediaRouter);
+console.log('✅ [EVICS] Viral Media routes registered at /api/viral-media');
 
 // -------------------------
 // /api/products — evics_products table with Shopify live fallback
