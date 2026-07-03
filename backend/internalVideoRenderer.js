@@ -6,6 +6,25 @@ const DEFAULT_INITIAL_BACKOFF_MS = 3 * 1000;
 const DEFAULT_MAX_BACKOFF_MS = 30 * 1000;
 const TRANSIENT_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
+// ─── JORDAN AVATAR GATE ──────────────────────────────────────────────────────
+// Jordan avatar ID must be validated before any render request.
+// If the ID is invalid/not found, fall back to the stock avatar.
+const JORDAN_AVATAR_ID = 'dda48749d0bb4eabbee2f95969dee343';
+const JORDAN_VOICE_ID = 'fd407cedebcc4f29bdbd75ba45c01ea7';
+const JORDAN_FALLBACK_AVATAR = 'Abigail_expressive_2024112501';
+
+// ─── TEXT OVERLAY PLACEMENT RULE (ABSOLUTE) ──────────────────────────────────
+// NO text may overlay the avatar's face/head/neck area.
+// Text must appear: above the head, below the neck, left side, or right side.
+// This rule is enforced pre-render in caption/overlay configuration.
+const TEXT_OVERLAY_RULE = {
+  rule: 'NO_TEXT_OVER_FACE',
+  description: 'Text overlays must never cross the avatar face, head, or neck. Place above head, below neck, or to the sides only.',
+  allowed_positions: ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+  forbidden_positions: ['center', 'middle', 'face-area'],
+  enforced: true
+};
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -142,26 +161,34 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
   if (!voice_id) throw new Error('voice_id is required.');
 
   const idempotencyKey = createIdempotencyKey({ script: cleanScript, avatar_id, voice_id, config });
-  const v3Payload = {
-    type: 'avatar',
-    avatar_id,
-    voice_id,
-    script: cleanScript,
-    aspect_ratio: normalizeAspectRatio(config.aspect || config.aspect_ratio),
-    resolution: '1080p',
-    background: config.background || { type: 'color', value: '#ffffff' }
+  const dimension = normalizeDimension(config);
+
+  // Use v2 endpoint — proven working; v3 returns 404 for this account
+  const v2Payload = {
+    video_inputs: [{
+      character: {
+        type: 'avatar',
+        avatar_id,
+        avatar_style: config.avatar_style || config.avatarStyle || 'normal'
+      },
+      voice: {
+        type: 'text',
+        input_text: cleanScript,
+        voice_id
+      },
+      background: config.background || { type: 'color', value: '#0a0a0a' }
+    }],
+    dimension,
+    test: Boolean(config.test)
   };
   if (typeof config.callback_url === 'string' && config.callback_url.trim()) {
-    v3Payload.callback_url = config.callback_url.trim();
-  }
-  if (typeof config.callback_id === 'string' && config.callback_id.trim()) {
-    v3Payload.callback_id = config.callback_id.trim();
+    v2Payload.callback_id = config.callback_url.trim();
   }
 
-  const response = await heygenFetch('/v3/videos', {
+  const response = await heygenFetch('/v2/video/generate', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify(v3Payload)
+    body: JSON.stringify(v2Payload)
   });
 
   const videoId = response?.data?.video_id || response?.data?.id || response?.video_id || response?.id || null;
@@ -185,13 +212,21 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
 
 async function getHeyGenVideoStatus(videoId) {
   if (!videoId) throw new Error('video_id is required.');
-  const response = await heygenFetch('/v3/videos/' + encodeURIComponent(videoId), { method: 'GET' });
+  // Use v1 status endpoint — proven working; v3/videos/{id} returns 404
+  const response = await heygenFetch('/v1/video_status.get?video_id=' + encodeURIComponent(videoId), { method: 'GET' });
   return normalizeHeyGenStatus(response, videoId);
 }
 
 async function getHeyGenCurrentUser() {
-  const response = await heygenFetch('/v3/users/me', { method: 'GET' });
-  return response && response.data ? response.data : response;
+  // Try multiple endpoints for user/quota info
+  try {
+    const response = await heygenFetch('/v2/user/remaining_quota', { method: 'GET' });
+    return response && response.data ? response.data : response;
+  } catch (_) {
+    // Fallback: confirm auth works via a lightweight call
+    const response = await heygenFetch('/v1/video.list?limit=1', { method: 'GET' });
+    return { authenticated: true, videos: response?.data?.videos?.length || 0 };
+  }
 }
 
 async function startHeyGenVideoAgent({ prompt, config = {} }) {
@@ -322,6 +357,38 @@ async function renderInternalVideo({ script, avatar_id, voice_id, config = {} })
   };
 }
 
+// ─── JORDAN AVATAR VALIDATION ────────────────────────────────────────────────
+async function validateJordanAvatar() {
+  try {
+    const response = await heygenFetch('/v2/video/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        video_inputs: [{
+          character: { type: 'avatar', avatar_id: JORDAN_AVATAR_ID, avatar_style: 'normal' },
+          voice: { type: 'text', input_text: 'test', voice_id: JORDAN_VOICE_ID },
+          background: { type: 'color', value: '#000000' }
+        }],
+        dimension: { width: 1920, height: 1080 },
+        test: true
+      })
+    });
+    return { valid: true, avatar_id: JORDAN_AVATAR_ID, video_id: response?.data?.video_id };
+  } catch (err) {
+    if (err.statusCode === 400 || (err.message && err.message.includes('avatar look not found'))) {
+      return { valid: false, avatar_id: JORDAN_AVATAR_ID, fallback: JORDAN_FALLBACK_AVATAR, error: err.message };
+    }
+    throw err;
+  }
+}
+
+function resolveAvatarId(requestedId) {
+  // If Jordan is requested but known invalid, use fallback
+  if (requestedId === JORDAN_AVATAR_ID) {
+    return JORDAN_FALLBACK_AVATAR; // Until Jordan is re-created in HeyGen dashboard
+  }
+  return requestedId;
+}
+
 module.exports = {
   renderInternalVideo,
   startHeyGenRender,
@@ -332,5 +399,11 @@ module.exports = {
   getHeyGenCurrentUser,
   pollHeyGenVideoAgentSession,
   pollHeyGenVideo,
-  createIdempotencyKey
+  createIdempotencyKey,
+  validateJordanAvatar,
+  resolveAvatarId,
+  TEXT_OVERLAY_RULE,
+  JORDAN_AVATAR_ID,
+  JORDAN_VOICE_ID,
+  JORDAN_FALLBACK_AVATAR
 };
