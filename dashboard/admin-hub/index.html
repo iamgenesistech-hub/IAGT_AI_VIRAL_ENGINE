@@ -7,66 +7,170 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="shell">
-    <header class="header">
+  <header class="exec-shell-header">
+    <div class="exec-shell-brand">
+      <span class="exec-mark">EVICS</span>
       <div>
-        <h1>Affiliate AdminHub Workspace</h1>
-        <p>Governance build for affiliate oversight, executive quality checks, and cross-workspace audit monitoring.</p>
+        <strong>I AM GENESIS TECH</strong>
+        <small>ELITE VIRAL INTELLIGENCE CONTROL SYSTEM</small>
       </div>
-      <div class="routes">
-        <a href="/workspace">EVICS</a>
-        <a href="/affiliate">Affiliate Hub</a>
-        <a href="/phone-app">Phone App</a>
-      </div>
-      <div class="top-controls">
-        <div class="pulse" id="adminPulse">Initializing admin telemetry…</div>
-        <button type="button" id="adminRefresh" class="control-btn state-off">Refresh now</button>
-      </div>
-    </header>
+    </div>
+    <nav class="exec-shell-nav">
+      <a href="/workspace">EVICS</a>
+      <a href="/viral-media">Viral Media</a>
+      <a href="/affiliate">Affiliate Hub</a>
+      <a href="/phone-app">Phone App</a>
+      <a href="/admin-hub" aria-current="page">Affiliate AdminHub</a>
+    </nav>
+    <div class="exec-shell-pulse" id="adminPulse">Initializing admin telemetry…</div>
+  </header>
 
-    <section class="layout">
-      <article class="panel">
-        <h2>Executive KPI snapshot</h2>
-        <div class="kpis">
-          <div class="kpi"><div class="label">Top affiliates tracked</div><div class="value" id="kpiAffiliates">0</div></div>
-          <div class="kpi"><div class="label">Mobile renders tracked</div><div class="value" id="kpiRenders">0</div></div>
-          <div class="kpi"><div class="label">A+ grade state</div><div class="value" id="kpiGrade">N/A</div></div>
-        </div>
-        <h2>Leaderboard watchlist</h2>
-        <ul id="adminLeaderboard" class="list">
-          <li>Loading leaderboard…</li>
-        </ul>
-        <h2 style="margin-top:16px">Live phone app board</h2>
-        <ul id="adminLiveUsers" class="list">
-          <li>Loading active phone sessions…</li>
-        </ul>
-      </article>
-
-      <aside class="panel monitor">
-        <h2>Admin live monitors</h2>
-        <p id="adminHealth">Loading health monitor…</p>
-        <p id="adminAudit">Loading audit monitor…</p>
-        <p id="adminProof">Loading proof monitor…</p>
-        <h2 style="margin-top:16px">Objective checkpoint</h2>
-        <ul id="adminObjectives" class="list">
-          <li>Loading objectives…</li>
-        </ul>
-        <h2 style="margin-top:16px">Affiliate comms console</h2>
-        <div class="comms-console">
-          <label for="adminCommsTarget">Target affiliate</label>
-          <select id="adminCommsTarget">
-            <option value="">No active affiliates</option>
-          </select>
-          <div id="adminConversationFeed" class="conversation-feed">
-            <div class="conversation-empty">Select an active affiliate to view live messages.</div>
+  <div class="exec-shell-main">
+    <div id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">ADM</div>
+          <div>
+            <strong>Affiliate AdminHub</strong>
+            <span>Build 04 · Governance Layer</span>
           </div>
-          <textarea id="adminMessageInput" rows="3" placeholder="Send direct admin instruction..."></textarea>
-          <button type="button" id="adminSendMessage" class="control-btn state-off">Send text</button>
-          <input id="adminVideoUrl" type="url" placeholder="https://...video.mp4" />
-          <button type="button" id="adminSendVideo" class="control-btn state-off">Send video</button>
+        </div>
+        <nav>
+          <button type="button" class="active">
+            <div>
+              <strong>KPI Dashboard</strong>
+              <small>Executive KPI snapshot and leaderboard</small>
+            </div>
+          </button>
+          <button type="button">
+            <div>
+              <strong>Phone Board</strong>
+              <small>Live phone app user sessions</small>
+            </div>
+          </button>
+          <button type="button">
+            <div>
+              <strong>Comms Console</strong>
+              <small>Direct affiliate instruction and video relay</small>
+            </div>
+          </button>
+          <button type="button">
+            <div>
+              <strong>Objectives</strong>
+              <small>A+ grade checkpoint tracking</small>
+            </div>
+          </button>
+        </nav>
+        <div class="automation-card">
+          <span>Admin telemetry</span>
+          <strong>Governance active</strong>
+          <div class="pulse-row">
+            <i></i>
+            <span>Affiliate oversight running</span>
+          </div>
         </div>
       </aside>
-    </section>
+
+      <main>
+        <div class="topbar">
+          <div>
+            <p class="workspace-eyebrow">Build 04 — Governance Layer</p>
+            <h1>Affiliate AdminHub Workspace</h1>
+            <p>Corporate governance layer for affiliate oversight, quality control, and high-level execution audits.</p>
+          </div>
+          <div class="top-actions">
+            <button type="button" id="adminRefresh" class="control-btn state-off">Refresh now</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Executive KPI Snapshot</h2>
+            </div>
+            <div class="panel-actions">
+              <p class="monitor-info" id="adminHealth">Loading health monitor…</p>
+            </div>
+          </div>
+          <p class="monitor-info" id="adminAudit">Loading audit monitor…</p>
+          <p class="monitor-info" id="adminProof">Loading proof monitor…</p>
+          <div class="kpis" style="margin-top:14px">
+            <div class="kpi">
+              <div class="label">Top affiliates tracked</div>
+              <div class="value" id="kpiAffiliates">0</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Mobile renders tracked</div>
+              <div class="value" id="kpiRenders">0</div>
+            </div>
+            <div class="kpi">
+              <div class="label">A+ grade state</div>
+              <div class="value" id="kpiGrade">N/A</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cols-2">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Leaderboard Watchlist</h2>
+              </div>
+            </div>
+            <ul id="adminLeaderboard" class="list">
+              <li>Loading leaderboard…</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Live Phone App Board</h2>
+              </div>
+            </div>
+            <ul id="adminLiveUsers" class="list">
+              <li>Loading active phone sessions…</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="cols-2">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Objective Checkpoint</h2>
+              </div>
+            </div>
+            <ul id="adminObjectives" class="list">
+              <li>Loading objectives…</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Affiliate Comms Console</h2>
+              </div>
+            </div>
+            <div class="comms-console">
+              <label for="adminCommsTarget">Target affiliate</label>
+              <select id="adminCommsTarget">
+                <option value="">No active affiliates</option>
+              </select>
+              <div id="adminConversationFeed" class="conversation-feed">
+                <div class="conversation-empty">Select an active affiliate to view live messages.</div>
+              </div>
+              <label for="adminMessageInput">Admin instruction</label>
+              <textarea id="adminMessageInput" rows="3" placeholder="Send direct admin instruction..."></textarea>
+              <button type="button" id="adminSendMessage" class="control-btn state-off">Send text</button>
+              <label for="adminVideoUrl">Video URL</label>
+              <input id="adminVideoUrl" type="url" placeholder="https://...video.mp4" />
+              <button type="button" id="adminSendVideo" class="control-btn state-off">Send video</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>

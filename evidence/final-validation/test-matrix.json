@@ -7,25 +7,30 @@
   },
   {
     "name": "mocked-action-flow",
-    "flowId": "flow_15488fb9e6e20126",
+    "flowId": "flow_9762f2291a51a56b",
     "videoUrl": "/generated/evics-sea-moss-proof-render.mp4",
     "status": "pass"
   },
   {
     "name": "faceless-first-class",
-    "flowId": "flow_61e414ff7bdee9bf",
+    "flowId": "flow_2dfd3a94a32b57fb",
     "format": "Faceless product ritual montage",
     "status": "pass"
   },
   {
     "name": "live-heygen-provider",
-    "status": "fail",
-    "error": "fetch failed"
+    "jobId": "render_job_8550e5cd8489549f",
+    "videoId": "46eba111cac041558a5d41b3a068308c",
+    "proofSource": "status-poll",
+    "renderGrade": 95,
+    "tier": "A+",
+    "duration": 38.6351,
+    "status": "pass"
   },
   {
     "name": "copilot-orchestration",
     "route": "EVIE",
-    "flowId": "flow_3abcca371121d50e",
+    "flowId": "flow_706584cd45e2edd1",
     "status": "pass"
   },
   {
@@ -40,42 +45,89 @@
       "overall": 80
     },
     "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-    "wisdomVersion": 482,
-    "promptVersionCount": 238,
-    "learningCount": 243,
+    "wisdomVersion": 498,
+    "promptVersionCount": 246,
+    "learningCount": 251,
     "mockRenderAvailable": true,
     "liveHeygenConfigured": true,
-    "timestamp": "2026-07-01T19:01:10.482Z",
+    "timestamp": "2026-07-03T18:55:51.489Z",
     "status": "pass"
   },
   {
     "name": "api-health",
-    "status": "fail",
-    "error": "fetch failed"
+    "status": "pass",
+    "body": {
+      "ok": true,
+      "architecture": "EVICS_EVIE_SHARED",
+      "qualityGates": {
+        "hookStrength": 75,
+        "pacing": 70,
+        "ctaClarity": 75,
+        "visualStyle": 80,
+        "overall": 80
+      },
+      "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
+      "wisdomVersion": 498,
+      "promptVersionCount": 246,
+      "learningCount": 251,
+      "mockRenderAvailable": true,
+      "liveHeygenConfigured": true,
+      "timestamp": "2026-07-03T18:55:51.508Z"
+    }
   },
   {
     "name": "api-action-flow",
-    "status": "fail",
-    "error": "fetch failed"
+    "status": "pass",
+    "flowId": "flow_e585e5b9333b8532"
   },
   {
     "name": "api-copilot-orchestration",
-    "status": "fail",
-    "error": "fetch failed"
+    "status": "pass",
+    "route": "EVIE"
   },
   {
     "name": "api-mocked-render-provider",
-    "status": "fail",
-    "error": "fetch failed"
+    "httpStatus": 202,
+    "url": "/generated/evics-sea-moss-proof-render.mp4",
+    "renderId": "mock_1783104951705",
+    "renderLogColumns": [
+      "video_id",
+      "script_text",
+      "product_title",
+      "product_image_url",
+      "product_page_url",
+      "company_label",
+      "avatar_id",
+      "voice_id",
+      "duration",
+      "cta_url",
+      "tracking_protocol",
+      "status",
+      "video_url",
+      "thumbnail_url",
+      "error_message",
+      "idempotency_key",
+      "created_at",
+      "updated_at"
+    ],
+    "status": "pass"
   },
   {
     "name": "production-closeout-status",
-    "status": "fail",
-    "error": "fetch failed"
+    "httpStatus": 200,
+    "shopifyStore": "iamgenesistech.myshopify.com",
+    "supabaseRenderTableOk": true,
+    "supabaseSharedTablesOk": true,
+    "heygenConfigured": true,
+    "status": "pass"
   },
   {
     "name": "shopify-reconnect-diagnostics",
-    "status": "fail",
-    "error": "fetch failed"
+    "httpStatus": 200,
+    "expectedStore": "iamgenesistech.myshopify.com",
+    "envTokenAccepted": true,
+    "primarySessionAccepted": true,
+    "oauthReady": true,
+    "status": "pass"
   }
 ]

@@ -790,39 +790,39 @@ async function hydrateFromServerApi() {
   } catch (error) {
     console.warn("Shopify product API unavailable.", error);
   }
+}
 
-  function formatHeyGenAuthModeLabel(mode) {
-    if (!mode) return "Unknown";
-    if (mode === "cli_api_key") return "CLI API Key (Priority 1)";
-    if (mode === "oauth_bearer") return "OAuth Bearer (Priority 2)";
-    if (mode === "cli_fallback_session") return "CLI Session Fallback (Priority 3)";
-    if (mode === "not_configured") return "Not Configured";
-    return mode;
+function formatHeyGenAuthModeLabel(mode) {
+  if (!mode) return "Unknown";
+  if (mode === "cli_api_key") return "CLI API Key (Priority 1)";
+  if (mode === "oauth_bearer") return "OAuth Bearer (Priority 2)";
+  if (mode === "cli_fallback_session") return "CLI Session Fallback (Priority 3)";
+  if (mode === "not_configured") return "Not Configured";
+  return mode;
+}
+
+function formatHeyGenCreditsLabel(account) {
+  if (!account) return "Credits unavailable";
+  if (account.credits_remaining !== null && account.credits_remaining !== undefined) {
+    const total = account.credits_total !== null && account.credits_total !== undefined ? ` / ${account.credits_total}` : "";
+    return `${account.credits_remaining}${total} credits`;
   }
+  return "Credits reported by HeyGen plan UI";
+}
 
-  function formatHeyGenCreditsLabel(account) {
-    if (!account) return "Credits unavailable";
-    if (account.credits_remaining !== null && account.credits_remaining !== undefined) {
-      const total = account.credits_total !== null && account.credits_total !== undefined ? ` / ${account.credits_total}` : "";
-      return `${account.credits_remaining}${total} credits`;
-    }
-    return "Credits reported by HeyGen plan UI";
-  }
-
-  async function hydrateHeyGenStatus() {
-    try {
-      const account = await apiFetch("/api/heygen/account-status");
-      const sessions = await apiFetch("/api/heygen/video-agent-sessions?limit=5");
-      state.heygenAccount = account.account || null;
-      state.heygenRecentSessions = Array.isArray(sessions.sessions) ? sessions.sessions : [];
-      state.heygenAuthMode = account.auth?.mode || "unknown";
-      state.heygenAuthDetail = `${formatHeyGenAuthModeLabel(account.auth?.mode)} · ${formatHeyGenCreditsLabel(account.account)}`;
-    } catch (error) {
-      state.heygenAccount = null;
-      state.heygenRecentSessions = [];
-      state.heygenAuthMode = "error";
-      state.heygenAuthDetail = error.message || "HeyGen status unavailable";
-    }
+async function hydrateHeyGenStatus() {
+  try {
+    const account = await apiFetch("/api/heygen/account-status");
+    const sessions = await apiFetch("/api/heygen/video-agent-sessions?limit=5");
+    state.heygenAccount = account.account || null;
+    state.heygenRecentSessions = Array.isArray(sessions.sessions) ? sessions.sessions : [];
+    state.heygenAuthMode = account.auth?.mode || "unknown";
+    state.heygenAuthDetail = `${formatHeyGenAuthModeLabel(account.auth?.mode)} · ${formatHeyGenCreditsLabel(account.account)}`;
+  } catch (error) {
+    state.heygenAccount = null;
+    state.heygenRecentSessions = [];
+    state.heygenAuthMode = "error";
+    state.heygenAuthDetail = error.message || "HeyGen status unavailable";
   }
 }
 
@@ -9008,14 +9008,27 @@ function bindEvents() {
     });
   });
 
-  // ── Connect Sources modal ──
-  const connectSourcesBtn = document.getElementById("connect-sources-btn");
-  if (connectSourcesBtn) {
-    connectSourcesBtn.addEventListener("click", () => {
-      state.connectSourcesOpen = true;
-      state.connectSourcesSaved = false;
-      state.connectSourcesError = null;
-      render();
+  // ── Connect Sources modal (topbar button + demo banner button) ──
+  [
+    document.getElementById("connect-sources-btn"),
+    document.getElementById("demo-connect-btn")
+  ].forEach((btn) => {
+    if (btn) {
+      btn.addEventListener("click", () => {
+        state.connectSourcesOpen = true;
+        state.connectSourcesSaved = false;
+        state.connectSourcesError = null;
+        render();
+      });
+    }
+  });
+
+  // ── Demo mode banner dismiss ──
+  const demoBannerDismiss = document.getElementById("demo-banner-dismiss");
+  if (demoBannerDismiss) {
+    demoBannerDismiss.addEventListener("click", () => {
+      const banner = document.getElementById("demo-mode-banner");
+      if (banner) banner.style.display = "none";
     });
   }
 
@@ -9470,6 +9483,25 @@ async function boot() {
       pollRenderStatus(state.renderStatusUrl);
     }
   }, 15000);
+
+  // Real-time evics_renders DB polling — every 10s to surface pending/processing jobs
+  setInterval(async () => {
+    if (!window.iagtSupabase || !window.iagtSupabase.enabled) return;
+    try {
+      const rows = await window.iagtSupabase.select(
+        "evics_renders",
+        "status=in.(pending,processing)&order=created_at.desc&limit=20"
+      );
+      if (Array.isArray(rows)) {
+        state.mediaRenderQueue = rows;
+        // If any pending jobs exist and we are idle, surface them in the status bar
+        if (rows.length > 0 && state.renderStatus === "idle") {
+          state.syncMessage = `${rows.length} render job(s) pending in queue.`;
+          render();
+        }
+      }
+    } catch { /* non-fatal — Supabase may be offline */ }
+  }, 10000);
 
   // Surface stuck renders from DB on boot (non-blocking)
   fetch("/api/recovery/pending-renders")

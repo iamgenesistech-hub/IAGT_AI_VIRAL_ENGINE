@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -71,12 +72,68 @@ async function httpJson(url, options = {}) {
   return { response, body };
 }
 
+function canAutoStartLocalServer(base) {
+  try {
+    const parsed = new URL(base);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch (_) {
+    return false;
+  }
+}
+
+async function isServerReachable(base) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const response = await fetch(`${base}/status`, { signal: controller.signal });
+    clearTimeout(timer);
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function waitForServerReady(base, timeoutMs = 30000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await isServerReachable(base)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
+async function ensureLocalServer(base) {
+  if (await isServerReachable(base)) {
+    return { started: false, process: null };
+  }
+  if (!canAutoStartLocalServer(base)) {
+    return { started: false, process: null };
+  }
+  const serverProcess = spawn(process.execPath, ['backend/server.js'], {
+    cwd: ROOT,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const ready = await waitForServerReady(base, 30000);
+  if (!ready) {
+    serverProcess.kill('SIGTERM');
+    throw new Error(`Unable to start local EVICS server at ${base} within 30 seconds.`);
+  }
+  return { started: true, process: serverProcess };
+}
+
+function stopLocalServer(serverProcess) {
+  if (!serverProcess || serverProcess.killed) return;
+  serverProcess.kill('SIGTERM');
+}
+
 async function run() {
   ensureDir(EVIDENCE_DIR);
   const startedAt = new Date().toISOString();
   const matrix = [];
   const blockers = [];
   const base = process.env.EVICS_BASE_URL || 'http://localhost:4175';
+  let managedServer = null;
   const commands = [
     'node --check backend/server.js',
     'node --check backend/sharedEvicsEvieCore.js',
@@ -89,6 +146,7 @@ async function run() {
     'HTTP GET /api/shopify/diagnostics'
   ];
 
+  managedServer = await ensureLocalServer(base);
   try {
     const rankings = rankCandidates();
     if (!rankings.length) throw new Error('No rankings generated.');
@@ -366,6 +424,9 @@ async function run() {
 
   console.log(JSON.stringify(summary, null, 2));
   if (failed.length) process.exitCode = 1;
+  if (managedServer && managedServer.started) {
+    stopLocalServer(managedServer.process);
+  }
 }
 
 run().catch((error) => {

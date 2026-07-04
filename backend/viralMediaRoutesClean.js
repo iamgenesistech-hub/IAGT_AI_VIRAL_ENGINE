@@ -130,8 +130,13 @@ function createViralMediaRouter() {
         });
       }
 
-      const script = generateJordanTrustScript(productData, brief);
-      const state = updateViralMediaState(s => {
+      const state = readViralMediaState();
+      const script = generateJordanTrustScript(productData, brief, {
+        jordanAvatar: state.jordanAvatar,
+        avatarId: req.body.avatarId || req.body.avatar_id,
+        voiceId: req.body.voiceId || req.body.voice_id
+      });
+      updateViralMediaState(s => {
         if (!s.scripts) s.scripts = [];
         s.scripts = s.scripts.filter(sc => sc.productId !== productId || sc.videoType !== 'jordan_avatar');
         s.scripts.push({
@@ -464,11 +469,15 @@ function createViralMediaRouter() {
         });
       }
 
-      const limit = count || productIds.length;
-      const products = await fetchBestSellingProducts(limit);
-      const campaigns = buildBatchCampaigns(products);
+      const limit = Number(count || productIds.length || 25);
+      const state = readViralMediaState();
+      const batchResult = await buildBatchCampaigns(limit, {
+        jordanAvailable: Boolean(state.jordanAvatar && state.jordanAvatar.available),
+        launchRendering: false
+      });
+      const campaigns = Array.isArray(batchResult.campaigns) ? batchResult.campaigns : [];
 
-      const state = updateViralMediaState(s => {
+      updateViralMediaState(s => {
         if (!s.videoCampaigns) s.videoCampaigns = [];
         campaigns.forEach(campaign => {
           s.videoCampaigns.push({
@@ -557,6 +566,11 @@ function createViralMediaRouter() {
           error: 'Missing avatarId or voiceId'
         });
       }
+
+      process.env.REACT_APP_JORDAN_AVATAR_ID = String(avatarId);
+      process.env.REACT_APP_JORDAN_VOICE_ID = String(voiceId);
+      process.env.HEYGEN_JORDAN_AVATAR_ID = String(avatarId);
+      process.env.HEYGEN_JORDAN_VOICE_ID = String(voiceId);
 
       const state = updateViralMediaState(s => {
         s.jordanAvatar = {

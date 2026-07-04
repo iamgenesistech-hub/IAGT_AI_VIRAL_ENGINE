@@ -7,57 +7,107 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="shell">
-    <header class="top">
-      <div class="title">
-        <h1>Phone App Workspace</h1>
-        <p>Dedicated mobile operations build with real-time render feed telemetry.</p>
+  <header class="exec-shell-header">
+    <div class="exec-shell-brand">
+      <span class="exec-mark">EVICS</span>
+      <div>
+        <strong>I AM GENESIS TECH</strong>
+        <small>ELITE VIRAL INTELLIGENCE CONTROL SYSTEM</small>
       </div>
-      <div class="links">
-        <a href="/workspace">EVICS</a>
-        <a href="/affiliate">Affiliate Hub</a>
-        <a href="/admin-hub">AdminHub</a>
-      </div>
-      <div class="top-controls">
-        <div class="pulse" id="phonePulse">Connecting monitors…</div>
-        <button type="button" id="phoneRefresh" class="control-btn state-off">Refresh now</button>
-      </div>
-    </header>
+    </div>
+    <nav class="exec-shell-nav">
+      <a href="/workspace">EVICS</a>
+      <a href="/viral-media">Viral Media</a>
+      <a href="/affiliate">Affiliate Hub</a>
+      <a href="/phone-app" aria-current="page">Phone App</a>
+      <a href="/admin-hub">Affiliate AdminHub</a>
+    </nav>
+    <div class="exec-shell-pulse" id="phonePulse">Connecting monitors…</div>
+  </header>
 
-    <section class="layout">
-      <article class="panel">
-        <h2>Mobile render queue</h2>
-        <ul id="phoneRenderList" class="render-list">
-          <li class="render-item">Loading render feed…</li>
-        </ul>
-      </article>
-      <aside class="panel monitor">
-        <h2>Live mobile monitors</h2>
-        <p id="phoneRenderMonitor">Loading render monitor…</p>
-        <p id="phoneHealthMonitor">Loading health monitor…</p>
-        <p id="phoneProofMonitor">Loading proof monitor…</p>
+  <div class="exec-shell-main">
+    <div id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">APP</div>
+          <div>
+            <strong>Phone App</strong>
+            <span>Build 03 · Mobile Operations</span>
+          </div>
+        </div>
+        <nav>
+          <button type="button" class="active">
+            <div>
+              <strong>Render Feed</strong>
+              <small>Mobile pipeline and live render queue</small>
+            </div>
+          </button>
+          <button type="button">
+            <div>
+              <strong>Support Chat</strong>
+              <small>AI-assisted affiliate support channel</small>
+            </div>
+          </button>
+        </nav>
+        <div class="automation-card">
+          <span>Mobile field sync</span>
+          <strong>Operations active</strong>
+          <div class="pulse-row">
+            <i></i>
+            <span id="phoneSessionInfo">Connecting session…</span>
+          </div>
+        </div>
       </aside>
-    </section>
 
-    <section class="panel chat-panel">
-      <div class="chat-head">
-        <div>
-          <h2>Affiliate Support Channel</h2>
-          <p id="phoneSessionInfo">Connecting your phone app support session…</p>
+      <main>
+        <div class="topbar">
+          <div>
+            <p class="workspace-eyebrow">Build 03 — Mobile Operations</p>
+            <h1>Phone App Workspace</h1>
+            <p>Dedicated mobile operations build with real-time render feed telemetry and live affiliate support.</p>
+          </div>
+          <div class="top-actions">
+            <button type="button" id="phoneRefresh" class="control-btn control-btn state-off">Refresh now</button>
+            <button type="button" id="phoneLogout" class="control-btn state-off">Log off</button>
+          </div>
         </div>
-        <div class="chat-actions">
-          <button type="button" id="phoneChatRefresh" class="control-btn state-off">Refresh thread</button>
-          <button type="button" id="phoneLogout" class="control-btn state-off">Log off</button>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Mobile Render Queue</h2>
+              <p>Live render feed from the mobile content pipeline.</p>
+            </div>
+            <div class="panel-actions">
+              <p class="monitor-info" id="phoneRenderMonitor">Loading render monitor…</p>
+            </div>
+          </div>
+          <p class="monitor-info" id="phoneHealthMonitor">Loading health monitor…</p>
+          <p class="monitor-info" id="phoneProofMonitor">Loading proof monitor…</p>
+          <ul id="phoneRenderList" class="render-list" style="margin-top:14px">
+            <li class="render-item">Loading render feed…</li>
+          </ul>
         </div>
-      </div>
-      <div id="phoneChatFeed" class="chat-feed">
-        <div class="chat-empty">Support thread is loading…</div>
-      </div>
-      <div class="chat-compose">
-        <input id="phoneChatInput" type="text" placeholder="Ask AI support or request Admin help..." />
-        <button type="button" id="phoneChatSend" class="control-btn state-off">Send message</button>
-      </div>
-    </section>
+
+        <div class="panel">
+          <div class="chat-head">
+            <div>
+              <h2>Affiliate Support Channel</h2>
+            </div>
+            <div class="chat-actions">
+              <button type="button" id="phoneChatRefresh" class="control-btn state-off">Refresh thread</button>
+            </div>
+          </div>
+          <div id="phoneChatFeed" class="chat-feed">
+            <div class="chat-empty">Support thread is loading…</div>
+          </div>
+          <div class="chat-compose">
+            <input id="phoneChatInput" type="text" placeholder="Ask AI support or request Admin help..." />
+            <button type="button" id="phoneChatSend" class="control-btn control-btn--primary state-off">Send</button>
+          </div>
+        </div>
+      </main>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
