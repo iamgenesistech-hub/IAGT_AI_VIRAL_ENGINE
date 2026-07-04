@@ -17,9 +17,11 @@
   const avatarPhotoPreview = document.getElementById('phoneAvatarPhotoPreview');
   const avatarVoiceInput = document.getElementById('phoneAvatarVoiceInput');
   const avatarVoiceRecordBtn = document.getElementById('phoneAvatarVoiceRecord');
+  const avatarVoiceRerecordBtn = document.getElementById('phoneAvatarVoiceRerecord');
   const avatarVoiceUploadBtn = document.getElementById('phoneAvatarVoiceUpload');
   const avatarVoicePreview = document.getElementById('phoneAvatarVoicePreview');
   const avatarSaveProfileBtn = document.getElementById('phoneAvatarSaveProfile');
+  const phoneVoiceHelp = document.getElementById('phoneVoiceHelp');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
@@ -205,6 +207,15 @@
       if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
       avatarMonitor.textContent = parts.join(' · ');
     }
+    if (phoneVoiceHelp) {
+      if (voiceRecordState.active) {
+        phoneVoiceHelp.textContent = 'Recording now. Press Stop recording when you are done.';
+      } else if (supportState.avatarSetup.voiceFileUrl) {
+        phoneVoiceHelp.textContent = 'Voice sample ready. Use Re-record to replace it, or upload a different file.';
+      } else {
+        phoneVoiceHelp.textContent = 'Allow microphone access to record directly, or upload a file below.';
+      }
+    }
   }
 
   async function uploadAvatarAsset(file, endpoint, fieldName) {
@@ -252,6 +263,24 @@
     if (!avatarVoiceRecordBtn) return;
     avatarVoiceRecordBtn.textContent = label;
     setControlState(avatarVoiceRecordBtn, state);
+  }
+
+  function setVoiceRerecordButton(label, state) {
+    if (!avatarVoiceRerecordBtn) return;
+    avatarVoiceRerecordBtn.textContent = label;
+    setControlState(avatarVoiceRerecordBtn, state);
+  }
+
+  function clearVoiceSample() {
+    supportState.avatarSetup.voiceFileUrl = '';
+    supportState.avatarSetup.voiceFilePath = '';
+    if (avatarVoiceInput) avatarVoiceInput.value = '';
+    if (avatarVoicePreview) {
+      avatarVoicePreview.removeAttribute('src');
+      avatarVoicePreview.classList.add('hidden');
+    }
+    persistAvatarSetup();
+    renderAvatarSetup();
   }
 
   async function startVoiceRecording() {
@@ -584,6 +613,28 @@
       } finally {
         avatarVoiceRecordBtn.disabled = false;
         setTimeout(() => avatarVoiceRecordBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  if (avatarVoiceRerecordBtn) {
+    avatarVoiceRerecordBtn.addEventListener('click', async () => {
+      avatarVoiceRerecordBtn.classList.add('pressing');
+      avatarVoiceRerecordBtn.disabled = true;
+      setControlState(avatarVoiceRerecordBtn, 'running');
+      try {
+        clearVoiceSample();
+        if (voiceRecordState.active) {
+          stopVoiceRecording();
+        }
+        await startVoiceRecording();
+        setVoiceRerecordButton('Re-record', 'completed');
+      } catch (error) {
+        sessionInfo.textContent = `Re-record failed: ${error.message}`;
+        setVoiceRerecordButton('Re-record', 'off');
+      } finally {
+        avatarVoiceRerecordBtn.disabled = false;
+        setTimeout(() => avatarVoiceRerecordBtn.classList.remove('pressing'), 120);
       }
     });
   }

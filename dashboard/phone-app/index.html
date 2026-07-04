@@ -93,9 +93,11 @@
             <div class="avatar-upload-card">
               <h3>Voice Sample</h3>
               <p>Upload a clean voice clip for cloning/reference.</p>
+              <p id="phoneVoiceHelp" class="avatar-help">Allow microphone access to record directly, or upload a file below.</p>
               <input id="phoneAvatarVoiceInput" type="file" accept="audio/*" />
               <div class="avatar-voice-actions">
                 <button type="button" id="phoneAvatarVoiceRecord" class="control-btn state-off">Record voice sample</button>
+                <button type="button" id="phoneAvatarVoiceRerecord" class="control-btn state-off">Re-record</button>
                 <button type="button" id="phoneAvatarVoiceUpload" class="control-btn state-off">Upload voice file</button>
               </div>
               <audio id="phoneAvatarVoicePreview" class="avatar-voice-preview hidden" controls preload="none"></audio>
