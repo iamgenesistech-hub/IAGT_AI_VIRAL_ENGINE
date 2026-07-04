@@ -21,7 +21,8 @@ const {
   getHeyGenVideoStatus,
   pollHeyGenVideoAgentSession,
   pollHeyGenVideo,
-  getHeyGenCurrentUser
+  getHeyGenCurrentUser,
+  enforceFaceSafeTextPosition
 } = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
@@ -115,6 +116,11 @@ app.use('/dashboard/viral-media', express.static(path.join(__dirname, '../dashbo
     res.setHeader('Cache-Control', 'no-store');
   }
 }));
+// Short-path aliases for viral-media dashboard
+app.get('/viral-media', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/viral-media/index.html')));
+app.use('/viral-media', express.static(path.join(__dirname, '../dashboard/viral-media'), {
+  setHeaders: function (res) { res.setHeader('Cache-Control', 'no-store'); }
+}));
 app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app')));
 app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub')));
 
@@ -170,7 +176,9 @@ const A_PLUS_WORKSPACE_URLS = [
 const SUPPORTED_PRODUCT_ENTRANCE_EFFECTS = new Set([
   'product-entrance-fade'
 ]);
-const FACE_SAFE_TEXT_OVERLAY_POSITIONS = new Set(['top', 'bottom']);
+// 'top' is removed — it would overlay the avatar's face/crown area.
+// All render paths must use 'bottom' to stay below the neck (y > 950 in 1080×1920).
+const FACE_SAFE_TEXT_OVERLAY_POSITIONS = new Set(['bottom']);
 
 function normalizeSpecialEffects(value) {
   const list = Array.isArray(value)
@@ -183,6 +191,109 @@ function normalizeSpecialEffects(value) {
       .map((effect) => String(effect || '').trim().toLowerCase().replace(/\s+/g, '-'))
       .filter(Boolean)
   ));
+}
+
+function normalizeExternalUrl(value) {
+  return String(value || '').trim();
+}
+
+function getPublicAppHost(req) {
+  const explicit = String(process.env.EVICS_HOST || process.env.HOST || '').trim();
+  if (explicit && /^https?:\/\//i.test(explicit)) return explicit.replace(/\/$/, '');
+  if (req && typeof req.get === 'function') {
+    const host = req.get('host');
+    if (host) {
+      const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+      return `${proto}://${host}`.replace(/\/$/, '');
+    }
+  }
+  return 'https://evics-api-480958062306.us-central1.run.app';
+}
+
+function absolutizePublicAssetUrl(req, value) {
+  const url = normalizeExternalUrl(value);
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/')) return `${getPublicAppHost(req)}${url}`;
+  return url;
+}
+
+function isTrustedStoreProductUrl(value) {
+  const url = normalizeExternalUrl(value);
+  if (!url) return false;
+  try {
+    const host = new URL(url).host.toLowerCase();
+    return host === 'iamgenesistech.com'
+      || host.endsWith('.iamgenesistech.com')
+      || host === 'iamgenesistech.myshopify.com'
+      || host.endsWith('.myshopify.com')
+      || host === 'cdn.shopify.com'
+      || host.endsWith('.shopify.com')
+      || host.endsWith('.shopifycdn.com');
+  } catch {
+    return false;
+  }
+}
+
+async function prepareStoreProductImageForRender(req, imageUrl) {
+  const trustedImageUrl = normalizeExternalUrl(imageUrl);
+  if (!trustedImageUrl || !isTrustedStoreProductUrl(trustedImageUrl)) {
+    throw new Error('Trusted I AM GENESIS TECH store product image is required for avatar video rendering.');
+  }
+  try {
+    const bgResult = await removeBackground(trustedImageUrl);
+    return absolutizePublicAssetUrl(req, bgResult.processedUrl || trustedImageUrl);
+  } catch {
+    return absolutizePublicAssetUrl(req, trustedImageUrl);
+  }
+}
+
+function selectSupportingStoreProducts(primaryProduct, products = [], limit = 2) {
+  const primaryId = String(primaryProduct?.productId || primaryProduct?.id || '').trim();
+  const primaryHandle = String(primaryProduct?.handle || '').trim().toLowerCase();
+  const primaryTitle = String(primaryProduct?.title || '').trim().toLowerCase();
+  const primaryCategory = String(primaryProduct?.category || primaryProduct?.product_type || '').trim().toLowerCase();
+  const ranked = (Array.isArray(products) ? products : [])
+    .filter((product) => product && product.primaryImageUrl && isTrustedStoreProductUrl(product.primaryImageUrl))
+    .filter((product) => {
+      const id = String(product.productId || product.id || '').trim();
+      const handle = String(product.handle || '').trim().toLowerCase();
+      const title = String(product.title || '').trim().toLowerCase();
+      return id !== primaryId && handle !== primaryHandle && title !== primaryTitle;
+    })
+    .sort((a, b) => {
+      const aCategory = String(a.category || a.product_type || '').trim().toLowerCase();
+      const bCategory = String(b.category || b.product_type || '').trim().toLowerCase();
+      const aScore = primaryCategory && aCategory === primaryCategory ? 1 : 0;
+      const bScore = primaryCategory && bCategory === primaryCategory ? 1 : 0;
+      return bScore - aScore;
+    });
+  return ranked.slice(0, limit);
+}
+
+async function resolveStoreProductBundle(req, criteria = {}, options = {}) {
+  const supportLimit = Number(options.supportLimit || 2);
+  let products = [];
+  try {
+    products = await fetchShopifyProducts();
+    if (products.length) writeProductMockupLibrary(products, 'shopify');
+  } catch {}
+  const productLibrary = products.length ? products : readProductMockupLibrary().products;
+  const primaryProduct = resolveProductMockup(criteria, productLibrary);
+  if (!primaryProduct) {
+    throw new Error('No matching I AM GENESIS TECH store product was found. Use a real store product title, handle, id, or product page URL.');
+  }
+  if (!primaryProduct.primaryImageUrl || !isTrustedStoreProductUrl(primaryProduct.primaryImageUrl)) {
+    throw new Error('The matched store product is missing a trusted Shopify/IAGT mockup image.');
+  }
+  const processedPrimaryImageUrl = await prepareStoreProductImageForRender(req, primaryProduct.primaryImageUrl);
+  const supportingProducts = [];
+  const relatedProducts = selectSupportingStoreProducts(primaryProduct, productLibrary, supportLimit);
+  for (const product of relatedProducts) {
+    const processedImageUrl = await prepareStoreProductImageForRender(req, product.primaryImageUrl);
+    supportingProducts.push({ ...product, processedImageUrl });
+  }
+  return { primaryProduct, processedPrimaryImageUrl, supportingProducts, productLibrary };
 }
 
 function readJsonOrFallback(filePath, fallbackValue) {
@@ -1700,10 +1811,12 @@ app.post('/api/video/generate', async (req, res) => {
     if (useVideoAgent && !prompt && !script) {
       return res.status(400).json({ success: false, error: 'prompt or script is required for render_mode=video-agent.' });
     }
-    if (!FACE_SAFE_TEXT_OVERLAY_POSITIONS.has(textOverlayPosition)) {
+    // Enforce face-safe text position — silently correct to 'bottom' if an unsafe position was passed
+    const safeguardedTextOverlayPosition = enforceFaceSafeTextPosition(textOverlayPosition);
+    if (!FACE_SAFE_TEXT_OVERLAY_POSITIONS.has(safeguardedTextOverlayPosition)) {
       return res.status(422).json({
         success: false,
-        error: 'Text overlay position must be top (above head) or bottom (below neck). Face/head overlap text is not allowed.',
+        error: 'Text overlay position must be bottom (below neck). Text covering the avatar face/head/neck is not allowed.',
         allowed: Array.from(FACE_SAFE_TEXT_OVERLAY_POSITIONS)
       });
     }
@@ -4478,8 +4591,8 @@ app.post('/api/product-to-video', async (req, res) => {
   const vid = voice_id  || process.env.HEYGEN_VOICE_ID  || 'f8c69e517f424cafaecde32dde57096b';
   if (!process.env.HEYGEN_API_KEY) return res.json({ success: false, error: 'HEYGEN_API_KEY not configured in Railway env vars.' });
   try {
-    const render = await startHeyGenRender({ script, avatar_id: aid, voice_id: vid, config: { aspect: '9:16', background: { type: 'color', value: '#000000' }, test: false } });
-    fs.writeFileSync(path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`), JSON.stringify({ video_id: render.video_id, product_id: product_id || null, product_name: product_name || null, affiliate_email: affiliate_email || null, status: 'rendering', created_at: new Date().toISOString() }));
+    const render = await startHeyGenRender({ script, avatar_id: aid, voice_id: vid, config: { aspect: '9:16', background: { type: 'color', value: '#000000' }, caption: false, test: false } });
+    fs.writeFileSync(path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`), JSON.stringify({ video_id: render.video_id, product_id: product_id || null, product_name: product_name || null, affiliate_email: affiliate_email || null, textOverlayPosition: 'bottom', status: 'rendering', created_at: new Date().toISOString() }));
     res.json({ success: true, video_id: render.video_id, videoId: render.video_id, status: 'rendering' });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
@@ -4610,6 +4723,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
         script: scr, background: bgConfig, processedImageUrl,
         affiliateCode: affiliateCode || '',
         productImageUrl: productImageUrl || null,
+        textOverlayPosition: 'bottom',
         status: 'rendering', created_at: new Date().toISOString()
       })
     );
@@ -4727,6 +4841,7 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
         processedImageUrl: meta.processedImageUrl,
         affiliateCode: meta.affiliateCode || '',
         productImageUrl: meta.productImageUrl || null,
+        textOverlayPosition: 'bottom',
         status: 'rendering',
         created_at: new Date().toISOString()
       })
@@ -6134,6 +6249,7 @@ app.post('/api/ppep/create-media-job', async (req, res) => {
       platform, avatar_id: avatar, script,
       status, approved: approved || false, output_media_url: outputMediaUrl,
       background: JSON.stringify(bgConfig), processed_image_url: processedImageUrl,
+      text_overlay_position: 'bottom',
       created_at: new Date().toISOString()
     };
 
