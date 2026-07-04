@@ -50,6 +50,7 @@
       voiceFileUrl: '',
       voiceFilePath: '',
       avatarId: '',
+      requestId: '',
       createdAvatar: null,
       returnTo: ''
     }
@@ -185,6 +186,7 @@
       supportState.avatarSetup.voiceFileUrl = String(parsed.voiceFileUrl || '');
       supportState.avatarSetup.voiceFilePath = String(parsed.voiceFilePath || '');
       supportState.avatarSetup.avatarId = String(parsed.avatarId || '');
+      supportState.avatarSetup.requestId = String(parsed.requestId || '');
       supportState.avatarSetup.createdAvatar = parsed.createdAvatar || null;
       supportState.avatarSetup.returnTo = String(parsed.returnTo || '');
     } catch (error) {
@@ -233,8 +235,9 @@
       const created = supportState.avatarSetup.createdAvatar;
       if (created && created.avatarId) {
         avatarCreatedTitle.textContent = `Avatar created: ${created.name || created.avatarId}`;
-        avatarCreatedMeta.textContent = `Avatar ID ${created.avatarId} · source ${created.source || 'phone-app'} · returned to phone app`;
+        avatarCreatedMeta.textContent = `Avatar ID ${created.avatarItemId || created.avatarId} · source ${created.source || 'phone-app'} · returned to phone app`;
         avatarReturnLink.href = supportState.avatarSetup.returnTo || '/phone-app';
+        avatarReturnLink.textContent = 'Return to phone app';
         avatarCreatedCard.classList.remove('hidden');
       } else {
         avatarCreatedCard.classList.add('hidden');
@@ -366,7 +369,7 @@
   }
 
   async function saveAvatarProfile() {
-    const payload = await apiJson('/api/affiliate/avatar/create', {
+    const payload = await apiJson('/api/affiliate/avatar/request', {
       method: 'POST',
       body: JSON.stringify({
         affiliateId: supportState.affiliateCode,
@@ -379,12 +382,15 @@
         returnTo: `/phone-app?affiliateCode=${encodeURIComponent(supportState.affiliateCode)}&affiliateName=${encodeURIComponent(supportState.affiliateName)}`
       })
     });
-    supportState.avatarSetup.avatarId = String(payload.avatarId || payload.avatar?.id || '');
-    supportState.avatarSetup.createdAvatar = payload.avatar || null;
-    supportState.avatarSetup.returnTo = String(payload.returnTo || '/phone-app');
+    supportState.avatarSetup.requestId = String(payload.requestId || '');
+    supportState.avatarSetup.returnTo = String(payload.request?.returnTo || '/phone-app');
+    localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
     persistAvatarSetup();
     renderAvatarSetup();
-    sessionInfo.textContent = `Avatar profile saved${supportState.avatarSetup.avatarId ? ` (${supportState.avatarSetup.avatarId})` : ''}. Returned to phone app.`;
+    sessionInfo.textContent = 'Avatar request sent to Affiliate Hub. Opening hub for HeyGen creation...';
+    if (payload.hubUrl) {
+      window.location.href = payload.hubUrl;
+    }
   }
 
   function resolveAffiliateIdentity() {
@@ -397,6 +403,36 @@
     localStorage.setItem('evicsAffiliateName', cleanName);
     supportState.affiliateCode = cleanCode;
     supportState.affiliateName = cleanName;
+  }
+
+  function getAvatarRequestIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get('avatarRequestId') || params.get('requestId') || localStorage.getItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`) || '').trim();
+  }
+
+  async function syncAvatarRequestStatus() {
+    const requestId = getAvatarRequestIdFromUrl();
+    if (!requestId) return;
+    const payload = await apiJson(`/api/affiliate/avatar/request/${encodeURIComponent(requestId)}`);
+    const request = payload.request || null;
+    if (!request) return;
+    supportState.avatarSetup.requestId = request.requestId || requestId;
+    supportState.avatarSetup.returnTo = request.returnTo || supportState.avatarSetup.returnTo || '/phone-app';
+    localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
+    if (request.status === 'completed' && request.avatar) {
+      supportState.avatarSetup.createdAvatar = request.avatar;
+      supportState.avatarSetup.avatarId = String(request.avatar.avatarItemId || request.avatar.avatarId || request.avatar.id || '');
+      supportState.avatarSetup.photoUrl = String(request.avatar.photoUrl || supportState.avatarSetup.photoUrl || '');
+      supportState.avatarSetup.voiceFileUrl = String(request.avatar.voiceFileUrl || supportState.avatarSetup.voiceFileUrl || '');
+      supportState.avatarSetup.voiceFilePath = String(request.avatar.voiceFilePath || supportState.avatarSetup.voiceFilePath || '');
+      persistAvatarSetup();
+      renderAvatarSetup();
+      sessionInfo.textContent = `Avatar created through Affiliate Hub and returned to ${supportState.affiliateCode}.`;
+    } else if (request.status === 'queued' || request.status === 'processing') {
+      sessionInfo.textContent = 'Avatar request is queued in Affiliate Hub. Creating now...';
+    } else if (request.status === 'failed') {
+      sessionInfo.textContent = `Avatar request failed: ${request.error || 'Unknown error'}`;
+    }
   }
 
   function renderChatFeed() {
@@ -728,6 +764,7 @@
       resolveAffiliateIdentity();
       hydrateAvatarSetup();
       renderAvatarSetup();
+      await syncAvatarRequestStatus();
       await startSupportSession();
       await refreshConversation();
     } catch (error) {
@@ -740,4 +777,5 @@
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void heartbeatSupport(); }, 15000);
   setInterval(() => { void refreshConversation(); }, 8000);
+  setInterval(() => { void syncAvatarRequestStatus(); }, 10000);
 })();

@@ -138,6 +138,14 @@
         <a id="openPhoneSupportLink" class="btn btn-secondary control-state state-off" href="/phone-app">Open Phone App Support Channel</a>
       </div>
     </section>
+    <section class="panel" id="avatarHandoffPanel" style="margin-bottom:12px">
+      <h3>Avatar Handoff</h3>
+      <p id="avatarHandoffStatus" style="margin-top:6px;color:var(--muted)">Waiting for a phone app avatar request.</p>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button id="createAvatarFromPhoneBtn" class="btn btn-primary control-state state-off" onclick="void createAvatarFromPhone()">Create avatar in HeyGen</button>
+        <a id="returnFromAvatarBtn" class="btn btn-secondary control-state state-off" href="/phone-app">Return to phone app</a>
+      </div>
+    </section>
     <div class="grid">
       <div>
         <section class="panel">
@@ -193,6 +201,8 @@
     let selectedBgId = null;
     let lastVideoId = null;
     let backgroundOptions = [];
+    let avatarRequestId = '';
+    let avatarRequest = null;
     const CONTROL_STANDBY_MS = 60000;
     const controlTimers = new Map();
 
@@ -217,6 +227,7 @@
     (function init() {
       const params = new URLSearchParams(location.search);
       const code = params.get('code') || params.get('c');
+      avatarRequestId = params.get('avatarRequestId') || '';
       if (code) {
         document.getElementById('codeInput').value = code;
         loginWithCode();
@@ -231,7 +242,81 @@
       });
       refreshMonitors();
       setInterval(refreshMonitors, 30000);
+      if (avatarRequestId) {
+        void loadAvatarRequest(avatarRequestId);
+      }
     })();
+
+    async function loadAvatarRequest(requestId) {
+      const statusEl = document.getElementById('avatarHandoffStatus');
+      const createBtn = document.getElementById('createAvatarFromPhoneBtn');
+      try {
+        const res = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(requestId)}`);
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.error || 'Unable to load avatar request');
+        avatarRequest = data.request || null;
+        if (!avatarRequest) {
+          statusEl.textContent = 'No avatar request was found for this session.';
+          return;
+        }
+        if (avatarRequest.status === 'completed' && avatarRequest.avatar) {
+          statusEl.textContent = `Avatar already created for ${avatarRequest.affiliateCode}. Returning to phone app...`;
+          document.getElementById('returnFromAvatarBtn').href = avatarRequest.returnTo || '/phone-app';
+        } else {
+          statusEl.textContent = `Request loaded for ${avatarRequest.affiliateCode}. Creating avatar through HeyGen...`;
+          await createAvatarFromPhone();
+        }
+        setControlState(createBtn, 'completed', 1400);
+      } catch (error) {
+        statusEl.textContent = `Avatar handoff error: ${error.message}`;
+        setControlState(createBtn, 'off');
+      }
+    }
+
+    async function createAvatarFromPhone() {
+      const statusEl = document.getElementById('avatarHandoffStatus');
+      const createBtn = document.getElementById('createAvatarFromPhoneBtn');
+      if (!avatarRequest && avatarRequestId) {
+        const loaded = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(avatarRequestId)}`);
+        const loadedPayload = await loaded.json();
+        avatarRequest = loadedPayload.request || null;
+      }
+      if (!avatarRequest) {
+        statusEl.textContent = 'No queued avatar request found.';
+        return;
+      }
+      createBtn.disabled = true;
+      setControlState(createBtn, 'running');
+      try {
+        const res = await fetch(`${API}/api/affiliate/avatar/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: avatarRequest.requestId,
+            affiliateId: avatarRequest.affiliateId || avatarRequest.affiliateCode,
+            name: avatarRequest.name,
+            photoUrl: avatarRequest.photoUrl,
+            voiceFileUrl: avatarRequest.voiceFileUrl,
+            voiceFilePath: avatarRequest.voiceFilePath,
+            source: 'affiliate-hub',
+            returnTo: avatarRequest.returnTo || `/phone-app?affiliateCode=${encodeURIComponent(avatarRequest.affiliateCode || affiliateCode || 'ROLAND787')}`
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.error || 'Avatar creation failed');
+        avatarRequest = data.request || avatarRequest;
+        const returnUrl = data.returnTo || avatarRequest.returnTo || `/phone-app?affiliateCode=${encodeURIComponent(avatarRequest.affiliateCode || affiliateCode || 'ROLAND787')}&avatarRequestId=${encodeURIComponent(avatarRequest.requestId)}`;
+        statusEl.textContent = `Avatar created for ${avatarRequest.affiliateCode}. Returning to phone app...`;
+        document.getElementById('returnFromAvatarBtn').href = returnUrl;
+        setControlState(createBtn, 'completed', 1800);
+        setTimeout(() => { location.href = returnUrl; }, 1200);
+      } catch (error) {
+        statusEl.textContent = `Avatar creation failed: ${error.message}`;
+        setControlState(createBtn, 'off');
+      } finally {
+        createBtn.disabled = false;
+      }
+    }
 
     async function refreshMonitors() {
       const renderMonitor = document.getElementById('monitorRender');

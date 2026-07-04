@@ -154,6 +154,7 @@ app.get('/ref/:code', (req, res) => {
 
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
 const LIVE_HEYGEN_PROOF_PATH = path.join(__dirname, '..', 'generated', 'live_heygen_proofs.json');
+const AFFILIATE_AVATAR_REQUESTS_PATH = path.join(__dirname, '..', 'generated', 'affiliate_avatar_requests.json');
 const EXCELLENCE_STATE_PATH = path.join(__dirname, '..', 'generated', 'a_plus_objectives_state.json');
 const EXCELLENCE_AUDIT_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_latest.json');
 const EXCELLENCE_AUDIT_HISTORY_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_history.json');
@@ -615,6 +616,116 @@ function readJsonArray(filePath) {
   if (!raw.trim()) return [];
   const parsed = JSON.parse(raw);
   return Array.isArray(parsed) ? parsed : [];
+}
+
+function readJsonArraySafe(filePath) {
+  try {
+    return readJsonArray(filePath);
+  } catch {
+    return [];
+  }
+}
+
+function writeJsonArray(filePath, value) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(Array.isArray(value) ? value : [], null, 2), 'utf8');
+}
+
+function makeAvatarRequestId() {
+  return `avreq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getAvatarRequests() {
+  return readJsonArraySafe(AFFILIATE_AVATAR_REQUESTS_PATH);
+}
+
+function saveAvatarRequests(records) {
+  writeJsonArray(AFFILIATE_AVATAR_REQUESTS_PATH, records);
+}
+
+function upsertAvatarRequest(record) {
+  const current = getAvatarRequests();
+  const next = current.filter((item) => item.requestId !== record.requestId);
+  next.unshift(record);
+  saveAvatarRequests(next.slice(0, 100));
+  return record;
+}
+
+function findAvatarRequest(requestId) {
+  return getAvatarRequests().find((item) => item.requestId === requestId) || null;
+}
+
+function findLatestAvatarRequest(affiliateCode) {
+  const code = String(affiliateCode || '').trim().toUpperCase();
+  if (!code) return null;
+  return getAvatarRequests().find((item) => String(item.affiliateCode || '').trim().toUpperCase() === code) || null;
+}
+
+function normalizeAvatarCreateResponse(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
+  const avatarItem = data.avatar_item || data.avatarItem || data.avatar || data.avatar_item_id || null;
+  const avatarGroup = data.avatar_group || data.avatarGroup || data.group || null;
+  return {
+    avatarItem,
+    avatarGroup,
+    raw: data
+  };
+}
+
+async function heygenApiJson(endpoint, body) {
+  if (!process.env.HEYGEN_API_KEY) {
+    const err = new Error('HEYGEN_API_KEY not configured in Railway env vars.');
+    err.code = 'HEYGEN_API_KEY_MISSING';
+    throw err;
+  }
+  const response = await fetch(`https://api.heygen.com${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': process.env.HEYGEN_API_KEY,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body || {})
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || payload?.error || `HeyGen request failed (${response.status})`);
+    error.statusCode = response.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl }) {
+  if (!photoUrl) {
+    throw new Error('A photo URL is required to create a HeyGen photo avatar.');
+  }
+  const avatarResp = await heygenApiJson('/v3/avatars', {
+    type: 'photo',
+    name: name || 'EVICS Affiliate Avatar',
+    file: { type: 'url', url: photoUrl }
+  });
+  const normalizedAvatar = normalizeAvatarCreateResponse(avatarResp);
+  let voiceCloneId = null;
+  let voiceCloneStatus = null;
+  if (voiceFileUrl) {
+    const voiceResp = await heygenApiJson('/v3/voices/clone', {
+      audio: { type: 'url', url: voiceFileUrl },
+      voice_name: `${name || 'EVICS Affiliate'} Voice`,
+      remove_background_noise: true
+    });
+    voiceCloneId = voiceResp?.data?.voice_clone_id || voiceResp?.voice_clone_id || null;
+    voiceCloneStatus = voiceCloneId ? 'queued' : null;
+  }
+  return {
+    avatar_item: normalizedAvatar.avatarItem,
+    avatar_group: normalizedAvatar.avatarGroup,
+    voice_clone_id: voiceCloneId,
+    voice_clone_status: voiceCloneStatus,
+    source_provider: 'heygen'
+  };
 }
 
 function recordLiveHeyGenProof({ videoId, videoUrl, thumbnailUrl, duration, renderGrade, source }) {
@@ -5000,6 +5111,72 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), (re
   }
 });
 
+// POST /api/affiliate/avatar/request — queue an avatar handoff from phone app to Affiliate Hub
+app.post('/api/affiliate/avatar/request', async (req, res) => {
+  try {
+    const {
+      affiliateCode,
+      affiliateId,
+      name,
+      photoUrl,
+      voiceFileUrl,
+      voiceFilePath,
+      source,
+      returnTo
+    } = req.body || {};
+    const cleanedCode = String(affiliateCode || affiliateId || '').trim().toUpperCase();
+    if (!cleanedCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    if (!photoUrl) return res.status(400).json({ success: false, error: 'photoUrl is required' });
+    const requestId = makeAvatarRequestId();
+    const baseReturnTo = String(returnTo || `/phone-app?affiliateCode=${encodeURIComponent(cleanedCode)}&affiliateName=${encodeURIComponent(name || cleanedCode)}`).trim();
+    const safeReturnTo = baseReturnTo.startsWith('/') ? baseReturnTo : `/phone-app?affiliateCode=${encodeURIComponent(cleanedCode)}&affiliateName=${encodeURIComponent(name || cleanedCode)}`;
+    const finalReturnTo = safeReturnTo.includes('avatarRequestId=')
+      ? safeReturnTo
+      : `${safeReturnTo}${safeReturnTo.includes('?') ? '&' : '?'}avatarRequestId=${encodeURIComponent(requestId)}`;
+    const record = upsertAvatarRequest({
+      requestId,
+      affiliateCode: cleanedCode,
+      affiliateId: affiliateId || cleanedCode,
+      name: name || `${cleanedCode} Avatar`,
+      photoUrl,
+      voiceFileUrl: voiceFileUrl || null,
+      voiceFilePath: voiceFilePath || null,
+      source: source || 'phone-app',
+      returnTo: finalReturnTo,
+      status: 'queued',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      avatar: null,
+      voiceCloneId: null,
+      voiceCloneStatus: null,
+      error: null
+    });
+    res.json({
+      success: true,
+      request: record,
+      requestId,
+      hubUrl: `/affiliate/workspace?code=${encodeURIComponent(cleanedCode)}&avatarRequestId=${encodeURIComponent(requestId)}`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/affiliate/avatar/request/:requestId — retrieve a queued/completed avatar request
+app.get('/api/affiliate/avatar/request/:requestId', (req, res) => {
+  const request = findAvatarRequest(req.params.requestId);
+  if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
+  res.json({ success: true, request });
+});
+
+// GET /api/affiliate/avatar/request/latest — fetch the latest request for an affiliate
+app.get('/api/affiliate/avatar/request/latest', (req, res) => {
+  const affiliateCode = String(req.query.affiliateCode || '').trim().toUpperCase();
+  const request = findLatestAvatarRequest(affiliateCode);
+  if (!request) return res.json({ success: true, request: null });
+  res.json({ success: true, request });
+});
+
 // POST /api/affiliate/avatar/create — create/register avatar profile (returns full avatar object)
 app.post('/api/affiliate/avatar/create', async (req, res) => {
   const {
@@ -5010,49 +5187,134 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     voiceFilePath,
     voiceFileUrl,
     source,
-    returnTo
+    returnTo,
+    requestId
   } = req.body || {};
   try {
-    const avatarId = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
-    const hasVoice = Boolean(voiceFilePath || voiceFileUrl);
     const safeReturnTo = String(returnTo || '').trim();
     const normalizedReturnTo = safeReturnTo.startsWith('/') ? safeReturnTo : '';
+    const finalRequestId = requestId || null;
+    const requestRecord = finalRequestId ? findAvatarRequest(finalRequestId) : null;
+    const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
+    const resolvedPhotoUrl = photoUrl || requestRecord?.photoUrl || null;
+    const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
 
-    const finalAvatarId = avatarId;
+    let avatarPayload;
+    if (process.env.HEYGEN_API_KEY) {
+    avatarPayload = await createHeyGenAffiliateAvatar({
+      name: resolvedName,
+      photoUrl: resolvedPhotoUrl,
+      voiceFileUrl: resolvedVoiceUrl
+    });
+    } else {
+    avatarPayload = {
+      avatar_item: {
+        id: process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501',
+        name: resolvedName,
+        avatar_type: 'photo_avatar',
+        group_id: 'local-demo-group',
+        preview_image_url: resolvedPhotoUrl,
+        supported_api_engines: ['avatar_4_quality', 'avatar_4_turbo'],
+        tags: []
+      },
+      avatar_group: {
+        id: 'local-demo-group',
+        name: resolvedName,
+        looks_count: 1,
+        consent_status: null,
+        created_at: Date.now()
+      },
+      voice_clone_id: resolvedVoiceUrl ? `voice_clone_${Date.now()}` : null,
+      voice_clone_status: resolvedVoiceUrl ? 'queued' : null,
+      source_provider: 'demo'
+    };
+    }
+
+    const avatarItem = avatarPayload.avatar_item || {};
+    const avatarGroup = avatarPayload.avatar_group || {};
+    const finalAvatarId = avatarItem.id || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
     const avatar = {
-      id: finalAvatarId,
-      avatarId: finalAvatarId,
-      name: name || `${affiliateId ? 'My' : 'EVICS'} Avatar`,
-      style: style || 'avatar',
-      photoUrl: photoUrl || null,
-      voiceFileUrl: voiceFileUrl || null,
-      voiceFilePath: voiceFilePath || null,
-      voiceCloneStatus: hasVoice ? 'uploaded' : 'none',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      isDefault: true,
-      source: source || 'affiliate-hub',
-      returnTo: normalizedReturnTo || null,
-      note: 'Using EVICS default expressive avatar (Abigail). Custom photo-avatar creation is disabled until a current HeyGen v3 endpoint is configured.'
+    id: finalAvatarId,
+    avatarId: finalAvatarId,
+    avatarItemId: avatarItem.id || null,
+    avatarGroupId: avatarGroup.id || null,
+    name: resolvedName,
+    style: style || 'avatar',
+    photoUrl: resolvedPhotoUrl || null,
+    voiceFileUrl: resolvedVoiceUrl || null,
+    voiceFilePath: voiceFilePath || null,
+    voiceCloneId: avatarPayload.voice_clone_id || null,
+    voiceCloneStatus: avatarPayload.voice_clone_status || (resolvedVoiceUrl ? 'uploaded' : 'none'),
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    isDefault: true,
+    source: source || 'affiliate-hub',
+    sourceProvider: avatarPayload.source_provider || 'heygen',
+    returnTo: normalizedReturnTo || null,
+    note: source === 'phone-app'
+      ? 'Created from the phone app handoff and routed back to the phone app after HeyGen processing.'
+      : 'Created via Affiliate Hub handoff and returned to the phone app.'
     };
 
-    // Persist to Supabase if available
     try {
-      await SupabaseConnector.from('affiliate_avatars').upsert([{
-        id: finalAvatarId, affiliate_id: affiliateId || null, name: avatar.name,
-        style: avatar.style, photo_url: photoUrl || null, voice_file_url: voiceFileUrl || null,
-        voice_clone_status: avatar.voiceCloneStatus, status: 'active', created_at: avatar.createdAt
-      }], { onConflict: 'id' });
+    await SupabaseConnector.from('affiliate_avatars').upsert([{
+      id: finalAvatarId,
+      affiliate_id: affiliateId || null,
+      name: avatar.name,
+      style: avatar.style,
+      photo_url: avatar.photoUrl,
+      voice_file_url: avatar.voiceFileUrl,
+      voice_clone_status: avatar.voiceCloneStatus,
+      status: 'active',
+      created_at: avatar.createdAt
+    }], { onConflict: 'id' });
     } catch {}
+
+    if (finalRequestId) {
+    upsertAvatarRequest({
+      ...(requestRecord || {}),
+      requestId: finalRequestId,
+      affiliateCode: String(affiliateId || requestRecord?.affiliateCode || '').trim().toUpperCase(),
+      affiliateId: affiliateId || requestRecord?.affiliateId || null,
+      name: avatar.name,
+      photoUrl: avatar.photoUrl,
+      voiceFileUrl: avatar.voiceFileUrl,
+      voiceFilePath: avatar.voiceFilePath,
+      source: requestRecord?.source || source || 'affiliate-hub',
+      returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
+      status: 'completed',
+      updatedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      avatar,
+      voiceCloneId: avatar.voiceCloneId,
+      voiceCloneStatus: avatar.voiceCloneStatus,
+      error: null
+    });
+    }
 
     res.json({
     success: true,
     avatar,
     avatarId: finalAvatarId,
+    avatarItemId: avatar.avatarItemId,
+    avatarGroupId: avatar.avatarGroupId,
+    voiceCloneId: avatar.voiceCloneId,
+    voiceCloneStatus: avatar.voiceCloneStatus,
+    source: source || 'affiliate-hub',
     returnTo: normalizedReturnTo || null,
-    source: source || 'affiliate-hub'
+    requestId: finalRequestId || null,
+    provider: avatar.sourceProvider
     });
   } catch (e) {
+    if (requestId) {
+    upsertAvatarRequest({
+      ...(findAvatarRequest(requestId) || {}),
+      requestId,
+      status: 'failed',
+      error: e.message,
+      updatedAt: new Date().toISOString()
+    });
+    }
     res.status(500).json({ success: false, error: e.message });
   }
 });
