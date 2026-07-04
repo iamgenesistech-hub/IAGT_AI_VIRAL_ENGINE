@@ -11,15 +11,37 @@
   const logoutBtn = document.getElementById('phoneLogout');
   const chatFeed = document.getElementById('phoneChatFeed');
   const sessionInfo = document.getElementById('phoneSessionInfo');
+  const avatarMonitor = document.getElementById('phoneAvatarMonitor');
+  const avatarPhotoInput = document.getElementById('phoneAvatarPhotoInput');
+  const avatarPhotoUploadBtn = document.getElementById('phoneAvatarPhotoUpload');
+  const avatarPhotoPreview = document.getElementById('phoneAvatarPhotoPreview');
+  const avatarVoiceInput = document.getElementById('phoneAvatarVoiceInput');
+  const avatarVoiceRecordBtn = document.getElementById('phoneAvatarVoiceRecord');
+  const avatarVoiceUploadBtn = document.getElementById('phoneAvatarVoiceUpload');
+  const avatarVoicePreview = document.getElementById('phoneAvatarVoicePreview');
+  const avatarSaveProfileBtn = document.getElementById('phoneAvatarSaveProfile');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
+  const voiceRecordState = {
+    recorder: null,
+    stream: null,
+    chunks: [],
+    active: false,
+    lastBlobUrl: ''
+  };
   const supportState = {
     affiliateCode: '',
     affiliateName: '',
     sessionId: null,
     lastSequence: 0,
-    messages: []
+    messages: [],
+    avatarSetup: {
+      photoUrl: '',
+      voiceFileUrl: '',
+      voiceFilePath: '',
+      avatarId: ''
+    }
   };
 
   function setControlState(el, state, autoOffMs = 0) {
@@ -133,6 +155,170 @@
       throw new Error(payload.error || `Request failed: ${response.status}`);
     }
     return payload;
+  }
+
+  function avatarStorageKey() {
+    return `evicsPhoneAvatarSetup:${supportState.affiliateCode || 'default'}`;
+  }
+
+  function persistAvatarSetup() {
+    localStorage.setItem(avatarStorageKey(), JSON.stringify(supportState.avatarSetup));
+  }
+
+  function hydrateAvatarSetup() {
+    const raw = localStorage.getItem(avatarStorageKey());
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      supportState.avatarSetup.photoUrl = String(parsed.photoUrl || '');
+      supportState.avatarSetup.voiceFileUrl = String(parsed.voiceFileUrl || '');
+      supportState.avatarSetup.voiceFilePath = String(parsed.voiceFilePath || '');
+      supportState.avatarSetup.avatarId = String(parsed.avatarId || '');
+    } catch (error) {
+      console.warn('Invalid stored avatar setup payload', error);
+    }
+  }
+
+  function renderAvatarSetup() {
+    if (avatarPhotoPreview) {
+      if (supportState.avatarSetup.photoUrl) {
+        avatarPhotoPreview.src = supportState.avatarSetup.photoUrl;
+        avatarPhotoPreview.classList.remove('hidden');
+      } else {
+        avatarPhotoPreview.removeAttribute('src');
+        avatarPhotoPreview.classList.add('hidden');
+      }
+    }
+    if (avatarVoicePreview) {
+      if (supportState.avatarSetup.voiceFileUrl) {
+        avatarVoicePreview.src = supportState.avatarSetup.voiceFileUrl;
+        avatarVoicePreview.classList.remove('hidden');
+      } else {
+        avatarVoicePreview.removeAttribute('src');
+        avatarVoicePreview.classList.add('hidden');
+      }
+    }
+    if (avatarMonitor) {
+      const parts = [];
+      parts.push(supportState.avatarSetup.photoUrl ? 'Photo uploaded' : 'Photo pending');
+      parts.push(supportState.avatarSetup.voiceFileUrl ? 'Voice uploaded' : 'Voice pending');
+      if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
+      avatarMonitor.textContent = parts.join(' · ');
+    }
+  }
+
+  async function uploadAvatarAsset(file, endpoint, fieldName) {
+    if (!file) throw new Error('Please choose a file before uploading.');
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    const response = await fetch(endpoint, { method: 'POST', body: formData });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.success === false) {
+      throw new Error(payload.error || `Upload failed: ${response.status}`);
+    }
+    return payload;
+  }
+
+  async function uploadRecordedAvatarVoice(blob) {
+    const file = new File([blob], `voice-sample-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice');
+    supportState.avatarSetup.voiceFileUrl = String(payload.voiceFileUrl || '');
+    supportState.avatarSetup.voiceFilePath = String(payload.voiceFilePath || '');
+    persistAvatarSetup();
+    renderAvatarSetup();
+    sessionInfo.textContent = 'Recorded voice sample uploaded and ready.';
+  }
+
+  async function uploadAvatarPhoto() {
+    const file = avatarPhotoInput?.files?.[0];
+    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-photo', 'photo');
+    supportState.avatarSetup.photoUrl = String(payload.photoUrl || '');
+    persistAvatarSetup();
+    renderAvatarSetup();
+    sessionInfo.textContent = 'Affiliate photo uploaded and ready.';
+  }
+
+  async function uploadAvatarVoice() {
+    const file = avatarVoiceInput?.files?.[0];
+    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice');
+    supportState.avatarSetup.voiceFileUrl = String(payload.voiceFileUrl || '');
+    supportState.avatarSetup.voiceFilePath = String(payload.voiceFilePath || '');
+    persistAvatarSetup();
+    renderAvatarSetup();
+    sessionInfo.textContent = 'Affiliate voice file uploaded and ready.';
+  }
+
+  function setVoiceRecordButton(label, state) {
+    if (!avatarVoiceRecordBtn) return;
+    avatarVoiceRecordBtn.textContent = label;
+    setControlState(avatarVoiceRecordBtn, state);
+  }
+
+  async function startVoiceRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('This browser does not support microphone recording.');
+    }
+    if (voiceRecordState.active) return;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    voiceRecordState.stream = stream;
+    voiceRecordState.recorder = recorder;
+    voiceRecordState.chunks = [];
+    voiceRecordState.active = true;
+    recorder.addEventListener('dataavailable', (event) => {
+      if (event.data && event.data.size > 0) voiceRecordState.chunks.push(event.data);
+    });
+    recorder.addEventListener('stop', () => {
+      void (async () => {
+        const blob = new Blob(voiceRecordState.chunks, { type: recorder.mimeType || 'audio/webm' });
+        if (voiceRecordState.lastBlobUrl) URL.revokeObjectURL(voiceRecordState.lastBlobUrl);
+        voiceRecordState.lastBlobUrl = URL.createObjectURL(blob);
+        if (avatarVoicePreview) {
+          avatarVoicePreview.src = voiceRecordState.lastBlobUrl;
+          avatarVoicePreview.classList.remove('hidden');
+        }
+        try {
+          await uploadRecordedAvatarVoice(blob);
+        } catch (error) {
+          sessionInfo.textContent = `Recorded voice upload failed: ${error.message}`;
+        } finally {
+          voiceRecordState.active = false;
+          voiceRecordState.recorder = null;
+          if (voiceRecordState.stream) {
+            voiceRecordState.stream.getTracks().forEach((track) => track.stop());
+            voiceRecordState.stream = null;
+          }
+          voiceRecordState.chunks = [];
+          setVoiceRecordButton('Record voice sample', 'off');
+        }
+      })();
+    });
+    recorder.start();
+    setVoiceRecordButton('Stop recording', 'running');
+    sessionInfo.textContent = 'Recording voice sample…';
+  }
+
+  function stopVoiceRecording() {
+    if (!voiceRecordState.recorder || !voiceRecordState.active) return;
+    voiceRecordState.recorder.stop();
+  }
+
+  async function saveAvatarProfile() {
+    const payload = await apiJson('/api/affiliate/avatar/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        affiliateId: supportState.affiliateCode,
+        name: `${supportState.affiliateName} Avatar`,
+        style: 'avatar',
+        photoUrl: supportState.avatarSetup.photoUrl || null,
+        voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
+        voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null
+      })
+    });
+    supportState.avatarSetup.avatarId = String(payload.avatarId || payload.avatar?.id || '');
+    persistAvatarSetup();
+    renderAvatarSetup();
+    sessionInfo.textContent = `Avatar profile saved${supportState.avatarSetup.avatarId ? ` (${supportState.avatarSetup.avatarId})` : ''}.`;
   }
 
   function resolveAffiliateIdentity() {
@@ -346,6 +532,80 @@
     });
   }
 
+  if (avatarPhotoUploadBtn) {
+    avatarPhotoUploadBtn.addEventListener('click', async () => {
+      avatarPhotoUploadBtn.classList.add('pressing');
+      avatarPhotoUploadBtn.disabled = true;
+      setControlState(avatarPhotoUploadBtn, 'running');
+      try {
+        await uploadAvatarPhoto();
+        setControlState(avatarPhotoUploadBtn, 'completed', 1300);
+      } catch (error) {
+        sessionInfo.textContent = `Photo upload failed: ${error.message}`;
+        setControlState(avatarPhotoUploadBtn, 'off');
+      } finally {
+        avatarPhotoUploadBtn.disabled = false;
+        setTimeout(() => avatarPhotoUploadBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  if (avatarVoiceUploadBtn) {
+    avatarVoiceUploadBtn.addEventListener('click', async () => {
+      avatarVoiceUploadBtn.classList.add('pressing');
+      avatarVoiceUploadBtn.disabled = true;
+      setControlState(avatarVoiceUploadBtn, 'running');
+      try {
+        await uploadAvatarVoice();
+        setControlState(avatarVoiceUploadBtn, 'completed', 1300);
+      } catch (error) {
+        sessionInfo.textContent = `Voice upload failed: ${error.message}`;
+        setControlState(avatarVoiceUploadBtn, 'off');
+      } finally {
+        avatarVoiceUploadBtn.disabled = false;
+        setTimeout(() => avatarVoiceUploadBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  if (avatarVoiceRecordBtn) {
+    avatarVoiceRecordBtn.addEventListener('click', async () => {
+      avatarVoiceRecordBtn.classList.add('pressing');
+      avatarVoiceRecordBtn.disabled = true;
+      try {
+        if (voiceRecordState.active) {
+          stopVoiceRecording();
+        } else {
+          await startVoiceRecording();
+        }
+      } catch (error) {
+        sessionInfo.textContent = `Voice recording failed: ${error.message}`;
+        setVoiceRecordButton('Record voice sample', 'off');
+      } finally {
+        avatarVoiceRecordBtn.disabled = false;
+        setTimeout(() => avatarVoiceRecordBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  if (avatarSaveProfileBtn) {
+    avatarSaveProfileBtn.addEventListener('click', async () => {
+      avatarSaveProfileBtn.classList.add('pressing');
+      avatarSaveProfileBtn.disabled = true;
+      setControlState(avatarSaveProfileBtn, 'running');
+      try {
+        await saveAvatarProfile();
+        setControlState(avatarSaveProfileBtn, 'completed', 1300);
+      } catch (error) {
+        sessionInfo.textContent = `Avatar profile save failed: ${error.message}`;
+        setControlState(avatarSaveProfileBtn, 'off');
+      } finally {
+        avatarSaveProfileBtn.disabled = false;
+        setTimeout(() => avatarSaveProfileBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
       logoutBtn.classList.add('pressing');
@@ -366,6 +626,8 @@
   async function boot() {
     try {
       resolveAffiliateIdentity();
+      hydrateAvatarSetup();
+      renderAvatarSetup();
       await startSupportSession();
       await refreshConversation();
     } catch (error) {

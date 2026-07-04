@@ -75,6 +75,40 @@
         <div class="panel">
           <div class="panel-head">
             <div>
+              <h2>Affiliate Avatar Setup</h2>
+              <p>Upload the affiliate headshot and voice sample so avatar ads can be generated from the phone app.</p>
+            </div>
+            <div class="panel-actions">
+              <p class="monitor-info" id="phoneAvatarMonitor">No media uploaded yet.</p>
+            </div>
+          </div>
+          <div class="avatar-setup-grid">
+            <div class="avatar-upload-card">
+              <h3>Profile Picture</h3>
+              <p>Upload a clear front-facing photo.</p>
+              <input id="phoneAvatarPhotoInput" type="file" accept="image/*" />
+              <button type="button" id="phoneAvatarPhotoUpload" class="control-btn state-off">Upload picture</button>
+              <img id="phoneAvatarPhotoPreview" class="avatar-photo-preview hidden" alt="Affiliate profile preview" />
+            </div>
+            <div class="avatar-upload-card">
+              <h3>Voice Sample</h3>
+              <p>Upload a clean voice clip for cloning/reference.</p>
+              <input id="phoneAvatarVoiceInput" type="file" accept="audio/*" />
+              <div class="avatar-voice-actions">
+                <button type="button" id="phoneAvatarVoiceRecord" class="control-btn state-off">Record voice sample</button>
+                <button type="button" id="phoneAvatarVoiceUpload" class="control-btn state-off">Upload voice file</button>
+              </div>
+              <audio id="phoneAvatarVoicePreview" class="avatar-voice-preview hidden" controls preload="none"></audio>
+            </div>
+          </div>
+          <div class="avatar-setup-actions">
+            <button type="button" id="phoneAvatarSaveProfile" class="control-btn primary-action state-off">Save avatar profile</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Mobile Render Queue</h2>
               <p>Live render feed from the mobile content pipeline.</p>
             </div>

@@ -159,6 +159,55 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 .panel-head p  { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .panel-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .monitor-info  { color: var(--text-sub); font-size: 12px; margin-top: 4px; }
+.hidden { display: none !important; }
+
+/* ── Avatar setup ─────────────────────────────────────────────────────────── */
+.avatar-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.avatar-upload-card {
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  background: rgba(8, 13, 21, 0.8);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.avatar-upload-card p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.avatar-upload-card input[type="file"] {
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(7,11,18,.85);
+  color: var(--text-sub);
+}
+.avatar-voice-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.avatar-photo-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border-dim);
+  background: #04080d;
+}
+.avatar-voice-preview {
+  width: 100%;
+  border-radius: 10px;
+}
+.avatar-setup-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .control-btn, .render-review-btn, .review-close {
@@ -256,4 +305,5 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 @media (max-width: 900px) {
   #app { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
+  .avatar-setup-grid { grid-template-columns: 1fr; }
 }
