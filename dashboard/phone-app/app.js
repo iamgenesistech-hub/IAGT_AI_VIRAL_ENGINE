@@ -20,6 +20,9 @@
   const avatarVoiceRerecordBtn = document.getElementById('phoneAvatarVoiceRerecord');
   const avatarVoiceUploadBtn = document.getElementById('phoneAvatarVoiceUpload');
   const avatarVoicePreview = document.getElementById('phoneAvatarVoicePreview');
+  const avatarVoiceFileRow = document.getElementById('phoneAvatarVoiceFileRow');
+  const avatarVoiceFileLink = document.getElementById('phoneAvatarVoiceFileLink');
+  const avatarVoiceCopyLinkBtn = document.getElementById('phoneAvatarVoiceCopyLink');
   const avatarSaveProfileBtn = document.getElementById('phoneAvatarSaveProfile');
   const phoneVoiceHelp = document.getElementById('phoneVoiceHelp');
   const modalState = { open: false, item: null };
@@ -198,6 +201,17 @@
       } else {
         avatarVoicePreview.removeAttribute('src');
         avatarVoicePreview.classList.add('hidden');
+      }
+    }
+    if (avatarVoiceFileRow && avatarVoiceFileLink) {
+      if (supportState.avatarSetup.voiceFileUrl) {
+        avatarVoiceFileLink.href = supportState.avatarSetup.voiceFileUrl;
+        avatarVoiceFileLink.textContent = supportState.avatarSetup.voiceFileUrl;
+        avatarVoiceFileRow.classList.remove('hidden');
+      } else {
+        avatarVoiceFileLink.removeAttribute('href');
+        avatarVoiceFileLink.textContent = 'Open recorded voice file';
+        avatarVoiceFileRow.classList.add('hidden');
       }
     }
     if (avatarMonitor) {
@@ -653,6 +667,18 @@
       } finally {
         avatarSaveProfileBtn.disabled = false;
         setTimeout(() => avatarSaveProfileBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  if (avatarVoiceCopyLinkBtn) {
+    avatarVoiceCopyLinkBtn.addEventListener('click', async () => {
+      if (!supportState.avatarSetup.voiceFileUrl) return;
+      try {
+        await navigator.clipboard.writeText(supportState.avatarSetup.voiceFileUrl);
+        sessionInfo.textContent = 'Voice file link copied to clipboard.';
+      } catch (error) {
+        sessionInfo.textContent = `Copy failed: ${error.message}`;
       }
     });
   }
