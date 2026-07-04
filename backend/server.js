@@ -28,6 +28,11 @@ const { startScheduler, getSchedulerLog } = require('../utils/automationSchedule
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
 const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground, resolveBackgroundUrl } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
+const {
+  intakeServiceWebsite,
+  generateServiceAvatarCampaign,
+  buildServiceRenderRequest
+} = require('../utils/serviceAdsEngine');
 const { postProcessVideo } = require('../utils/videoPostProcessor');
 const {
   writeProductMockupLibrary,
@@ -3100,6 +3105,98 @@ app.post('/api/agent/generate-ads', async (req, res) => {
   }
 });
 
+// /api/services/intake-website — ingest a service-business website (law firms supported)
+app.post('/api/services/intake-website', async (req, res) => {
+  try {
+    const {
+      websiteUrl,
+      businessType,
+      representativeName,
+      targetAudience,
+      serviceRegion
+    } = req.body || {};
+    if (!websiteUrl) {
+      return res.status(400).json({ success: false, error: 'websiteUrl is required.' });
+    }
+    const profile = await intakeServiceWebsite({
+      websiteUrl,
+      businessTypeHint: businessType,
+      representativeName,
+      targetAudience,
+      serviceRegion
+    });
+    noStore(res);
+    return res.json({
+      success: true,
+      profile,
+      next: {
+        generateCampaignEndpoint: '/api/services/generate-avatar-ads',
+        buildRenderRequestEndpoint: '/api/services/build-render-request',
+        videoGenerateEndpoint: '/api/video/generate'
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/services/generate-avatar-ads — create service-avatar campaign concepts/scripts
+app.post('/api/services/generate-avatar-ads', async (req, res) => {
+  try {
+    const body = req.body || {};
+    let profile = body.profile || null;
+    if (!profile) {
+      if (!body.websiteUrl) {
+        return res.status(400).json({ success: false, error: 'profile or websiteUrl is required.' });
+      }
+      profile = await intakeServiceWebsite({
+        websiteUrl: body.websiteUrl,
+        businessTypeHint: body.businessType,
+        representativeName: body.representativeName,
+        targetAudience: body.targetAudience,
+        serviceRegion: body.serviceRegion
+      });
+    }
+    const campaign = generateServiceAvatarCampaign({
+      profile,
+      avatar: body.avatar || {},
+      destinationUrl: body.destinationUrl || body.websiteUrl || profile.websiteUrl
+    });
+    noStore(res);
+    return res.json({ success: true, campaign });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// /api/services/build-render-request — convert campaign concept to /api/video/generate payload
+app.post('/api/services/build-render-request', async (req, res) => {
+  try {
+    const body = req.body || {};
+    if (!body.campaign) {
+      return res.status(400).json({ success: false, error: 'campaign is required.' });
+    }
+    const renderRequest = buildServiceRenderRequest({
+      campaign: body.campaign,
+      conceptId: body.conceptId,
+      avatarId: body.avatarId || body.avatar_id,
+      voiceId: body.voiceId || body.voice_id
+    });
+    noStore(res);
+    return res.json({
+      success: true,
+      renderRequest,
+      next: {
+        endpoint: '/api/video/generate',
+        method: 'POST',
+        body: renderRequest.request
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
 // /api/agent/approve-creative â€” approve or reject a creative
 app.post('/api/agent/approve-creative', async (req, res) => {
   try {
@@ -4905,10 +5002,21 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), (re
 
 // POST /api/affiliate/avatar/create — create/register avatar profile (returns full avatar object)
 app.post('/api/affiliate/avatar/create', async (req, res) => {
-  const { affiliateId, name, style, photoUrl, voiceFilePath, voiceFileUrl } = req.body || {};
+  const {
+    affiliateId,
+    name,
+    style,
+    photoUrl,
+    voiceFilePath,
+    voiceFileUrl,
+    source,
+    returnTo
+  } = req.body || {};
   try {
     const avatarId = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
     const hasVoice = Boolean(voiceFilePath || voiceFileUrl);
+    const safeReturnTo = String(returnTo || '').trim();
+    const normalizedReturnTo = safeReturnTo.startsWith('/') ? safeReturnTo : '';
 
     const finalAvatarId = avatarId;
     const avatar = {
@@ -4923,6 +5031,8 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       status: 'active',
       createdAt: new Date().toISOString(),
       isDefault: true,
+      source: source || 'affiliate-hub',
+      returnTo: normalizedReturnTo || null,
       note: 'Using EVICS default expressive avatar (Abigail). Custom photo-avatar creation is disabled until a current HeyGen v3 endpoint is configured.'
     };
 
@@ -4935,7 +5045,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       }], { onConflict: 'id' });
     } catch {}
 
-    res.json({ success: true, avatar, avatarId: finalAvatarId });
+    res.json({
+    success: true,
+    avatar,
+    avatarId: finalAvatarId,
+    returnTo: normalizedReturnTo || null,
+    source: source || 'affiliate-hub'
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -6889,6 +7005,9 @@ app.listen(PORT, () => {
   console.log(`âž¡ï¸  Agent viral scan:    POST http://127.0.0.1:${PORT}/api/agent/viral-scan`);
   console.log(`âž¡ï¸  Agent reconstruct:   POST http://127.0.0.1:${PORT}/api/agent/reconstruct`);
   console.log(`âž¡ï¸  Agent generate ads:  POST http://127.0.0.1:${PORT}/api/agent/generate-ads`);
+  console.log(`âž¡ï¸  Service intake:      POST http://127.0.0.1:${PORT}/api/services/intake-website`);
+  console.log(`âž¡ï¸  Service campaigns:   POST http://127.0.0.1:${PORT}/api/services/generate-avatar-ads`);
+  console.log(`âž¡ï¸  Service render req:  POST http://127.0.0.1:${PORT}/api/services/build-render-request`);
   console.log(`âž¡ï¸  Agent approve:       POST http://127.0.0.1:${PORT}/api/agent/approve-creative`);
   console.log(`âž¡ï¸  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
   console.log(`âž¡ï¸  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);

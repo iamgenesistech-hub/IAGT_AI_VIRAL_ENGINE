@@ -227,6 +227,24 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   display: flex;
   justify-content: flex-end;
 }
+.avatar-created-card {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(0,199,245,.26);
+  border-radius: 12px;
+  background: rgba(0, 40, 60, 0.35);
+  display: grid;
+  gap: 10px;
+}
+.avatar-created-card strong {
+  display: block;
+  color: var(--text);
+}
+.avatar-created-card p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .control-btn, .render-review-btn, .review-close {

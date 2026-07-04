@@ -24,6 +24,10 @@
   const avatarVoiceFileLink = document.getElementById('phoneAvatarVoiceFileLink');
   const avatarVoiceCopyLinkBtn = document.getElementById('phoneAvatarVoiceCopyLink');
   const avatarSaveProfileBtn = document.getElementById('phoneAvatarSaveProfile');
+  const avatarCreatedCard = document.getElementById('phoneAvatarCreatedCard');
+  const avatarCreatedTitle = document.getElementById('phoneAvatarCreatedTitle');
+  const avatarCreatedMeta = document.getElementById('phoneAvatarCreatedMeta');
+  const avatarReturnLink = document.getElementById('phoneAvatarReturnLink');
   const phoneVoiceHelp = document.getElementById('phoneVoiceHelp');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
@@ -45,7 +49,9 @@
       photoUrl: '',
       voiceFileUrl: '',
       voiceFilePath: '',
-      avatarId: ''
+      avatarId: '',
+      createdAvatar: null,
+      returnTo: ''
     }
   };
 
@@ -179,6 +185,8 @@
       supportState.avatarSetup.voiceFileUrl = String(parsed.voiceFileUrl || '');
       supportState.avatarSetup.voiceFilePath = String(parsed.voiceFilePath || '');
       supportState.avatarSetup.avatarId = String(parsed.avatarId || '');
+      supportState.avatarSetup.createdAvatar = parsed.createdAvatar || null;
+      supportState.avatarSetup.returnTo = String(parsed.returnTo || '');
     } catch (error) {
       console.warn('Invalid stored avatar setup payload', error);
     }
@@ -220,6 +228,17 @@
       parts.push(supportState.avatarSetup.voiceFileUrl ? 'Voice uploaded' : 'Voice pending');
       if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
       avatarMonitor.textContent = parts.join(' · ');
+    }
+    if (avatarCreatedCard && avatarCreatedTitle && avatarCreatedMeta && avatarReturnLink) {
+      const created = supportState.avatarSetup.createdAvatar;
+      if (created && created.avatarId) {
+        avatarCreatedTitle.textContent = `Avatar created: ${created.name || created.avatarId}`;
+        avatarCreatedMeta.textContent = `Avatar ID ${created.avatarId} · source ${created.source || 'phone-app'} · returned to phone app`;
+        avatarReturnLink.href = supportState.avatarSetup.returnTo || '/phone-app';
+        avatarCreatedCard.classList.remove('hidden');
+      } else {
+        avatarCreatedCard.classList.add('hidden');
+      }
     }
     if (phoneVoiceHelp) {
       if (voiceRecordState.active) {
@@ -355,13 +374,17 @@
         style: 'avatar',
         photoUrl: supportState.avatarSetup.photoUrl || null,
         voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
-        voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null
+        voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
+        source: 'phone-app',
+        returnTo: `/phone-app?affiliateCode=${encodeURIComponent(supportState.affiliateCode)}&affiliateName=${encodeURIComponent(supportState.affiliateName)}`
       })
     });
     supportState.avatarSetup.avatarId = String(payload.avatarId || payload.avatar?.id || '');
+    supportState.avatarSetup.createdAvatar = payload.avatar || null;
+    supportState.avatarSetup.returnTo = String(payload.returnTo || '/phone-app');
     persistAvatarSetup();
     renderAvatarSetup();
-    sessionInfo.textContent = `Avatar profile saved${supportState.avatarSetup.avatarId ? ` (${supportState.avatarSetup.avatarId})` : ''}.`;
+    sessionInfo.textContent = `Avatar profile saved${supportState.avatarSetup.avatarId ? ` (${supportState.avatarSetup.avatarId})` : ''}. Returned to phone app.`;
   }
 
   function resolveAffiliateIdentity() {
