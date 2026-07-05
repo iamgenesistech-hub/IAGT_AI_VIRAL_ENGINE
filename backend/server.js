@@ -5917,6 +5917,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       productTitle,
       productImageUrl,
       productPageUrl,
+      productPrice,
       platform,
       customScript
     } = req.body || {};
@@ -5945,10 +5946,15 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Avatar has no photo URL. Re-create your avatar with a photo.' });
     }
 
+    // Resolve avatar metadata
+    const avatarName = avatarRecord.name || avatarRecord.avatar?.name || 'Affiliate Avatar';
+    const avatarId = avatarRecord.avatar?.avatarId || avatarRecord.avatar?.id || null;
+
     // Resolve product info
     const resolvedProductTitle = productTitle || avatarRecord.productTitle || 'Premium Product';
     const resolvedProductImage = productImageUrl || avatarRecord.productImageUrl || '';
     const resolvedProductPage = productPageUrl || avatarRecord.productPageUrl || '';
+    const resolvedProductPrice = productPrice || null;
     const resolvedPlatform = platform || avatarRecord.platform || 'tiktok';
 
     // Generate a compelling product script
@@ -6001,20 +6007,37 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     }
 
     const videoJobId = `pvid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Compute AI quality render score (0-100) based on input completeness and rendering factors
+    const qualityScore = computeRenderQualityScore({
+      hasPhoto: !!photoUrl,
+      hasVoiceClone: voiceId !== defaultVoice,
+      hasProductImage: !!resolvedProductImage,
+      hasProductPage: !!resolvedProductPage,
+      hasCustomScript: !!customScript,
+      scriptLength: script.length,
+      platform: resolvedPlatform
+    });
+
     const record = upsertProductVideoRecord({
       videoJobId,
       heygenVideoId: videoId,
       affiliateCode: cleanCode,
       avatarRequestId: avatarRequestId || avatarRecord.requestId || null,
+      avatarName,
+      avatarId,
       photoUrl,
       voiceId,
+      voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
       productId: productId || null,
       productHandle: productHandle || null,
       productTitle: resolvedProductTitle,
+      productPrice: resolvedProductPrice,
       productImageUrl: resolvedProductImage,
       productPageUrl: resolvedProductPage,
       platform: resolvedPlatform,
       script,
+      qualityScore,
       status: 'rendering',
       videoUrl: null,
       thumbnailUrl: null,
@@ -6029,8 +6052,15 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       heygenVideoId: videoId,
       status: 'rendering',
       script,
+      avatarName,
+      avatarId,
+      avatarPhotoUrl: photoUrl,
+      voiceId,
+      voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
       productTitle: resolvedProductTitle,
-      platform: resolvedPlatform
+      productPrice: resolvedProductPrice,
+      platform: resolvedPlatform,
+      qualityScore
     });
 
     // Background poll for video completion
@@ -6124,6 +6154,22 @@ function generateProductVideoScript({ productTitle, productPageUrl, platform }) 
   };
   const hook = platformHook[platform] || platformHook.tiktok;
   return `${hook} I'm talking about ${productTitle}. This isn't just another product — this is real quality, real results, and I can personally vouch for it. If you've been looking for something that actually delivers, this is it. Click the link and see for yourself. Trust me, you won't regret it.`;
+}
+
+// AI Quality Render Score — evaluates input completeness and render configuration
+function computeRenderQualityScore({ hasPhoto, hasVoiceClone, hasProductImage, hasProductPage, hasCustomScript, scriptLength, platform }) {
+  let score = 40; // Base score for a valid render request
+  if (hasPhoto) score += 15;
+  if (hasVoiceClone) score += 15; // Custom voice adds authenticity
+  if (hasProductImage) score += 10;
+  if (hasProductPage) score += 5;
+  if (hasCustomScript) score += 8; // Custom scripts indicate intent
+  // Script quality: short scripts get penalized, optimal 80-200 chars
+  if (scriptLength > 80 && scriptLength < 300) score += 5;
+  else if (scriptLength >= 300) score += 2;
+  // Platform match bonus (vertical formats score higher for short-form)
+  if (['tiktok', 'instagram', 'youtube'].includes(platform)) score += 2;
+  return Math.min(100, Math.max(0, score));
 }
 
 // POST /api/affiliate/clicks

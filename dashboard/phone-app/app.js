@@ -639,11 +639,14 @@
       const statusLabel = item.status === 'completed' ? '✅ Ready to post' : item.status === 'failed' ? '❌ Failed' : '⏳ Rendering…';
       const thumb = item.thumbnailUrl || item.photoUrl || '';
       const pEmoji = platformEmoji[item.platform] || '🎬';
+      const priceStr = item.productPrice ? `$${Number(item.productPrice).toFixed(2)}` : '';
+      const scoreStr = item.qualityScore != null ? `${item.qualityScore}/100` : '';
       return `<button type="button" class="video-library-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
         ${thumb ? `<img class="vlc-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="vlc-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:32px">🎬</div>'}
         ${item.status === 'completed' ? '<span class="vlc-play-overlay">▶</span>' : ''}
-        <strong>${escapeHtml(item.productTitle || 'Product Video')}</strong>
+        <strong>${escapeHtml(item.productTitle || 'Product Video')}${priceStr ? ' · ' + priceStr : ''}</strong>
         <span class="vlc-platform">${pEmoji} ${escapeHtml(item.platform || 'tiktok')}</span>
+        ${scoreStr ? `<span class="vlc-score" title="AI Quality Score">${scoreStr}</span>` : ''}
         <span class="vlc-status ${statusClass}">${statusLabel}</span>
       </button>`;
     }).join('');
@@ -669,15 +672,34 @@
     if (!productVideoPreview) return;
     if (!item) { productVideoPreview.classList.add('hidden'); return; }
     productVideoPreview.classList.remove('hidden');
-    if (productVideoTitle) productVideoTitle.textContent = item.productTitle || 'Product Video';
+    if (productVideoTitle) {
+      const priceStr = item.productPrice ? ` · $${Number(item.productPrice).toFixed(2)}` : '';
+      productVideoTitle.textContent = (item.productTitle || 'Product Video') + priceStr;
+    }
     if (productVideoMeta) {
+      let metaLines = [];
       if (item.status === 'completed') {
-        productVideoMeta.textContent = `Rendered ${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : 'recently'} · Ready to share`;
+        metaLines.push(`✅ Rendered ${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : 'recently'} · Ready to share`);
       } else if (item.status === 'rendering') {
-        productVideoMeta.textContent = '⏳ Video is rendering… check back in ~60 seconds.';
+        metaLines.push('⏳ Video is rendering… check back in ~60 seconds.');
       } else {
-        productVideoMeta.textContent = `Failed: ${item.error || 'Unknown error'}`;
+        metaLines.push(`❌ Failed: ${item.error || 'Unknown error'}`);
       }
+      // Avatar used
+      if (item.avatarName || item.photoUrl) {
+        metaLines.push(`🧑 Avatar: ${item.avatarName || 'Affiliate Avatar'}`);
+      }
+      // Voice ID used
+      if (item.voiceId) {
+        const voiceLabel = item.voiceType === 'clone' ? `Cloned Voice (${item.voiceId.substring(0, 8)}…)` : `Stock Voice (${item.voiceId.substring(0, 8)}…)`;
+        metaLines.push(`🎙️ Voice: ${voiceLabel}`);
+      }
+      // Quality score (dev mode — will be admin-only in production)
+      if (item.qualityScore !== undefined && item.qualityScore !== null) {
+        const scoreColor = item.qualityScore >= 80 ? '🟢' : item.qualityScore >= 60 ? '🟡' : '🔴';
+        metaLines.push(`${scoreColor} AI Quality Score: ${item.qualityScore}/100`);
+      }
+      productVideoMeta.innerHTML = metaLines.map(l => `<span style="display:block;margin-bottom:3px">${escapeHtml(l)}</span>`).join('');
     }
     if (productVideoScript) productVideoScript.textContent = item.script || '';
 
@@ -1636,6 +1658,7 @@
             productTitle: product.title || null,
             productImageUrl: product.imageUrl || product.image || product.image_url || null,
             productPageUrl: product.productPageUrl || product.productUrl || null,
+            productPrice: product.price || null,
             platform: platformSelect ? platformSelect.value : 'tiktok'
           })
         });

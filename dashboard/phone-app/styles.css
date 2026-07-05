@@ -1110,6 +1110,17 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 .video-library-card .vlc-status.completed { color: var(--green); }
 .video-library-card .vlc-status.rendering { color: var(--gold); }
 .video-library-card .vlc-status.failed { color: var(--red); }
+.video-library-card .vlc-score {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(217,191,122,.12);
+  color: var(--gold);
+  letter-spacing: .3px;
+}
 
 /* Player Section */
 .video-library-player-section {
