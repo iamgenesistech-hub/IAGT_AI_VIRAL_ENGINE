@@ -440,8 +440,8 @@
     if (!avatarLibraryGrid) return;
     const items = Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : [];
     if (!items.length) {
-      avatarLibraryGrid.innerHTML = '<div class="avatar-empty">No paid avatars found yet.</div>';
-      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = 'No paid avatars found yet.';
+      avatarLibraryGrid.innerHTML = '<div class="avatar-empty">No avatars found yet.</div>';
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = 'No avatars found yet.';
       renderAvatarLibraryPreview(null);
       return;
     }
