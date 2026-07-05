@@ -105,7 +105,7 @@
         phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Voice reference script unavailable.';
       }
     } catch (error) {
-      supportState.voiceReferenceScript = 'Hey, I wanted to share something that has genuinely made a difference for me. What I like about this item is that it is simple to use, easy to stay consistent with, and it fits real life without feeling complicated.\n\nIt feels natural, it is easy to explain, and it becomes part of your routine quickly. If you have been looking for something practical that helps you keep moving forward, this is worth checking out today.';
+      supportState.voiceReferenceScript = 'I use the Phone App as my personal affiliate control center. It lets me upload a voice sample and profile photo to create my AI avatar, then review it, choose a product from the approved catalog, and select the platform I want to advertise on. From there, the request goes into the Affiliate Hub, which turns my avatar, voice identity, and product choice into a platform-ready video built for TikTok, Instagram Reels, YouTube Shorts, Facebook, and more.\n\nThe hub uses product data, viral content patterns, and AI scoring to build the strongest script and format possible, and if AI can create something better than the scraped references, it uses its best judgment. This gives me a simple, scalable way to post AI avatar-driven product videos and earn commissions from sales generated through my affiliate content.';
       if (phoneVoiceScript) {
         phoneVoiceScript.textContent = supportState.voiceReferenceScript;
       }

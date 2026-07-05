@@ -5373,9 +5373,9 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   res.set('Cache-Control', 'no-store, max-age=0');
   res.json({
     success: true,
-    version: '2026-07-05-generic-v2',
+    version: '2026-07-05-generic-v3',
     script: {
-      scriptText: 'I have been really excited to share this because it is simple, useful, and easy to talk about in a natural way. What I like most is that it fits into everyday life without making things complicated.\n\nIt feels genuine, it is easy to explain, and it gives you a clear reason to keep coming back to it. If you want something practical that people can understand right away, this is a great choice to talk about today.',
+      scriptText: 'I use the Phone App as my personal affiliate control center. It lets me upload a voice sample and profile photo to create my AI avatar, then review it, choose a product from the approved catalog, and select the platform I want to advertise on. From there, the request goes into the Affiliate Hub, which turns my avatar, voice identity, and product choice into a platform-ready video built for TikTok, Instagram Reels, YouTube Shorts, Facebook, and more.\n\nThe hub uses product data, viral content patterns, and AI scoring to build the strongest script and format possible, and if AI can create something better than the scraped references, it uses its best judgment. This gives me a simple, scalable way to post AI avatar-driven product videos and earn commissions from sales generated through my affiliate content.',
       tone: 'enthusiastic',
       duration: '20-30 seconds',
       tips: [
