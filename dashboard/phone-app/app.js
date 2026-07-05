@@ -39,6 +39,13 @@
   const productTitle = document.getElementById('phoneProductTitle');
   const productMeta = document.getElementById('phoneProductMeta');
   const productReferences = document.getElementById('phoneProductReferences');
+  const attireTopSelect = document.getElementById('phoneAttireTop');
+  const attireBottomSelect = document.getElementById('phoneAttireBottom');
+  const attireStyleSelect = document.getElementById('phoneAttireStyle');
+  const attireTopColorSelect = document.getElementById('phoneAttireTopColor');
+  const attireBottomColorSelect = document.getElementById('phoneAttireBottomColor');
+  const attireUsePhotoCheckbox = document.getElementById('phoneAttireUsePhoto');
+  const attireGrid = document.getElementById('phoneAttireGrid');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
@@ -66,7 +73,15 @@
       selectedProductId: '',
       selectedPlatform: 'tiktok',
       selectedProduct: null,
-      productReferences: []
+      productReferences: [],
+      attire: {
+        usePhoto: false,
+        top: 'corporate-blazer',
+        bottom: 'dress-pants',
+        style: 'corporate-executive',
+        topColor: 'black',
+        bottomColor: 'black'
+      }
     },
     products: [],
     voiceReferenceScript: ''
@@ -232,6 +247,16 @@
       supportState.avatarSetup.selectedPlatform = String(parsed.selectedPlatform || 'tiktok');
       supportState.avatarSetup.selectedProduct = parsed.selectedProduct || null;
       supportState.avatarSetup.productReferences = Array.isArray(parsed.productReferences) ? parsed.productReferences : [];
+      if (parsed.attire && typeof parsed.attire === 'object') {
+        supportState.avatarSetup.attire = {
+          usePhoto: Boolean(parsed.attire.usePhoto),
+          top: String(parsed.attire.top || 'corporate-blazer'),
+          bottom: String(parsed.attire.bottom || 'dress-pants'),
+          style: String(parsed.attire.style || 'corporate-executive'),
+          topColor: String(parsed.attire.topColor || 'black'),
+          bottomColor: String(parsed.attire.bottomColor || 'black')
+        };
+      }
     } catch (error) {
       console.warn('Invalid stored avatar setup payload', error);
     }
@@ -301,6 +326,20 @@
     if (phoneVoiceScript) {
       phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Loading voice reference script…';
     }
+    // Sync attire selects with state
+    if (attireUsePhotoCheckbox) attireUsePhotoCheckbox.checked = supportState.avatarSetup.attire.usePhoto;
+    if (attireGrid) {
+      if (supportState.avatarSetup.attire.usePhoto) {
+        attireGrid.classList.add('disabled');
+      } else {
+        attireGrid.classList.remove('disabled');
+      }
+    }
+    if (attireTopSelect) attireTopSelect.value = supportState.avatarSetup.attire.top;
+    if (attireBottomSelect) attireBottomSelect.value = supportState.avatarSetup.attire.bottom;
+    if (attireStyleSelect) attireStyleSelect.value = supportState.avatarSetup.attire.style;
+    if (attireTopColorSelect) attireTopColorSelect.value = supportState.avatarSetup.attire.topColor;
+    if (attireBottomColorSelect) attireBottomColorSelect.value = supportState.avatarSetup.attire.bottomColor;
   }
 
     function escapeHtml(value) {
@@ -626,6 +665,7 @@
         productImageUrl: supportState.avatarSetup.selectedProduct.imageUrl || supportState.avatarSetup.selectedProduct.image || supportState.avatarSetup.selectedProduct.image_url || null,
         platform: supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok',
         platformLabel: platformLabelOf(supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok'),
+        attire: supportState.avatarSetup.attire,
         source: 'phone-app',
         returnTo: `/phone-app?affiliateCode=${encodeURIComponent(supportState.affiliateCode)}&affiliateName=${encodeURIComponent(supportState.affiliateName)}`
       })
@@ -909,6 +949,33 @@
       setStatus(`Platform set to ${platformLabelOf(platformSelect.value)}.`, 'success');
     });
   }
+
+  // ── Attire selection listeners ─────────────────────────────────────────────
+  if (attireUsePhotoCheckbox) {
+    attireUsePhotoCheckbox.addEventListener('change', () => {
+      supportState.avatarSetup.attire.usePhoto = attireUsePhotoCheckbox.checked;
+      if (attireGrid) {
+        if (attireUsePhotoCheckbox.checked) {
+          attireGrid.classList.add('disabled');
+        } else {
+          attireGrid.classList.remove('disabled');
+        }
+      }
+      persistAvatarSetup();
+    });
+  }
+  function bindAttireSelect(el, key) {
+    if (!el) return;
+    el.addEventListener('change', () => {
+      supportState.avatarSetup.attire[key] = el.value;
+      persistAvatarSetup();
+    });
+  }
+  bindAttireSelect(attireTopSelect, 'top');
+  bindAttireSelect(attireBottomSelect, 'bottom');
+  bindAttireSelect(attireStyleSelect, 'style');
+  bindAttireSelect(attireTopColorSelect, 'topColor');
+  bindAttireSelect(attireBottomColorSelect, 'bottomColor');
 
   if (productSearchInput) {
     let searchTimer = null;

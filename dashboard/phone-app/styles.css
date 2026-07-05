@@ -249,6 +249,65 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   margin-top: 4px;
 }
 
+/* ── Attire selection panel ──────────────────────────────────────────────── */
+.attire-panel {
+  margin-top: 14px;
+}
+.attire-use-photo-row {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  background: rgba(7, 11, 18, 0.72);
+}
+.attire-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+.attire-checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.attire-grid.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.attire-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.attire-group {
+  display: grid;
+  gap: 4px;
+}
+.attire-group label {
+  font-size: 12px;
+  color: var(--text-sub);
+  font-weight: 600;
+}
+.attire-group select {
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(7, 11, 18, 0.85);
+  color: var(--text);
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.attire-group select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .voice-script-card {
   border: 1px solid var(--border-dim);
   border-radius: 12px;

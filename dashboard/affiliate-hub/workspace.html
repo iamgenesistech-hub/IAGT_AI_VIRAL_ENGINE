@@ -141,6 +141,7 @@
     <section class="panel" id="avatarHandoffPanel" style="margin-bottom:12px">
       <h3>Avatar Handoff</h3>
       <p id="avatarHandoffStatus" style="margin-top:6px;color:var(--muted)">Waiting for a phone app avatar request.</p>
+      <p id="attireDisplay" style="margin-top:6px;color:var(--accent2);font-size:12px;display:none"></p>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button id="createAvatarFromPhoneBtn" class="btn btn-primary control-state state-off" onclick="void createAvatarFromPhone()">Create avatar in HeyGen</button>
         <a id="returnFromAvatarBtn" class="btn btn-secondary control-state state-off" href="/phone-app">Return to phone app</a>
@@ -259,6 +260,23 @@
           statusEl.textContent = 'No avatar request was found for this session.';
           return;
         }
+        if (avatarRequest.platform) {
+          const platformSelect = document.getElementById('platformSelect');
+          if (platformSelect) platformSelect.value = String(avatarRequest.platform).toLowerCase();
+        }
+        // Display attire selection if present
+        if (avatarRequest.attire) {
+          const attireEl = document.getElementById('attireDisplay');
+          if (attireEl) {
+            const a = avatarRequest.attire;
+            if (a.usePhoto) {
+              attireEl.textContent = 'Attire: Using clothing from profile photo';
+            } else {
+              attireEl.textContent = `Attire: ${a.style || 'professional'} | Top: ${a.top || '—'} (${a.topColor || '—'}) | Bottom: ${a.bottom || '—'} (${a.bottomColor || '—'})`;
+            }
+            attireEl.style.display = 'block';
+          }
+        }
         if (avatarRequest.status === 'completed' && avatarRequest.avatar) {
           statusEl.textContent = `Avatar already created for ${avatarRequest.affiliateCode}. Returning to phone app...`;
           document.getElementById('returnFromAvatarBtn').href = avatarRequest.returnTo || '/phone-app';
@@ -266,6 +284,7 @@
           statusEl.textContent = `Request loaded for ${avatarRequest.affiliateCode}. Creating avatar through HeyGen...`;
           await createAvatarFromPhone();
         }
+        matchAvatarRequestProduct();
         setControlState(createBtn, 'completed', 1400);
       } catch (error) {
         statusEl.textContent = `Avatar handoff error: ${error.message}`;
@@ -298,6 +317,7 @@
             photoUrl: avatarRequest.photoUrl,
             voiceFileUrl: avatarRequest.voiceFileUrl,
             voiceFilePath: avatarRequest.voiceFilePath,
+            attire: avatarRequest.attire || null,
             source: 'affiliate-hub',
             returnTo: avatarRequest.returnTo || `/phone-app?affiliateCode=${encodeURIComponent(avatarRequest.affiliateCode || affiliateCode || 'ROLAND787')}`
           })
@@ -395,6 +415,9 @@
           </li>
         `).join('');
         window._products = products;
+        if (avatarRequest) {
+          matchAvatarRequestProduct();
+        }
       } catch (e) {
         document.getElementById('productList').innerHTML = `<li style="color:#ffccd4;padding:8px">${e.message}</li>`;
       }
@@ -418,6 +441,31 @@
       setControlState(button, 'completed', 1200);
       loadBackgroundOptions();
       setStatus('Product selected. Configure your render settings.', 'success');
+    }
+
+    function matchAvatarRequestProduct() {
+      if (!avatarRequest || !Array.isArray(window._products) || !window._products.length) return;
+      if (selectedProduct && String(selectedProduct.id || '') === String(avatarRequest.productId || '')) return;
+      let matchIndex = -1;
+      if (avatarRequest.productId) {
+        matchIndex = window._products.findIndex((item) => String(item.id || '') === String(avatarRequest.productId));
+      }
+      if (matchIndex < 0 && avatarRequest.productHandle) {
+        matchIndex = window._products.findIndex((item) => String(item.handle || '').toLowerCase() === String(avatarRequest.productHandle || '').toLowerCase());
+      }
+      if (matchIndex < 0 && avatarRequest.productTitle) {
+        const requestTitle = String(avatarRequest.productTitle || '').toLowerCase();
+        matchIndex = window._products.findIndex((item) => String(item.title || '').toLowerCase() === requestTitle);
+      }
+      if (matchIndex >= 0) {
+        selectProduct(matchIndex);
+        const platformValue = String(avatarRequest.platform || '').toLowerCase();
+        const platformSelect = document.getElementById('platformSelect');
+        if (platformValue && platformSelect) {
+          platformSelect.value = platformValue;
+        }
+        setStatus(`Product imported from phone app: ${avatarRequest.productTitle || selectedProduct.title}.`, 'success');
+      }
     }
 
     async function loadBackgroundOptions() {

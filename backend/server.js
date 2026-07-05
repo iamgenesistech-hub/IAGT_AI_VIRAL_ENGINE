@@ -698,14 +698,22 @@ async function heygenApiJson(endpoint, body) {
   return payload;
 }
 
-async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl }) {
+async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attire }) {
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
+  }
+  // Build attire description for avatar generation prompt/metadata
+  let attireDescription = null;
+  if (attire && attire.usePhoto) {
+    attireDescription = 'Attire: Use the clothing visible in the uploaded profile photo. Do not change or replace the outfit.';
+  } else if (attire) {
+    attireDescription = `Attire: ${attire.style || 'professional'} style. Top: ${attire.top || 'dress-shirt'} in ${attire.topColor || 'black'}. Bottom: ${attire.bottom || 'dress-pants'} in ${attire.bottomColor || 'black'}.`;
   }
   const avatarResp = await heygenApiJson('/v3/avatars', {
     type: 'photo',
     name: name || 'EVICS Affiliate Avatar',
-    file: { type: 'url', url: photoUrl }
+    file: { type: 'url', url: photoUrl },
+    ...(attireDescription ? { description: attireDescription } : {})
   });
   const normalizedAvatar = normalizeAvatarCreateResponse(avatarResp);
   let voiceCloneId = null;
@@ -5128,6 +5136,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       productImageUrl,
       platform,
       platformLabel,
+      attire,
       source,
       returnTo
     } = req.body || {};
@@ -5155,6 +5164,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       productImageUrl: productImageUrl || null,
       platform: platform || null,
       platformLabel: platformLabel || null,
+      attire: attire && typeof attire === 'object' ? attire : null,
       source: source || 'phone-app',
       returnTo: finalReturnTo,
       status: 'queued',
@@ -5207,6 +5217,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     productImageUrl,
     platform,
     platformLabel,
+    attire,
     source,
     returnTo,
     requestId
@@ -5226,13 +5237,15 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedProductImageUrl = productImageUrl || requestRecord?.productImageUrl || null;
     const resolvedPlatform = platform || requestRecord?.platform || null;
     const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
+    const resolvedAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
 
     let avatarPayload;
     if (process.env.HEYGEN_API_KEY) {
     avatarPayload = await createHeyGenAffiliateAvatar({
       name: resolvedName,
       photoUrl: resolvedPhotoUrl,
-      voiceFileUrl: resolvedVoiceUrl
+      voiceFileUrl: resolvedVoiceUrl,
+      attire: resolvedAttire
     });
     } else {
     avatarPayload = {
@@ -5280,6 +5293,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     productImageUrl: resolvedProductImageUrl,
     platform: resolvedPlatform,
     platformLabel: resolvedPlatformLabel,
+    attire: resolvedAttire,
     status: 'active',
     createdAt: new Date().toISOString(),
     isDefault: true,
@@ -5329,6 +5343,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       productImageUrl: avatar.productImageUrl || requestRecord?.productImageUrl || null,
       platform: avatar.platform || requestRecord?.platform || null,
       platformLabel: avatar.platformLabel || requestRecord?.platformLabel || null,
+      attire: avatar.attire || requestRecord?.attire || null,
       source: requestRecord?.source || source || 'affiliate-hub',
       returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
       status: 'completed',
