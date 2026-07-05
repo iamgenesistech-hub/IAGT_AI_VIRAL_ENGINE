@@ -525,7 +525,7 @@
   async function loadAvatarLibrary() {
     if (!avatarLibraryGrid) return;
     const url = new URL('/api/affiliate/avatar-gallery', window.location.origin);
-    url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+    url.searchParams.set('affiliateCode', supportState.affiliateCode || '');
     try {
       const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
       const payload = await response.json().catch(() => ({}));
@@ -593,7 +593,8 @@
           requestId: item.requestId,
           videoId: videoId || proofPayload.videoId || null,
           videoUrl,
-          thumbnailUrl
+          thumbnailUrl,
+          affiliateCode: supportState.affiliateCode
         })
       });
     }
@@ -635,7 +636,7 @@
   async function loadProductVideos() {
     if (!productVideoGrid) return;
     const url = new URL('/api/affiliate/product-videos', window.location.origin);
-    url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+    url.searchParams.set('affiliateCode', supportState.affiliateCode || '');
     try {
       const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
       const payload = await response.json().catch(() => ({}));
@@ -969,7 +970,7 @@
       if (!productList) return;
       const query = String(productSearchInput?.value || '').trim();
       const url = new URL('/api/affiliate/workspace/products', window.location.origin);
-      url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+      url.searchParams.set('affiliateCode', supportState.affiliateCode || '');
       url.searchParams.set('source', 'viral');
       url.searchParams.set('limit', '24');
       if (query) url.searchParams.set('q', query);
@@ -1159,8 +1160,8 @@
 
   function resolveAffiliateIdentity() {
     const params = new URLSearchParams(window.location.search);
-    const code = String(params.get('affiliateCode') || params.get('code') || params.get('ref') || localStorage.getItem('evicsAffiliateCode') || 'ROLAND787');
-    const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40) || 'ROLAND787';
+    const code = String(params.get('affiliateCode') || params.get('code') || params.get('ref') || localStorage.getItem('evicsAffiliateCode') || '');
+    const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40) || '';
     localStorage.setItem('evicsAffiliateCode', cleanCode);
     const name = String(params.get('affiliateName') || localStorage.getItem('evicsAffiliateName') || cleanCode);
     const cleanName = name.trim().slice(0, 64) || cleanCode;
@@ -1665,7 +1666,7 @@
             if (videoUrl) {
               await apiJson('/api/affiliate/avatar/proof-complete', {
                 method: 'POST',
-                body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl })
+                body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl, affiliateCode: supportState.affiliateCode })
               });
               if (createAvatarStatus) {
                 createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';

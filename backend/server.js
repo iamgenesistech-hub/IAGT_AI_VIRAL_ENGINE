@@ -833,10 +833,10 @@ function findLatestAvatarRequest(affiliateCode) {
 function normalizeAvatarGalleryAttire(attire) {
   if (!attire || typeof attire !== 'object') return null;
   return {
-    usePhoto: Boolean(attire.usePhoto),
+    usePhoto: Boolean(attire.usePhoto || attire.usePhotoClothing),
     top: String(attire.top || ''),
     bottom: String(attire.bottom || ''),
-    style: String(attire.style || ''),
+    style: String(attire.style || attire.overallStyle || ''),
     topColor: String(attire.topColor || ''),
     bottomColor: String(attire.bottomColor || '')
   };
@@ -857,10 +857,10 @@ function buildAvatarGalleryItem(record) {
     style: avatar.style || record.style || 'professional',
     photoUrl: avatar.photoUrl || record.photoUrl || null,
     attire,
-    attireLabel: attire && attire.usePhoto
+    attireLabel: attire && (attire.usePhoto)
       ? 'Using profile photo clothing'
       : attire
-        ? [attire.style, attire.top, attire.bottom].filter(Boolean).join(' · ')
+        ? [attire.style || attire.overallStyle, attire.top ? `${attire.topColor || ''} ${attire.top}`.trim() : null, attire.bottom ? `${attire.bottomColor || ''} ${attire.bottom}`.trim() : null].filter(Boolean).join(' · ') || 'Professional'
         : 'Professional',
     avatarId,
     heygenAvatarId: avatar.avatarId || avatar.avatarItemId || null,
@@ -936,15 +936,33 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   }
   // Build attire description for avatar generation prompt/metadata
   let attireDescription = null;
-  if (attire && attire.usePhotoClothing) {
+  if (attire && (attire.usePhotoClothing || attire.usePhoto)) {
     attireDescription = 'Attire: Use the clothing visible in the uploaded profile photo. Do not change or replace the outfit.';
   } else if (attire) {
     attireDescription = `Attire: ${attire.overallStyle || attire.style || 'professional'} style. Top: ${attire.top || 'dress-shirt'} in ${attire.topColor || 'black'}. Bottom: ${attire.bottom || 'dress-pants'} in ${attire.bottomColor || 'black'}.`;
   }
 
-  // Use the v2 talking photo video generation approach (proven to work)
-  // This generates a short proof video using the affiliate's photo as a talking photo
-  const proofScript = "This is my avatar, and it's time to get this blessing flowing!";
+  // Step 1: Register the affiliate's photo as a HeyGen talking photo
+  let talkingPhotoId = null;
+  try {
+    const uploadResp = await heygenApiJson('/v2/talking_photo', {
+      url: photoUrl
+    });
+    talkingPhotoId = uploadResp?.data?.talking_photo_id || uploadResp?.talking_photo_id || null;
+    console.log(`[Avatar] Registered talking photo: ${talkingPhotoId || 'no ID returned'}`);
+  } catch (uploadErr) {
+    console.log(`[Avatar] Talking photo upload failed: ${uploadErr.message}. Using fallback ID.`);
+  }
+
+  // Fall back to default talking photo if registration failed
+  if (!talkingPhotoId) {
+    talkingPhotoId = process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7';
+  }
+
+  // Step 2: Generate a short proof video using the registered talking photo
+  const proofScript = attireDescription
+    ? `This is my avatar dressed in ${attire.overallStyle || attire.style || 'professional'} style, and it's time to get this blessing flowing!`
+    : "This is my avatar, and it's time to get this blessing flowing!";
   const defaultVoiceId = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
 
   let videoResult = null;
@@ -953,8 +971,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       video_inputs: [{
         character: {
           type: 'talking_photo',
-          talking_photo_id: process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7',
-          talking_photo_url: photoUrl
+          talking_photo_id: talkingPhotoId
         },
         voice: {
           type: 'text',
@@ -965,7 +982,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       dimension: { width: 720, height: 1280 }
     });
   } catch (v2Err) {
-    // If v2 fails, try v3 as fallback
+    // If v2 fails, try v3 avatar creation as fallback
     try {
       const v3Resp = await heygenApiJson('/v3/avatars', {
         type: 'photo',
@@ -979,6 +996,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
         avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
         voice_clone_id: null,
         voice_clone_status: null,
+        talking_photo_id: talkingPhotoId,
         source_provider: 'heygen'
       };
     } catch (v3Err) {
@@ -1013,6 +1031,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       avatar_type: 'photo_avatar',
       preview_image_url: photoUrl,
       proof_video_id: videoId,
+      talking_photo_id: talkingPhotoId,
       supported_api_engines: ['avatar_4_quality', 'avatar_4_turbo'],
       tags: attireDescription ? [attireDescription] : []
     },
@@ -1025,6 +1044,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
     voice_clone_id: voiceCloneId,
     voice_clone_status: voiceCloneStatus,
     proof_video_id: videoId,
+    talking_photo_id: talkingPhotoId,
     source_provider: 'heygen'
   };
 }
@@ -5523,10 +5543,14 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
     name
   } = req.body || {};
   const resolvedRequest = requestId ? findAvatarRequest(requestId) : null;
+  // AFFILIATE ISOLATION: verify the requesting affiliate owns this avatar request
+  const ownerCode = String(affiliateCode || resolvedRequest?.affiliateCode || '').trim().toUpperCase();
+  if (resolvedRequest && affiliateCode && ownerCode !== String(resolvedRequest.affiliateCode || '').trim().toUpperCase()) {
+    return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
+  }
   const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501').trim();
   if (!resolvedAvatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
   const resolvedScript = String(script || "This is my avatar, and it's time to get this blessing flowing! I'm ready to show up with confidence and keep this blessing flowing.").trim();
-  const ownerCode = String(affiliateCode || resolvedRequest?.affiliateCode || '').trim().toUpperCase();
   if (!process.env.HEYGEN_API_KEY) {
     const demoVideoUrl = '/generated/evics-sea-moss-proof-render.mp4';
     if (resolvedRequest) {
@@ -5557,17 +5581,35 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
     });
   }
   try {
-    const render = await startHeyGenRender({
-      script: resolvedScript,
-      avatar_id: resolvedAvatarId,
-      voice_id: process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b',
-      config: {
-        aspect: '9:16',
-        background: { type: 'color', color: '#0b1016' },
-        caption: false,
-        test: false
-      }
-    });
+    // Use the affiliate's registered talking_photo_id for video generation
+    const storedTalkingPhotoId = resolvedRequest?.avatar?.talkingPhotoId || resolvedRequest?.talkingPhotoId || null;
+    let render;
+    if (storedTalkingPhotoId) {
+      const v2Resp = await heygenApiJson('/v2/video/generate', {
+        video_inputs: [{
+          character: { type: 'talking_photo', talking_photo_id: storedTalkingPhotoId },
+          voice: {
+            type: 'text',
+            input_text: resolvedScript,
+            voice_id: resolvedRequest?.avatar?.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b'
+          }
+        }],
+        dimension: { width: 720, height: 1280 }
+      });
+      render = { video_id: v2Resp?.data?.video_id || null };
+    } else {
+      render = await startHeyGenRender({
+        script: resolvedScript,
+        avatar_id: resolvedAvatarId,
+        voice_id: process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b',
+        config: {
+          aspect: '9:16',
+          background: { type: 'color', color: '#0b1016' },
+          caption: false,
+          test: false
+        }
+      });
+    }
     if (resolvedRequest) {
       upsertAvatarRequest({
         ...resolvedRequest,
@@ -5600,10 +5642,14 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
 // POST /api/affiliate/avatar/proof-complete — store proof render results for the gallery
 app.post('/api/affiliate/avatar/proof-complete', (req, res) => {
   noStore(res);
-  const { requestId, videoId, videoUrl, thumbnailUrl } = req.body || {};
+  const { requestId, videoId, videoUrl, thumbnailUrl, affiliateCode } = req.body || {};
   if (!requestId) return res.status(400).json({ success: false, error: 'requestId is required' });
   const request = findAvatarRequest(requestId);
   if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
+  // AFFILIATE ISOLATION: verify ownership if affiliateCode provided
+  if (affiliateCode && request.affiliateCode && String(affiliateCode).trim().toUpperCase() !== String(request.affiliateCode).trim().toUpperCase()) {
+    return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
+  }
   const next = upsertAvatarRequest({
     ...request,
     avatar: {
@@ -5656,6 +5702,10 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedPlatform = platform || requestRecord?.platform || null;
     const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
     const resolvedAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
+    // Normalize attire field names (client sends usePhotoClothing, server uses usePhoto)
+    if (resolvedAttire && resolvedAttire.usePhotoClothing !== undefined) {
+      resolvedAttire.usePhoto = Boolean(resolvedAttire.usePhotoClothing);
+    }
 
     let avatarPayload;
     if (process.env.HEYGEN_API_KEY) {
@@ -5697,6 +5747,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     avatarId: finalAvatarId,
     avatarItemId: avatarItem.id || null,
     avatarGroupId: avatarGroup.id || null,
+    affiliateCode: String(affiliateId || '').trim().toUpperCase(),
     name: resolvedName,
     style: style || 'avatar',
     photoUrl: resolvedPhotoUrl || null,
@@ -5704,6 +5755,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     voiceFilePath: voiceFilePath || null,
     voiceCloneId: avatarPayload.voice_clone_id || null,
     voiceCloneStatus: avatarPayload.voice_clone_status || (resolvedVoiceUrl ? 'uploaded' : 'none'),
+    talkingPhotoId: avatarPayload.talking_photo_id || avatarItem.talking_photo_id || null,
     proofVideoId: avatarPayload.proof_video_id || null,
     proofStatus: avatarPayload.proof_video_id ? 'rendering' : null,
     productId: resolvedProductId,
@@ -5714,6 +5766,11 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     platform: resolvedPlatform,
     platformLabel: resolvedPlatformLabel,
     attire: resolvedAttire,
+    attireLabel: resolvedAttire
+      ? (resolvedAttire.usePhoto || resolvedAttire.usePhotoClothing)
+        ? 'Using profile photo clothing'
+        : `${resolvedAttire.overallStyle || resolvedAttire.style || 'professional'} · ${resolvedAttire.topColor || ''} ${resolvedAttire.top || 'dress-shirt'} · ${resolvedAttire.bottomColor || ''} ${resolvedAttire.bottom || 'dress-pants'}`.trim()
+      : 'Professional',
     status: 'active',
     createdAt: new Date().toISOString(),
     isDefault: true,
@@ -5764,6 +5821,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       platform: avatar.platform || requestRecord?.platform || null,
       platformLabel: avatar.platformLabel || requestRecord?.platformLabel || null,
       attire: avatar.attire || requestRecord?.attire || null,
+      talkingPhotoId: avatar.talkingPhotoId || requestRecord?.talkingPhotoId || null,
       source: requestRecord?.source || source || 'affiliate-hub',
       returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
       status: 'completed',
@@ -5782,8 +5840,12 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     avatarId: finalAvatarId,
     avatarItemId: avatar.avatarItemId,
     avatarGroupId: avatar.avatarGroupId,
+    affiliateCode: avatar.affiliateCode,
+    talkingPhotoId: avatar.talkingPhotoId,
     voiceCloneId: avatar.voiceCloneId,
     voiceCloneStatus: avatar.voiceCloneStatus,
+    attire: avatar.attire,
+    attireLabel: avatar.attireLabel,
     source: source || 'affiliate-hub',
     returnTo: normalizedReturnTo || null,
     requestId: finalRequestId || null,
@@ -6001,9 +6063,13 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     let avatarRecord = null;
     if (avatarRequestId) {
       avatarRecord = findAvatarRequest(avatarRequestId);
+      // AFFILIATE ISOLATION: verify this affiliate owns the avatar
+      if (avatarRecord && avatarRecord.affiliateCode && avatarRecord.affiliateCode !== cleanCode) {
+        return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
+      }
     }
     if (!avatarRecord) {
-      // Fall back to latest completed avatar for this affiliate
+      // Fall back to latest completed avatar for this affiliate ONLY
       const allRecords = getAvatarGalleryRecords(cleanCode);
       if (allRecords.length) {
         avatarRecord = findAvatarRequest(allRecords[0].requestId);
@@ -6021,6 +6087,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     // Resolve avatar metadata
     const avatarName = avatarRecord.name || avatarRecord.avatar?.name || 'Affiliate Avatar';
     const avatarId = avatarRecord.avatar?.avatarId || avatarRecord.avatar?.id || null;
+    // Use the affiliate's registered talking_photo_id (registered during avatar creation)
+    const talkingPhotoId = avatarRecord.avatar?.talkingPhotoId || avatarRecord.talkingPhotoId || null;
 
     // Resolve product info
     const resolvedProductTitle = productTitle || avatarRecord.productTitle || 'Premium Product';
@@ -6041,22 +6109,27 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
     let voiceId = cloneVoice || defaultVoice;
 
-    // Build the HeyGen request payload
-    const buildPayload = (vid) => ({
-      video_inputs: [{
-        character: {
-          type: 'talking_photo',
-          talking_photo_id: process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7',
-          talking_photo_url: photoUrl
-        },
-        voice: {
-          type: 'text',
-          input_text: script,
-          voice_id: vid
-        }
-      }],
-      dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 }
-    });
+    // Build the HeyGen request payload — use affiliate's registered talking_photo_id
+    const buildPayload = (vid) => {
+      const characterPayload = { type: 'talking_photo' };
+      if (talkingPhotoId) {
+        characterPayload.talking_photo_id = talkingPhotoId;
+      } else {
+        // Fallback: register photo on the fly if no stored ID
+        characterPayload.talking_photo_id = process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7';
+      }
+      return {
+        video_inputs: [{
+          character: characterPayload,
+          voice: {
+            type: 'text',
+            input_text: script,
+            voice_id: vid
+          }
+        }],
+        dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 }
+      };
+    };
 
     // Render via HeyGen v2/video/generate — try clone voice, fall back to default
     let videoResult = null;
