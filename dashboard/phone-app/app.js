@@ -20,6 +20,9 @@
   const avatarVoiceRerecordBtn = document.getElementById('phoneAvatarVoiceRerecord');
   const avatarVoiceUploadBtn = document.getElementById('phoneAvatarVoiceUpload');
   const avatarVoicePreview = document.getElementById('phoneAvatarVoicePreview');
+  const voiceVolumeRow = document.getElementById('phoneVoiceVolumeRow');
+  const voiceVolumeSlider = document.getElementById('phoneVoiceVolume');
+  const voiceVolumeValue = document.getElementById('phoneVoiceVolumeValue');
   const avatarVoiceFileRow = document.getElementById('phoneAvatarVoiceFileRow');
   const avatarVoiceFileLink = document.getElementById('phoneAvatarVoiceFileLink');
   const avatarVoiceCopyLinkBtn = document.getElementById('phoneAvatarVoiceCopyLink');
@@ -288,9 +291,12 @@
       if (supportState.avatarSetup.voiceFileUrl) {
         avatarVoicePreview.src = supportState.avatarSetup.voiceFileUrl;
         avatarVoicePreview.classList.remove('hidden');
+        if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
+        avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
       } else {
         avatarVoicePreview.removeAttribute('src');
         avatarVoicePreview.classList.add('hidden');
+        if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
       }
     }
     if (avatarVoiceFileRow && avatarVoiceFileLink) {
@@ -834,6 +840,7 @@
       avatarVoicePreview.removeAttribute('src');
       avatarVoicePreview.classList.add('hidden');
     }
+    if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
     persistAvatarSetup();
     renderAvatarSetup();
   }
@@ -860,6 +867,8 @@
         if (avatarVoicePreview) {
           avatarVoicePreview.src = voiceRecordState.lastBlobUrl;
           avatarVoicePreview.classList.remove('hidden');
+          if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
+          avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
         }
         try {
           await uploadRecordedAvatarVoice(blob);
@@ -1189,6 +1198,16 @@
       persistAvatarSetup();
       renderSelectedProductDetails();
       setStatus(`Platform set to ${platformLabelOf(platformSelect.value)}.`, 'success');
+    });
+  }
+
+  // ── Voice volume control ──────────────────────────────────────────────────
+  if (voiceVolumeSlider && avatarVoicePreview) {
+    avatarVoicePreview.volume = parseInt(voiceVolumeSlider.value, 10) / 100;
+    voiceVolumeSlider.addEventListener('input', () => {
+      const vol = parseInt(voiceVolumeSlider.value, 10);
+      avatarVoicePreview.volume = vol / 100;
+      if (voiceVolumeValue) voiceVolumeValue.textContent = vol + '%';
     });
   }
 
