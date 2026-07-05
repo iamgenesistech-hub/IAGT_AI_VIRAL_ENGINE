@@ -5402,11 +5402,11 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     returnTo,
     requestId
   } = req.body || {};
+  const finalRequestId = requestId || makeAvatarRequestId();
   try {
     const safeReturnTo = String(returnTo || '').trim();
     const normalizedReturnTo = safeReturnTo.startsWith('/') ? safeReturnTo : '';
-    const finalRequestId = requestId || null;
-    const requestRecord = finalRequestId ? findAvatarRequest(finalRequestId) : null;
+    const requestRecord = findAvatarRequest(finalRequestId);
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
     const resolvedPhotoUrl = photoUrl || requestRecord?.photoUrl || null;
     const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
@@ -5506,7 +5506,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     }], { onConflict: 'id' });
     } catch {}
 
-    if (finalRequestId) {
+    // Always store in avatar request records so the gallery can discover it
     upsertAvatarRequest({
       ...(requestRecord || {}),
       requestId: finalRequestId,
@@ -5527,6 +5527,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       source: requestRecord?.source || source || 'affiliate-hub',
       returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
       status: 'completed',
+      createdAt: requestRecord?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       avatar,
@@ -5534,7 +5535,6 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       voiceCloneStatus: avatar.voiceCloneStatus,
       error: null
     });
-    }
 
     res.json({
     success: true,
@@ -5550,15 +5550,14 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     provider: avatar.sourceProvider
     });
   } catch (e) {
-    if (requestId) {
     upsertAvatarRequest({
-      ...(findAvatarRequest(requestId) || {}),
-      requestId,
+      ...(findAvatarRequest(finalRequestId) || {}),
+      requestId: finalRequestId,
+      affiliateCode: String(affiliateId || '').trim().toUpperCase(),
       status: 'failed',
       error: e.message,
       updatedAt: new Date().toISOString()
     });
-    }
     res.status(500).json({ success: false, error: e.message });
   }
 });

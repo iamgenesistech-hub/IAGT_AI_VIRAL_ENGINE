@@ -1381,7 +1381,7 @@
 
         setControlState(createAvatarBtn, 'completed', 2000);
         if (createAvatarStatus) {
-          createAvatarStatus.textContent = '✅ Avatar creation request sent! Your avatar is being generated. Check the Avatar Library below for your proof video.';
+          createAvatarStatus.textContent = '✅ Avatar created! It has been returned to your Avatar Library below.';
           createAvatarStatus.className = 'create-avatar-status status-success';
         }
         if (payload.requestId || payload.avatarId) {
@@ -1393,7 +1393,9 @@
         }
         persistAvatarSetup();
         renderAvatarSetup();
-        sessionInfo.textContent = 'Avatar creation request submitted to Affiliate Hub.';
+        sessionInfo.textContent = 'Avatar created and returned to your library.';
+        // Reload avatar library so the new avatar appears immediately
+        await loadAvatarLibrary();
       } catch (error) {
         setControlState(createAvatarBtn, 'off');
         if (createAvatarStatus) {
