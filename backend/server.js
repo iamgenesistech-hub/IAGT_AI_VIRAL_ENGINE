@@ -5972,16 +5972,16 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   res.set('Cache-Control', 'no-store, max-age=0');
   res.json({
     success: true,
-    version: '2026-07-05-generic-v3',
+    version: '2026-07-05-values-v1',
     script: {
-      scriptText: 'I use the Phone App as my personal affiliate control center. It lets me upload a voice sample and profile photo to create my AI avatar, then review it, choose a product from the approved catalog, and select the platform I want to advertise on. From there, the request goes into the Affiliate Hub, which turns my avatar, voice identity, and product choice into a platform-ready video built for TikTok, Instagram Reels, YouTube Shorts, Facebook, and more.\n\nThe hub uses product data, viral content patterns, and AI scoring to build the strongest script and format possible. It uses its best judgment. This gives me a simple, scalable way to post AI avatar-driven product videos and earn commissions from sales generated through my affiliate content.',
-      tone: 'enthusiastic',
+      scriptText: 'I step into this journey with purpose. I will use this platform not just for my gain, but to bless others. I will learn with humility, act with integrity, and lead with compassion. I will seek wisdom before action, truth before convenience, and long-term benefit over short-term gain. May my success not only enrich me, but uplift my family, my community, and all I encounter. I choose to build, not tear down; to serve, not exploit; to love, not harm. In every step, may I be a blessing to others as I grow.',
+      tone: 'sincere, purposeful, measured',
       duration: '20-30 seconds',
       tips: [
-        'Speak naturally and with genuine excitement',
-        'Keep your pace steady so the AI can capture your natural cadence',
-        'Pause briefly after the opening sentence and the benefit statement',
-        'End with a clear call to action'
+        'Speak from your heart—this is your personal commitment',
+        'Keep a steady, measured pace that feels genuine',
+        'Pause after the opening statement and before the closing',
+        'Let the conviction in your words carry the message'
       ]
     }
   });
