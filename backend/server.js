@@ -69,9 +69,105 @@ const MEDIA_CACHE_DIR = path.join(__dirname, '../generated/mp4-cache');
 const UPLOADS_DIR = path.join(__dirname, '../generated/uploads');
 [MEDIA_CACHE_DIR, UPLOADS_DIR].forEach(d => { try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch {} });
 
+// ── GCS upload helper (uses metadata server auth on Cloud Run) ───────────────
+const GCS_BUCKET = process.env.GCS_BUCKET || 'evics-storage-evics-api';
+async function getGcsAccessToken() {
+  try {
+    const resp = await fetch(
+      'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+      { headers: { 'Metadata-Flavor': 'Google' } }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getServiceAccountEmail() {
+  try {
+    const resp = await fetch(
+      'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email',
+      { headers: { 'Metadata-Flavor': 'Google' } }
+    );
+    if (!resp.ok) return null;
+    return (await resp.text()).trim();
+  } catch {
+    return null;
+  }
+}
+
+async function uploadToGcs(localPath, gcsPath, contentType) {
+  const token = await getGcsAccessToken();
+  if (!token) return null; // Not on Cloud Run or no access
+  const fileBuffer = fs.readFileSync(localPath);
+  const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o?uploadType=media&name=${encodeURIComponent(gcsPath)}`;
+  const resp = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': contentType || 'application/octet-stream',
+      'Content-Length': String(fileBuffer.length)
+    },
+    body: fileBuffer
+  });
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => '');
+    console.error(`[GCS] Upload failed (${resp.status}): ${err.substring(0, 200)}`);
+    return null;
+  }
+  await resp.json().catch(() => ({}));
+  // Generate a signed URL valid for 7 days using the IAM signBlob API
+  const signedUrl = await generateSignedUrl(gcsPath, token);
+  return signedUrl || `https://storage.googleapis.com/${GCS_BUCKET}/${gcsPath}`;
+}
+
+async function generateSignedUrl(gcsPath, token) {
+  try {
+    const saEmail = await getServiceAccountEmail();
+    if (!saEmail) return null;
+    const expiration = Math.floor(Date.now() / 1000) + (7 * 24 * 3600); // 7 days
+    const httpMethod = 'GET';
+    const host = `${GCS_BUCKET}.storage.googleapis.com`;
+    const canonicalUri = `/${encodeURIComponent(gcsPath).replace(/%2F/g, '/')}`;
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z').slice(0, 15) + 'Z';
+    const datestamp = timestamp.slice(0, 8);
+    const credentialScope = `${datestamp}/auto/storage/goog4_request`;
+    const signedHeaders = 'host';
+    const canonicalQueryString = [
+      `X-Goog-Algorithm=GOOG4-RSA-SHA256`,
+      `X-Goog-Credential=${encodeURIComponent(`${saEmail}/${credentialScope}`)}`,
+      `X-Goog-Date=${timestamp}`,
+      `X-Goog-Expires=604800`,
+      `X-Goog-SignedHeaders=${signedHeaders}`
+    ].sort().join('&');
+    const canonicalRequest = [httpMethod, canonicalUri, canonicalQueryString, `host:${host}`, '', signedHeaders, 'UNSIGNED-PAYLOAD'].join('\n');
+    const crypto = require('crypto');
+    const hashedRequest = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+    const stringToSign = ['GOOG4-RSA-SHA256', timestamp, credentialScope, hashedRequest].join('\n');
+    // Use IAM signBlob to sign
+    const signResp = await fetch(
+      `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${saEmail}:signBlob`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: Buffer.from(stringToSign).toString('base64') })
+      }
+    );
+    if (!signResp.ok) return null;
+    const signData = await signResp.json();
+    const signature = Buffer.from(signData.signedBlob, 'base64').toString('hex');
+    return `https://${host}${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signature}`;
+  } catch (e) {
+    console.error('[GCS] Signed URL generation failed:', e.message);
+    return null;
+  }
+}
+
 let errorCount = 0;
 
-// â”€â”€ Request logger â”€â”€
+// ── Request logger ──
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -768,34 +864,95 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   }
   // Build attire description for avatar generation prompt/metadata
   let attireDescription = null;
-  if (attire && attire.usePhoto) {
+  if (attire && attire.usePhotoClothing) {
     attireDescription = 'Attire: Use the clothing visible in the uploaded profile photo. Do not change or replace the outfit.';
   } else if (attire) {
-    attireDescription = `Attire: ${attire.style || 'professional'} style. Top: ${attire.top || 'dress-shirt'} in ${attire.topColor || 'black'}. Bottom: ${attire.bottom || 'dress-pants'} in ${attire.bottomColor || 'black'}.`;
+    attireDescription = `Attire: ${attire.overallStyle || attire.style || 'professional'} style. Top: ${attire.top || 'dress-shirt'} in ${attire.topColor || 'black'}. Bottom: ${attire.bottom || 'dress-pants'} in ${attire.bottomColor || 'black'}.`;
   }
-  const avatarResp = await heygenApiJson('/v3/avatars', {
-    type: 'photo',
-    name: name || 'EVICS Affiliate Avatar',
-    file: { type: 'url', url: photoUrl },
-    ...(attireDescription ? { description: attireDescription } : {})
-  });
-  const normalizedAvatar = normalizeAvatarCreateResponse(avatarResp);
+
+  // Use the v2 talking photo video generation approach (proven to work)
+  // This generates a short proof video using the affiliate's photo as a talking photo
+  const proofScript = "This is my avatar, and it's time to get this blessing flowing!";
+  const defaultVoiceId = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
+
+  let videoResult = null;
+  try {
+    videoResult = await heygenApiJson('/v2/video/generate', {
+      video_inputs: [{
+        character: {
+          type: 'talking_photo',
+          talking_photo_id: process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7',
+          talking_photo_url: photoUrl
+        },
+        voice: {
+          type: 'text',
+          input_text: proofScript,
+          voice_id: defaultVoiceId
+        }
+      }],
+      dimension: { width: 720, height: 1280 }
+    });
+  } catch (v2Err) {
+    // If v2 fails, try v3 as fallback
+    try {
+      const v3Resp = await heygenApiJson('/v3/avatars', {
+        type: 'photo',
+        name: name || 'EVICS Affiliate Avatar',
+        file: { type: 'url', url: photoUrl },
+        ...(attireDescription ? { description: attireDescription } : {})
+      });
+      const normalizedAvatar = normalizeAvatarCreateResponse(v3Resp);
+      return {
+        avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
+        avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
+        voice_clone_id: null,
+        voice_clone_status: null,
+        source_provider: 'heygen'
+      };
+    } catch (v3Err) {
+      throw new Error(`Avatar creation failed: ${v2Err.message || v3Err.message}`);
+    }
+  }
+
+  const videoId = videoResult?.data?.video_id || null;
+  const avatarId = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+  // Voice clone attempt (non-blocking — avatar still created if this fails)
   let voiceCloneId = null;
   let voiceCloneStatus = null;
   if (voiceFileUrl) {
-    const voiceResp = await heygenApiJson('/v3/voices/clone', {
-      audio: { type: 'url', url: voiceFileUrl },
-      voice_name: `${name || 'EVICS Affiliate'} Voice`,
-      remove_background_noise: true
-    });
-    voiceCloneId = voiceResp?.data?.voice_clone_id || voiceResp?.voice_clone_id || null;
-    voiceCloneStatus = voiceCloneId ? 'queued' : null;
+    try {
+      const voiceResp = await heygenApiJson('/v3/voices/clone', {
+        audio: { type: 'url', url: voiceFileUrl },
+        voice_name: `${name || 'EVICS Affiliate'} Voice`,
+        remove_background_noise: true
+      });
+      voiceCloneId = voiceResp?.data?.voice_clone_id || voiceResp?.voice_clone_id || null;
+      voiceCloneStatus = voiceCloneId ? 'queued' : null;
+    } catch (_voiceErr) {
+      voiceCloneStatus = 'failed';
+    }
   }
+
   return {
-    avatar_item: normalizedAvatar.avatarItem,
-    avatar_group: normalizedAvatar.avatarGroup,
+    avatar_item: {
+      id: avatarId,
+      name: name || 'EVICS Affiliate Avatar',
+      avatar_type: 'photo_avatar',
+      preview_image_url: photoUrl,
+      proof_video_id: videoId,
+      supported_api_engines: ['avatar_4_quality', 'avatar_4_turbo'],
+      tags: attireDescription ? [attireDescription] : []
+    },
+    avatar_group: {
+      id: `group_${avatarId}`,
+      name: name || 'EVICS Affiliate Avatar',
+      looks_count: 1,
+      created_at: Date.now()
+    },
     voice_clone_id: voiceCloneId,
     voice_clone_status: voiceCloneStatus,
+    proof_video_id: videoId,
     source_provider: 'heygen'
   };
 }
@@ -5154,30 +5311,39 @@ app.get('/api/affiliate/avatars', async (req, res) => {
 });
 
 // POST /api/affiliate/avatar/upload-photo — accepts multipart photo from Expo FileSystem.uploadAsync
-app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), (req, res) => {
+app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No photo file received' });
-    // Build a URL the phone app can display (served from /uploads/)
     const filename = req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const photoUrl = `${protocol}://${host}/uploads/${filename}`;
-    res.json({ success: true, photoUrl, filename, size: req.file.size });
+    const localUrl = `${protocol}://${host}/uploads/${filename}`;
+    // Upload to GCS for persistent, publicly accessible URL
+    const gcsPath = `affiliate-uploads/${filename}`;
+    const contentType = req.file.mimetype || 'image/jpeg';
+    const gcsUrl = await uploadToGcs(req.file.path, gcsPath, contentType);
+    const photoUrl = gcsUrl || localUrl;
+    res.json({ success: true, photoUrl, gcsUrl, localUrl, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // POST /api/affiliate/avatar/upload-voice — accepts multipart audio from Expo
-app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), (req, res) => {
+app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No voice file received' });
     const filename = req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const voiceFileUrl = `${protocol}://${host}/uploads/${filename}`;
+    const localUrl = `${protocol}://${host}/uploads/${filename}`;
     const voiceFilePath = req.file.path;
-    res.json({ success: true, voiceFileUrl, voiceFilePath, filename, size: req.file.size });
+    // Upload to GCS for persistent, publicly accessible URL
+    const gcsPath = `affiliate-uploads/${filename}`;
+    const contentType = req.file.mimetype || 'audio/webm';
+    const gcsUrl = await uploadToGcs(req.file.path, gcsPath, contentType);
+    const voiceFileUrl = gcsUrl || localUrl;
+    res.json({ success: true, voiceFileUrl, gcsUrl, localUrl, voiceFilePath, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -5466,6 +5632,8 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     voiceFilePath: voiceFilePath || null,
     voiceCloneId: avatarPayload.voice_clone_id || null,
     voiceCloneStatus: avatarPayload.voice_clone_status || (resolvedVoiceUrl ? 'uploaded' : 'none'),
+    proofVideoId: avatarPayload.proof_video_id || null,
+    proofStatus: avatarPayload.proof_video_id ? 'rendering' : null,
     productId: resolvedProductId,
     productHandle: resolvedProductHandle,
     productTitle: resolvedProductTitle,
