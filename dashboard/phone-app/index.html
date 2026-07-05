@@ -127,65 +127,82 @@
               </label>
             </div>
             <div class="attire-grid" id="phoneAttireGrid">
-              <div class="attire-group">
-                <label for="phoneAttireTop">Top</label>
-                <select id="phoneAttireTop">
-                  <option value="corporate-blazer">Corporate Blazer</option>
-                  <option value="dress-shirt">Dress Shirt</option>
-                  <option value="polo-shirt">Polo Shirt</option>
-                  <option value="t-shirt">T-Shirt</option>
-                  <option value="blouse">Blouse</option>
-                  <option value="executive-jacket">Executive Jacket</option>
-                  <option value="casual-hoodie">Casual Hoodie</option>
-                </select>
+              <!-- TOP row -->
+              <div class="attire-row">
+                <h3 class="attire-row-label">Top</h3>
+                <div class="attire-row-fields">
+                  <div class="attire-group">
+                    <label for="phoneAttireTop">Style</label>
+                    <select id="phoneAttireTop">
+                      <option value="corporate-blazer">Corporate Blazer</option>
+                      <option value="dress-shirt">Dress Shirt</option>
+                      <option value="polo-shirt">Polo Shirt</option>
+                      <option value="t-shirt">T-Shirt</option>
+                      <option value="blouse">Blouse</option>
+                      <option value="executive-jacket">Executive Jacket</option>
+                      <option value="casual-hoodie">Casual Hoodie</option>
+                    </select>
+                  </div>
+                  <div class="attire-group">
+                    <label for="phoneAttireTopColor">Color</label>
+                    <select id="phoneAttireTopColor">
+                      <option value="black">Black</option>
+                      <option value="white">White</option>
+                      <option value="navy">Navy Blue</option>
+                      <option value="gray">Gray</option>
+                      <option value="light-blue">Light Blue</option>
+                      <option value="burgundy">Burgundy</option>
+                      <option value="cream">Cream</option>
+                      <option value="green">Green</option>
+                      <option value="pink">Pink</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div class="attire-group">
-                <label for="phoneAttireBottom">Bottom</label>
-                <select id="phoneAttireBottom">
-                  <option value="dress-pants">Dress Pants</option>
-                  <option value="slacks">Slacks</option>
-                  <option value="chinos">Chinos</option>
-                  <option value="shorts">Shorts</option>
-                  <option value="skirt">Skirt</option>
-                  <option value="dress">Dress (full outfit)</option>
-                  <option value="jeans">Jeans</option>
-                </select>
+              <!-- BOTTOM row -->
+              <div class="attire-row">
+                <h3 class="attire-row-label">Bottom</h3>
+                <div class="attire-row-fields">
+                  <div class="attire-group">
+                    <label for="phoneAttireBottom">Style</label>
+                    <select id="phoneAttireBottom">
+                      <option value="dress-pants">Dress Pants</option>
+                      <option value="slacks">Slacks</option>
+                      <option value="chinos">Chinos</option>
+                      <option value="shorts">Shorts</option>
+                      <option value="skirt">Skirt</option>
+                      <option value="dress">Dress (full outfit)</option>
+                      <option value="jeans">Jeans</option>
+                    </select>
+                  </div>
+                  <div class="attire-group">
+                    <label for="phoneAttireBottomColor">Color</label>
+                    <select id="phoneAttireBottomColor">
+                      <option value="black">Black</option>
+                      <option value="navy">Navy Blue</option>
+                      <option value="gray">Gray</option>
+                      <option value="khaki">Khaki</option>
+                      <option value="white">White</option>
+                      <option value="brown">Brown</option>
+                      <option value="beige">Beige</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div class="attire-group">
-                <label for="phoneAttireStyle">Overall Style</label>
-                <select id="phoneAttireStyle">
-                  <option value="corporate-executive">Corporate Executive</option>
-                  <option value="salesperson-professional">Salesperson Professional</option>
-                  <option value="business-casual">Business Casual</option>
-                  <option value="casual-presenter">Casual Presenter</option>
-                  <option value="warm-climate-light">Warm Climate / Light Attire</option>
-                </select>
-              </div>
-              <div class="attire-group">
-                <label for="phoneAttireTopColor">Top Color</label>
-                <select id="phoneAttireTopColor">
-                  <option value="black">Black</option>
-                  <option value="white">White</option>
-                  <option value="navy">Navy Blue</option>
-                  <option value="gray">Gray</option>
-                  <option value="light-blue">Light Blue</option>
-                  <option value="burgundy">Burgundy</option>
-                  <option value="cream">Cream</option>
-                  <option value="green">Green</option>
-                  <option value="pink">Pink</option>
-                </select>
-              </div>
-              <div class="attire-group">
-                <label for="phoneAttireBottomColor">Bottom Color</label>
-                <select id="phoneAttireBottomColor">
-                  <option value="black">Black</option>
-                  <option value="navy">Navy Blue</option>
-                  <option value="gray">Gray</option>
-                  <option value="khaki">Khaki</option>
-                  <option value="white">White</option>
-                  <option value="brown">Brown</option>
-                  <option value="beige">Beige</option>
-                </select>
+              <!-- OVERALL STYLE row -->
+              <div class="attire-row attire-row-full">
+                <h3 class="attire-row-label">Overall Style</h3>
+                <div class="attire-row-fields">
+                  <div class="attire-group attire-group-wide">
+                    <select id="phoneAttireStyle">
+                      <option value="corporate-executive">Corporate Executive</option>
+                      <option value="salesperson-professional">Salesperson Professional</option>
+                      <option value="business-casual">Business Casual</option>
+                      <option value="casual-presenter">Casual Presenter</option>
+                      <option value="warm-climate-light">Warm Climate / Light Attire</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

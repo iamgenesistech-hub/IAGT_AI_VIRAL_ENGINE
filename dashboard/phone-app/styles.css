@@ -279,18 +279,45 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   pointer-events: none;
 }
 .attire-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.attire-row {
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(7, 11, 18, 0.55);
+}
+.attire-row-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.attire-row-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.attire-row-full .attire-row-fields {
+  grid-template-columns: 1fr;
+}
+.attire-group-wide select {
+  width: 100%;
 }
 .attire-group {
   display: grid;
   gap: 4px;
 }
 .attire-group label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-sub);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 .attire-group select {
   border: 1px solid var(--border-dim);
@@ -299,6 +326,7 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   background: rgba(7, 11, 18, 0.85);
   color: var(--text);
   font-size: 13px;
+  width: 100%;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
