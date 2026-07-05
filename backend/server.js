@@ -5717,6 +5717,39 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     requestId: finalRequestId || null,
     provider: avatar.sourceProvider
     });
+
+    // Background poll: wait for proof video to complete, then update the record
+    if (avatar.proofVideoId) {
+      (async () => {
+        try {
+          for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 5000));
+            const s = await getHeyGenVideoStatus(avatar.proofVideoId);
+            if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
+              const rec = findAvatarRequest(finalRequestId);
+              if (rec) {
+                upsertAvatarRequest({
+                  ...rec,
+                  avatar: {
+                    ...(rec.avatar || {}),
+                    proofVideoId: avatar.proofVideoId,
+                    proofVideoUrl: s.video_url,
+                    proofThumbnailUrl: s.thumbnail_url || rec.avatar?.photoUrl || rec.photoUrl || null,
+                    proofStatus: 'completed',
+                    proofCompletedAt: new Date().toISOString()
+                  },
+                  updatedAt: new Date().toISOString()
+                });
+              }
+              console.log(`[Avatar] Proof video ready for ${finalRequestId}: ${s.video_url.substring(0, 80)}…`);
+              break;
+            }
+          }
+        } catch (pollErr) {
+          console.error(`[Avatar] Background proof poll error: ${pollErr.message}`);
+        }
+      })();
+    }
   } catch (e) {
     upsertAvatarRequest({
       ...(findAvatarRequest(finalRequestId) || {}),

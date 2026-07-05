@@ -1381,7 +1381,7 @@
 
         setControlState(createAvatarBtn, 'completed', 2000);
         if (createAvatarStatus) {
-          createAvatarStatus.textContent = '✅ Avatar created! It has been returned to your Avatar Library below.';
+          createAvatarStatus.textContent = '✅ Avatar created! Rendering proof video…';
           createAvatarStatus.className = 'create-avatar-status status-success';
         }
         if (payload.requestId || payload.avatarId) {
@@ -1393,9 +1393,36 @@
         }
         persistAvatarSetup();
         renderAvatarSetup();
-        sessionInfo.textContent = 'Avatar created and returned to your library.';
+        sessionInfo.textContent = 'Avatar created — waiting for proof video render…';
         // Reload avatar library so the new avatar appears immediately
         await loadAvatarLibrary();
+
+        // Poll for proof video completion and store URL
+        const proofVideoId = payload.avatar?.proofVideoId || null;
+        const requestId = payload.requestId || null;
+        if (proofVideoId && requestId) {
+          try {
+            if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 30-60 seconds)';
+            const proofResult = await waitForAvatarProof(proofVideoId);
+            const videoUrl = proofResult.videoUrl || proofResult.video_url || '';
+            const thumbnailUrl = proofResult.thumbnailUrl || payload.avatar?.photoUrl || '';
+            if (videoUrl) {
+              await apiJson('/api/affiliate/avatar/proof-complete', {
+                method: 'POST',
+                body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl })
+              });
+              if (createAvatarStatus) {
+                createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
+              }
+              sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
+              await loadAvatarLibrary();
+            }
+          } catch (proofErr) {
+            if (createAvatarStatus) {
+              createAvatarStatus.textContent = '✅ Avatar created! Proof video still rendering — tap "Generate proof" in library to check.';
+            }
+          }
+        }
       } catch (error) {
         setControlState(createAvatarBtn, 'off');
         if (createAvatarStatus) {
