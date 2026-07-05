@@ -295,27 +295,48 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel video-library-panel">
           <div class="panel-head">
             <div>
-              <h2>My Product Videos</h2>
-              <p>AI-generated product videos using your avatar.</p>
+              <h2>🎬 My Rendered Videos</h2>
+              <p>Your AI avatar product videos — ready to post to social platforms.</p>
             </div>
             <div class="panel-actions">
-              <p class="monitor-info" id="phoneProductVideoMonitor">No product videos yet.</p>
-              <button type="button" id="phoneProductVideoRefresh" class="control-btn state-off" style="font-size:11px;padding:4px 10px;">Refresh</button>
+              <p class="monitor-info" id="phoneProductVideoMonitor">No videos yet.</p>
+              <button type="button" id="phoneProductVideoRefresh" class="control-btn state-off" style="font-size:11px;padding:4px 10px;">🔄 Refresh</button>
             </div>
           </div>
-          <div id="phoneProductVideoGrid" class="product-video-grid">
-            <div class="avatar-empty">No product videos generated yet. Select an avatar and a product, then tap "Generate Product Video".</div>
-          </div>
-          <div id="phoneProductVideoPreview" class="product-video-preview hidden">
-            <video id="phoneProductVideoPlayer" class="product-video-player" controls playsinline preload="metadata"></video>
-            <div class="product-video-preview-info">
-              <strong id="phoneProductVideoTitle">Product Video</strong>
-              <p id="phoneProductVideoMeta">Rendered with your avatar.</p>
-              <p id="phoneProductVideoScript" class="product-video-script-text"></p>
+
+          <!-- Active Video Player -->
+          <div id="phoneProductVideoPreview" class="video-library-player-section hidden">
+            <div class="video-library-player-wrap">
+              <video id="phoneProductVideoPlayer" class="video-library-main-player" controls playsinline preload="metadata"></video>
             </div>
+            <div class="video-library-player-info">
+              <strong id="phoneProductVideoTitle" class="video-library-title">Product Video</strong>
+              <p id="phoneProductVideoMeta" class="video-library-meta">Rendered with your avatar.</p>
+              <p id="phoneProductVideoScript" class="video-library-script"></p>
+              <div class="video-library-platform-badge" id="phoneProductVideoPlatformBadge">
+                <span class="platform-badge">TikTok</span>
+              </div>
+              <div class="video-library-post-actions" id="phoneProductVideoPostActions">
+                <p class="post-actions-label">Post this video to:</p>
+                <div class="post-actions-grid">
+                  <button type="button" class="post-action-btn" data-post-platform="facebook">📘 Facebook</button>
+                  <button type="button" class="post-action-btn" data-post-platform="instagram">📷 Instagram</button>
+                  <button type="button" class="post-action-btn" data-post-platform="tiktok">🎵 TikTok</button>
+                  <button type="button" class="post-action-btn" data-post-platform="youtube">▶️ YouTube</button>
+                  <button type="button" class="post-action-btn" data-post-platform="pinterest">📌 Pinterest</button>
+                  <button type="button" class="post-action-btn" data-post-platform="x">✖️ X</button>
+                </div>
+                <p id="phoneProductVideoPostStatus" class="post-status-text"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Cards Grid -->
+          <div id="phoneProductVideoGrid" class="video-library-grid">
+            <div class="avatar-empty">No product videos generated yet. Select an avatar and a product above, then tap "🎬 Generate Product Video".</div>
           </div>
         </div>
 

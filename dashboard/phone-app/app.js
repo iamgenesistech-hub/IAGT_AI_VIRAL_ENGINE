@@ -626,21 +626,25 @@
     if (!productVideoGrid) return;
     const items = supportState.productVideos;
     if (!items.length) {
-      productVideoGrid.innerHTML = '<div class="avatar-empty">No product videos generated yet. Select an avatar and a product, then tap "Generate Product Video".</div>';
-      if (productVideoMonitor) productVideoMonitor.textContent = 'No product videos yet.';
+      productVideoGrid.innerHTML = '<div class="avatar-empty">No product videos generated yet. Select an avatar and a product above, then tap "🎬 Generate Product Video".</div>';
+      if (productVideoMonitor) productVideoMonitor.textContent = 'No videos yet.';
       renderProductVideoPreview(null);
       return;
     }
-    if (productVideoMonitor) productVideoMonitor.textContent = `${items.length} video${items.length === 1 ? '' : 's'}`;
+    if (productVideoMonitor) productVideoMonitor.textContent = `${items.length} video${items.length === 1 ? '' : 's'} rendered`;
+    const platformEmoji = { tiktok: '🎵', instagram: '📷', youtube: '▶️', facebook: '📘', pinterest: '📌', x: '✖️' };
     productVideoGrid.innerHTML = items.map((item) => {
       const selected = item.videoJobId === supportState.selectedProductVideoId;
       const statusClass = item.status === 'completed' ? 'completed' : item.status === 'failed' ? 'failed' : 'rendering';
-      const statusLabel = item.status === 'completed' ? '✅ Ready' : item.status === 'failed' ? '❌ Failed' : '⏳ Rendering…';
+      const statusLabel = item.status === 'completed' ? '✅ Ready to post' : item.status === 'failed' ? '❌ Failed' : '⏳ Rendering…';
       const thumb = item.thumbnailUrl || item.photoUrl || '';
-      return `<button type="button" class="product-video-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
-        ${thumb ? `<img class="pv-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="pv-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">🎬</div>'}
+      const pEmoji = platformEmoji[item.platform] || '🎬';
+      return `<button type="button" class="video-library-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
+        ${thumb ? `<img class="vlc-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="vlc-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:32px">🎬</div>'}
+        ${item.status === 'completed' ? '<span class="vlc-play-overlay">▶</span>' : ''}
         <strong>${escapeHtml(item.productTitle || 'Product Video')}</strong>
-        <span class="pv-status ${statusClass}">${statusLabel}</span>
+        <span class="vlc-platform">${pEmoji} ${escapeHtml(item.platform || 'tiktok')}</span>
+        <span class="vlc-status ${statusClass}">${statusLabel}</span>
       </button>`;
     }).join('');
 
@@ -666,16 +670,80 @@
     if (!item) { productVideoPreview.classList.add('hidden'); return; }
     productVideoPreview.classList.remove('hidden');
     if (productVideoTitle) productVideoTitle.textContent = item.productTitle || 'Product Video';
-    if (productVideoMeta) productVideoMeta.textContent = item.status === 'completed' ? `Platform: ${item.platform || 'tiktok'} · Rendered ${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}` : item.status === 'rendering' ? 'Video is rendering… check back in ~60 seconds.' : `Failed: ${item.error || 'Unknown error'}`;
+    if (productVideoMeta) {
+      if (item.status === 'completed') {
+        productVideoMeta.textContent = `Rendered ${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : 'recently'} · Ready to share`;
+      } else if (item.status === 'rendering') {
+        productVideoMeta.textContent = '⏳ Video is rendering… check back in ~60 seconds.';
+      } else {
+        productVideoMeta.textContent = `Failed: ${item.error || 'Unknown error'}`;
+      }
+    }
     if (productVideoScript) productVideoScript.textContent = item.script || '';
+
+    // Platform badge
+    const badgeEl = document.getElementById('phoneProductVideoPlatformBadge');
+    if (badgeEl) {
+      const platform = item.platform || 'tiktok';
+      const platformLabels = { tiktok: 'TikTok', instagram: 'Instagram Reels', youtube: 'YouTube Shorts', facebook: 'Facebook', pinterest: 'Pinterest', x: 'X' };
+      badgeEl.innerHTML = `<span class="platform-badge ${platform}">${platformLabels[platform] || platform}</span>`;
+    }
+
+    // Video player
     if (productVideoPlayer) {
       if (item.videoUrl) {
         productVideoPlayer.src = item.videoUrl;
         productVideoPlayer.classList.remove('hidden');
+        productVideoPlayer.load();
       } else {
         productVideoPlayer.removeAttribute('src');
         productVideoPlayer.classList.add('hidden');
       }
+    }
+
+    // Wire post buttons
+    const postActions = document.getElementById('phoneProductVideoPostActions');
+    if (postActions) {
+      postActions.querySelectorAll('[data-post-platform]').forEach((btn) => {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', async () => {
+          if (!item.videoUrl) { alert('Video is not ready yet.'); return; }
+          newBtn.classList.add('posting');
+          newBtn.textContent = '⏳ Posting…';
+          const postStatus = document.getElementById('phoneProductVideoPostStatus');
+          try {
+            const platform = newBtn.getAttribute('data-post-platform');
+            const socialInput = document.getElementById('phoneSocial' + platform.charAt(0).toUpperCase() + platform.slice(1));
+            const accountUrl = socialInput ? socialInput.value.trim() : '';
+            const resp = await fetch('/api/affiliate/social/post', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                affiliateCode: supportState.affiliateCode,
+                platform,
+                accountUrl: accountUrl || `https://${platform}.com/affiliate`,
+                videoUrl: item.videoUrl,
+                productId: item.productId || null
+              })
+            });
+            const result = await resp.json().catch(() => ({}));
+            newBtn.classList.remove('posting');
+            newBtn.classList.add('posted');
+            const platformEmojis = { facebook: '📘', instagram: '📷', tiktok: '🎵', youtube: '▶️', pinterest: '📌', x: '✖️' };
+            newBtn.textContent = `${platformEmojis[platform] || '✅'} Posted!`;
+            if (postStatus) postStatus.textContent = result.message || `Video queued for ${platform}!`;
+            setTimeout(() => {
+              newBtn.classList.remove('posted');
+              newBtn.textContent = `${platformEmojis[platform] || '🔗'} ${platform.charAt(0).toUpperCase() + platform.slice(1)}`;
+            }, 3000);
+          } catch (err) {
+            newBtn.classList.remove('posting');
+            newBtn.textContent = '❌ Error';
+            if (postStatus) postStatus.textContent = `Post failed: ${err.message}`;
+          }
+        });
+      });
     }
   }
 
