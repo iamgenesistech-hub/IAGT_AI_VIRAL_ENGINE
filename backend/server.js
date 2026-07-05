@@ -5121,6 +5121,13 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       photoUrl,
       voiceFileUrl,
       voiceFilePath,
+      productId,
+      productHandle,
+      productTitle,
+      productPageUrl,
+      productImageUrl,
+      platform,
+      platformLabel,
       source,
       returnTo
     } = req.body || {};
@@ -5141,6 +5148,13 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       photoUrl,
       voiceFileUrl: voiceFileUrl || null,
       voiceFilePath: voiceFilePath || null,
+      productId: productId || null,
+      productHandle: productHandle || null,
+      productTitle: productTitle || null,
+      productPageUrl: productPageUrl || null,
+      productImageUrl: productImageUrl || null,
+      platform: platform || null,
+      platformLabel: platformLabel || null,
       source: source || 'phone-app',
       returnTo: finalReturnTo,
       status: 'queued',
@@ -5186,6 +5200,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     photoUrl,
     voiceFilePath,
     voiceFileUrl,
+    productId,
+    productHandle,
+    productTitle,
+    productPageUrl,
+    productImageUrl,
+    platform,
+    platformLabel,
     source,
     returnTo,
     requestId
@@ -5198,6 +5219,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
     const resolvedPhotoUrl = photoUrl || requestRecord?.photoUrl || null;
     const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
+    const resolvedProductId = productId || requestRecord?.productId || null;
+    const resolvedProductHandle = productHandle || requestRecord?.productHandle || null;
+    const resolvedProductTitle = productTitle || requestRecord?.productTitle || null;
+    const resolvedProductPageUrl = productPageUrl || requestRecord?.productPageUrl || null;
+    const resolvedProductImageUrl = productImageUrl || requestRecord?.productImageUrl || null;
+    const resolvedPlatform = platform || requestRecord?.platform || null;
+    const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
 
     let avatarPayload;
     if (process.env.HEYGEN_API_KEY) {
@@ -5245,6 +5273,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     voiceFilePath: voiceFilePath || null,
     voiceCloneId: avatarPayload.voice_clone_id || null,
     voiceCloneStatus: avatarPayload.voice_clone_status || (resolvedVoiceUrl ? 'uploaded' : 'none'),
+    productId: resolvedProductId,
+    productHandle: resolvedProductHandle,
+    productTitle: resolvedProductTitle,
+    productPageUrl: resolvedProductPageUrl,
+    productImageUrl: resolvedProductImageUrl,
+    platform: resolvedPlatform,
+    platformLabel: resolvedPlatformLabel,
     status: 'active',
     createdAt: new Date().toISOString(),
     isDefault: true,
@@ -5264,6 +5299,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       style: avatar.style,
       photo_url: avatar.photoUrl,
       voice_file_url: avatar.voiceFileUrl,
+      product_id: avatar.productId,
+      product_handle: avatar.productHandle,
+      product_title: avatar.productTitle,
+      product_page_url: avatar.productPageUrl,
+      product_image_url: avatar.productImageUrl,
+      platform: avatar.platform,
+      platform_label: avatar.platformLabel,
       voice_clone_status: avatar.voiceCloneStatus,
       status: 'active',
       created_at: avatar.createdAt
@@ -5280,6 +5322,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       photoUrl: avatar.photoUrl,
       voiceFileUrl: avatar.voiceFileUrl,
       voiceFilePath: avatar.voiceFilePath,
+      productId: avatar.productId || requestRecord?.productId || null,
+      productHandle: avatar.productHandle || requestRecord?.productHandle || null,
+      productTitle: avatar.productTitle || requestRecord?.productTitle || null,
+      productPageUrl: avatar.productPageUrl || requestRecord?.productPageUrl || null,
+      productImageUrl: avatar.productImageUrl || requestRecord?.productImageUrl || null,
+      platform: avatar.platform || requestRecord?.platform || null,
+      platformLabel: avatar.platformLabel || requestRecord?.platformLabel || null,
       source: requestRecord?.source || source || 'affiliate-hub',
       returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
       status: 'completed',
@@ -5324,12 +5373,13 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   res.json({
     success: true,
     script: {
-      scriptText: 'I am so excited to share this product with you. It has completely changed my health journey and I know it can change yours too. The results speak for themselves â€” more energy, better focus, and I feel amazing. Try it today at iamgenesistech.com',
+      scriptText: 'Hey, I wanted to share something that has genuinely made a difference for me. What I like about this item is that it is simple to use, easy to stay consistent with, and it fits real life without feeling complicated.\n\nIt feels natural, it is easy to explain, and it becomes part of your routine quickly. If you have been looking for something practical that helps you keep moving forward, this is worth checking out today.',
       tone: 'enthusiastic',
-      duration: '15-20 seconds',
+      duration: '20-30 seconds',
       tips: [
         'Speak naturally and with genuine excitement',
-        'Pause briefly after the first sentence for emphasis',
+        'Keep your pace steady so the AI can capture your natural cadence',
+        'Pause briefly after the opening sentence and the benefit statement',
         'End with a clear call to action'
       ]
     }

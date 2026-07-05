@@ -29,6 +29,16 @@
   const avatarCreatedMeta = document.getElementById('phoneAvatarCreatedMeta');
   const avatarReturnLink = document.getElementById('phoneAvatarReturnLink');
   const phoneVoiceHelp = document.getElementById('phoneVoiceHelp');
+  const phoneVoiceScript = document.getElementById('phoneVoiceScript');
+  const productMonitor = document.getElementById('phoneProductMonitor');
+  const productSearchInput = document.getElementById('phoneProductSearch');
+  const platformSelect = document.getElementById('phonePlatformSelect');
+  const productList = document.getElementById('phoneProductList');
+  const productDetails = document.getElementById('phoneProductDetails');
+  const productImage = document.getElementById('phoneProductImage');
+  const productTitle = document.getElementById('phoneProductTitle');
+  const productMeta = document.getElementById('phoneProductMeta');
+  const productReferences = document.getElementById('phoneProductReferences');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
@@ -52,8 +62,14 @@
       avatarId: '',
       requestId: '',
       createdAvatar: null,
-      returnTo: ''
-    }
+      returnTo: '',
+      selectedProductId: '',
+      selectedPlatform: 'tiktok',
+      selectedProduct: null,
+      productReferences: []
+    },
+    products: [],
+    voiceReferenceScript: ''
   };
 
   function setControlState(el, state, autoOffMs = 0) {
@@ -71,6 +87,29 @@
         el.classList.add('state-off');
       }, effectiveAutoOffMs);
       controlTimers.set(el, timeout);
+    }
+  }
+
+  async function loadVoiceReferenceScript() {
+    try {
+      const response = await fetch('/api/affiliate/avatar/voice-reference-script', {
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || `Request failed: ${response.status}`);
+      }
+      const script = payload.script && (payload.script.scriptText || payload.script.text) ? String(payload.script.scriptText || payload.script.text) : '';
+      supportState.voiceReferenceScript = script || supportState.voiceReferenceScript || '';
+      if (phoneVoiceScript) {
+        phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Voice reference script unavailable.';
+      }
+    } catch (error) {
+      supportState.voiceReferenceScript = 'Hey, I wanted to share something that has genuinely made a difference for me. What I like about this item is that it is simple to use, easy to stay consistent with, and it fits real life without feeling complicated.\n\nIt feels natural, it is easy to explain, and it becomes part of your routine quickly. If you have been looking for something practical that helps you keep moving forward, this is worth checking out today.';
+      if (phoneVoiceScript) {
+        phoneVoiceScript.textContent = supportState.voiceReferenceScript;
+      }
+      console.warn('Voice reference script load failed', error);
     }
   }
 
@@ -189,6 +228,10 @@
       supportState.avatarSetup.requestId = String(parsed.requestId || '');
       supportState.avatarSetup.createdAvatar = parsed.createdAvatar || null;
       supportState.avatarSetup.returnTo = String(parsed.returnTo || '');
+      supportState.avatarSetup.selectedProductId = String(parsed.selectedProductId || '');
+      supportState.avatarSetup.selectedPlatform = String(parsed.selectedPlatform || 'tiktok');
+      supportState.avatarSetup.selectedProduct = parsed.selectedProduct || null;
+      supportState.avatarSetup.productReferences = Array.isArray(parsed.productReferences) ? parsed.productReferences : [];
     } catch (error) {
       console.warn('Invalid stored avatar setup payload', error);
     }
@@ -204,6 +247,7 @@
         avatarPhotoPreview.classList.add('hidden');
       }
     }
+
     if (avatarVoicePreview) {
       if (supportState.avatarSetup.voiceFileUrl) {
         avatarVoicePreview.src = supportState.avatarSetup.voiceFileUrl;
@@ -228,6 +272,8 @@
       const parts = [];
       parts.push(supportState.avatarSetup.photoUrl ? 'Photo uploaded' : 'Photo pending');
       parts.push(supportState.avatarSetup.voiceFileUrl ? 'Voice uploaded' : 'Voice pending');
+      parts.push(supportState.avatarSetup.selectedProduct ? `Product: ${supportState.avatarSetup.selectedProduct.title || 'selected'}` : 'Product pending');
+      parts.push(`Platform: ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`);
       if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
       avatarMonitor.textContent = parts.join(' · ');
     }
@@ -252,7 +298,199 @@
         phoneVoiceHelp.textContent = 'Allow microphone access to record directly, or upload a file below.';
       }
     }
+    if (phoneVoiceScript) {
+      phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Loading voice reference script…';
+    }
   }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    }
+
+    function platformLabelOf(value) {
+      const normalized = String(value || 'tiktok').toLowerCase();
+      if (normalized === 'instagram') return 'Instagram Reels 9:16';
+      if (normalized === 'youtube') return 'YouTube Shorts 9:16';
+      if (normalized === 'facebook') return 'Facebook Feed 16:9';
+      return 'TikTok 9:16';
+    }
+
+    function renderProductSelection() {
+      const products = Array.isArray(supportState.products) ? supportState.products : [];
+      const query = String(productSearchInput?.value || '').trim().toLowerCase();
+      const filtered = query
+        ? products.filter((item) => {
+            const haystack = [
+              item.title,
+              item.product_type,
+              item.category,
+              item.handle,
+              item.tags && item.tags.join ? item.tags.join(' ') : ''
+            ].join(' ').toLowerCase();
+            return haystack.includes(query);
+          })
+        : products;
+
+      if (!productList) return;
+      if (!filtered.length) {
+        productList.innerHTML = '<div class="product-empty">No products match your search.</div>';
+        return;
+      }
+
+      productList.innerHTML = filtered.map((item) => {
+        const selected = String(item.id) === String(supportState.avatarSetup.selectedProductId);
+        const badges = [
+          item.category || item.product_type || 'Product',
+          item.salesVelocity || (item.viralScore ? `Viral ${item.viralScore}` : null),
+          item.intelligence && item.intelligence.bestPlatform ? item.intelligence.bestPlatform : null
+        ].filter(Boolean);
+        return `<article class="product-card ${selected ? 'selected' : ''}" data-product-id="${escapeHtml(item.id)}">
+          <div class="product-card-top">
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class="product-meta">$${Number(item.price || 0).toFixed(2)} · ${escapeHtml(item.estimatedPayout || item.commissionPercent || '')}${item.estimatedPayout ? '' : '%'}</div>
+          </div>
+          <div class="product-badges">
+            ${badges.map((badge) => `<span class="product-badge">${escapeHtml(badge)}</span>`).join('')}
+          </div>
+        </article>`;
+      }).join('');
+
+      productList.querySelectorAll('.product-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const productId = card.getAttribute('data-product-id');
+          const index = products.findIndex((item) => String(item.id) === String(productId));
+          if (index >= 0) selectProduct(index);
+        });
+      });
+    }
+
+    async function loadProductReferences(product) {
+      const refs = [];
+      if (!product || !product.handle) return refs;
+      try {
+        const response = await fetch(`/api/viral-media/products/${encodeURIComponent(product.handle)}/similar-ads?limit=3`, {
+          headers: { Accept: 'application/json' }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.success === false) {
+          throw new Error(payload.error || `Request failed: ${response.status}`);
+        }
+        const items = Array.isArray(payload.similarAds)
+          ? payload.similarAds
+          : Array.isArray(payload.items)
+            ? payload.items
+            : Array.isArray(payload.references)
+              ? payload.references
+              : [];
+        return items.slice(0, 3);
+      } catch (error) {
+        console.warn('Similar-ad lookup failed', error);
+        return refs;
+      }
+    }
+
+    function renderSelectedProductDetails() {
+      const selected = supportState.avatarSetup.selectedProduct;
+      if (!productDetails || !productTitle || !productMeta || !productImage || !productReferences || !productMonitor) return;
+
+      if (!selected) {
+        productDetails.classList.add('hidden');
+        productMonitor.textContent = 'No product selected yet.';
+        return;
+      }
+
+      productDetails.classList.remove('hidden');
+      productTitle.textContent = selected.title || 'Selected product';
+      const parts = [];
+      parts.push(selected.category || selected.product_type || 'Product');
+      if (selected.price !== undefined && selected.price !== null) parts.push(`$${Number(selected.price || 0).toFixed(2)}`);
+      if (selected.estimatedPayout) parts.push(`Est. payout ${selected.estimatedPayout}`);
+      if (selected.viralScore) parts.push(`Viral score ${selected.viralScore}`);
+      if (selected.intelligence && selected.intelligence.bestPlatform) parts.push(`Best platform ${selected.intelligence.bestPlatform}`);
+      productMeta.textContent = parts.join(' · ');
+      if (selected.imageUrl || selected.image || selected.image_url) {
+        productImage.src = selected.imageUrl || selected.image || selected.image_url;
+        productImage.classList.remove('hidden');
+      } else {
+        productImage.removeAttribute('src');
+        productImage.classList.add('hidden');
+      }
+      productMonitor.textContent = `${selected.title || 'Product selected'} · ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`;
+      if (supportState.avatarSetup.productReferences.length) {
+        productReferences.innerHTML = supportState.avatarSetup.productReferences.map((item) => {
+          const title = item.title || item.scriptTitle || item.hook || item.name || 'Reference';
+          const meta = [
+            item.platform || item.source || 'viral ad',
+            item.format || item.formatLabel || item.mediaType || 'format',
+            item.similarityScore ? `Match ${item.similarityScore}` : null
+          ].filter(Boolean).join(' · ');
+          const link = item.sourceUrl || item.videoUrl || item.video_url || item.url || '';
+          return `<div class="product-reference">
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(meta)}</span>
+            ${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">Open reference</a>` : ''}
+          </div>`;
+        }).join('');
+      } else {
+        productReferences.innerHTML = '<div class="product-empty">No similar ad references loaded yet.</div>';
+      }
+    }
+
+    async function selectProduct(idx) {
+      const products = Array.isArray(supportState.products) ? supportState.products : [];
+      const selected = products[idx];
+      if (!selected) return;
+      supportState.avatarSetup.selectedProductId = String(selected.id || '');
+      supportState.avatarSetup.selectedProduct = selected;
+      supportState.avatarSetup.productReferences = await loadProductReferences(selected);
+      if (platformSelect) {
+        supportState.avatarSetup.selectedPlatform = String(platformSelect.value || supportState.avatarSetup.selectedPlatform || 'tiktok');
+      }
+      persistAvatarSetup();
+      renderProductSelection();
+      renderSelectedProductDetails();
+      const link = selected.affiliateLink || selected.productUrl || selected.productPageUrl || '';
+      if (link) {
+        setStatus(`Selected ${selected.title}. Your affiliate link is ready.`, 'success');
+      } else {
+        setStatus(`Selected ${selected.title}.`, 'success');
+      }
+    }
+
+    async function loadProducts() {
+      if (!productList) return;
+      const query = String(productSearchInput?.value || '').trim();
+      const url = new URL('/api/affiliate/workspace/products', window.location.origin);
+      url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+      url.searchParams.set('source', 'viral');
+      url.searchParams.set('limit', '24');
+      if (query) url.searchParams.set('q', query);
+      try {
+        const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.success === false) {
+          throw new Error(payload.error || `Request failed: ${response.status}`);
+        }
+        const products = Array.isArray(payload.products) ? payload.products : Array.isArray(payload.items) ? payload.items : [];
+        supportState.products = products;
+        renderProductSelection();
+
+        const selectedId = supportState.avatarSetup.selectedProductId;
+        if (selectedId) {
+          const matchIndex = products.findIndex((item) => String(item.id) === String(selectedId));
+          if (matchIndex >= 0) {
+            supportState.avatarSetup.selectedProduct = products[matchIndex];
+            supportState.avatarSetup.productReferences = await loadProductReferences(products[matchIndex]);
+            renderSelectedProductDetails();
+          }
+        } else {
+          renderSelectedProductDetails();
+        }
+      } catch (error) {
+        productList.innerHTML = `<div class="product-empty">Unable to load products: ${escapeHtml(error.message)}</div>`;
+        setStatus(`Product load failed: ${error.message}`, 'error');
+      }
+    }
 
   async function uploadAvatarAsset(file, endpoint, fieldName) {
     if (!file) throw new Error('Please choose a file before uploading.');
@@ -369,6 +607,9 @@
   }
 
   async function saveAvatarProfile() {
+    if (!supportState.avatarSetup.selectedProduct) {
+      throw new Error('Please select a product before sending the avatar to the hub.');
+    }
     const payload = await apiJson('/api/affiliate/avatar/request', {
       method: 'POST',
       body: JSON.stringify({
@@ -378,16 +619,27 @@
         photoUrl: supportState.avatarSetup.photoUrl || null,
         voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
         voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
+        productId: supportState.avatarSetup.selectedProduct.id || null,
+        productHandle: supportState.avatarSetup.selectedProduct.handle || null,
+        productTitle: supportState.avatarSetup.selectedProduct.title || null,
+        productPageUrl: supportState.avatarSetup.selectedProduct.productPageUrl || supportState.avatarSetup.selectedProduct.productUrl || null,
+        productImageUrl: supportState.avatarSetup.selectedProduct.imageUrl || supportState.avatarSetup.selectedProduct.image || supportState.avatarSetup.selectedProduct.image_url || null,
+        platform: supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok',
+        platformLabel: platformLabelOf(supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok'),
         source: 'phone-app',
         returnTo: `/phone-app?affiliateCode=${encodeURIComponent(supportState.affiliateCode)}&affiliateName=${encodeURIComponent(supportState.affiliateName)}`
       })
     });
     supportState.avatarSetup.requestId = String(payload.requestId || '');
     supportState.avatarSetup.returnTo = String(payload.request?.returnTo || '/phone-app');
+    supportState.avatarSetup.productReferences = Array.isArray(supportState.avatarSetup.productReferences)
+      ? supportState.avatarSetup.productReferences
+      : [];
     localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
     persistAvatarSetup();
     renderAvatarSetup();
-    sessionInfo.textContent = 'Avatar request sent to Affiliate Hub. Opening hub for HeyGen creation...';
+    renderSelectedProductDetails();
+    sessionInfo.textContent = 'Avatar request sent to Affiliate Hub with the selected product and platform.';
     if (payload.hubUrl) {
       window.location.href = payload.hubUrl;
     }
@@ -418,6 +670,19 @@
     if (!request) return;
     supportState.avatarSetup.requestId = request.requestId || requestId;
     supportState.avatarSetup.returnTo = request.returnTo || supportState.avatarSetup.returnTo || '/phone-app';
+    supportState.avatarSetup.selectedProductId = String(request.productId || supportState.avatarSetup.selectedProductId || '');
+    supportState.avatarSetup.selectedPlatform = String(request.platform || supportState.avatarSetup.selectedPlatform || 'tiktok');
+    if (platformSelect) platformSelect.value = supportState.avatarSetup.selectedPlatform;
+    if (request.productId || request.productTitle) {
+      supportState.avatarSetup.selectedProduct = {
+        id: request.productId || '',
+        handle: request.productHandle || '',
+        title: request.productTitle || 'Selected product',
+        productPageUrl: request.productPageUrl || '',
+        productUrl: request.productPageUrl || '',
+        imageUrl: request.productImageUrl || ''
+      };
+    }
     localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
     if (request.status === 'completed' && request.avatar) {
       supportState.avatarSetup.createdAvatar = request.avatar;
@@ -427,6 +692,7 @@
       supportState.avatarSetup.voiceFilePath = String(request.avatar.voiceFilePath || supportState.avatarSetup.voiceFilePath || '');
       persistAvatarSetup();
       renderAvatarSetup();
+      renderSelectedProductDetails();
       sessionInfo.textContent = `Avatar created through Affiliate Hub and returned to ${supportState.affiliateCode}.`;
     } else if (request.status === 'queued' || request.status === 'processing') {
       sessionInfo.textContent = 'Avatar request is queued in Affiliate Hub. Creating now...';
@@ -634,6 +900,26 @@
     });
   }
 
+  if (platformSelect) {
+    platformSelect.value = supportState.avatarSetup.selectedPlatform || 'tiktok';
+    platformSelect.addEventListener('change', () => {
+      supportState.avatarSetup.selectedPlatform = platformSelect.value;
+      persistAvatarSetup();
+      renderSelectedProductDetails();
+      setStatus(`Platform set to ${platformLabelOf(platformSelect.value)}.`, 'success');
+    });
+  }
+
+  if (productSearchInput) {
+    let searchTimer = null;
+    productSearchInput.addEventListener('input', () => {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        void loadProducts();
+      }, 200);
+    });
+  }
+
   if (avatarPhotoUploadBtn) {
     avatarPhotoUploadBtn.addEventListener('click', async () => {
       avatarPhotoUploadBtn.classList.add('pressing');
@@ -764,7 +1050,9 @@
       resolveAffiliateIdentity();
       hydrateAvatarSetup();
       renderAvatarSetup();
+      await loadVoiceReferenceScript();
       await syncAvatarRequestStatus();
+      await loadProducts();
       await startSupportSession();
       await refreshConversation();
     } catch (error) {

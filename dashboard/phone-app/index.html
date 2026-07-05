@@ -94,6 +94,12 @@
               <h3>Voice Sample</h3>
               <p>Upload a clean voice clip for cloning/reference.</p>
               <p id="phoneVoiceHelp" class="avatar-help">Allow microphone access to record directly, or upload a file below.</p>
+              <div class="voice-script-card">
+                <div class="voice-script-head">
+                  <h4>Voice Reference Script</h4>
+                </div>
+                <p id="phoneVoiceScript" class="voice-script-text">Loading voice reference script…</p>
+              </div>
               <input id="phoneAvatarVoiceInput" type="file" accept="audio/*" />
               <div class="avatar-voice-actions">
                 <button type="button" id="phoneAvatarVoiceRecord" class="control-btn state-off">Record voice sample</button>
@@ -107,9 +113,6 @@
               </div>
             </div>
           </div>
-          <div class="avatar-setup-actions">
-            <button type="button" id="phoneAvatarSaveProfile" class="control-btn primary-action state-off">Save avatar profile</button>
-          </div>
           <div class="avatar-created-card hidden" id="phoneAvatarCreatedCard">
             <div>
               <strong id="phoneAvatarCreatedTitle">Avatar created</strong>
@@ -118,6 +121,41 @@
             <div class="avatar-file-row">
               <a id="phoneAvatarReturnLink" href="/phone-app" target="_self">Return to phone app</a>
             </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Product Selection</h2>
+              <p>Choose the product and platform you want the hub to advertise.</p>
+            </div>
+            <div class="panel-actions">
+              <p class="monitor-info" id="phoneProductMonitor">No product selected yet.</p>
+            </div>
+          </div>
+          <div class="product-controls">
+            <input id="phoneProductSearch" type="search" placeholder="Search products by name or category" />
+            <select id="phonePlatformSelect">
+              <option value="tiktok">TikTok 9:16</option>
+              <option value="instagram">Instagram Reels 9:16</option>
+              <option value="youtube">YouTube Shorts 9:16</option>
+              <option value="facebook">Facebook Feed 16:9</option>
+            </select>
+          </div>
+          <div id="phoneProductList" class="product-grid">
+            <div class="product-empty">Loading products…</div>
+          </div>
+          <div id="phoneProductDetails" class="product-details hidden">
+            <img id="phoneProductImage" class="product-preview" alt="Selected product preview" />
+            <div class="product-details-copy">
+              <strong id="phoneProductTitle">Selected product</strong>
+              <p id="phoneProductMeta">Select a product to view its reference data.</p>
+              <div id="phoneProductReferences" class="product-reference-list"></div>
+            </div>
+          </div>
+          <div class="avatar-setup-actions">
+            <button type="button" id="phoneAvatarSaveProfile" class="control-btn primary-action state-off">Send avatar + product to hub</button>
           </div>
         </div>
 
