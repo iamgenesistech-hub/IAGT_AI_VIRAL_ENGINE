@@ -377,6 +377,126 @@
           </div>
         </div>
 
+        <div class="panel billing-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Billing & Payouts</h2>
+              <p>Manage your subscription, avatar purchases, and choose how you get paid.</p>
+            </div>
+          </div>
+
+          <!-- Subscription Status -->
+          <div class="billing-section">
+            <h3 class="billing-section-label">Subscription</h3>
+            <div class="billing-status-card" id="phoneBillingSubCard">
+              <div class="billing-status-row">
+                <span class="billing-label">Plan</span>
+                <span class="billing-value" id="phoneBillingPlan">Free Trial</span>
+              </div>
+              <div class="billing-status-row">
+                <span class="billing-label">Status</span>
+                <span class="billing-value billing-badge" id="phoneBillingStatus">Active</span>
+              </div>
+              <div class="billing-status-row">
+                <span class="billing-label">Next billing</span>
+                <span class="billing-value" id="phoneBillingNext">—</span>
+              </div>
+              <div class="billing-actions">
+                <button type="button" id="phoneBillingManageSub" class="control-btn state-off">Manage subscription</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Purchase History -->
+          <div class="billing-section">
+            <h3 class="billing-section-label">Avatar & Video Purchases</h3>
+            <div class="billing-purchase-list" id="phoneBillingPurchases">
+              <div class="billing-purchase-empty">No purchases yet.</div>
+            </div>
+            <div class="billing-actions">
+              <button type="button" id="phoneBillingBuyAvatar" class="control-btn primary-action state-off">Buy new avatar ($29)</button>
+              <button type="button" id="phoneBillingBuyVideo" class="control-btn state-off">Buy video render ($9)</button>
+            </div>
+          </div>
+
+          <!-- Commission Balance -->
+          <div class="billing-section">
+            <h3 class="billing-section-label">Commission Balance</h3>
+            <div class="billing-status-card">
+              <div class="billing-status-row">
+                <span class="billing-label">Available balance</span>
+                <span class="billing-value billing-highlight" id="phoneBillingBalance">$0.00</span>
+              </div>
+              <div class="billing-status-row">
+                <span class="billing-label">Lifetime earned</span>
+                <span class="billing-value" id="phoneBillingLifetime">$0.00</span>
+              </div>
+              <div class="billing-status-row">
+                <span class="billing-label">Last payout</span>
+                <span class="billing-value" id="phoneBillingLastPayout">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payout Method -->
+          <div class="billing-section">
+            <h3 class="billing-section-label">Payout Method</h3>
+            <p class="billing-hint">Choose how you receive your commissions.</p>
+            <div class="billing-payout-options">
+              <label class="billing-payout-option">
+                <input type="radio" name="payoutMethod" value="stripe-usd" id="phonePayoutStripe" checked />
+                <div class="billing-payout-option-card">
+                  <span class="billing-payout-icon">💵</span>
+                  <div>
+                    <strong>USD via Stripe</strong>
+                    <p>Direct deposit to bank account or debit card</p>
+                  </div>
+                </div>
+              </label>
+              <label class="billing-payout-option">
+                <input type="radio" name="payoutMethod" value="btc" id="phonePayoutBtc" />
+                <div class="billing-payout-option-card">
+                  <span class="billing-payout-icon">₿</span>
+                  <div>
+                    <strong>Bitcoin (BTC)</strong>
+                    <p>Sent to your BTC wallet address</p>
+                  </div>
+                </div>
+              </label>
+              <label class="billing-payout-option">
+                <input type="radio" name="payoutMethod" value="eth" id="phonePayoutEth" />
+                <div class="billing-payout-option-card">
+                  <span class="billing-payout-icon">⟠</span>
+                  <div>
+                    <strong>Ethereum (ETH)</strong>
+                    <p>Sent to your ETH wallet address</p>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <!-- Payout details based on selection -->
+            <div class="billing-payout-details" id="phoneBillingPayoutDetails">
+              <div id="phonePayoutStripeFields" class="billing-payout-fields">
+                <p class="billing-hint">Connect your bank via Stripe to receive USD payouts.</p>
+                <button type="button" id="phoneBillingConnectStripe" class="control-btn state-off">Connect Stripe account</button>
+                <p class="billing-payout-status" id="phoneStripeConnectStatus">Not connected</p>
+              </div>
+              <div id="phonePayoutCryptoFields" class="billing-payout-fields hidden">
+                <label class="billing-field-label" for="phonePayoutWallet">Wallet address</label>
+                <input type="text" id="phonePayoutWallet" placeholder="Enter your BTC or ETH wallet address" />
+                <button type="button" id="phoneBillingSaveWallet" class="control-btn state-off">Save wallet address</button>
+                <p class="billing-payout-status" id="phoneCryptoWalletStatus">No wallet saved</p>
+              </div>
+            </div>
+
+            <!-- Request Payout -->
+            <div class="billing-actions" style="margin-top:12px">
+              <button type="button" id="phoneBillingRequestPayout" class="control-btn primary-action state-off">Request payout</button>
+            </div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="chat-head">
             <div>

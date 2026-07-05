@@ -5583,6 +5583,74 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   });
 });
 
+// GET /api/affiliate/billing/info
+app.get('/api/affiliate/billing/info', (req, res) => {
+  const code = req.query.code || '';
+  // Placeholder billing info — will be connected to Stripe when API keys are set
+  res.json({
+    success: true,
+    plan: 'Starter',
+    subscriptionStatus: 'Active',
+    nextBillingDate: '—',
+    balance: '0.00',
+    lifetimeEarned: '0.00',
+    lastPayoutDate: '—',
+    purchases: []
+  });
+});
+
+// POST /api/affiliate/billing/checkout
+app.post('/api/affiliate/billing/checkout', (req, res) => {
+  const { affiliateCode, item, price } = req.body || {};
+  console.log(`[Billing] Checkout request: ${item} ($${(price / 100).toFixed(2)}) for ${affiliateCode}`);
+  // When Stripe is configured, create a Checkout Session here
+  res.json({
+    success: true,
+    message: 'Stripe checkout will be activated once payment processing is configured. Your request has been noted.',
+    item,
+    price
+  });
+});
+
+// POST /api/affiliate/billing/manage-subscription
+app.post('/api/affiliate/billing/manage-subscription', (req, res) => {
+  const { affiliateCode } = req.body || {};
+  console.log(`[Billing] Manage subscription for ${affiliateCode}`);
+  // When Stripe is configured, create a billing portal session here
+  res.json({
+    success: true,
+    message: 'Subscription management portal will be available once Stripe is fully connected.'
+  });
+});
+
+// POST /api/affiliate/billing/connect-stripe
+app.post('/api/affiliate/billing/connect-stripe', (req, res) => {
+  const { affiliateCode } = req.body || {};
+  console.log(`[Billing] Stripe Connect onboarding for ${affiliateCode}`);
+  // When Stripe Connect is configured, create an Account Link here
+  res.json({
+    success: true,
+    message: 'Stripe Connect onboarding will be activated once your platform account is configured.'
+  });
+});
+
+// POST /api/affiliate/billing/request-payout
+app.post('/api/affiliate/billing/request-payout', (req, res) => {
+  const { affiliateCode, method, walletAddress } = req.body || {};
+  console.log(`[Billing] Payout request: ${method} for ${affiliateCode}${walletAddress ? ` → ${walletAddress}` : ''}`);
+  let message = '';
+  if (method === 'stripe-usd') {
+    message = 'Your USD payout request has been submitted. Funds will be transferred via Stripe once processing is configured.';
+  } else if (method === 'btc') {
+    message = `Your BTC payout request has been submitted to wallet ${walletAddress || '(none)'}. Processing will begin once crypto payouts are configured.`;
+  } else if (method === 'eth') {
+    message = `Your ETH payout request has been submitted to wallet ${walletAddress || '(none)'}. Processing will begin once crypto payouts are configured.`;
+  } else {
+    message = 'Payout request noted. Processing will begin once payment rails are configured.';
+  }
+  res.json({ success: true, message, method, status: 'pending' });
+});
+
 // POST /api/affiliate/social/post
 app.post('/api/affiliate/social/post', async (req, res) => {
   try {

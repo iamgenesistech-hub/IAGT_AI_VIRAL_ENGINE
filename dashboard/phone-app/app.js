@@ -1400,12 +1400,215 @@
       await syncAvatarRequestStatus();
       await loadAvatarLibrary();
       await loadProducts();
+      await loadBillingInfo();
       await startSupportSession();
       await refreshConversation();
     } catch (error) {
       sessionInfo.textContent = `Support startup failed: ${error.message}`;
     }
     await refresh(refreshBtn);
+  }
+
+  // ── Billing & Payouts ──────────────────────────────────────────────────────
+  const BILLING_STORAGE_KEY = 'evics_billing_prefs';
+  const billingPlan = document.getElementById('phoneBillingPlan');
+  const billingStatus = document.getElementById('phoneBillingStatus');
+  const billingNext = document.getElementById('phoneBillingNext');
+  const billingBalance = document.getElementById('phoneBillingBalance');
+  const billingLifetime = document.getElementById('phoneBillingLifetime');
+  const billingLastPayout = document.getElementById('phoneBillingLastPayout');
+  const billingPurchases = document.getElementById('phoneBillingPurchases');
+  const billingManageSubBtn = document.getElementById('phoneBillingManageSub');
+  const billingBuyAvatarBtn = document.getElementById('phoneBillingBuyAvatar');
+  const billingBuyVideoBtn = document.getElementById('phoneBillingBuyVideo');
+  const billingConnectStripeBtn = document.getElementById('phoneBillingConnectStripe');
+  const billingSaveWalletBtn = document.getElementById('phoneBillingSaveWallet');
+  const billingRequestPayoutBtn = document.getElementById('phoneBillingRequestPayout');
+  const payoutWalletInput = document.getElementById('phonePayoutWallet');
+  const stripeConnectStatus = document.getElementById('phoneStripeConnectStatus');
+  const cryptoWalletStatus = document.getElementById('phoneCryptoWalletStatus');
+  const payoutStripeFields = document.getElementById('phonePayoutStripeFields');
+  const payoutCryptoFields = document.getElementById('phonePayoutCryptoFields');
+  const payoutRadios = document.querySelectorAll('input[name="payoutMethod"]');
+
+  function loadBillingPrefs() {
+    try {
+      const stored = localStorage.getItem(BILLING_STORAGE_KEY);
+      if (!stored) return {};
+      return JSON.parse(stored);
+    } catch (e) { return {}; }
+  }
+
+  function saveBillingPrefs(prefs) {
+    localStorage.setItem(BILLING_STORAGE_KEY, JSON.stringify(prefs));
+  }
+
+  function updatePayoutFieldsVisibility() {
+    const selected = document.querySelector('input[name="payoutMethod"]:checked');
+    const method = selected ? selected.value : 'stripe-usd';
+    if (payoutStripeFields && payoutCryptoFields) {
+      if (method === 'stripe-usd') {
+        payoutStripeFields.classList.remove('hidden');
+        payoutCryptoFields.classList.add('hidden');
+      } else {
+        payoutStripeFields.classList.add('hidden');
+        payoutCryptoFields.classList.remove('hidden');
+        if (payoutWalletInput) {
+          payoutWalletInput.placeholder = method === 'btc'
+            ? 'Enter your BTC wallet address (e.g., bc1q...)'
+            : 'Enter your ETH wallet address (e.g., 0x...)';
+        }
+      }
+    }
+    const prefs = loadBillingPrefs();
+    prefs.payoutMethod = method;
+    saveBillingPrefs(prefs);
+  }
+
+  payoutRadios.forEach(radio => {
+    radio.addEventListener('change', updatePayoutFieldsVisibility);
+  });
+
+  // Restore saved payout method
+  const savedBilling = loadBillingPrefs();
+  if (savedBilling.payoutMethod) {
+    const radio = document.querySelector(`input[name="payoutMethod"][value="${savedBilling.payoutMethod}"]`);
+    if (radio) radio.checked = true;
+  }
+  if (savedBilling.walletAddress && payoutWalletInput) {
+    payoutWalletInput.value = savedBilling.walletAddress;
+    if (cryptoWalletStatus) cryptoWalletStatus.textContent = 'Wallet saved ✓';
+  }
+  if (savedBilling.stripeConnected && stripeConnectStatus) {
+    stripeConnectStatus.textContent = 'Connected ✓';
+  }
+  updatePayoutFieldsVisibility();
+
+  if (billingManageSubBtn) {
+    billingManageSubBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/affiliate/billing/manage-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateCode: supportState.affiliateCode })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.url) {
+          window.open(data.url, '_blank');
+        } else {
+          alert(data.message || 'Subscription management will be available soon.');
+        }
+      } catch (e) { alert('Unable to connect. Try again later.'); }
+    });
+  }
+
+  if (billingBuyAvatarBtn) {
+    billingBuyAvatarBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/affiliate/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateCode: supportState.affiliateCode, item: 'avatar', price: 2900 })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.url) { window.open(data.url, '_blank'); }
+        else { alert(data.message || 'Checkout will be available soon.'); }
+      } catch (e) { alert('Unable to connect. Try again later.'); }
+    });
+  }
+
+  if (billingBuyVideoBtn) {
+    billingBuyVideoBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/affiliate/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateCode: supportState.affiliateCode, item: 'video-render', price: 900 })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.url) { window.open(data.url, '_blank'); }
+        else { alert(data.message || 'Checkout will be available soon.'); }
+      } catch (e) { alert('Unable to connect. Try again later.'); }
+    });
+  }
+
+  if (billingConnectStripeBtn) {
+    billingConnectStripeBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/affiliate/billing/connect-stripe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateCode: supportState.affiliateCode })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.url) {
+          window.open(data.url, '_blank');
+          const prefs = loadBillingPrefs();
+          prefs.stripeConnected = true;
+          saveBillingPrefs(prefs);
+          if (stripeConnectStatus) stripeConnectStatus.textContent = 'Connecting…';
+        } else {
+          alert(data.message || 'Stripe Connect will be available soon.');
+        }
+      } catch (e) { alert('Unable to connect. Try again later.'); }
+    });
+  }
+
+  if (billingSaveWalletBtn) {
+    billingSaveWalletBtn.addEventListener('click', () => {
+      const wallet = payoutWalletInput ? payoutWalletInput.value.trim() : '';
+      if (!wallet) {
+        if (cryptoWalletStatus) cryptoWalletStatus.textContent = '⚠️ Please enter a wallet address.';
+        return;
+      }
+      const prefs = loadBillingPrefs();
+      prefs.walletAddress = wallet;
+      saveBillingPrefs(prefs);
+      if (cryptoWalletStatus) cryptoWalletStatus.textContent = 'Wallet saved ✓';
+    });
+  }
+
+  if (billingRequestPayoutBtn) {
+    billingRequestPayoutBtn.addEventListener('click', async () => {
+      const prefs = loadBillingPrefs();
+      const method = prefs.payoutMethod || 'stripe-usd';
+      try {
+        const res = await fetch('/api/affiliate/billing/request-payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            affiliateCode: supportState.affiliateCode,
+            method,
+            walletAddress: prefs.walletAddress || ''
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || 'Payout request submitted. You will be notified when it is processed.');
+      } catch (e) { alert('Unable to submit payout request. Try again later.'); }
+    });
+  }
+
+  // Load billing info from API
+  async function loadBillingInfo() {
+    try {
+      const res = await fetch(`/api/affiliate/billing/info?code=${encodeURIComponent(supportState.affiliateCode)}`, {
+        headers: { Accept: 'application/json' }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        if (billingPlan) billingPlan.textContent = data.plan || 'Free Trial';
+        if (billingStatus) billingStatus.textContent = data.subscriptionStatus || 'Active';
+        if (billingNext) billingNext.textContent = data.nextBillingDate || '—';
+        if (billingBalance) billingBalance.textContent = '$' + (data.balance || '0.00');
+        if (billingLifetime) billingLifetime.textContent = '$' + (data.lifetimeEarned || '0.00');
+        if (billingLastPayout) billingLastPayout.textContent = data.lastPayoutDate || '—';
+        if (billingPurchases && Array.isArray(data.purchases) && data.purchases.length > 0) {
+          billingPurchases.innerHTML = data.purchases.map(p =>
+            `<div class="billing-purchase-item"><span class="purchase-name">${p.name}</span><span class="purchase-date">${p.date}</span><span class="purchase-amount">$${p.amount}</span></div>`
+          ).join('');
+        }
+      }
+    } catch (e) { console.warn('Billing info load failed', e); }
   }
 
   // ── Social accounts & posting ──────────────────────────────────────────────
