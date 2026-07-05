@@ -225,9 +225,19 @@ app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-ap
 app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub')));
 
 // Serve uploaded avatar photos and voice files
-app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/uploads', express.static(UPLOADS_DIR, {
+  setHeaders: function (res, filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    // Fix audio content types — express.static maps .webm to video/webm
+    if (ext === '.webm') res.setHeader('Content-Type', 'audio/webm');
+    else if (ext === '.mp3') res.setHeader('Content-Type', 'audio/mpeg');
+    else if (ext === '.wav') res.setHeader('Content-Type', 'audio/wav');
+    else if (ext === '.ogg') res.setHeader('Content-Type', 'audio/ogg');
+    else if (ext === '.m4a') res.setHeader('Content-Type', 'audio/mp4');
+  }
+}));
 
-// Fallback: if local file missing (ephemeral container), proxy from GCS
+// Fallback: if local file missing (ephemeral container), proxy from GCS with Range support
 app.get('/uploads/:filename', async (req, res) => {
   const { filename } = req.params;
   const gcsPath = `affiliate-uploads/${filename}`;
@@ -235,13 +245,56 @@ app.get('/uploads/:filename', async (req, res) => {
     const token = await getGcsAccessToken();
     if (!token) return res.status(404).json({ error: 'File not found and GCS unavailable' });
     const gcsUrl = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o/${encodeURIComponent(gcsPath)}?alt=media`;
-    const gcsResp = await fetch(gcsUrl, { headers: { 'Authorization': `Bearer ${token}` } });
-    if (!gcsResp.ok) return res.status(404).json({ error: 'File not found in local storage or GCS' });
-    const ct = gcsResp.headers.get('content-type') || 'application/octet-stream';
-    res.setHeader('Content-Type', ct);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    const arrayBuf = await gcsResp.arrayBuffer();
-    res.send(Buffer.from(arrayBuf));
+
+    // First get file metadata (size) for Range support
+    const metaUrl = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o/${encodeURIComponent(gcsPath)}`;
+    const metaResp = await fetch(metaUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!metaResp.ok) return res.status(404).json({ error: 'File not found in local storage or GCS' });
+    const meta = await metaResp.json();
+    const totalSize = parseInt(meta.size, 10);
+
+    // Determine content type — fix audio/webm files served as video/webm
+    let ct = meta.contentType || 'application/octet-stream';
+    const ext = path.extname(filename).toLowerCase();
+    if (ext === '.webm' && ct === 'video/webm') ct = 'audio/webm';
+    if (ext === '.mp3') ct = 'audio/mpeg';
+    if (ext === '.wav') ct = 'audio/wav';
+    if (ext === '.ogg') ct = 'audio/ogg';
+    if (ext === '.m4a') ct = 'audio/mp4';
+
+    // Handle HTTP Range requests (required for audio/video playback)
+    const rangeHeader = req.headers.range;
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+      const chunkSize = end - start + 1;
+
+      const gcsResp = await fetch(gcsUrl, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Range': `bytes=${start}-${end}` }
+      });
+      if (!gcsResp.ok && gcsResp.status !== 206) {
+        return res.status(416).json({ error: 'Range not satisfiable' });
+      }
+      res.status(206);
+      res.setHeader('Content-Type', ct);
+      res.setHeader('Content-Length', chunkSize);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const arrayBuf = await gcsResp.arrayBuffer();
+      res.send(Buffer.from(arrayBuf));
+    } else {
+      // Full file request
+      const gcsResp = await fetch(gcsUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!gcsResp.ok) return res.status(404).json({ error: 'File not found in GCS' });
+      res.setHeader('Content-Type', ct);
+      res.setHeader('Content-Length', totalSize);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const arrayBuf = await gcsResp.arrayBuffer();
+      res.send(Buffer.from(arrayBuf));
+    }
   } catch (e) {
     res.status(500).json({ error: 'GCS proxy error: ' + e.message });
   }

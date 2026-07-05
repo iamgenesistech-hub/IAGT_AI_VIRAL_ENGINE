@@ -295,7 +295,16 @@
       if (supportState.avatarSetup.photoUrl) {
         avatarPhotoPreview.src = supportState.avatarSetup.photoUrl;
         avatarPhotoPreview.classList.remove('hidden');
-      } else {
+        avatarPhotoPreview.onerror = function() {
+          // If the server URL fails, fall back to local blob if available
+          if (avatarPhotoPreview._localBlobUrl && avatarPhotoPreview.src !== avatarPhotoPreview._localBlobUrl) {
+            avatarPhotoPreview.src = avatarPhotoPreview._localBlobUrl;
+          } else {
+            avatarPhotoPreview.alt = 'Photo uploaded — reload to refresh preview';
+            avatarPhotoPreview.style.minHeight = '60px';
+          }
+        };
+      } else if (!avatarPhotoPreview._localBlobUrl) {
         avatarPhotoPreview.removeAttribute('src');
         avatarPhotoPreview.classList.add('hidden');
       }
@@ -304,14 +313,27 @@
     if (avatarVoicePreview) {
       if (supportState.avatarSetup.voiceFileUrl) {
         avatarVoicePreview.src = supportState.avatarSetup.voiceFileUrl;
+        avatarVoicePreview.preload = 'metadata';
         avatarVoicePreview.classList.remove('hidden');
         if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
         avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
         avatarVoicePreview.onerror = function() {
-          avatarVoicePreview.classList.add('hidden');
-          if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
-          if (sessionInfo) sessionInfo.textContent = '⚠️ Voice file unavailable — please re-record or re-upload.';
+          // If server URL fails, fall back to local blob if available
+          if (avatarVoicePreview._localBlobUrl && avatarVoicePreview.src !== avatarVoicePreview._localBlobUrl) {
+            avatarVoicePreview.src = avatarVoicePreview._localBlobUrl;
+          } else {
+            avatarVoicePreview.classList.add('hidden');
+            if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
+            if (sessionInfo) sessionInfo.textContent = '⚠️ Voice file unavailable — please re-record or re-upload.';
+          }
         };
+      } else if (avatarVoicePreview._localBlobUrl) {
+        // Keep local blob preview visible even before upload
+        avatarVoicePreview.src = avatarVoicePreview._localBlobUrl;
+        avatarVoicePreview.preload = 'metadata';
+        avatarVoicePreview.classList.remove('hidden');
+        if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
+        avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
       } else {
         avatarVoicePreview.removeAttribute('src');
         avatarVoicePreview.classList.add('hidden');
@@ -1447,6 +1469,24 @@
     });
   }
 
+  // Immediate local preview when user selects a photo file
+  if (avatarPhotoInput) {
+    avatarPhotoInput.addEventListener('change', () => {
+      const file = avatarPhotoInput.files && avatarPhotoInput.files[0];
+      if (!file || !avatarPhotoPreview) return;
+      // Revoke any prior object URL to avoid memory leak
+      if (avatarPhotoPreview._localBlobUrl) {
+        URL.revokeObjectURL(avatarPhotoPreview._localBlobUrl);
+        avatarPhotoPreview._localBlobUrl = null;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      avatarPhotoPreview._localBlobUrl = blobUrl;
+      avatarPhotoPreview.src = blobUrl;
+      avatarPhotoPreview.classList.remove('hidden');
+      avatarPhotoPreview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
   if (avatarPhotoUploadBtn) {
     avatarPhotoUploadBtn.addEventListener('click', async () => {
       avatarPhotoUploadBtn.classList.add('pressing');
@@ -1455,12 +1495,31 @@
       try {
         await uploadAvatarPhoto();
         setControlState(avatarPhotoUploadBtn, 'completed', 1300);
+        // Scroll to the preview after upload
+        if (avatarPhotoPreview) avatarPhotoPreview.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } catch (error) {
         sessionInfo.textContent = `Photo upload failed: ${error.message}`;
         setControlState(avatarPhotoUploadBtn, 'off');
       } finally {
         avatarPhotoUploadBtn.disabled = false;
         setTimeout(() => avatarPhotoUploadBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  // Immediate local playback when user selects a voice file
+  if (avatarVoiceInput) {
+    avatarVoiceInput.addEventListener('change', () => {
+      const file = avatarVoiceInput.files && avatarVoiceInput.files[0];
+      if (file && avatarVoicePreview) {
+        if (avatarVoicePreview._localBlobUrl) URL.revokeObjectURL(avatarVoicePreview._localBlobUrl);
+        avatarVoicePreview._localBlobUrl = URL.createObjectURL(file);
+        avatarVoicePreview.src = avatarVoicePreview._localBlobUrl;
+        avatarVoicePreview.preload = 'metadata';
+        avatarVoicePreview.classList.remove('hidden');
+        if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
+        avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
+        avatarVoicePreview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
   }

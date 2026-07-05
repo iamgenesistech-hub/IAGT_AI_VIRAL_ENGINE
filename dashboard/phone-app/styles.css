@@ -197,14 +197,16 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 }
 .avatar-photo-preview {
   width: 100%;
-  min-height: 340px;
+  min-height: 200px;
   max-height: 520px;
   object-fit: contain;
   object-position: center center;
   border-radius: 10px;
-  border: 1px solid var(--border-dim);
+  border: 2px solid var(--accent2);
   background: #04080d;
   padding: 6px;
+  margin-top: 8px;
+  box-shadow: 0 0 12px rgba(0,255,200,0.15);
 }
 .avatar-voice-preview {
   width: 100%;
