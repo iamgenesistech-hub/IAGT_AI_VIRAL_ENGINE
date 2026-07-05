@@ -294,3 +294,36 @@ Require stack:
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[EVICS] 404 GET /api/governance/health (4ms)
+[EVICS] 404 GET /api/governance/oath/ai (3ms)
+[EVICS] 404 GET /api/affiliate/avatar/voice-identity-oath (2ms)
+[EVICS] 404 GET /api/affiliate/profile/DEANTHON277 (2ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 404 GET /api/governance/health (3ms)
+[EVICS] 404 GET /api/governance/standard (1ms)
+[EVICS] 404 GET /api/governance/oath/ai (1ms)
+[EVICS] 404 GET /api/governance/oath/affiliate (1ms)
+[EVICS] 404 GET /api/affiliate/avatar/voice-identity-oath (4ms)
+[EVICS] 404 POST /api/governance/evaluate (2ms)
+[EVICS] 404 POST /api/governance/evaluate (1ms)
+[EVICS] 404 POST /api/governance/evaluate (1ms)
+[EVICS] 404 GET /api/governance/stats (1ms)
+[EVICS] 404 GET /api/affiliate/profile/DEANTHON277 (2ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 404 GET /api/governance/health (2ms)
+[EVICS] 404 GET /api/governance/standard (1ms)
+[EVICS] 404 GET /api/governance/oath/ai (1ms)
+[EVICS] 404 GET /api/governance/oath/affiliate (1ms)
+[EVICS] 404 GET /api/affiliate/avatar/voice-identity-oath (3ms)
+[EVICS] 404 POST /api/governance/evaluate (4ms)
+[EVICS] 404 POST /api/governance/evaluate (4ms)
+[EVICS] 404 POST /api/governance/evaluate (2ms)
+[EVICS] 404 GET /api/governance/stats (4ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[EVICS] 404 GET /api/viral-media (2ms)
+[EVICS] 404 GET /api/governance/health (1ms)
+[EVICS] 404 GET /api/governance/oath/ai (1ms)
+[EVICS] 404 GET /api/affiliate/avatar/voice-identity-oath (3ms)

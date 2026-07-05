@@ -169,6 +169,52 @@
             </div>
           </div>
         </div>
+
+        <div class="panel governance-panel">
+          <div class="panel-head">
+            <div>
+              <h2>🕊️ Sacred Intelligence Governance</h2>
+              <p class="panel-sub">Every AI output is measured against truth, integrity, dignity, and love before it is delivered.</p>
+            </div>
+            <button type="button" id="govRefresh" class="control-btn state-off">Refresh</button>
+          </div>
+          <div class="gov-kpis">
+            <div class="gov-kpi">
+              <span class="gov-kpi-label">Pass Rate</span>
+              <span class="gov-kpi-value" id="govPassRate">—</span>
+            </div>
+            <div class="gov-kpi">
+              <span class="gov-kpi-label">Total Checks</span>
+              <span class="gov-kpi-value" id="govTotal">—</span>
+            </div>
+            <div class="gov-kpi">
+              <span class="gov-kpi-label">Blocked</span>
+              <span class="gov-kpi-value" id="govBlocked">—</span>
+            </div>
+            <div class="gov-kpi">
+              <span class="gov-kpi-label">Rewritten</span>
+              <span class="gov-kpi-value" id="govRewritten">—</span>
+            </div>
+          </div>
+          <div class="gov-scores">
+            <div class="gov-score"><span>Avg Love</span><strong id="govAvgLove">—</strong></div>
+            <div class="gov-score"><span>Avg Truth</span><strong id="govAvgTruth">—</strong></div>
+            <div class="gov-score"><span>Avg Dignity</span><strong id="govAvgDignity">—</strong></div>
+            <div class="gov-score"><span>Avg Integrity</span><strong id="govAvgIntegrity">—</strong></div>
+          </div>
+          <div class="cols-2">
+            <div>
+              <h3 class="gov-subhead">Most Common Violations</h3>
+              <ul id="govViolations" class="list"><li>Loading…</li></ul>
+            </div>
+            <div>
+              <h3 class="gov-subhead">Agents With Repeated Failures</h3>
+              <ul id="govFailingAgents" class="list"><li>Loading…</li></ul>
+            </div>
+          </div>
+          <h3 class="gov-subhead">Recent Governance Activity</h3>
+          <ul id="govRecent" class="list"><li>Loading recent governance checks…</li></ul>
+        </div>
       </main>
     </div>
   </div>

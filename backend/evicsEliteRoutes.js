@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
+// EVICS Sacred Intelligence Governance Engine — governs VP/Board agent output.
+const governance = require('./sacredIntelligenceGovernance');
+
 const DEFAULT_PRODUCTS = [
   {
     id: 'ignite-focus-stack',
@@ -670,7 +673,35 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
       const provider = String(req.params.provider || 'heygen').toLowerCase();
       const body = req.body || {};
       const mediaId = String(body.mediaId || body.media_id || 'media-' + Date.now());
-      const script = String(body.spokenScript || body.prompt || body.script || '').trim();
+      let script = String(body.spokenScript || body.prompt || body.script || '').trim();
+
+      // Sacred Intelligence Governance gate — govern agent-generated scripts before
+      // they are rendered. Fixable content is auto-rewritten; failing content is blocked.
+      let governanceReview = null;
+      if (script) {
+        governanceReview = governance.validateAgentAction(script, {
+          agentName: 'vp_copilot',
+          workflowName: 'agent-render-submit'
+        });
+        if (!governanceReview.approved || !governanceReview.finalApprovedOutput) {
+          return sendJson(res, 422, {
+            success: false,
+            error: 'Script did not pass the EVICS Sacred Intelligence Governance standard.',
+            governance: {
+              approved: governanceReview.approved,
+              status: governanceReview.status,
+              reason: governanceReview.reason,
+              truthScore: governanceReview.truthScore,
+              integrityScore: governanceReview.integrityScore,
+              dignityScore: governanceReview.dignityScore,
+              loveScore: governanceReview.loveScore,
+              violations: governanceReview.violations
+            }
+          });
+        }
+        script = governanceReview.finalApprovedOutput;
+      }
+
       const jobId = provider + '-' + Date.now();
       let job = {
         jobId,
@@ -704,7 +735,20 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
         state.updatedAt = nowIso();
       });
       logTimeline('render_submit', `Render submitted to ${provider}.`, { jobId: job.jobId, mediaId });
-      return sendJson(res, 200, { success: true, job, jobId: job.jobId });
+      return sendJson(res, 200, {
+        success: true,
+        job,
+        jobId: job.jobId,
+        governance: governanceReview ? {
+          approved: governanceReview.approved,
+          status: governanceReview.status,
+          revisionRequired: governanceReview.revisionRequired,
+          truthScore: governanceReview.truthScore,
+          integrityScore: governanceReview.integrityScore,
+          dignityScore: governanceReview.dignityScore,
+          loveScore: governanceReview.loveScore
+        } : null
+      });
     } catch (error) {
       return sendJson(res, 500, { success: false, error: error.message || 'Could not submit render.' });
     }

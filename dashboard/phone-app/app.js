@@ -701,10 +701,121 @@
     renderProductVideoPreview(selected || null);
   }
 
+  async function copyToClipboard(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (_) { /* fall through to legacy path */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Renders the algorithm-optimized caption & hashtag kit with one-tap copy per platform.
+  function renderCaptionKit(item) {
+    const kit = document.getElementById('phoneProductVideoCaptionKit');
+    if (!kit) return;
+    const meta = item && item.metadata;
+    const platforms = meta && meta.platforms ? meta.platforms : null;
+    if (!platforms || !Object.keys(platforms).length) {
+      kit.classList.add('hidden');
+      kit.innerHTML = '';
+      return;
+    }
+    kit.classList.remove('hidden');
+
+    const platformEmoji = { tiktok: '🎵', instagram: '📷', youtube: '▶️', facebook: '📘', pinterest: '📌', x: '✖️' };
+    const keys = Object.keys(platforms);
+    let current = kit.dataset.platform && platforms[kit.dataset.platform]
+      ? kit.dataset.platform
+      : (platforms[item.platform] ? item.platform : (meta.primaryPlatform || keys[0]));
+    kit.dataset.platform = current;
+    const pkg = platforms[current];
+
+    const pills = keys.map((k) => {
+      const active = k === current ? ' active' : '';
+      return `<button type="button" class="caption-pill${active}" data-cap-platform="${escapeHtml(k)}">${platformEmoji[k] || ''} ${escapeHtml(platforms[k].platformLabel || k)}</button>`;
+    }).join('');
+
+    const bestTime = Array.isArray(pkg.postingTime) ? pkg.postingTime.join(', ') : (pkg.postingTime || '');
+    const titleBlock = pkg.titleMatters
+      ? `<div class="caption-field">
+           <div class="caption-field-head"><span>Title (SEO)</span><button type="button" class="caption-copy-mini" data-copy="title">Copy</button></div>
+           <div class="caption-field-body" data-field="title">${escapeHtml(pkg.title)}</div>
+         </div>`
+      : '';
+
+    kit.innerHTML = `
+      <div class="caption-kit-head">
+        <strong>📈 Algorithm-Optimized Post Kit</strong>
+        <span class="caption-kit-sub">Tap a platform, then copy your ready-to-post caption &amp; hashtags.</span>
+      </div>
+      <div class="caption-pills">${pills}</div>
+      ${titleBlock}
+      <div class="caption-field">
+        <div class="caption-field-head"><span>Caption</span><button type="button" class="caption-copy-mini" data-copy="caption">Copy</button></div>
+        <div class="caption-field-body" data-field="caption">${escapeHtml(pkg.description)}</div>
+      </div>
+      <div class="caption-field">
+        <div class="caption-field-head"><span>Hashtags</span><button type="button" class="caption-copy-mini" data-copy="hashtags">Copy</button></div>
+        <div class="caption-field-body caption-hashtags" data-field="hashtags">${escapeHtml(pkg.hashtagLine)}</div>
+      </div>
+      <div class="caption-tips">
+        <span>📐 ${escapeHtml(pkg.formatSpec ? (pkg.formatSpec.dimension + ' · ' + pkg.formatSpec.durationSweetSpot) : '')}</span>
+        ${bestTime ? `<span>⏰ Best time: ${escapeHtml(bestTime)}</span>` : ''}
+      </div>
+      ${pkg.formatSpec && pkg.formatSpec.notes ? `<p class="caption-note">💡 ${escapeHtml(pkg.formatSpec.notes)}</p>` : ''}
+      <button type="button" class="control-btn caption-copy-all state-off" data-copy="all">📋 Copy full post (caption + hashtags)</button>
+      <p class="caption-copy-status" id="phoneCaptionCopyStatus"></p>
+    `;
+
+    // Switch platform
+    kit.querySelectorAll('[data-cap-platform]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        kit.dataset.platform = btn.getAttribute('data-cap-platform');
+        renderCaptionKit(item);
+      });
+    });
+
+    // Copy actions
+    const statusEl = kit.querySelector('#phoneCaptionCopyStatus');
+    const flash = (msg) => {
+      if (!statusEl) return;
+      statusEl.textContent = msg;
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2500);
+    };
+    kit.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const kind = btn.getAttribute('data-copy');
+        let text = '';
+        if (kind === 'title') text = pkg.title;
+        else if (kind === 'caption') text = pkg.description;
+        else if (kind === 'hashtags') text = pkg.hashtagLine;
+        else text = (pkg.titleMatters ? (pkg.title + '\n\n') : '') + pkg.description;
+        const ok = await copyToClipboard(text);
+        flash(ok ? `✅ Copied ${kind === 'all' ? 'full post' : kind} for ${pkg.platformLabel}` : '⚠️ Copy failed — select and copy manually.');
+      });
+    });
+  }
+
   function renderProductVideoPreview(item) {
     if (!productVideoPreview) return;
     if (!item) { productVideoPreview.classList.add('hidden'); return; }
     productVideoPreview.classList.remove('hidden');
+    renderCaptionKit(item);
     if (productVideoTitle) {
       const priceStr = item.productPrice ? ` · $${Number(item.productPrice).toFixed(2)}` : '';
       productVideoTitle.textContent = (item.productTitle || 'Product Video') + priceStr;

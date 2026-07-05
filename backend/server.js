@@ -28,6 +28,7 @@ const { startScheduler, getSchedulerLog } = require('../utils/automationSchedule
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
 const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground, resolveBackgroundUrl } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
+const algorithmOptimization = require('./algorithmOptimizationEngine');
 const {
   intakeServiceWebsite,
   generateServiceAvatarCampaign,
@@ -49,6 +50,10 @@ const {
   buildAPlusVideoAgentPrompt,
   gradeCompletedRender
 } = require('./renderQualityValidator');
+
+// EVICS Sacred Intelligence Governance Engine — centralized AI operating standard.
+const governance = require('./sacredIntelligenceGovernance');
+const { registerGovernanceRoutes } = require('./governanceRoutes');
 
 // OpenAI client — initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
@@ -1598,6 +1603,9 @@ registerEvicsEliteRoutes(app, {
 });
 registerMediaOutputRoutes(app, SupabaseConnector);
 
+// ===== REGISTER SACRED INTELLIGENCE GOVERNANCE ROUTES =====
+registerGovernanceRoutes(app);
+
 // ===== REGISTER VIRAL MEDIA ROUTES =====
 const viralMediaRouter = createViralMediaRouter();
 app.use('/api/viral-media', viralMediaRouter);
@@ -2192,6 +2200,7 @@ app.post('/api/video/generate', async (req, res) => {
     let renderPrompt = prompt;
     let scriptQuality = null;
     let scriptUpgraded = false;
+    let governanceReview = null;
     const config = body.config || {};
     const requestedAvatarPreset = String(
       body.avatar_preset ||
@@ -2364,6 +2373,42 @@ app.post('/api/video/generate', async (req, res) => {
           success: false,
           error: 'Script did not meet A+ quality gates after automatic upgrade.',
           quality: scriptQuality
+        });
+      }
+    }
+
+    // ===== SACRED INTELLIGENCE GOVERNANCE GATE =====
+    // Every generated marketing script passes through the governance engine before
+    // it can be rendered. Fixable content is auto-rewritten; content that still
+    // fails truth/integrity/dignity/love standards is blocked (no regression to
+    // legitimate scripts, which pass untouched).
+    if (!isMockRender && renderScript && String(renderScript).trim()) {
+      governanceReview = governance.validateMarketingContent(renderScript, {
+        agentName: 'render-pipeline',
+        workflowName: 'product-video-script'
+      });
+      if (governanceReview.approved && governanceReview.finalApprovedOutput) {
+        if (governanceReview.revisionRequired &&
+            governanceReview.finalApprovedOutput !== renderScript) {
+          renderScript = governanceReview.finalApprovedOutput;
+          scriptUpgraded = true;
+        }
+      } else {
+        return res.status(422).json({
+          success: false,
+          error: 'Script did not pass the EVICS Sacred Intelligence Governance standard.',
+          governance: {
+            approved: governanceReview.approved,
+            status: governanceReview.status,
+            reason: governanceReview.reason,
+            truthScore: governanceReview.truthScore,
+            integrityScore: governanceReview.integrityScore,
+            dignityScore: governanceReview.dignityScore,
+            loveScore: governanceReview.loveScore,
+            manipulationRisk: governanceReview.manipulationRisk,
+            exploitationRisk: governanceReview.exploitationRisk,
+            violations: governanceReview.violations
+          }
         });
       }
     }
@@ -2591,6 +2636,17 @@ app.post('/api/video/generate', async (req, res) => {
       status: result.status || 'rendering',
       quality: scriptQuality,
       script_upgraded: scriptUpgraded,
+      governance: governanceReview ? {
+        approved: governanceReview.approved,
+        status: governanceReview.status,
+        revisionRequired: governanceReview.revisionRequired,
+        truthScore: governanceReview.truthScore,
+        integrityScore: governanceReview.integrityScore,
+        dignityScore: governanceReview.dignityScore,
+        loveScore: governanceReview.loveScore,
+        manipulationRisk: governanceReview.manipulationRisk,
+        exploitationRisk: governanceReview.exploitationRisk
+      } : null,
       product_title: renderPackage.productTitle,
       product_image_url: renderPackage.productImageUrl,
       product_page_url: renderPackage.productPageUrl,
@@ -5987,6 +6043,31 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   });
 });
 
+// GET /api/affiliate/avatar/voice-identity-oath
+// Optional spoken script for avatar voice recording — the EVICS User & Affiliate
+// Oath. Captures voice patterns while aligning the avatar with the platform mission.
+app.get('/api/affiliate/avatar/voice-identity-oath', (_req, res) => {
+  res.set('Cache-Control', 'no-store, max-age=0');
+  res.json({
+    success: true,
+    label: governance.VOICE_IDENTITY_OATH_LABEL,
+    version: '2026-07-05-sacred-v1',
+    script: {
+      scriptText: governance.EVICS_USER_AFFILIATE_OATH,
+      tone: 'sincere, purposeful, measured',
+      duration: '30-45 seconds',
+      optional: true,
+      purpose: 'Capture your voice identity while affirming your commitment as a steward of opportunity within EVICS.',
+      tips: [
+        'Speak from your heart—this is your personal commitment',
+        'Keep a steady, measured pace that feels genuine',
+        'Pause between each line so your voice identity is captured clearly',
+        'Let the conviction in your words carry the message'
+      ]
+    }
+  });
+});
+
 // GET /api/affiliate/billing/info
 app.get('/api/affiliate/billing/info', (req, res) => {
   const code = req.query.code || '';
@@ -6197,7 +6278,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
             voice_id: vid
           }
         }],
-        dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 }
+        dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 },
+        caption: true
       };
     };
 
@@ -6234,6 +6316,17 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       platform: resolvedPlatform
     });
 
+    // Algorithm Amplification: build per-platform SEO/discovery metadata packages
+    // (title, description, hashtags, keywords, cover text, posting time, format spec).
+    // TODO(trending-feed): inject live tags from evics_trends here.
+    const metadata = buildVideoMetadataPackage({
+      productTitle: resolvedProductTitle,
+      productPrice: resolvedProductPrice,
+      productPageUrl: resolvedProductPage,
+      script,
+      primaryPlatform: resolvedPlatform
+    });
+
     const record = upsertProductVideoRecord({
       videoJobId,
       heygenVideoId: videoId,
@@ -6253,6 +6346,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       platform: resolvedPlatform,
       script,
       qualityScore,
+      metadata,
       status: 'rendering',
       videoUrl: null,
       thumbnailUrl: null,
@@ -6275,7 +6369,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       productTitle: resolvedProductTitle,
       productPrice: resolvedProductPrice,
       platform: resolvedPlatform,
-      qualityScore
+      qualityScore,
+      metadata
     });
 
     // Background poll for video completion
@@ -6347,7 +6442,7 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
   }
   res.json({
     success: true,
-    ...record
+    ...ensureVideoMetadata(record)
   });
 });
 
@@ -6356,9 +6451,40 @@ app.get('/api/affiliate/product-videos', (req, res) => {
   noStore(res);
   const affiliateCode = String(req.query.affiliateCode || '').trim().toUpperCase();
   if (!affiliateCode) return res.json({ success: true, videos: [], count: 0 });
-  const videos = getProductVideosByAffiliate(affiliateCode);
+  const videos = getProductVideosByAffiliate(affiliateCode).map(ensureVideoMetadata);
   res.json({ success: true, videos, count: videos.length });
 });
+
+// Build per-platform algorithm/SEO metadata packages for a product video.
+// Deterministic, dependency-free (see backend/algorithmOptimizationEngine.js).
+function buildVideoMetadataPackage({ productTitle, productPrice, productPageUrl, script, primaryPlatform, trendingTags = [] }) {
+  try {
+    return algorithmOptimization.optimizeForAllPlatforms(
+      { productTitle, productPrice, productPageUrl, script },
+      { primaryPlatform: primaryPlatform || 'tiktok', trendingTags }
+    );
+  } catch (err) {
+    console.warn('[AlgoOptimize] metadata build failed:', err.message);
+    return null;
+  }
+}
+
+// Backfill metadata on records that predate the algorithm engine (defensive).
+function ensureVideoMetadata(record) {
+  if (!record || (record.metadata && record.metadata.platforms)) return record;
+  const metadata = buildVideoMetadataPackage({
+    productTitle: record.productTitle,
+    productPrice: record.productPrice,
+    productPageUrl: record.productPageUrl,
+    script: record.script,
+    primaryPlatform: record.platform
+  });
+  if (metadata) {
+    record.metadata = metadata;
+    upsertProductVideoRecord(record);
+  }
+  return record;
+}
 
 function generateProductVideoScript({ productTitle, productPageUrl, platform }) {
   const platformHook = {
@@ -8284,6 +8410,15 @@ app.listen(PORT, () => {
 
   // Start automation scheduler (viral scan, profit audit, library cleanup, exec report)
   startScheduler(`http://127.0.0.1:${PORT}`);
+
+  // Bootstrap the Sacred Intelligence Governance Engine — load the AI Oath and
+  // Sacred Intelligence Standard into the system before any AI task runs, and log it.
+  try {
+    governance.bootstrapAgent('evics-platform', { workflowName: 'server-startup' });
+    console.log('🕊️  [EVICS] Sacred Intelligence Governance Engine active — every AI output is governed by truth, integrity, dignity, and love.');
+  } catch (govErr) {
+    console.warn('[EVICS Governance] Bootstrap warning:', govErr && govErr.message ? govErr.message : govErr);
+  }
 
   // Startup environment validation â€” warn about missing keys and their impact
   const envChecks = [

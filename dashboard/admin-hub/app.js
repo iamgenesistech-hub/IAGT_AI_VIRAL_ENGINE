@@ -16,6 +16,7 @@
   const sendVideoBtn = document.getElementById('adminSendVideo');
   const messageInput = document.getElementById('adminMessageInput');
   const videoInput = document.getElementById('adminVideoUrl');
+  const govRefreshBtn = document.getElementById('govRefresh');
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
   const commsState = {
@@ -245,6 +246,74 @@
     });
   }
 
+  function govText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function scoreClass(score) {
+    const n = Number(score);
+    if (!Number.isFinite(n)) return '';
+    if (n >= 90) return 'good';
+    if (n >= 75) return 'warn';
+    return 'bad';
+  }
+
+  async function refreshGovernance(controlEl = null) {
+    setControlState(controlEl, 'running');
+    const violationsEl = document.getElementById('govViolations');
+    const failingAgentsEl = document.getElementById('govFailingAgents');
+    const recentEl = document.getElementById('govRecent');
+    try {
+      const payload = await apiJson('/api/governance/stats');
+      const s = payload.stats || {};
+      govText('govPassRate', typeof s.passRate === 'number' ? `${s.passRate}%` : '—');
+      govText('govTotal', s.total != null ? s.total : '0');
+      govText('govBlocked', s.blockedCount != null ? s.blockedCount : '0');
+      govText('govRewritten', s.rewrittenCount != null ? s.rewrittenCount : '0');
+      govText('govAvgLove', s.averageLoveScore != null ? s.averageLoveScore : '—');
+      govText('govAvgTruth', s.averageTruthScore != null ? s.averageTruthScore : '—');
+      govText('govAvgDignity', s.averageDignityScore != null ? s.averageDignityScore : '—');
+      govText('govAvgIntegrity', s.averageIntegrityScore != null ? s.averageIntegrityScore : '—');
+
+      if (violationsEl) {
+        const v = s.mostCommonViolations || [];
+        violationsEl.innerHTML = v.length
+          ? v.map((row) => `<li>${row.violation}<small>${row.count} occurrence${row.count === 1 ? '' : 's'}</small></li>`).join('')
+          : '<li>No violations recorded. All outputs honoring the standard.</li>';
+      }
+      if (failingAgentsEl) {
+        const a = s.agentsWithRepeatedFailures || [];
+        failingAgentsEl.innerHTML = a.length
+          ? a.map((row) => `<li>${row.agent}<small>${row.failures} blocked output${row.failures === 1 ? '' : 's'}</small></li>`).join('')
+          : '<li>No agents with repeated failures.</li>';
+      }
+      if (recentEl) {
+        const r = s.recent || [];
+        recentEl.innerHTML = r.length
+          ? r.slice(0, 12).map((row) => {
+              const statusLabel = row.approved ? (row.revisionRequired ? 'rewritten' : 'approved') : 'blocked';
+              const statusClass = row.approved ? (row.revisionRequired ? 'warn' : 'good') : 'bad';
+              const when = row.timestamp ? new Date(row.timestamp).toLocaleTimeString() : '';
+              const sc = row.scores || {};
+              return `<li><span class="${statusClass}">${statusLabel}</span> · ${row.agentName || 'agent'} / ${row.workflowName || 'workflow'}` +
+                `<small>Love ${sc.loveScore ?? '—'} · Truth ${sc.truthScore ?? '—'} · Dignity ${sc.dignityScore ?? '—'} · ${when}</small></li>`;
+            }).join('')
+          : '<li>No governance activity yet. Checks appear here as AI outputs are evaluated.</li>';
+      }
+      setControlState(controlEl, 'completed', 1500);
+    } catch (error) {
+      if (violationsEl) violationsEl.innerHTML = `<li>Governance monitor unavailable: ${error.message}</li>`;
+      if (failingAgentsEl) failingAgentsEl.innerHTML = '<li>—</li>';
+      if (recentEl) recentEl.innerHTML = '<li>—</li>';
+      setControlState(controlEl, 'off');
+    }
+  }
+
+  if (govRefreshBtn) {
+    govRefreshBtn.addEventListener('click', () => { void refreshGovernance(govRefreshBtn); });
+  }
+
   if (sendTextBtn) {
     sendTextBtn.addEventListener('click', () => { void sendAdminMessage('text'); });
   }
@@ -257,12 +326,15 @@
       refreshBtn.classList.add('pressing');
       void refresh(refreshBtn);
       void refreshComms(refreshBtn);
+      void refreshGovernance(refreshBtn);
       setTimeout(() => refreshBtn.classList.remove('pressing'), 120);
     });
   }
 
   void refresh(refreshBtn);
   void refreshComms();
+  void refreshGovernance();
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void refreshComms(); }, 8000);
+  setInterval(() => { void refreshGovernance(); }, 30000);
 })();

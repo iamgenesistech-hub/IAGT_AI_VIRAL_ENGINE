@@ -1,6 +1,6 @@
 {
-  "version": 646,
-  "updatedAt": "2026-07-05T03:11:36.878Z",
+  "version": 706,
+  "updatedAt": "2026-07-05T22:47:41.132Z",
   "learnings": [
     {
       "id": "learning_fa0b5a9a93c0e378",
@@ -5512,6 +5512,516 @@
         "Mock/internal render path produced reviewable video evidence."
       ],
       "createdAt": "2026-07-05T03:11:36.877Z"
+    },
+    {
+      "id": "learning_c9368381377e21ef",
+      "flowId": "flow_7b63638447c3f137",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_a3641d106d14df0b",
+      "renderJobId": "render_job_4b899fb42769e1cb",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:27.675Z"
+    },
+    {
+      "id": "learning_f63bc9c6fbd9d3d3",
+      "flowId": "flow_60025722d9a0991b",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_d25f942debd258f6",
+      "renderJobId": "render_job_098b6f33d59f81fb",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:27.706Z"
+    },
+    {
+      "id": "learning_619cfdb5c910d708",
+      "flowId": "flow_17b88b019d38ee13",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_3c57f2e5db081faa",
+      "renderJobId": "render_job_23b632fab71d67ec",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:27.740Z"
+    },
+    {
+      "id": "learning_eff812e282814c67",
+      "flowId": "flow_918a12d898f0ae60",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_34f1022bb07eff42",
+      "renderJobId": "render_job_5539f80ac908d008",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:27.817Z"
+    },
+    {
+      "id": "learning_c5bbf921abde4cca",
+      "flowId": "flow_3fdd89abff0b53ed",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_6936c91fcf7792a4",
+      "renderJobId": "render_job_cb158d07608a64a7",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:27.964Z"
+    },
+    {
+      "id": "learning_bfbd0b1af7050aa5",
+      "flowId": "flow_7fe2600bb87d193d",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_158fcae3a1a4fc26",
+      "renderJobId": "render_job_4a3341f1b9a66075",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:30:28.064Z"
+    },
+    {
+      "id": "learning_0e9945734c9feb4f",
+      "flowId": "flow_4455ae4194e275c0",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_a3641d106d14df0b",
+      "renderJobId": "render_job_1d04f9ac69748196",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.125Z"
+    },
+    {
+      "id": "learning_6f36c449fc6bfd80",
+      "flowId": "flow_209b3aa1f657129e",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_d25f942debd258f6",
+      "renderJobId": "render_job_16d99deefd3e8b2a",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.150Z"
+    },
+    {
+      "id": "learning_04c39f63116fe1a7",
+      "flowId": "flow_d4a5e67d589d7fc2",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_3c57f2e5db081faa",
+      "renderJobId": "render_job_4a135c801777b389",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.179Z"
+    },
+    {
+      "id": "learning_98b46112c544875c",
+      "flowId": "flow_abecdbb247bb5d6b",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_34f1022bb07eff42",
+      "renderJobId": "render_job_ad219c683a19cb1c",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.234Z"
+    },
+    {
+      "id": "learning_c9d8881f2b8501cb",
+      "flowId": "flow_b41d7d89ecdc3ba4",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_6936c91fcf7792a4",
+      "renderJobId": "render_job_214253c10679e890",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.283Z"
+    },
+    {
+      "id": "learning_0e09ad5fbed7ed11",
+      "flowId": "flow_e01fa2da462e2875",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_158fcae3a1a4fc26",
+      "renderJobId": "render_job_40aae97b26d57042",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T21:42:02.319Z"
+    },
+    {
+      "id": "learning_9ab6c1495003c100",
+      "flowId": "flow_423b720780db1d23",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_a3641d106d14df0b",
+      "renderJobId": "render_job_235ee81803ad9c54",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:19.975Z"
+    },
+    {
+      "id": "learning_ffd270d4514f1b7b",
+      "flowId": "flow_6f882755e1cd5d86",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_d25f942debd258f6",
+      "renderJobId": "render_job_70b0c676d58a5078",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:19.995Z"
+    },
+    {
+      "id": "learning_95a5e9963a7ecafd",
+      "flowId": "flow_743de60896bfe773",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_3c57f2e5db081faa",
+      "renderJobId": "render_job_c81d22251b56559c",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:20.013Z"
+    },
+    {
+      "id": "learning_291f1d2168ead11a",
+      "flowId": "flow_363faea3d884de1d",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_34f1022bb07eff42",
+      "renderJobId": "render_job_0a86d78479905941",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:20.062Z"
+    },
+    {
+      "id": "learning_f788db85ebd3c9d7",
+      "flowId": "flow_e7ec31d25e3fefbe",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_6936c91fcf7792a4",
+      "renderJobId": "render_job_c45145c20017f26c",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:20.159Z"
+    },
+    {
+      "id": "learning_3e1fafd2c56eaf3f",
+      "flowId": "flow_4a40a83492856e0a",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_158fcae3a1a4fc26",
+      "renderJobId": "render_job_259c03d0a0ef0198",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:20.202Z"
+    },
+    {
+      "id": "learning_e97c9e9848287301",
+      "flowId": "flow_6cc5521e57a6bee2",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_a3641d106d14df0b",
+      "renderJobId": "render_job_71298d2f68eecaa9",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.082Z"
+    },
+    {
+      "id": "learning_1b909c5f7b2f2145",
+      "flowId": "flow_48b5698b8d7c3f47",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_d25f942debd258f6",
+      "renderJobId": "render_job_3d3c0aaac2eb2fad",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.113Z"
+    },
+    {
+      "id": "learning_3cc80a8f7b66a3c5",
+      "flowId": "flow_ca25bf7cbd444dba",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_3c57f2e5db081faa",
+      "renderJobId": "render_job_d5548e666f0ca9fb",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.136Z"
+    },
+    {
+      "id": "learning_59bf4a0b0a58a109",
+      "flowId": "flow_b4c3362a5ad62edb",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_34f1022bb07eff42",
+      "renderJobId": "render_job_9563e87d0f248001",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.185Z"
+    },
+    {
+      "id": "learning_2e34b3bd5dd30d8a",
+      "flowId": "flow_65fef41985ca34a4",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_6936c91fcf7792a4",
+      "renderJobId": "render_job_ca49e4f2d5d217b9",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.241Z"
+    },
+    {
+      "id": "learning_63425ddb164824e0",
+      "flowId": "flow_d3df9e3ac57f927f",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_158fcae3a1a4fc26",
+      "renderJobId": "render_job_03770ba365f1bc44",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:32.282Z"
+    },
+    {
+      "id": "learning_fad8bd2c028cf157",
+      "flowId": "flow_6fa41928fdf39a09",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_a3641d106d14df0b",
+      "renderJobId": "render_job_75c8b2ad103831be",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:40.945Z"
+    },
+    {
+      "id": "learning_941597e09d56536a",
+      "flowId": "flow_e9aa8bc8d3c33d15",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_d25f942debd258f6",
+      "renderJobId": "render_job_bbd96c92ea3b7580",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:40.972Z"
+    },
+    {
+      "id": "learning_d65d4531b082637a",
+      "flowId": "flow_04dd807ed1abe12f",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_3c57f2e5db081faa",
+      "renderJobId": "render_job_ee190bff42dfcdd0",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:41.000Z"
+    },
+    {
+      "id": "learning_c8da1e825b70110c",
+      "flowId": "flow_468a463d660087d9",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_34f1022bb07eff42",
+      "renderJobId": "render_job_cf2df104655d007a",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:41.047Z"
+    },
+    {
+      "id": "learning_117f8192931f128d",
+      "flowId": "flow_a9466175a70ab631",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_6936c91fcf7792a4",
+      "renderJobId": "render_job_093461070b42449b",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:41.088Z"
+    },
+    {
+      "id": "learning_8d04147fc9eca508",
+      "flowId": "flow_b90443619f79a44f",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "scriptId": "script_158fcae3a1a4fc26",
+      "renderJobId": "render_job_8fcb063291e9aaac",
+      "result": "publish-ready",
+      "reasonSummary": [
+        "Faceless format matched to Sea Moss Complex.",
+        "Faceless Ritual Channel supports Faceless hands-only montage.",
+        "Compliance language is constrained for General Wellness.",
+        "Quality gates passed.",
+        "Compliance gate passed.",
+        "Mock/internal render path produced reviewable video evidence."
+      ],
+      "createdAt": "2026-07-05T22:47:41.132Z"
     }
   ],
   "promptVersions": [
@@ -7667,6 +8177,216 @@
       "version": "prompt-1783221096851",
       "rankingId": "ranking_0c86481c0744f38a",
       "createdAt": "2026-07-05T03:11:36.851Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_ce0e40dbf8094747",
+      "version": "prompt-1783287027649",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:27.649Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_c8948c98003feba9",
+      "version": "prompt-1783287027682",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:27.682Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_3d45434605d12abd",
+      "version": "prompt-1783287027715",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:27.715Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_7d192c6513b99474",
+      "version": "prompt-1783287027793",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:27.793Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_9b750fdb016fdd8a",
+      "version": "prompt-1783287027912",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:27.912Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_45b3efce66587eae",
+      "version": "prompt-1783287028024",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:30:28.024Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_ce0e40dbf8094747",
+      "version": "prompt-1783287722098",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.098Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_c8948c98003feba9",
+      "version": "prompt-1783287722132",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.132Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_3d45434605d12abd",
+      "version": "prompt-1783287722157",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.157Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_7d192c6513b99474",
+      "version": "prompt-1783287722209",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.209Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_9b750fdb016fdd8a",
+      "version": "prompt-1783287722269",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.269Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_45b3efce66587eae",
+      "version": "prompt-1783287722306",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T21:42:02.306Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_ce0e40dbf8094747",
+      "version": "prompt-1783291639958",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:19.959Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_c8948c98003feba9",
+      "version": "prompt-1783291639980",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:19.980Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_3d45434605d12abd",
+      "version": "prompt-1783291640000",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:20.000Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_7d192c6513b99474",
+      "version": "prompt-1783291640043",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:20.043Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_9b750fdb016fdd8a",
+      "version": "prompt-1783291640136",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:20.136Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_45b3efce66587eae",
+      "version": "prompt-1783291640184",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:20.184Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_ce0e40dbf8094747",
+      "version": "prompt-1783291652063",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.063Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_c8948c98003feba9",
+      "version": "prompt-1783291652091",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.091Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_3d45434605d12abd",
+      "version": "prompt-1783291652118",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.118Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_7d192c6513b99474",
+      "version": "prompt-1783291652164",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.164Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_9b750fdb016fdd8a",
+      "version": "prompt-1783291652224",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.224Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_45b3efce66587eae",
+      "version": "prompt-1783291652268",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:32.268Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_ce0e40dbf8094747",
+      "version": "prompt-1783291660927",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:40.927Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_c8948c98003feba9",
+      "version": "prompt-1783291660952",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:40.952Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_3d45434605d12abd",
+      "version": "prompt-1783291660976",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:40.976Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_7d192c6513b99474",
+      "version": "prompt-1783291661021",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:41.021Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_9b750fdb016fdd8a",
+      "version": "prompt-1783291661076",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:41.076Z",
+      "source": "template"
+    },
+    {
+      "id": "prompt_45b3efce66587eae",
+      "version": "prompt-1783291661107",
+      "rankingId": "ranking_0c86481c0744f38a",
+      "createdAt": "2026-07-05T22:47:41.107Z",
       "source": "template"
     }
   ]
