@@ -46,6 +46,15 @@
   const attireBottomColorSelect = document.getElementById('phoneAttireBottomColor');
   const attireUsePhotoCheckbox = document.getElementById('phoneAttireUsePhoto');
   const attireGrid = document.getElementById('phoneAttireGrid');
+  const avatarLibraryMonitor = document.getElementById('phoneAvatarLibraryMonitor');
+  const avatarLibraryGrid = document.getElementById('phoneAvatarLibraryGrid');
+  const avatarLibraryPreview = document.getElementById('phoneAvatarLibraryPreview');
+  const avatarLibraryPreviewImage = document.getElementById('phoneAvatarLibraryPreviewImage');
+  const avatarLibraryPreviewVideo = document.getElementById('phoneAvatarLibraryPreviewVideo');
+  const avatarLibraryPreviewTitle = document.getElementById('phoneAvatarLibraryPreviewTitle');
+  const avatarLibraryPreviewMeta = document.getElementById('phoneAvatarLibraryPreviewMeta');
+  const avatarLibraryPreviewPrompt = document.getElementById('phoneAvatarLibraryPreviewPrompt');
+  const avatarLibraryRefreshBtn = document.getElementById('phoneAvatarLibraryRefresh');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
@@ -84,7 +93,9 @@
       }
     },
     products: [],
-    voiceReferenceScript: ''
+    voiceReferenceScript: '',
+    avatarLibrary: [],
+    selectedAvatarLibraryId: ''
   };
 
   function setControlState(el, state, autoOffMs = 0) {
@@ -340,6 +351,237 @@
     if (attireStyleSelect) attireStyleSelect.value = supportState.avatarSetup.attire.style;
     if (attireTopColorSelect) attireTopColorSelect.value = supportState.avatarSetup.attire.topColor;
     if (attireBottomColorSelect) attireBottomColorSelect.value = supportState.avatarSetup.attire.bottomColor;
+    renderAvatarLibrary();
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function formatAttireLabel(attire) {
+    if (!attire) return 'Professional';
+    if (attire.usePhoto) return 'Using profile photo clothing';
+    const parts = [];
+    if (attire.style) parts.push(String(attire.style).replace(/-/g, ' '));
+    const top = [attire.top, attire.topColor].filter(Boolean).map((value) => String(value).replace(/-/g, ' ')).join(' ');
+    const bottom = [attire.bottom, attire.bottomColor].filter(Boolean).map((value) => String(value).replace(/-/g, ' ')).join(' ');
+    if (top) parts.push(`Top: ${top}`);
+    if (bottom) parts.push(`Bottom: ${bottom}`);
+    return parts.length ? parts.join(' · ') : 'Professional';
+  }
+
+  function normalizeAvatarLibraryItem(item) {
+    const attire = item && item.attire && typeof item.attire === 'object' ? item.attire : null;
+    const proofVideoUrl = String(item && (item.proofVideoUrl || item.proof_video_url || item.videoUrl || item.video_url) || '').trim();
+    const proofVideoId = String(item && (item.proofVideoId || item.proof_video_id || item.videoId || item.video_id) || '').trim();
+    const photoUrl = String(item && (item.photoUrl || item.previewUrl || item.proofThumbnailUrl || item.proof_thumbnail_url) || '').trim();
+    return {
+      id: String(item && (item.id || item.avatarId || item.requestId) || '').trim(),
+      requestId: String(item && item.requestId || '').trim(),
+      name: String(item && item.name || 'Affiliate avatar'),
+      style: String(item && item.style || 'professional'),
+      photoUrl,
+      attire: attire ? {
+        usePhoto: Boolean(attire.usePhoto),
+        top: String(attire.top || ''),
+        bottom: String(attire.bottom || ''),
+        style: String(attire.style || ''),
+        topColor: String(attire.topColor || ''),
+        bottomColor: String(attire.bottomColor || '')
+      } : null,
+      attireLabel: String(item && item.attireLabel || formatAttireLabel(attire)),
+      avatarId: String(item && (item.avatarId || item.heygenAvatarId || item.id) || '').trim(),
+      proofVideoId,
+      proofVideoUrl,
+      proofThumbnailUrl: photoUrl,
+      proofStatus: proofVideoUrl ? 'completed' : (proofVideoId ? 'rendering' : 'pending')
+    };
+  }
+
+  function renderAvatarLibraryPreview(item, statusText) {
+    if (!avatarLibraryPreview || !avatarLibraryPreviewImage || !avatarLibraryPreviewVideo || !avatarLibraryPreviewTitle || !avatarLibraryPreviewMeta || !avatarLibraryPreviewPrompt) {
+      return;
+    }
+    if (!item) {
+      avatarLibraryPreview.classList.add('hidden');
+      return;
+    }
+    avatarLibraryPreview.classList.remove('hidden');
+    avatarLibraryPreviewTitle.textContent = item.name || 'Affiliate avatar';
+    avatarLibraryPreviewMeta.textContent = statusText || (item.proofVideoUrl ? 'Proof ready to play.' : 'Generating proof video for this avatar.');
+    avatarLibraryPreviewPrompt.textContent = item.proofStatus === 'completed'
+      ? "This is my avatar, and it's time to get this blessing flowing!"
+      : "Tap generate proof to create the 8-second proof clip.";
+
+    const mediaUrl = item.proofThumbnailUrl || item.photoUrl || '';
+    if (mediaUrl) {
+      avatarLibraryPreviewImage.src = mediaUrl;
+      avatarLibraryPreviewImage.classList.remove('hidden');
+    } else {
+      avatarLibraryPreviewImage.removeAttribute('src');
+      avatarLibraryPreviewImage.classList.add('hidden');
+    }
+
+    if (item.proofVideoUrl) {
+      avatarLibraryPreviewVideo.src = item.proofVideoUrl;
+      avatarLibraryPreviewVideo.classList.remove('hidden');
+    } else {
+      avatarLibraryPreviewVideo.removeAttribute('src');
+      avatarLibraryPreviewVideo.classList.add('hidden');
+    }
+
+    if (avatarLibraryRefreshBtn) {
+      avatarLibraryRefreshBtn.textContent = item.proofVideoUrl ? 'Refresh proof' : 'Generate proof';
+      avatarLibraryRefreshBtn.disabled = false;
+    }
+  }
+
+  function renderAvatarLibrary() {
+    if (!avatarLibraryGrid) return;
+    const items = Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : [];
+    if (!items.length) {
+      avatarLibraryGrid.innerHTML = '<div class="avatar-empty">No paid avatars found yet.</div>';
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = 'No paid avatars found yet.';
+      renderAvatarLibraryPreview(null);
+      return;
+    }
+    if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `${items.length} paid avatar${items.length === 1 ? '' : 's'} loaded`;
+    avatarLibraryGrid.innerHTML = items.map((item) => {
+      const selected = String(item.id) === String(supportState.selectedAvatarLibraryId || '');
+      const thumb = item.photoUrl || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#08111b"/><text x="50%" y="50%" text-anchor="middle" fill="#8fb7c9" font-family="Arial, sans-serif" font-size="24">No photo</text></svg>')}`;
+      const status = item.proofVideoUrl ? 'Proof ready' : (item.proofVideoId ? 'Proof rendering' : 'No proof yet');
+      return `<button type="button" class="avatar-library-card${selected ? ' selected' : ''}" data-avatar-id="${escapeHtml(item.id)}">
+        <img class="avatar-library-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(item.name)} thumbnail" />
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${escapeHtml(item.attireLabel || 'Professional')}</span>
+        <span class="avatar-library-status">${escapeHtml(status)}</span>
+      </button>`;
+    }).join('');
+
+    avatarLibraryGrid.querySelectorAll('[data-avatar-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const avatarId = String(button.getAttribute('data-avatar-id') || '');
+        const match = items.find((entry) => String(entry.id) === avatarId);
+        if (match) {
+          void selectAvatarLibraryItem(match.id);
+        }
+      });
+    });
+
+    const selected = items.find((entry) => String(entry.id) === String(supportState.selectedAvatarLibraryId || '')) || items[0];
+    if (selected && !supportState.selectedAvatarLibraryId) {
+      supportState.selectedAvatarLibraryId = selected.id;
+    }
+    renderAvatarLibraryPreview(selected || null);
+  }
+
+  async function loadAvatarLibrary() {
+    if (!avatarLibraryGrid) return;
+    const url = new URL('/api/affiliate/avatar-gallery', window.location.origin);
+    url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+    try {
+      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || `Request failed: ${response.status}`);
+      }
+      supportState.avatarLibrary = Array.isArray(payload.avatars) ? payload.avatars.map(normalizeAvatarLibraryItem).filter((item) => item.id) : [];
+      if (!supportState.avatarLibrary.length) {
+        supportState.selectedAvatarLibraryId = '';
+      } else if (!supportState.avatarLibrary.some((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''))) {
+        supportState.selectedAvatarLibraryId = supportState.avatarLibrary[0].id;
+      }
+      renderAvatarLibrary();
+    } catch (error) {
+      supportState.avatarLibrary = [];
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Avatar library error: ${error.message}`;
+      avatarLibraryGrid.innerHTML = '<div class="avatar-empty">Unable to load avatar library.</div>';
+      renderAvatarLibraryPreview(null);
+    }
+  }
+
+  async function waitForAvatarProof(videoId) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const response = await fetch(`/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}`, {
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || `Proof status request failed: ${response.status}`);
+      }
+      if (payload.status === 'completed' || payload.status === 'done' || payload.videoUrl || payload.video_url) {
+        return payload;
+      }
+      await sleep(3000);
+    }
+    throw new Error('Proof video is still rendering. Please try again in a moment.');
+  }
+
+  async function requestAvatarProof(item) {
+    if (!item) throw new Error('Select an avatar first.');
+    if (!item.requestId) throw new Error('Missing avatar request record.');
+    const proofScript = "This is my avatar, and it's time to get this blessing flowing! I'm ready to show up with confidence and move with purpose.";
+    const response = await apiJson('/api/affiliate/avatar/proof', {
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: item.requestId,
+        affiliateCode: supportState.affiliateCode,
+        avatarId: item.avatarId || item.id,
+        name: item.name,
+        script: proofScript
+      })
+    });
+    const status = String(response.status || '').toLowerCase();
+    const videoId = String(response.videoId || '');
+    let proofPayload = response;
+    if (status === 'rendering' && videoId) {
+      proofPayload = await waitForAvatarProof(videoId);
+    }
+    const videoUrl = String(proofPayload.videoUrl || proofPayload.video_url || proofPayload.rawVideoUrl || response.videoUrl || response.video_url || '').trim();
+    const thumbnailUrl = String(proofPayload.thumbnailUrl || item.photoUrl || '').trim();
+    if (videoUrl) {
+      await apiJson('/api/affiliate/avatar/proof-complete', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestId: item.requestId,
+          videoId: videoId || proofPayload.videoId || null,
+          videoUrl,
+          thumbnailUrl
+        })
+      });
+    }
+    return {
+      ...item,
+      proofVideoId: videoId || proofPayload.videoId || item.proofVideoId || '',
+      proofVideoUrl: videoUrl || item.proofVideoUrl || '',
+      proofThumbnailUrl: thumbnailUrl || item.proofThumbnailUrl || '',
+      proofStatus: videoUrl ? 'completed' : 'rendering'
+    };
+  }
+
+  async function selectAvatarLibraryItem(avatarId) {
+    const items = Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : [];
+    const match = items.find((entry) => String(entry.id) === String(avatarId || ''));
+    if (!match) return;
+    supportState.selectedAvatarLibraryId = match.id;
+    renderAvatarLibrary();
+    renderAvatarLibraryPreview(match, match.proofVideoUrl ? 'Proof ready to play.' : 'Generating proof video when needed.');
+    if (!match.proofVideoUrl && match.requestId) {
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Generating proof for ${match.name}...`;
+      if (avatarLibraryRefreshBtn) avatarLibraryRefreshBtn.disabled = true;
+      try {
+        const updated = await requestAvatarProof(match);
+        supportState.avatarLibrary = items.map((item) => String(item.id) === String(updated.id) ? updated : item);
+        renderAvatarLibrary();
+        renderAvatarLibraryPreview(updated, 'Proof ready to play.');
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof ready for ${updated.name}.`;
+      } catch (error) {
+        renderAvatarLibraryPreview(match, `Proof generation failed: ${error.message}`);
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof generation failed: ${error.message}`;
+      } finally {
+        if (avatarLibraryRefreshBtn) avatarLibraryRefreshBtn.disabled = false;
+      }
+    }
   }
 
     function escapeHtml(value) {
@@ -1095,6 +1337,24 @@
     });
   }
 
+  if (avatarLibraryRefreshBtn) {
+    avatarLibraryRefreshBtn.addEventListener('click', async () => {
+      const selected = (Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : []).find((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''));
+      if (!selected) return;
+      avatarLibraryRefreshBtn.disabled = true;
+      try {
+        const updated = await requestAvatarProof(selected);
+        supportState.avatarLibrary = supportState.avatarLibrary.map((item) => String(item.id) === String(updated.id) ? updated : item);
+        renderAvatarLibrary();
+        renderAvatarLibraryPreview(updated, 'Proof ready to play.');
+      } catch (error) {
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof refresh failed: ${error.message}`;
+      } finally {
+        avatarLibraryRefreshBtn.disabled = false;
+      }
+    });
+  }
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
       logoutBtn.classList.add('pressing');
@@ -1119,6 +1379,7 @@
       renderAvatarSetup();
       await loadVoiceReferenceScript();
       await syncAvatarRequestStatus();
+      await loadAvatarLibrary();
       await loadProducts();
       await startSupportSession();
       await refreshConversation();

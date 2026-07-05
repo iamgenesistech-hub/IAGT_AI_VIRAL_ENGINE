@@ -662,6 +662,70 @@ function findLatestAvatarRequest(affiliateCode) {
   return getAvatarRequests().find((item) => String(item.affiliateCode || '').trim().toUpperCase() === code) || null;
 }
 
+function normalizeAvatarGalleryAttire(attire) {
+  if (!attire || typeof attire !== 'object') return null;
+  return {
+    usePhoto: Boolean(attire.usePhoto),
+    top: String(attire.top || ''),
+    bottom: String(attire.bottom || ''),
+    style: String(attire.style || ''),
+    topColor: String(attire.topColor || ''),
+    bottomColor: String(attire.bottomColor || '')
+  };
+}
+
+function buildAvatarGalleryItem(record) {
+  if (!record) return null;
+  const avatar = record.avatar && typeof record.avatar === 'object' ? record.avatar : {};
+  const attire = normalizeAvatarGalleryAttire(avatar.attire || record.attire || null);
+  const avatarId = avatar.avatarItemId || avatar.avatarId || record.avatarId || record.requestId || null;
+  const proofVideoId = avatar.proofVideoId || avatar.proof_video_id || record.proofVideoId || null;
+  const proofVideoUrl = avatar.proofVideoUrl || avatar.proof_video_url || avatar.videoUrl || avatar.video_url || record.proofVideoUrl || record.videoUrl || record.video_url || null;
+  const proofThumbnailUrl = avatar.proofThumbnailUrl || avatar.proof_thumbnail_url || record.proofThumbnailUrl || record.thumbnailUrl || record.thumbnail_url || record.photoUrl || avatar.photoUrl || null;
+  return {
+    id: avatarId,
+    requestId: record.requestId || null,
+    name: record.name || avatar.name || 'Affiliate avatar',
+    style: avatar.style || record.style || 'professional',
+    photoUrl: avatar.photoUrl || record.photoUrl || null,
+    attire,
+    attireLabel: attire && attire.usePhoto
+      ? 'Using profile photo clothing'
+      : attire
+        ? [attire.style, attire.top, attire.bottom].filter(Boolean).join(' · ')
+        : 'Professional',
+    avatarId,
+    heygenAvatarId: avatar.avatarId || avatar.avatarItemId || null,
+    voiceCloneStatus: avatar.voiceCloneStatus || record.voiceCloneStatus || null,
+    createdAt: record.completedAt || avatar.createdAt || record.updatedAt || record.createdAt || null,
+    proofVideoId,
+    proofVideoUrl,
+    proofThumbnailUrl
+  };
+}
+
+function getAvatarGalleryRecords(affiliateCode) {
+  const code = String(affiliateCode || '').trim().toUpperCase();
+  if (!code) return [];
+  const seen = new Set();
+  return getAvatarRequests()
+    .filter((record) => String(record.affiliateCode || '').trim().toUpperCase() === code)
+    .filter((record) => record && record.avatar && typeof record.avatar === 'object')
+    .sort((left, right) => {
+      const leftTime = new Date(left.completedAt || left.updatedAt || left.createdAt || 0).getTime();
+      const rightTime = new Date(right.completedAt || right.updatedAt || right.createdAt || 0).getTime();
+      return rightTime - leftTime;
+    })
+    .map((record) => buildAvatarGalleryItem(record))
+    .filter((item) => {
+      if (!item || !item.id) return false;
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .slice(0, 10);
+}
+
 function normalizeAvatarCreateResponse(payload) {
   const data = payload && payload.data ? payload.data : payload || {};
   const avatarItem = data.avatar_item || data.avatarItem || data.avatar || data.avatar_item_id || null;
@@ -5199,6 +5263,122 @@ app.get('/api/affiliate/avatar/request/latest', (req, res) => {
   const request = findLatestAvatarRequest(affiliateCode);
   if (!request) return res.json({ success: true, request: null });
   res.json({ success: true, request });
+});
+
+// GET /api/affiliate/avatar-gallery — list up to 10 paid avatars for the affiliate
+app.get('/api/affiliate/avatar-gallery', (req, res) => {
+  noStore(res);
+  const affiliateCode = String(req.query.affiliateCode || req.query.affiliateId || '').trim().toUpperCase();
+  if (!affiliateCode) return res.json({ success: true, avatars: [] });
+  const avatars = getAvatarGalleryRecords(affiliateCode);
+  res.json({ success: true, avatars, count: avatars.length });
+});
+
+// POST /api/affiliate/avatar/proof — generate a short proof render for an avatar
+app.post('/api/affiliate/avatar/proof', async (req, res) => {
+  noStore(res);
+  const {
+    requestId,
+    affiliateCode,
+    avatarId,
+    script,
+    name
+  } = req.body || {};
+  const resolvedRequest = requestId ? findAvatarRequest(requestId) : null;
+  const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501').trim();
+  if (!resolvedAvatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
+  const resolvedScript = String(script || "This is my avatar, and it's time to get this blessing flowing! I'm ready to show up with confidence and keep this blessing flowing.").trim();
+  const ownerCode = String(affiliateCode || resolvedRequest?.affiliateCode || '').trim().toUpperCase();
+  if (!process.env.HEYGEN_API_KEY) {
+    const demoVideoUrl = '/generated/evics-sea-moss-proof-render.mp4';
+    if (resolvedRequest) {
+      upsertAvatarRequest({
+        ...resolvedRequest,
+        avatar: {
+          ...(resolvedRequest.avatar || {}),
+          proofVideoId: `demo-${Date.now()}`,
+          proofVideoUrl: demoVideoUrl,
+          proofThumbnailUrl: resolvedRequest.photoUrl || resolvedRequest.avatar?.photoUrl || null,
+          proofScript: resolvedScript,
+          proofStatus: 'completed',
+          proofCompletedAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      });
+    }
+    return res.json({
+      success: true,
+      status: 'completed',
+      videoId: `demo-${Date.now()}`,
+      videoUrl: demoVideoUrl,
+      thumbnailUrl: resolvedRequest?.photoUrl || resolvedRequest?.avatar?.photoUrl || null,
+      script: resolvedScript,
+      avatarId: resolvedAvatarId,
+      requestId: resolvedRequest?.requestId || null,
+      affiliateCode: ownerCode || null
+    });
+  }
+  try {
+    const render = await startHeyGenRender({
+      script: resolvedScript,
+      avatar_id: resolvedAvatarId,
+      voice_id: process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b',
+      config: {
+        aspect: '9:16',
+        background: { type: 'color', color: '#0b1016' },
+        caption: false,
+        test: false
+      }
+    });
+    if (resolvedRequest) {
+      upsertAvatarRequest({
+        ...resolvedRequest,
+        avatar: {
+          ...(resolvedRequest.avatar || {}),
+          proofVideoId: render.video_id || null,
+          proofVideoUrl: null,
+          proofThumbnailUrl: resolvedRequest.photoUrl || resolvedRequest.avatar?.photoUrl || null,
+          proofScript: resolvedScript,
+          proofStatus: 'rendering',
+          proofRequestedAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      });
+    }
+    res.json({
+      success: true,
+      status: 'rendering',
+      videoId: render.video_id,
+      script: resolvedScript,
+      avatarId: resolvedAvatarId,
+      requestId: resolvedRequest?.requestId || null,
+      affiliateCode: ownerCode || null
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/affiliate/avatar/proof-complete — store proof render results for the gallery
+app.post('/api/affiliate/avatar/proof-complete', (req, res) => {
+  noStore(res);
+  const { requestId, videoId, videoUrl, thumbnailUrl } = req.body || {};
+  if (!requestId) return res.status(400).json({ success: false, error: 'requestId is required' });
+  const request = findAvatarRequest(requestId);
+  if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
+  const next = upsertAvatarRequest({
+    ...request,
+    avatar: {
+      ...(request.avatar || {}),
+      proofVideoId: String(videoId || request.avatar?.proofVideoId || '').trim() || null,
+      proofVideoUrl: String(videoUrl || request.avatar?.proofVideoUrl || '').trim() || null,
+      proofThumbnailUrl: String(thumbnailUrl || request.avatar?.proofThumbnailUrl || request.photoUrl || '').trim() || null,
+      proofStatus: 'completed',
+      proofCompletedAt: new Date().toISOString()
+    },
+    updatedAt: new Date().toISOString()
+  });
+  res.json({ success: true, request: next });
 });
 
 // POST /api/affiliate/avatar/create — create/register avatar profile (returns full avatar object)

@@ -199,6 +199,35 @@
               <a id="phoneAvatarReturnLink" href="/phone-app" target="_self">Return to phone app</a>
             </div>
           </div>
+
+          <div class="panel avatar-library-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Paid Avatar Library</h2>
+                <p>Tap any avatar to open the 8-second proof clip for that paid look.</p>
+              </div>
+              <div class="panel-actions">
+                <p class="monitor-info" id="phoneAvatarLibraryMonitor">Loading paid avatars…</p>
+              </div>
+            </div>
+            <div id="phoneAvatarLibraryGrid" class="avatar-library-grid">
+              <div class="avatar-empty">Loading avatar library…</div>
+            </div>
+            <div id="phoneAvatarLibraryPreview" class="avatar-library-preview hidden">
+              <div class="avatar-library-preview-media">
+                <img id="phoneAvatarLibraryPreviewImage" class="avatar-library-preview-image hidden" alt="Selected avatar thumbnail" />
+                <video id="phoneAvatarLibraryPreviewVideo" class="avatar-library-preview-video hidden" controls playsinline preload="metadata"></video>
+              </div>
+              <div class="avatar-library-preview-copy">
+                <strong id="phoneAvatarLibraryPreviewTitle">Select an avatar</strong>
+                <p id="phoneAvatarLibraryPreviewMeta">Click a thumbnail to see the proof video.</p>
+                <p id="phoneAvatarLibraryPreviewPrompt">This is my avatar, and it's time to get this blessing flowing!</p>
+                <div class="avatar-library-actions">
+                  <button type="button" id="phoneAvatarLibraryRefresh" class="control-btn state-off">Generate proof</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="panel">

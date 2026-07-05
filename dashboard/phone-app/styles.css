@@ -308,6 +308,103 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   outline: none;
 }
 
+/* ── Avatar library panel ────────────────────────────────────────────────── */
+.avatar-library-panel {
+  margin-top: 14px;
+}
+.avatar-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.avatar-library-card {
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  background: rgba(7, 11, 18, 0.82);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.avatar-library-card:hover,
+.avatar-library-card.selected {
+  border-color: rgba(0, 199, 245, 0.8);
+  box-shadow: 0 0 0 1px rgba(0, 199, 245, 0.15) inset;
+}
+.avatar-library-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #04080d;
+  border: 1px solid var(--border-dim);
+}
+.avatar-library-card strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.avatar-library-card span {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.avatar-library-status {
+  font-size: 11px;
+  color: var(--accent2);
+}
+.avatar-library-preview {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(160px, 260px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  background: rgba(7, 11, 18, 0.72);
+}
+.avatar-library-preview-media {
+  display: grid;
+  gap: 8px;
+}
+.avatar-library-preview-image,
+.avatar-library-preview-video {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border-dim);
+  background: #04080d;
+}
+.avatar-library-preview-image {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+.avatar-library-preview-video {
+  min-height: 240px;
+}
+.avatar-library-preview-copy {
+  display: grid;
+  gap: 6px;
+}
+.avatar-library-preview-copy strong {
+  color: var(--text);
+  font-size: 14px;
+}
+.avatar-library-preview-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.avatar-library-actions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .voice-script-card {
   border: 1px solid var(--border-dim);
   border-radius: 12px;
