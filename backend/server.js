@@ -323,6 +323,7 @@ app.get('/ref/:code', (req, res) => {
 const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
 const LIVE_HEYGEN_PROOF_PATH = path.join(__dirname, '..', 'generated', 'live_heygen_proofs.json');
 const AFFILIATE_AVATAR_REQUESTS_PATH = path.join(__dirname, '..', 'generated', 'affiliate_avatar_requests.json');
+const AFFILIATE_PROFILES_PATH = path.join(__dirname, '..', 'generated', 'affiliate_profiles.json');
 const EXCELLENCE_STATE_PATH = path.join(__dirname, '..', 'generated', 'a_plus_objectives_state.json');
 const EXCELLENCE_AUDIT_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_latest.json');
 const EXCELLENCE_AUDIT_HISTORY_PATH = path.join(__dirname, '..', 'generated', 'a_plus_audit_history.json');
@@ -828,6 +829,43 @@ function findLatestAvatarRequest(affiliateCode) {
   const code = String(affiliateCode || '').trim().toUpperCase();
   if (!code) return null;
   return getAvatarRequests().find((item) => String(item.affiliateCode || '').trim().toUpperCase() === code) || null;
+}
+
+// ── Affiliate Profile Management ────────────────────────────────────────────
+function getAffiliateProfiles() {
+  return readJsonArraySafe(AFFILIATE_PROFILES_PATH);
+}
+
+function saveAffiliateProfiles(records) {
+  writeJsonArray(AFFILIATE_PROFILES_PATH, records);
+}
+
+function getAffiliateProfile(affiliateCode) {
+  const code = String(affiliateCode || '').trim().toUpperCase();
+  if (!code) return null;
+  const profiles = getAffiliateProfiles();
+  return profiles.find((p) => String(p.affiliateCode || '').trim().toUpperCase() === code) || null;
+}
+
+function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '') {
+  const code = String(affiliateCode || '').trim().toUpperCase();
+  if (!code) throw new Error('affiliateCode is required');
+  const profiles = getAffiliateProfiles();
+  const existing = profiles.find((p) => String(p.affiliateCode || '').trim().toUpperCase() === code);
+  const updated = {
+    affiliateCode: code,
+    name: String(name || code).trim().slice(0, 128),
+    pictureUrl: String(pictureUrl || '').trim(),
+    updatedAt: new Date().toISOString()
+  };
+  if (existing) {
+    Object.assign(existing, updated);
+  } else {
+    updated.createdAt = new Date().toISOString();
+    profiles.unshift(updated);
+  }
+  saveAffiliateProfiles(profiles.slice(0, 500));
+  return updated;
 }
 
 function normalizeAvatarGalleryAttire(attire) {
@@ -5530,6 +5568,38 @@ app.get('/api/affiliate/avatar-gallery', (req, res) => {
   if (!affiliateCode) return res.json({ success: true, avatars: [] });
   const avatars = getAvatarGalleryRecords(affiliateCode);
   res.json({ success: true, avatars, count: avatars.length });
+});
+
+// GET /api/affiliate/profile/:affiliateCode — fetch affiliate profile (name + picture)
+app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
+  noStore(res);
+  const affiliateCode = String(req.params.affiliateCode || '').trim().toUpperCase();
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+  const profile = getAffiliateProfile(affiliateCode);
+  if (!profile) {
+    return res.json({
+      success: true,
+      profile: {
+        affiliateCode,
+        name: affiliateCode,
+        pictureUrl: null,
+        createdAt: new Date().toISOString()
+      }
+    });
+  }
+  res.json({ success: true, profile });
+});
+
+// POST /api/affiliate/profile — update affiliate profile (name + picture)
+app.post('/api/affiliate/profile', (req, res) => {
+  try {
+    const { affiliateCode, name, pictureUrl } = req.body || {};
+    if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    const profile = upsertAffiliateProfile(affiliateCode, name, pictureUrl);
+    res.json({ success: true, profile });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // POST /api/affiliate/avatar/proof — generate a short proof render for an avatar

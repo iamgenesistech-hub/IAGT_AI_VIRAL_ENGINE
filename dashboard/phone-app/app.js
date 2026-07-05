@@ -11,6 +11,11 @@
   const logoutBtn = document.getElementById('phoneLogout');
   const chatFeed = document.getElementById('phoneChatFeed');
   const sessionInfo = document.getElementById('phoneSessionInfo');
+  // Affiliate profile banner
+  const affiliateProfileBanner = document.getElementById('phoneAffiliateProfile');
+  const affiliateProfilePic = document.getElementById('phoneAffiliateProfilePic');
+  const affiliateProfileName = document.getElementById('phoneAffiliateProfileName');
+  const affiliateProfileCode = document.getElementById('phoneAffiliateProfileCode');
   const avatarMonitor = document.getElementById('phoneAvatarMonitor');
   const avatarPhotoInput = document.getElementById('phoneAvatarPhotoInput');
   const avatarPhotoUploadBtn = document.getElementById('phoneAvatarPhotoUpload');
@@ -1170,6 +1175,32 @@
     supportState.affiliateName = cleanName;
   }
 
+  async function loadAffiliateProfile() {
+    if (!supportState.affiliateCode) return;
+    try {
+      const res = await fetch(`/api/affiliate/profile/${encodeURIComponent(supportState.affiliateCode)}`);
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.profile) {
+        const profile = data.profile;
+        if (affiliateProfileBanner) {
+          affiliateProfileBanner.style.display = 'flex';
+          if (affiliateProfileName) affiliateProfileName.textContent = profile.name || supportState.affiliateCode;
+          if (affiliateProfileCode) affiliateProfileCode.textContent = `ID: ${profile.affiliateCode}`;
+          if (affiliateProfilePic && profile.pictureUrl) {
+            affiliateProfilePic.src = profile.pictureUrl;
+            affiliateProfilePic.onerror = () => {
+              affiliateProfilePic.style.display = 'none';
+            };
+          } else if (affiliateProfilePic) {
+            affiliateProfilePic.style.display = 'none';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load affiliate profile:', e.message);
+    }
+  }
+
   function getAvatarRequestIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return String(params.get('avatarRequestId') || params.get('requestId') || localStorage.getItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`) || '').trim();
@@ -1810,6 +1841,7 @@
   async function boot() {
     try {
       resolveAffiliateIdentity();
+      await loadAffiliateProfile();
       hydrateAvatarSetup();
       renderAvatarSetup();
       await loadVoiceReferenceScript();
