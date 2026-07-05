@@ -5959,10 +5959,12 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     });
 
     // Use the affiliate's voice clone if available, otherwise fall back to default
-    const voiceId = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
+    const defaultVoice = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
+    const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
+    let voiceId = cloneVoice || defaultVoice;
 
-    // Render via HeyGen v2/video/generate with the affiliate's photo as talking_photo
-    const videoResult = await heygenApiJson('/v2/video/generate', {
+    // Build the HeyGen request payload
+    const buildPayload = (vid) => ({
       video_inputs: [{
         character: {
           type: 'talking_photo',
@@ -5972,11 +5974,26 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         voice: {
           type: 'text',
           input_text: script,
-          voice_id: voiceId
+          voice_id: vid
         }
       }],
       dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 }
     });
+
+    // Render via HeyGen v2/video/generate — try clone voice, fall back to default
+    let videoResult = null;
+    try {
+      videoResult = await heygenApiJson('/v2/video/generate', buildPayload(voiceId));
+    } catch (voiceErr) {
+      // If voice clone is invalid, retry with default voice
+      if (cloneVoice && voiceId !== defaultVoice && /voice.*not found|invalid.*voice/i.test(voiceErr.message)) {
+        console.log(`[ProductVideo] Voice clone ${voiceId} invalid, falling back to default voice.`);
+        voiceId = defaultVoice;
+        videoResult = await heygenApiJson('/v2/video/generate', buildPayload(voiceId));
+      } else {
+        throw voiceErr;
+      }
+    }
 
     const videoId = videoResult?.data?.video_id || null;
     if (!videoId) {

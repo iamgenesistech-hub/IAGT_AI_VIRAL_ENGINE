@@ -288,3 +288,8 @@ Require stack:
 [EVICS] 404 GET /api/affiliate/avatar-gallery (13ms)
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 500 GET /api/heygen/account-status (16019ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
