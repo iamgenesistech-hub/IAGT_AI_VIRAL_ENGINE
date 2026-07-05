@@ -274,3 +274,17 @@ Require stack:
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [EVICS] 500 GET /api/heygen/account-status (16028ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 404 POST /api/media-output/outputs/96accf8848e44c378cea8d4919f972d6/actions (5ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 400 GET /api/affiliates/tier-progress (7ms)
+[EVICS] 400 GET /api/affiliates/tier-progress (2ms)
+[EVICS] 400 GET /api/affiliates/tier-progress (2ms)
+[EVICS] 400 GET /api/affiliates/tier-progress (11ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 400 GET /api/affiliates/tier-progress (2ms)
+[EVICS] 404 GET /api/affiliate/avatar-gallery (13ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401

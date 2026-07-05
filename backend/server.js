@@ -5881,6 +5881,234 @@ app.post('/api/affiliate/social/post', async (req, res) => {
   }
 });
 
+// ── Product Video Generation ─────────────────────────────────────────────────
+
+// In-memory store for product video records (same pattern as avatar requests)
+const PRODUCT_VIDEO_RECORDS = new Map();
+
+function upsertProductVideoRecord(record) {
+  if (!record || !record.videoJobId) return record;
+  PRODUCT_VIDEO_RECORDS.set(record.videoJobId, { ...record });
+  return record;
+}
+
+function findProductVideoRecord(videoJobId) {
+  return PRODUCT_VIDEO_RECORDS.get(videoJobId) || null;
+}
+
+function getProductVideosByAffiliate(affiliateCode) {
+  if (!affiliateCode) return [];
+  const upper = affiliateCode.toUpperCase();
+  const results = [];
+  for (const rec of PRODUCT_VIDEO_RECORDS.values()) {
+    if (String(rec.affiliateCode || '').toUpperCase() === upper) results.push(rec);
+  }
+  return results.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+// POST /api/affiliate/product-video/generate — create a product video with the affiliate's avatar
+app.post('/api/affiliate/product-video/generate', async (req, res) => {
+  try {
+    const {
+      affiliateCode,
+      avatarRequestId,
+      productId,
+      productHandle,
+      productTitle,
+      productImageUrl,
+      productPageUrl,
+      platform,
+      customScript
+    } = req.body || {};
+
+    const cleanCode = String(affiliateCode || '').trim().toUpperCase();
+    if (!cleanCode) return res.status(400).json({ success: false, error: 'affiliateCode is required.' });
+
+    // Resolve the avatar from the request record
+    let avatarRecord = null;
+    if (avatarRequestId) {
+      avatarRecord = findAvatarRequest(avatarRequestId);
+    }
+    if (!avatarRecord) {
+      // Fall back to latest completed avatar for this affiliate
+      const allRecords = getAvatarGalleryRecords(cleanCode);
+      if (allRecords.length) {
+        avatarRecord = findAvatarRequest(allRecords[0].requestId);
+      }
+    }
+    if (!avatarRecord || !avatarRecord.avatar) {
+      return res.status(400).json({ success: false, error: 'No completed avatar found. Create an avatar first.' });
+    }
+
+    const photoUrl = avatarRecord.photoUrl || avatarRecord.avatar?.photoUrl || null;
+    if (!photoUrl) {
+      return res.status(400).json({ success: false, error: 'Avatar has no photo URL. Re-create your avatar with a photo.' });
+    }
+
+    // Resolve product info
+    const resolvedProductTitle = productTitle || avatarRecord.productTitle || 'Premium Product';
+    const resolvedProductImage = productImageUrl || avatarRecord.productImageUrl || '';
+    const resolvedProductPage = productPageUrl || avatarRecord.productPageUrl || '';
+    const resolvedPlatform = platform || avatarRecord.platform || 'tiktok';
+
+    // Generate a compelling product script
+    const script = customScript || generateProductVideoScript({
+      productTitle: resolvedProductTitle,
+      productPageUrl: resolvedProductPage,
+      platform: resolvedPlatform
+    });
+
+    // Use the affiliate's voice clone if available, otherwise fall back to default
+    const voiceId = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
+
+    // Render via HeyGen v2/video/generate with the affiliate's photo as talking_photo
+    const videoResult = await heygenApiJson('/v2/video/generate', {
+      video_inputs: [{
+        character: {
+          type: 'talking_photo',
+          talking_photo_id: process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7',
+          talking_photo_url: photoUrl
+        },
+        voice: {
+          type: 'text',
+          input_text: script,
+          voice_id: voiceId
+        }
+      }],
+      dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 }
+    });
+
+    const videoId = videoResult?.data?.video_id || null;
+    if (!videoId) {
+      return res.status(500).json({ success: false, error: 'HeyGen did not return a video ID.' });
+    }
+
+    const videoJobId = `pvid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const record = upsertProductVideoRecord({
+      videoJobId,
+      heygenVideoId: videoId,
+      affiliateCode: cleanCode,
+      avatarRequestId: avatarRequestId || avatarRecord.requestId || null,
+      photoUrl,
+      voiceId,
+      productId: productId || null,
+      productHandle: productHandle || null,
+      productTitle: resolvedProductTitle,
+      productImageUrl: resolvedProductImage,
+      productPageUrl: resolvedProductPage,
+      platform: resolvedPlatform,
+      script,
+      status: 'rendering',
+      videoUrl: null,
+      thumbnailUrl: null,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+      error: null
+    });
+
+    res.json({
+      success: true,
+      videoJobId,
+      heygenVideoId: videoId,
+      status: 'rendering',
+      script,
+      productTitle: resolvedProductTitle,
+      platform: resolvedPlatform
+    });
+
+    // Background poll for video completion
+    (async () => {
+      try {
+        for (let i = 0; i < 40; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          const s = await getHeyGenVideoStatus(videoId);
+          if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
+            upsertProductVideoRecord({
+              ...record,
+              status: 'completed',
+              videoUrl: s.video_url,
+              thumbnailUrl: s.thumbnail_url || photoUrl,
+              completedAt: new Date().toISOString()
+            });
+            console.log(`[ProductVideo] Completed ${videoJobId}: ${s.video_url.substring(0, 80)}…`);
+            break;
+          }
+          if (s && s.status === 'failed') {
+            upsertProductVideoRecord({
+              ...record,
+              status: 'failed',
+              error: s.error || 'HeyGen rendering failed',
+              completedAt: new Date().toISOString()
+            });
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.error(`[ProductVideo] Poll error for ${videoJobId}: ${pollErr.message}`);
+        upsertProductVideoRecord({
+          ...record,
+          status: 'failed',
+          error: pollErr.message,
+          completedAt: new Date().toISOString()
+        });
+      }
+    })();
+  } catch (err) {
+    console.error('[ProductVideo] Generate error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/affiliate/product-video/status/:videoJobId — check rendering status
+app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
+  noStore(res);
+  const record = findProductVideoRecord(req.params.videoJobId);
+  if (!record) {
+    return res.status(404).json({ success: false, error: 'Product video job not found.' });
+  }
+  // If still rendering, check HeyGen directly
+  if (record.status === 'rendering' && record.heygenVideoId) {
+    try {
+      const s = await getHeyGenVideoStatus(record.heygenVideoId);
+      if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
+        record.status = 'completed';
+        record.videoUrl = s.video_url;
+        record.thumbnailUrl = s.thumbnail_url || record.photoUrl;
+        record.completedAt = new Date().toISOString();
+        upsertProductVideoRecord(record);
+      } else if (s && s.status === 'failed') {
+        record.status = 'failed';
+        record.error = s.error || 'Rendering failed';
+        upsertProductVideoRecord(record);
+      }
+    } catch (_) {}
+  }
+  res.json({
+    success: true,
+    ...record
+  });
+});
+
+// GET /api/affiliate/product-videos — list all product videos for an affiliate
+app.get('/api/affiliate/product-videos', (req, res) => {
+  noStore(res);
+  const affiliateCode = String(req.query.affiliateCode || '').trim().toUpperCase();
+  if (!affiliateCode) return res.json({ success: true, videos: [], count: 0 });
+  const videos = getProductVideosByAffiliate(affiliateCode);
+  res.json({ success: true, videos, count: videos.length });
+});
+
+function generateProductVideoScript({ productTitle, productPageUrl, platform }) {
+  const platformHook = {
+    tiktok: "Listen up — I found something that's about to change the game.",
+    instagram: "Stop scrolling! You need to see this.",
+    youtube: "Hey everyone — I've been using something incredible and I had to share it.",
+    facebook: "I rarely post about products, but this one deserves the attention."
+  };
+  const hook = platformHook[platform] || platformHook.tiktok;
+  return `${hook} I'm talking about ${productTitle}. This isn't just another product — this is real quality, real results, and I can personally vouch for it. If you've been looking for something that actually delivers, this is it. Click the link and see for yourself. Trust me, you won't regret it.`;
+}
+
 // POST /api/affiliate/clicks
 app.post('/api/affiliate/clicks', async (req, res) => {
   const { affiliateId, affiliateCode, productId, productTitle, destination, source } = req.body || {};

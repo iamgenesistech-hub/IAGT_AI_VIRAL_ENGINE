@@ -287,6 +287,18 @@
       "lastSeenAtMs": 1783216218281,
       "endedAt": "2026-07-05T01:50:30.726Z",
       "endedReason": "manual-logoff"
+    },
+    "sess_1783225783114_vhcrew": {
+      "sessionId": "sess_1783225783114_vhcrew",
+      "affiliateCode": "ROLAND787",
+      "affiliateName": "ROLAND787",
+      "workspace": "phone-app",
+      "status": "offline",
+      "startedAt": "2026-07-05T04:29:43.114Z",
+      "lastSeenAt": "2026-07-05T04:44:12.760Z",
+      "lastSeenAtMs": 1783226652760,
+      "endedAt": "2026-07-05T04:44:15.812Z",
+      "endedReason": "manual-logoff"
     }
   },
   "conversations": {

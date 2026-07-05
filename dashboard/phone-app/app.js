@@ -60,6 +60,16 @@
   const avatarLibraryPreviewMeta = document.getElementById('phoneAvatarLibraryPreviewMeta');
   const avatarLibraryPreviewPrompt = document.getElementById('phoneAvatarLibraryPreviewPrompt');
   const avatarLibraryRefreshBtn = document.getElementById('phoneAvatarLibraryRefresh');
+  const generateProductVideoBtn = document.getElementById('phoneGenerateProductVideo');
+  const productVideoStatus = document.getElementById('phoneProductVideoStatus');
+  const productVideoMonitor = document.getElementById('phoneProductVideoMonitor');
+  const productVideoGrid = document.getElementById('phoneProductVideoGrid');
+  const productVideoPreview = document.getElementById('phoneProductVideoPreview');
+  const productVideoPlayer = document.getElementById('phoneProductVideoPlayer');
+  const productVideoTitle = document.getElementById('phoneProductVideoTitle');
+  const productVideoMeta = document.getElementById('phoneProductVideoMeta');
+  const productVideoScript = document.getElementById('phoneProductVideoScript');
+  const productVideoRefreshBtn = document.getElementById('phoneProductVideoRefresh');
   const modalState = { open: false, item: null };
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
@@ -100,7 +110,9 @@
     products: [],
     voiceReferenceScript: '',
     avatarLibrary: [],
-    selectedAvatarLibraryId: ''
+    selectedAvatarLibraryId: '',
+    productVideos: [],
+    selectedProductVideoId: ''
   };
 
   function setControlState(el, state, autoOffMs = 0) {
@@ -590,6 +602,96 @@
         if (avatarLibraryRefreshBtn) avatarLibraryRefreshBtn.disabled = false;
       }
     }
+  }
+
+  // ── Product Video Gallery ────────────────────────────────────────────────
+  async function loadProductVideos() {
+    if (!productVideoGrid) return;
+    const url = new URL('/api/affiliate/product-videos', window.location.origin);
+    url.searchParams.set('affiliateCode', supportState.affiliateCode || 'ROLAND787');
+    try {
+      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) throw new Error(payload.error || `Request failed: ${response.status}`);
+      supportState.productVideos = Array.isArray(payload.videos) ? payload.videos : [];
+      renderProductVideoGallery();
+    } catch (error) {
+      supportState.productVideos = [];
+      if (productVideoMonitor) productVideoMonitor.textContent = `Error: ${error.message}`;
+      if (productVideoGrid) productVideoGrid.innerHTML = '<div class="avatar-empty">Unable to load product videos.</div>';
+    }
+  }
+
+  function renderProductVideoGallery() {
+    if (!productVideoGrid) return;
+    const items = supportState.productVideos;
+    if (!items.length) {
+      productVideoGrid.innerHTML = '<div class="avatar-empty">No product videos generated yet. Select an avatar and a product, then tap "Generate Product Video".</div>';
+      if (productVideoMonitor) productVideoMonitor.textContent = 'No product videos yet.';
+      renderProductVideoPreview(null);
+      return;
+    }
+    if (productVideoMonitor) productVideoMonitor.textContent = `${items.length} video${items.length === 1 ? '' : 's'}`;
+    productVideoGrid.innerHTML = items.map((item) => {
+      const selected = item.videoJobId === supportState.selectedProductVideoId;
+      const statusClass = item.status === 'completed' ? 'completed' : item.status === 'failed' ? 'failed' : 'rendering';
+      const statusLabel = item.status === 'completed' ? '✅ Ready' : item.status === 'failed' ? '❌ Failed' : '⏳ Rendering…';
+      const thumb = item.thumbnailUrl || item.photoUrl || '';
+      return `<button type="button" class="product-video-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
+        ${thumb ? `<img class="pv-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="pv-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">🎬</div>'}
+        <strong>${escapeHtml(item.productTitle || 'Product Video')}</strong>
+        <span class="pv-status ${statusClass}">${statusLabel}</span>
+      </button>`;
+    }).join('');
+
+    productVideoGrid.querySelectorAll('[data-pvid]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pvid = btn.getAttribute('data-pvid');
+        const match = items.find((v) => v.videoJobId === pvid);
+        if (match) {
+          supportState.selectedProductVideoId = match.videoJobId;
+          renderProductVideoGallery();
+          renderProductVideoPreview(match);
+        }
+      });
+    });
+
+    const selected = items.find((v) => v.videoJobId === supportState.selectedProductVideoId) || items[0];
+    if (selected && !supportState.selectedProductVideoId) supportState.selectedProductVideoId = selected.videoJobId;
+    renderProductVideoPreview(selected || null);
+  }
+
+  function renderProductVideoPreview(item) {
+    if (!productVideoPreview) return;
+    if (!item) { productVideoPreview.classList.add('hidden'); return; }
+    productVideoPreview.classList.remove('hidden');
+    if (productVideoTitle) productVideoTitle.textContent = item.productTitle || 'Product Video';
+    if (productVideoMeta) productVideoMeta.textContent = item.status === 'completed' ? `Platform: ${item.platform || 'tiktok'} · Rendered ${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}` : item.status === 'rendering' ? 'Video is rendering… check back in ~60 seconds.' : `Failed: ${item.error || 'Unknown error'}`;
+    if (productVideoScript) productVideoScript.textContent = item.script || '';
+    if (productVideoPlayer) {
+      if (item.videoUrl) {
+        productVideoPlayer.src = item.videoUrl;
+        productVideoPlayer.classList.remove('hidden');
+      } else {
+        productVideoPlayer.removeAttribute('src');
+        productVideoPlayer.classList.add('hidden');
+      }
+    }
+  }
+
+  async function pollProductVideoStatus(videoJobId) {
+    for (let i = 0; i < 25; i++) {
+      await sleep(5000);
+      try {
+        const response = await fetch(`/api/affiliate/product-video/status/${encodeURIComponent(videoJobId)}`, { headers: { Accept: 'application/json' } });
+        const payload = await response.json().catch(() => ({}));
+        if (payload.status === 'completed' && payload.videoUrl) return payload;
+        if (payload.status === 'failed') throw new Error(payload.error || 'Rendering failed');
+      } catch (err) {
+        if (err.message.includes('failed')) throw err;
+      }
+    }
+    throw new Error('Video is still rendering. Refresh the gallery to check status.');
   }
 
     function escapeHtml(value) {
@@ -1436,22 +1538,70 @@
     });
   }
 
-  if (avatarSaveProfileBtn) {
-    avatarSaveProfileBtn.addEventListener('click', async () => {
-      avatarSaveProfileBtn.classList.add('pressing');
-      avatarSaveProfileBtn.disabled = true;
-      setControlState(avatarSaveProfileBtn, 'running');
+  // ── Generate Product Video button ─────────────────────────────────────────
+  if (generateProductVideoBtn) {
+    generateProductVideoBtn.addEventListener('click', async () => {
+      // Validate: need a selected avatar and a selected product
+      const selectedAvatar = supportState.avatarLibrary.find((a) => String(a.id) === String(supportState.selectedAvatarLibraryId || ''));
+      if (!selectedAvatar) {
+        if (productVideoStatus) { productVideoStatus.textContent = '⚠️ Select an avatar from your Avatar Library first.'; productVideoStatus.className = 'create-avatar-status status-error'; }
+        return;
+      }
+      if (!supportState.avatarSetup.selectedProduct) {
+        if (productVideoStatus) { productVideoStatus.textContent = '⚠️ Select a product above first.'; productVideoStatus.className = 'create-avatar-status status-error'; }
+        return;
+      }
+
+      generateProductVideoBtn.disabled = true;
+      setControlState(generateProductVideoBtn, 'running');
+      if (productVideoStatus) { productVideoStatus.textContent = '⏳ Sending to Affiliate Hub for video generation…'; productVideoStatus.className = 'create-avatar-status'; }
+
       try {
-        await saveAvatarProfile();
-        setControlState(avatarSaveProfileBtn, 'completed', 1300);
+        const product = supportState.avatarSetup.selectedProduct;
+        const payload = await apiJson('/api/affiliate/product-video/generate', {
+          method: 'POST',
+          body: JSON.stringify({
+            affiliateCode: supportState.affiliateCode,
+            avatarRequestId: selectedAvatar.requestId || supportState.avatarSetup.requestId || null,
+            productId: product.id || null,
+            productHandle: product.handle || null,
+            productTitle: product.title || null,
+            productImageUrl: product.imageUrl || product.image || product.image_url || null,
+            productPageUrl: product.productPageUrl || product.productUrl || null,
+            platform: platformSelect ? platformSelect.value : 'tiktok'
+          })
+        });
+
+        setControlState(generateProductVideoBtn, 'completed', 2000);
+        if (productVideoStatus) { productVideoStatus.textContent = '✅ Video rendering started! Waiting for completion…'; productVideoStatus.className = 'create-avatar-status status-success'; }
+        sessionInfo.textContent = 'Product video rendering — this may take 30-90 seconds.';
+
+        // Poll for completion
+        const videoJobId = payload.videoJobId;
+        if (videoJobId) {
+          try {
+            if (productVideoStatus) productVideoStatus.textContent = '⏳ Rendering product video… (30-90 seconds)';
+            const result = await pollProductVideoStatus(videoJobId);
+            if (productVideoStatus) { productVideoStatus.textContent = '✅ Product video ready! Check "My Product Videos" below.'; productVideoStatus.className = 'create-avatar-status status-success'; }
+            sessionInfo.textContent = 'Product video delivered to your gallery.';
+          } catch (pollErr) {
+            if (productVideoStatus) productVideoStatus.textContent = '✅ Video submitted! Rendering may take a minute — tap Refresh below to check.';
+          }
+          await loadProductVideos();
+        }
       } catch (error) {
-        sessionInfo.textContent = `Avatar profile save failed: ${error.message}`;
-        setControlState(avatarSaveProfileBtn, 'off');
+        setControlState(generateProductVideoBtn, 'off');
+        if (productVideoStatus) { productVideoStatus.textContent = `❌ Error: ${error.message}`; productVideoStatus.className = 'create-avatar-status status-error'; }
+        sessionInfo.textContent = `Product video generation failed: ${error.message}`;
       } finally {
-        avatarSaveProfileBtn.disabled = false;
-        setTimeout(() => avatarSaveProfileBtn.classList.remove('pressing'), 120);
+        generateProductVideoBtn.disabled = false;
       }
     });
+  }
+
+  // Product Video Refresh button
+  if (productVideoRefreshBtn) {
+    productVideoRefreshBtn.addEventListener('click', () => { loadProductVideos(); });
   }
 
   if (avatarVoiceCopyLinkBtn) {
@@ -1510,6 +1660,7 @@
       await syncAvatarRequestStatus();
       await loadAvatarLibrary();
       await loadProducts();
+      await loadProductVideos();
       await loadBillingInfo();
       await startSupportSession();
       await refreshConversation();

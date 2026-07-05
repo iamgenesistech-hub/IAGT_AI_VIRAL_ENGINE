@@ -1033,3 +1033,95 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   .product-details { grid-template-columns: 1fr; }
   .social-account-row { grid-template-columns: 28px 1fr auto; }
 }
+
+/* ── Product Video Gallery ────────────────────────────────────────────────── */
+.product-video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.product-video-card {
+  background: var(--card2);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color .2s, transform .15s;
+  text-align: center;
+}
+.product-video-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.product-video-card.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(217,191,122,.25);
+}
+.product-video-card .pv-thumb {
+  width: 100%;
+  aspect-ratio: 9/16;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg);
+}
+.product-video-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.product-video-card .pv-status {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.product-video-card .pv-status.completed { color: var(--green); }
+.product-video-card .pv-status.rendering { color: var(--gold); }
+.product-video-card .pv-status.failed { color: var(--red); }
+
+.product-video-preview {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid rgba(0,199,245,.2);
+  border-radius: 12px;
+  background: rgba(0,40,60,.2);
+}
+.product-video-player {
+  width: 100%;
+  max-height: 420px;
+  border-radius: 10px;
+  background: #000;
+}
+.product-video-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.product-video-preview-info strong {
+  color: var(--text);
+  font-size: 14px;
+}
+.product-video-preview-info p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+.product-video-script-text {
+  font-style: italic;
+  font-size: 11px !important;
+  color: var(--dim) !important;
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+}
+@media (max-width: 700px) {
+  .product-video-preview { grid-template-columns: 1fr; }
+}

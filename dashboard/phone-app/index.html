@@ -290,7 +290,32 @@
             </div>
           </div>
           <div class="avatar-setup-actions">
-            <button type="button" id="phoneAvatarSaveProfile" class="control-btn primary-action state-off">Send avatar + product to hub</button>
+            <button type="button" id="phoneGenerateProductVideo" class="control-btn primary-action state-off">🎬 Generate Product Video</button>
+            <p id="phoneProductVideoStatus" class="create-avatar-status"></p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>My Product Videos</h2>
+              <p>AI-generated product videos using your avatar.</p>
+            </div>
+            <div class="panel-actions">
+              <p class="monitor-info" id="phoneProductVideoMonitor">No product videos yet.</p>
+              <button type="button" id="phoneProductVideoRefresh" class="control-btn state-off" style="font-size:11px;padding:4px 10px;">Refresh</button>
+            </div>
+          </div>
+          <div id="phoneProductVideoGrid" class="product-video-grid">
+            <div class="avatar-empty">No product videos generated yet. Select an avatar and a product, then tap "Generate Product Video".</div>
+          </div>
+          <div id="phoneProductVideoPreview" class="product-video-preview hidden">
+            <video id="phoneProductVideoPlayer" class="product-video-player" controls playsinline preload="metadata"></video>
+            <div class="product-video-preview-info">
+              <strong id="phoneProductVideoTitle">Product Video</strong>
+              <p id="phoneProductVideoMeta">Rendered with your avatar.</p>
+              <p id="phoneProductVideoScript" class="product-video-script-text"></p>
+            </div>
           </div>
         </div>
 
