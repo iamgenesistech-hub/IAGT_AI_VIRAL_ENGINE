@@ -228,6 +228,26 @@ app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hu
 // Serve uploaded avatar photos and voice files
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Fallback: if local file missing (ephemeral container), proxy from GCS
+app.get('/uploads/:filename', async (req, res) => {
+  const { filename } = req.params;
+  const gcsPath = `affiliate-uploads/${filename}`;
+  try {
+    const token = await getGcsAccessToken();
+    if (!token) return res.status(404).json({ error: 'File not found and GCS unavailable' });
+    const gcsUrl = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o/${encodeURIComponent(gcsPath)}?alt=media`;
+    const gcsResp = await fetch(gcsUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!gcsResp.ok) return res.status(404).json({ error: 'File not found in local storage or GCS' });
+    const ct = gcsResp.headers.get('content-type') || 'application/octet-stream';
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const arrayBuf = await gcsResp.arrayBuffer();
+    res.send(Buffer.from(arrayBuf));
+  } catch (e) {
+    res.status(500).json({ error: 'GCS proxy error: ' + e.message });
+  }
+});
+
 // Serve bg-removed product images (permanent cache — never re-processed)
 app.use('/processed-images', express.static(BG_CACHE_DIR));
 

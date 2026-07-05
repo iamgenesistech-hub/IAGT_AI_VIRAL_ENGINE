@@ -307,6 +307,11 @@
         avatarVoicePreview.classList.remove('hidden');
         if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
         avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
+        avatarVoicePreview.onerror = function() {
+          avatarVoicePreview.classList.add('hidden');
+          if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
+          if (sessionInfo) sessionInfo.textContent = '⚠️ Voice file unavailable — please re-record or re-upload.';
+        };
       } else {
         avatarVoicePreview.removeAttribute('src');
         avatarVoicePreview.classList.add('hidden');
