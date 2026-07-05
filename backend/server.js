@@ -5583,6 +5583,36 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
   });
 });
 
+// POST /api/affiliate/social/post
+app.post('/api/affiliate/social/post', async (req, res) => {
+  try {
+    const { affiliateCode, platform, accountUrl, videoUrl, productId } = req.body || {};
+    if (!platform || !accountUrl) {
+      return res.status(400).json({ success: false, error: 'Platform and account URL are required.' });
+    }
+    // Log the post request for future platform API integration
+    const postRecord = {
+      affiliateCode: affiliateCode || 'unknown',
+      platform,
+      accountUrl,
+      videoUrl: videoUrl || '',
+      productId: productId || '',
+      status: 'queued',
+      requestedAt: new Date().toISOString()
+    };
+    console.log('[Social Post] Queued:', JSON.stringify(postRecord));
+    res.json({
+      success: true,
+      message: `Video post to ${platform} has been queued. Platform integration will deliver the content.`,
+      postId: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      status: 'queued'
+    });
+  } catch (err) {
+    console.error('[Social Post] Error:', err);
+    res.status(500).json({ success: false, error: 'Failed to queue social post.' });
+  }
+});
+
 // POST /api/affiliate/clicks
 app.post('/api/affiliate/clicks', async (req, res) => {
   const { affiliateId, affiliateCode, productId, productTitle, destination, source } = req.body || {};

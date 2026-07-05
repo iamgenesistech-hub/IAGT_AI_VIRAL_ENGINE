@@ -304,6 +304,79 @@
           </ul>
         </div>
 
+        <div class="panel social-accounts-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Social Accounts & Posting</h2>
+              <p>Link your social media accounts to post AI videos directly to each platform.</p>
+            </div>
+            <div class="panel-actions">
+              <button type="button" id="phoneSocialSave" class="control-btn state-off">Save accounts</button>
+            </div>
+          </div>
+          <div class="social-accounts-grid">
+            <div class="social-account-row">
+              <div class="social-account-icon">📘</div>
+              <div class="social-account-field">
+                <label for="phoneSocialFacebook">Facebook</label>
+                <input type="url" id="phoneSocialFacebook" placeholder="https://facebook.com/yourpage" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="facebook">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">📷</div>
+              <div class="social-account-field">
+                <label for="phoneSocialInstagram">Instagram</label>
+                <input type="url" id="phoneSocialInstagram" placeholder="https://instagram.com/yourhandle" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="instagram">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">🎵</div>
+              <div class="social-account-field">
+                <label for="phoneSocialTiktok">TikTok</label>
+                <input type="url" id="phoneSocialTiktok" placeholder="https://tiktok.com/@yourhandle" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="tiktok">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">▶️</div>
+              <div class="social-account-field">
+                <label for="phoneSocialYoutube">YouTube</label>
+                <input type="url" id="phoneSocialYoutube" placeholder="https://youtube.com/@yourchannel" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="youtube">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">📌</div>
+              <div class="social-account-field">
+                <label for="phoneSocialPinterest">Pinterest</label>
+                <input type="url" id="phoneSocialPinterest" placeholder="https://pinterest.com/yourprofile" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="pinterest">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">✖️</div>
+              <div class="social-account-field">
+                <label for="phoneSocialX">X (Twitter)</label>
+                <input type="url" id="phoneSocialX" placeholder="https://x.com/yourhandle" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="x">Post</button>
+            </div>
+            <div class="social-account-row">
+              <div class="social-account-icon">🔗</div>
+              <div class="social-account-field">
+                <label for="phoneSocialOther">Other</label>
+                <input type="url" id="phoneSocialOther" placeholder="https://other-platform.com/yourprofile" />
+              </div>
+              <button type="button" class="control-btn social-post-btn state-off" data-platform="other">Post</button>
+            </div>
+          </div>
+          <div class="social-post-status hidden" id="phoneSocialPostStatus">
+            <p id="phoneSocialPostMessage">Ready to post.</p>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="chat-head">
             <div>

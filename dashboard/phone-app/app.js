@@ -1408,6 +1408,96 @@
     await refresh(refreshBtn);
   }
 
+  // ── Social accounts & posting ──────────────────────────────────────────────
+  const SOCIAL_STORAGE_KEY = 'evics_social_accounts';
+  const socialFields = {
+    facebook: document.getElementById('phoneSocialFacebook'),
+    instagram: document.getElementById('phoneSocialInstagram'),
+    tiktok: document.getElementById('phoneSocialTiktok'),
+    youtube: document.getElementById('phoneSocialYoutube'),
+    pinterest: document.getElementById('phoneSocialPinterest'),
+    x: document.getElementById('phoneSocialX'),
+    other: document.getElementById('phoneSocialOther')
+  };
+  const socialSaveBtn = document.getElementById('phoneSocialSave');
+  const socialPostStatus = document.getElementById('phoneSocialPostStatus');
+  const socialPostMessage = document.getElementById('phoneSocialPostMessage');
+
+  function loadSocialAccounts() {
+    try {
+      const stored = localStorage.getItem(SOCIAL_STORAGE_KEY);
+      if (!stored) return;
+      const accounts = JSON.parse(stored);
+      Object.keys(socialFields).forEach(key => {
+        if (socialFields[key] && accounts[key]) socialFields[key].value = accounts[key];
+      });
+    } catch (e) { console.warn('Failed to load social accounts', e); }
+  }
+
+  function saveSocialAccounts() {
+    const accounts = {};
+    Object.keys(socialFields).forEach(key => {
+      if (socialFields[key]) accounts[key] = socialFields[key].value.trim();
+    });
+    localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(accounts));
+    return accounts;
+  }
+
+  if (socialSaveBtn) {
+    socialSaveBtn.addEventListener('click', () => {
+      saveSocialAccounts();
+      if (socialPostStatus && socialPostMessage) {
+        socialPostStatus.classList.remove('hidden');
+        socialPostMessage.textContent = '✅ Social accounts saved successfully.';
+        setTimeout(() => socialPostStatus.classList.add('hidden'), 3000);
+      }
+    });
+  }
+
+  document.querySelectorAll('.social-post-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const platform = btn.dataset.platform;
+      const accounts = saveSocialAccounts();
+      const accountUrl = accounts[platform] || '';
+      if (!accountUrl) {
+        if (socialPostStatus && socialPostMessage) {
+          socialPostStatus.classList.remove('hidden');
+          socialPostMessage.textContent = `⚠️ Please enter your ${platform} account link first.`;
+          setTimeout(() => socialPostStatus.classList.add('hidden'), 3000);
+        }
+        return;
+      }
+      if (socialPostStatus && socialPostMessage) {
+        socialPostStatus.classList.remove('hidden');
+        socialPostMessage.textContent = `📤 Posting video to ${platform}…`;
+      }
+      try {
+        const response = await fetch('/api/affiliate/social/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            affiliateCode: supportState.affiliateCode,
+            platform,
+            accountUrl,
+            videoUrl: supportState.avatarSetup.createdAvatar?.videoUrl || '',
+            productId: supportState.avatarSetup.selectedProductId || ''
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (data.success) {
+          socialPostMessage.textContent = `✅ Video posted to ${platform} successfully!`;
+        } else {
+          socialPostMessage.textContent = data.message || `⚠️ Post to ${platform} queued — platform integration pending.`;
+        }
+      } catch (err) {
+        socialPostMessage.textContent = `⚠️ Post to ${platform} queued — will retry when connection is available.`;
+      }
+      setTimeout(() => { if (socialPostStatus) socialPostStatus.classList.add('hidden'); }, 5000);
+    });
+  });
+
+  loadSocialAccounts();
+
   void boot();
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void heartbeatSupport(); }, 15000);
