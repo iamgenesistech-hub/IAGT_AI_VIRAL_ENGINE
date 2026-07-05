@@ -6,17 +6,271 @@ Require stack:
 - C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\node_modules\@supabase\supabase-js\dist\index.cjs
 - C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\utils\SupabaseConnector.js
 - C:\Users\rolan\OneDrive\GitHub For I AM GENESIS TECH\GenesisAI folder\IAGT_AI_VIRAL_ENGINE\backend\server.js
-(node:8760) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:9716) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[ViralScript] OpenAI failed, using template: 401 Incorrect API key provided: sk-proj-********************************************************************************************************************************************************hCUA. You can find your API key at https://platform.openai.com/account/api-keys.
-[ViralScript] OpenAI failed, using template: 401 Incorrect API key provided: sk-proj-********************************************************************************************************************************************************hCUA. You can find your API key at https://platform.openai.com/account/api-keys.
-[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
 [shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
-[EVICS] 404 GET /api/services/config (170ms)
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
-[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
-[EVICS] 404 GET /api/services/config (6ms)
-[EVICS] 404 GET /evics/app.js (3ms)
 [shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
-[shopifyLiveConnector] fetchShopifyOrders failed: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Storefront refresh failed: getaddrinfo ENOTFOUND iamgenesistech.myshopify.com
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (2ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (2ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (2ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (14ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (15ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (14ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (15ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (10ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (11ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (16ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (9ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (10ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (9ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (9ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (5ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (7ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (7ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (5ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (5ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (7ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (5ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (11ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (12ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (10ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (7ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (11ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (14ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (2ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (2ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (5ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (3ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (9ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (11ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (8ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (12ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (16ms)
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (4ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 409 POST /api/affiliate/comms/session/heartbeat (6ms)
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[shopifyLiveConnector] Admin API failed, trying storefront: Request failed with status code 401
+[EVICS] 500 GET /api/heygen/account-status (16028ms)

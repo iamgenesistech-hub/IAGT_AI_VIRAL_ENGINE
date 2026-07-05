@@ -7,19 +7,19 @@
   },
   {
     "name": "mocked-action-flow",
-    "flowId": "flow_9762f2291a51a56b",
+    "flowId": "flow_0a82662cfe0025bd",
     "videoUrl": "/generated/evics-sea-moss-proof-render.mp4",
     "status": "pass"
   },
   {
     "name": "faceless-first-class",
-    "flowId": "flow_2dfd3a94a32b57fb",
+    "flowId": "flow_a4c17263d53edadd",
     "format": "Faceless product ritual montage",
     "status": "pass"
   },
   {
     "name": "live-heygen-provider",
-    "jobId": "render_job_8550e5cd8489549f",
+    "jobId": "render_job_a9bb5aaea11c15a0",
     "videoId": "46eba111cac041558a5d41b3a068308c",
     "proofSource": "status-poll",
     "renderGrade": 95,
@@ -30,7 +30,7 @@
   {
     "name": "copilot-orchestration",
     "route": "EVIE",
-    "flowId": "flow_706584cd45e2edd1",
+    "flowId": "flow_7bd3d554a9bc49c0",
     "status": "pass"
   },
   {
@@ -45,12 +45,12 @@
       "overall": 80
     },
     "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-    "wisdomVersion": 498,
-    "promptVersionCount": 246,
-    "learningCount": 251,
+    "wisdomVersion": 642,
+    "promptVersionCount": 318,
+    "learningCount": 323,
     "mockRenderAvailable": true,
     "liveHeygenConfigured": true,
-    "timestamp": "2026-07-03T18:55:51.489Z",
+    "timestamp": "2026-07-05T03:11:36.669Z",
     "status": "pass"
   },
   {
@@ -67,18 +67,18 @@
         "overall": 80
       },
       "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-      "wisdomVersion": 498,
-      "promptVersionCount": 246,
-      "learningCount": 251,
+      "wisdomVersion": 642,
+      "promptVersionCount": 318,
+      "learningCount": 323,
       "mockRenderAvailable": true,
       "liveHeygenConfigured": true,
-      "timestamp": "2026-07-03T18:55:51.508Z"
+      "timestamp": "2026-07-05T03:11:36.694Z"
     }
   },
   {
     "name": "api-action-flow",
     "status": "pass",
-    "flowId": "flow_e585e5b9333b8532"
+    "flowId": "flow_fee7ce13cc7eee52"
   },
   {
     "name": "api-copilot-orchestration",
@@ -89,7 +89,7 @@
     "name": "api-mocked-render-provider",
     "httpStatus": 202,
     "url": "/generated/evics-sea-moss-proof-render.mp4",
-    "renderId": "mock_1783104951705",
+    "renderId": "mock_1783221097433",
     "renderLogColumns": [
       "video_id",
       "script_text",

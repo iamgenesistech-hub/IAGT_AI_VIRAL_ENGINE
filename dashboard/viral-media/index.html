@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Viral Product Media Command Center</title>
+    <meta
+      name="description"
+      content="Separate EVICS Viral Product Media Command Center for product briefs, video campaigns, render queues, publishing plans, and learning loop intelligence."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="viral-shell">
+    <div class="viral-shell-grid">
+      <aside class="viral-sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">EVICS</div>
+          <div>
+            <strong>Viral Product Media</strong>
+            <p>Command Center</p>
+          </div>
+        </div>
+
+        <div class="sidebar-summary">
+          <span class="summary-label">Publishing mode</span>
+          <strong id="sidebarPublishingMode">Manual Approval</strong>
+          <span class="summary-label">Jordan avatar</span>
+          <strong id="sidebarJordanStatus">Checking...</strong>
+        </div>
+
+        <nav class="viral-nav">
+          <a href="/viral-media" data-route="/viral-media">Overview</a>
+          <a href="/viral-media/dashboard" data-route="/viral-media/dashboard">Dashboard</a>
+          <a href="/viral-media/batch-builder" data-route="/viral-media/batch-builder">Batch Builder</a>
+          <a href="/viral-media/jordan-avatar" data-route="/viral-media/jordan-avatar">Jordan Avatar</a>
+          <a href="/viral-media/ai-commercials" data-route="/viral-media/ai-commercials">AI Commercials</a>
+          <a href="/viral-media/briefs" data-route="/viral-media/briefs">Briefs</a>
+          <a href="/viral-media/scoreboard" data-route="/viral-media/scoreboard">Scoreboard</a>
+          <a href="/viral-media/render-queue" data-route="/viral-media/render-queue">Render Queue</a>
+          <a href="/viral-media/publishing" data-route="/viral-media/publishing">Publishing</a>
+          <a href="/viral-media/board-review" data-route="/viral-media/board-review">Board Review</a>
+          <a href="/viral-media/learning-loop" data-route="/viral-media/learning-loop">Learning Loop</a>
+          <a href="/viral-media/regeneration" data-route="/viral-media/regeneration">Regeneration Queue</a>
+        </nav>
+
+        <div class="sidebar-note">
+          <h3>Safety gate</h3>
+          <p>Manual Approval stays on by default. Jordan trust videos remain blocked until the avatar is recreated.</p>
+        </div>
+      </aside>
+
+      <main class="viral-main">
+        <header class="viral-topbar">
+          <div>
+            <p class="eyebrow">Separate EVICS workspace</p>
+            <h1>Viral Product Media Command Center</h1>
+            <p class="lead">
+              A Titanium-style workspace for autonomous product briefs, Jordan trust videos, AI cinematic commercials,
+              render queues, publishing plans, and the learning loop.
+            </p>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn primary" data-action="batch-build">Generate 25 Product Viral Campaigns</button>
+            <button class="btn" data-action="refresh-dashboard">Refresh</button>
+          </div>
+        </header>
+
+        <section class="hero-panel">
+          <div>
+            <p class="eyebrow" id="routeLabel">Route focus</p>
+            <h2 id="routeTitle">Dashboard</h2>
+            <p id="routeDescription" class="hero-copy">
+              Overview, product command center, and campaign status in one isolated workspace.
+            </p>
+          </div>
+          <div class="hero-status">
+            <div class="status-chip" id="dashboardStatus">Loading...</div>
+            <div class="status-chip muted" id="dashboardFocus">Manual Approval</div>
+          </div>
+        </section>
+
+        <section class="stats-grid" id="summaryCards"></section>
+
+        <section class="panel" id="product-command-center">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Product Media Command Center</p>
+              <h2>Top selling products</h2>
+            </div>
+            <div class="panel-actions">
+              <input id="productSearch" class="input" type="search" placeholder="Search product, SKU, handle, category..." />
+              <button class="btn" data-action="check-jordan">Check Jordan Avatar</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="productTable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Handle</th>
+                  <th>SKU</th>
+                  <th>Collection</th>
+                  <th>Category</th>
+                  <th>Rank</th>
+                  <th>Status</th>
+                  <th>Jordan</th>
+                  <th>AI</th>
+                  <th>Exports</th>
+                  <th>Platforms</th>
+                  <th>Viral</th>
+                  <th>Conversion</th>
+                  <th>Engagement</th>
+                  <th>Board</th>
+                  <th>Learning</th>
+                  <th>Last Generated</th>
+                  <th>Next Action</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section-grid" id="moduleSections">
+          <article class="panel" id="batch-builder">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">25 Best-Seller Batch Builder</p>
+                <h2>Generate 25 Product Viral Campaigns</h2>
+              </div>
+              <button class="btn primary" data-action="batch-build">Run batch</button>
+            </div>
+            <div class="mini-grid" id="batchBuilderCard"></div>
+          </article>
+
+          <article class="panel" id="jordan-avatar">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Jordan Avatar Video Builder</p>
+                <h2>Trust-first product video workflow</h2>
+              </div>
+              <button class="btn" data-action="jordan-script">Generate script</button>
+            </div>
+            <div class="mini-grid" id="jordanBuilderCard"></div>
+          </article>
+
+          <article class="panel" id="ai-commercials">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">AI Cinematic Video Builder</p>
+                <h2>Discovery-first commercial workflow</h2>
+              </div>
+              <button class="btn" data-action="ai-concept">Generate concept</button>
+            </div>
+            <div class="mini-grid" id="aiBuilderCard"></div>
+          </article>
+
+          <article class="panel" id="briefs">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Product Creative Briefs</p>
+                <h2>Structured campaign direction</h2>
+              </div>
+              <button class="btn" data-action="brief-first">Generate brief</button>
+            </div>
+            <div class="list-stack" id="briefList"></div>
+          </article>
+
+          <article class="panel" id="scoreboard">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Viral Scoreboard</p>
+                <h2>Pre-publish scoring</h2>
+              </div>
+              <button class="btn" data-action="score-first">Score creative</button>
+            </div>
+            <div class="list-stack" id="scoreList"></div>
+          </article>
+
+          <article class="panel" id="render-queue">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Render Queue</p>
+                <h2>Queued media generation jobs</h2>
+              </div>
+              <button class="btn" data-action="queue-render">Queue render</button>
+            </div>
+            <div class="list-stack" id="renderQueueList"></div>
+          </article>
+
+          <article class="panel" id="exports">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Media Export Center</p>
+                <h2>Aspect ratio export matrix</h2>
+              </div>
+              <button class="btn" data-action="export-first">Build exports</button>
+            </div>
+            <div class="list-stack" id="exportList"></div>
+          </article>
+
+          <article class="panel" id="publishing">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Platform Publishing Planner</p>
+                <h2>Manual approval publishing mode</h2>
+              </div>
+              <button class="btn" data-action="publish-plan">Plan publishing</button>
+            </div>
+            <div class="list-stack" id="publishingList"></div>
+          </article>
+
+          <article class="panel" id="board-review">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">AI Board Review</p>
+                <h2>Executive review and regeneration gate</h2>
+              </div>
+              <button class="btn" data-action="board-review">Run review</button>
+            </div>
+            <div class="list-stack" id="boardReviewList"></div>
+          </article>
+
+          <article class="panel" id="learning-loop">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Learning Loop Insights</p>
+                <h2>Measured feedback from every asset</h2>
+              </div>
+              <button class="btn" data-action="learning-loop">Add insight</button>
+            </div>
+            <div class="list-stack" id="learningLoopList"></div>
+          </article>
+
+          <article class="panel" id="regeneration">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Regeneration Queue</p>
+                <h2>Weak assets marked for rebuild</h2>
+              </div>
+              <button class="btn" data-action="regen-first">Queue regeneration</button>
+            </div>
+            <div class="list-stack" id="regenerationList"></div>
+          </article>
+        </section>
+
+        <section class="panel" id="media-library">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Media Library</p>
+              <h2>Searchable asset archive</h2>
+            </div>
+            <div class="panel-actions">
+              <input id="librarySearch" class="input" type="search" placeholder="Filter product, SKU, type, platform, status..." />
+            </div>
+          </div>
+          <div class="list-stack" id="mediaLibraryList"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

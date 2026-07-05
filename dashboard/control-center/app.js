@@ -1,3 +1,4 @@
+// EVICS Workspace Build: 2026-07-04T10:55:00Z
 // ── API helpers ──
 const API_BASE = "";
 
@@ -280,6 +281,44 @@ const state = {
   vpMission: null,
   vpMissionLoading: false,
   vpMissionError: null,
+  vpAssistantOpen: (() => {
+    try { return localStorage.getItem("evics_vp_assistant_open") !== "false"; } catch (e) { return true; }
+  })(),
+  vpAssistantCollapsed: (() => {
+    try { return localStorage.getItem("evics_vp_assistant_collapsed") === "true"; } catch (e) { return false; }
+  })(),
+  vpAssistantInput: "",
+  vpAssistantMessages: [
+    {
+      role: "assistant",
+      text: "VP online. You can talk to me or use the mission controls below.",
+      createdAt: new Date().toISOString(),
+      source: "system"
+    }
+  ],
+  vpAssistantSending: false,
+  vpAssistantListening: false,
+  vpAssistantSpeaking: true,
+  vpAssistantError: null,
+  vpAssistantStatus: "Ready",
+  vpAssistantOffsetX: (() => {
+    try {
+      const raw = localStorage.getItem("evics_vp_assistant_offset_x");
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (e) {
+      return 0;
+    }
+  })(),
+  vpAssistantOffsetY: (() => {
+    try {
+      const raw = localStorage.getItem("evics_vp_assistant_offset_y");
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (e) {
+      return 0;
+    }
+  })(),
 
   // Published Media Gallery
   publishedMediaOpen: false,
@@ -964,7 +1003,8 @@ function icon(name) {
     shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
     key:     '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
     bell:    '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-    swap:    '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'
+    swap:    '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+    mic:     '<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 12a7 7 0 0 1-14 0"/><path d="M12 19v3"/>'
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
 }
@@ -1482,6 +1522,11 @@ const MEDIA_TYPES = [
   { id: "banner", label: "Banners" }
 ];
 
+// Shared demo datasets are synchronized from render() for handlers that run outside render scope.
+var RENDER_APPS = [];
+var DEMO_MEDIA = [];
+var DEMO_PUBLISHED_MEDIA = [];
+
 function render() {
   const app = document.getElementById("app");
   const ad = selectedAd();
@@ -1651,6 +1696,11 @@ const DEMO_PUBLISHED_MEDIA = [
     publishedAt: "2025-01-10T14:00:00Z"
   }
 ];
+
+// Sync render-scoped demo data to global scope for event handlers (bindEvents, delegated actions).
+window.RENDER_APPS = RENDER_APPS;
+window.DEMO_MEDIA = DEMO_MEDIA;
+window.DEMO_PUBLISHED_MEDIA = DEMO_PUBLISHED_MEDIA;
 
 // Demo analytics data
 const DEMO_ANALYTICS = {
@@ -6166,6 +6216,417 @@ function renderConnectSourcesModal() {
   </div>`;
 }
 
+let vpSpeechRecognition = null;
+let vpSpeechPending = "";
+let vpAssistantDrag = null;
+let vpAssistantDragListenersBound = false;
+
+function setVpAssistantOpen(isOpen) {
+  state.vpAssistantOpen = Boolean(isOpen);
+  try { localStorage.setItem("evics_vp_assistant_open", state.vpAssistantOpen ? "true" : "false"); } catch (e) { /* ignore */ }
+}
+
+function setVpAssistantCollapsed(isCollapsed) {
+  state.vpAssistantCollapsed = Boolean(isCollapsed);
+  try { localStorage.setItem("evics_vp_assistant_collapsed", state.vpAssistantCollapsed ? "true" : "false"); } catch (e) { /* ignore */ }
+}
+
+function clampVpAssistantOffset(offsetX, offsetY) {
+  const viewportWidth = Math.max(window.innerWidth || 0, 320);
+  const viewportHeight = Math.max(window.innerHeight || 0, 320);
+  const shell = document.getElementById("vp-assistant-shell");
+  const fallbackWidth = state.vpAssistantCollapsed ? 320 : 420;
+  const fallbackHeight = state.vpAssistantCollapsed ? 86 : 620;
+  const shellWidth = shell ? shell.offsetWidth : fallbackWidth;
+  const shellHeight = shell ? shell.offsetHeight : fallbackHeight;
+  const baseLeft = viewportWidth - 18 - shellWidth;
+  const baseTop = viewportHeight - 18 - shellHeight;
+  const xMin = 8 - baseLeft;
+  const xMax = viewportWidth - shellWidth - 8 - baseLeft;
+  const yMin = 8 - baseTop;
+  const yMax = viewportHeight - shellHeight - 8 - baseTop;
+  const minX = Math.min(xMin, xMax);
+  const maxX = Math.max(xMin, xMax);
+  const minY = Math.min(yMin, yMax);
+  const maxY = Math.max(yMin, yMax);
+  const nextX = Number.isFinite(offsetX) ? offsetX : 0;
+  const nextY = Number.isFinite(offsetY) ? offsetY : 0;
+  return {
+    x: Math.min(Math.max(nextX, minX), maxX),
+    y: Math.min(Math.max(nextY, minY), maxY)
+  };
+}
+
+function applyVpAssistantOffsetStyles() {
+  const shell = document.getElementById("vp-assistant-shell");
+  if (!shell) return;
+  shell.style.setProperty("--vp-assistant-offset-x", `${state.vpAssistantOffsetX || 0}px`);
+  shell.style.setProperty("--vp-assistant-offset-y", `${state.vpAssistantOffsetY || 0}px`);
+}
+
+function setVpAssistantOffset(offsetX, offsetY, options = {}) {
+  const clamped = clampVpAssistantOffset(Number(offsetX), Number(offsetY));
+  state.vpAssistantOffsetX = clamped.x;
+  state.vpAssistantOffsetY = clamped.y;
+  applyVpAssistantOffsetStyles();
+  if (options.persist === false) return;
+  try {
+    localStorage.setItem("evics_vp_assistant_offset_x", String(state.vpAssistantOffsetX));
+    localStorage.setItem("evics_vp_assistant_offset_y", String(state.vpAssistantOffsetY));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function bindVpAssistantDrag() {
+  const shell = document.getElementById("vp-assistant-shell");
+  const header = document.getElementById("vp-assistant-header");
+  if (!shell || !header) return;
+  setVpAssistantOffset(state.vpAssistantOffsetX, state.vpAssistantOffsetY, { persist: false });
+  if (header.dataset.vpDragBound === "true") return;
+  header.dataset.vpDragBound = "true";
+
+  header.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    const interactiveTarget = event.target.closest("button, input, textarea, select, label, a");
+    if (interactiveTarget) return;
+    event.preventDefault();
+    vpAssistantDrag = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: state.vpAssistantOffsetX || 0,
+      originY: state.vpAssistantOffsetY || 0
+    };
+    shell.classList.add("dragging");
+  });
+
+  if (!vpAssistantDragListenersBound) {
+    document.addEventListener("mousemove", (event) => {
+      if (!vpAssistantDrag) return;
+      const nextX = vpAssistantDrag.originX + (event.clientX - vpAssistantDrag.startX);
+      const nextY = vpAssistantDrag.originY + (event.clientY - vpAssistantDrag.startY);
+      setVpAssistantOffset(nextX, nextY, { persist: false });
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (!vpAssistantDrag) return;
+      vpAssistantDrag = null;
+      const activeShell = document.getElementById("vp-assistant-shell");
+      if (activeShell) {
+        activeShell.classList.remove("dragging");
+      }
+      setVpAssistantOffset(state.vpAssistantOffsetX, state.vpAssistantOffsetY);
+    });
+
+    window.addEventListener("resize", () => {
+      if (!state.vpAssistantOpen) return;
+      setVpAssistantOffset(state.vpAssistantOffsetX, state.vpAssistantOffsetY, { persist: false });
+    });
+    vpAssistantDragListenersBound = true;
+  }
+}
+
+function pushVpMessage(role, text, extras = {}) {
+  if (!text) return null;
+  const message = {
+    role,
+    text: String(text),
+    createdAt: new Date().toISOString(),
+    ...extras
+  };
+  state.vpAssistantMessages.push(message);
+  state.vpAssistantMessages = state.vpAssistantMessages.slice(-24);
+  return message;
+}
+
+function speakVpReply(text) {
+  if (!state.vpAssistantSpeaking || !window.speechSynthesis || !text) return;
+  const utterance = new SpeechSynthesisUtterance(String(text));
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  utterance.lang = "en-US";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function stopVpListening() {
+  if (vpSpeechRecognition) {
+    vpSpeechRecognition.stop();
+  }
+  state.vpAssistantListening = false;
+}
+
+function getVpSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+  if (!vpSpeechRecognition) {
+    vpSpeechRecognition = new SpeechRecognition();
+    vpSpeechRecognition.lang = "en-US";
+    vpSpeechRecognition.interimResults = true;
+    vpSpeechRecognition.continuous = false;
+    vpSpeechRecognition.onstart = () => {
+      state.vpAssistantListening = true;
+      state.vpAssistantError = null;
+      render();
+    };
+    vpSpeechRecognition.onresult = (event) => {
+      let transcript = "";
+      let finalTranscript = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        const part = event.results[i][0] && event.results[i][0].transcript ? event.results[i][0].transcript : "";
+        transcript += part;
+        if (event.results[i].isFinal) {
+          finalTranscript += part;
+        }
+      }
+      state.vpAssistantInput = transcript.trim();
+      if (finalTranscript.trim()) {
+        vpSpeechPending = finalTranscript.trim();
+      }
+      render();
+    };
+    vpSpeechRecognition.onerror = (event) => {
+      state.vpAssistantListening = false;
+      state.vpAssistantError = event.error === "not-allowed"
+        ? "Microphone permission was denied."
+        : `Voice input error: ${event.error || "unknown error"}`;
+      render();
+    };
+    vpSpeechRecognition.onend = () => {
+      state.vpAssistantListening = false;
+      render();
+      if (vpSpeechPending.trim()) {
+        const message = vpSpeechPending.trim();
+        vpSpeechPending = "";
+        void sendVpAssistantMessage(message, { source: "voice" });
+      }
+    };
+  }
+  return vpSpeechRecognition;
+}
+
+function renderVpAssistant() {
+  const mission = state.vpMission;
+  const messages = Array.isArray(state.vpAssistantMessages) ? state.vpAssistantMessages : [];
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const voiceSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const launcherOnly = !state.vpAssistantOpen;
+  const statusText = state.vpAssistantListening
+    ? "Listening"
+    : state.vpAssistantSending
+      ? "Thinking"
+      : state.vpAssistantStatus || "Ready";
+  const shellStyle = [
+    `--vp-assistant-offset-x:${Number(state.vpAssistantOffsetX || 0)}px`,
+    `--vp-assistant-offset-y:${Number(state.vpAssistantOffsetY || 0)}px`
+  ];
+  if (launcherOnly) shellStyle.push("display:none");
+
+  return `
+    <div class="vp-assistant-launcher" ${launcherOnly ? "" : 'style="display:none"'}>
+      <button class="vp-launcher-btn" id="vp-assistant-open-btn" aria-label="Open floating VP assistant">
+        ${icon("spark")} VP AI
+      </button>
+    </div>
+    <section class="vp-assistant-shell ${state.vpAssistantCollapsed ? "collapsed" : ""}" id="vp-assistant-shell" style="${shellStyle.join(";")}" aria-label="Floating VP AI terminal">
+      <header class="vp-assistant-header" id="vp-assistant-header">
+        <div class="vp-assistant-title">
+          <span class="vp-assistant-badge">${icon("crown")} VP AI</span>
+          <div>
+            <strong>Floating VP Terminal</strong>
+            <small>${escapeHtml(statusText)}</small>
+          </div>
+        </div>
+        <div class="vp-assistant-header-actions">
+          <button class="vp-mini-btn" id="vp-minimize-btn" title="${state.vpAssistantCollapsed ? "Expand" : "Minimize"}">${state.vpAssistantCollapsed ? "▢" : "—"}</button>
+          <button class="vp-mini-btn" id="vp-close-btn" title="Close VP terminal">✕</button>
+        </div>
+      </header>
+      ${state.vpAssistantCollapsed ? "" : `
+      <div class="vp-assistant-body">
+        <div class="vp-assistant-mission-card">
+          <div class="vp-assistant-mission-head">
+            <div>
+              <span>Mission</span>
+              <strong>${mission ? escapeHtml(mission.status || "running") : "Idle"}</strong>
+            </div>
+            <div class="vp-assistant-mission-meta">
+              <small>${mission ? `ID ${escapeHtml(mission.missionId || "")}` : "No mission running"}</small>
+            </div>
+          </div>
+          <div class="vp-assistant-controls">
+            <button class="vp-action-btn primary" id="vp-launch-mission-btn" ${state.vpMissionLoading ? "disabled" : ""}>
+              ${state.vpMissionLoading ? `${icon("radar")} Launching…` : `${icon("spark")} Launch Mission`}
+            </button>
+            <button class="vp-action-btn" id="vp-refresh-mission-btn" ${mission && mission.missionId ? "" : "disabled"}>
+              ${icon("radar")} Refresh
+            </button>
+            <button class="vp-action-btn" id="vp-open-media-output-btn">${icon("video")} Media Review</button>
+          </div>
+          <div class="vp-assistant-mission-details">
+            ${mission ? `
+              <div><strong>Target:</strong> ${Number(mission.targetCount || 0)}</div>
+              <div><strong>Published:</strong> ${Number(mission.publishedCount || 0)}</div>
+              <div><strong>Origin:</strong> ${escapeHtml(mission.originSectionId || "executive-workspace")}</div>
+            ` : `
+              <div>Launch a mission or ask a question to start the VP workflow.</div>
+            `}
+          </div>
+        </div>
+
+        <div class="vp-assistant-transcript" id="vp-transcript">
+          ${messages.map((msg) => `
+            <div class="vp-message vp-message-${msg.role}">
+              <span class="vp-message-role">${escapeHtml(msg.role === "assistant" ? "VP" : "You")}</span>
+              <p>${escapeHtml(msg.text)}</p>
+              ${msg.nextActions && msg.nextActions.length ? `<ul>${msg.nextActions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="vp-assistant-input-wrap">
+          <textarea id="vp-assistant-input" rows="3" placeholder="Ask the VP what to do next, or speak to it...">${escapeHtml(state.vpAssistantInput)}</textarea>
+          <div class="vp-assistant-actions">
+            <button class="vp-action-btn primary" id="vp-send-btn">${icon("send")} Send</button>
+            <button class="vp-action-btn ${state.vpAssistantListening ? "active" : ""}" id="vp-mic-btn" ${voiceSupported ? "" : "disabled"}>
+              ${state.vpAssistantListening ? `${icon("mic")} Stop` : `${icon("mic")} Talk`}
+            </button>
+            <label class="vp-voice-toggle">
+              <input type="checkbox" id="vp-speak-toggle" ${state.vpAssistantSpeaking ? "checked" : ""} />
+              <span>Speak replies</span>
+            </label>
+          </div>
+          ${state.vpAssistantError ? `<div class="vp-assistant-error">${escapeHtml(state.vpAssistantError)}</div>` : ""}
+          <div class="vp-assistant-footer">
+            <small>${voiceSupported ? "Voice input ready." : "Speech recognition is not supported in this browser."}</small>
+            ${lastMessage ? `<button class="vp-link-btn" id="vp-clear-thread-btn">Clear thread</button>` : ""}
+          </div>
+        </div>
+      </div>`}
+    </section>
+  `;
+}
+
+async function launchVpMission(originSectionId = state.currentSection || "executive-workspace") {
+  if (state.vpMissionLoading) return;
+  state.vpMissionLoading = true;
+  state.vpMissionError = null;
+  render();
+  try {
+    const res = await fetch("/api/agents/vp-mission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetCount: 3, originSectionId })
+    });
+    if (!res.ok) throw new Error("VP mission launch failed.");
+    const data = await res.json();
+    state.vpMission = data.mission || null;
+    state.vpAssistantStatus = "Mission launched";
+    pushVpMessage("assistant", "VP mission launched. I’m coordinating the executive workflow now.", {
+      nextActions: ["Refresh the mission for live status", "Open Media Review to inspect outputs"]
+    });
+    state.syncMessage = "VP mission launched.";
+    state.syncLevel = "connected";
+  } catch (error) {
+    state.vpMissionError = error.message || "VP mission launch failed.";
+    state.vpAssistantStatus = "Mission failed";
+    pushVpMessage("assistant", state.vpMissionError);
+  }
+  state.vpMissionLoading = false;
+  render();
+}
+
+async function refreshVpMission() {
+  if (!state.vpMission || !state.vpMission.missionId) return;
+  try {
+    const res = await fetch(`/api/agents/vp-mission/${state.vpMission.missionId}`);
+    if (!res.ok) throw new Error("Could not refresh VP mission.");
+    const data = await res.json();
+    state.vpMission = data.mission || state.vpMission;
+    state.vpMissionError = null;
+    state.vpAssistantStatus = "Mission refreshed";
+    pushVpMessage("assistant", `Mission ${state.vpMission.missionId} refreshed.`);
+  } catch (error) {
+    state.vpMissionError = error.message || "Could not refresh VP mission.";
+    state.vpAssistantStatus = "Refresh failed";
+    pushVpMessage("assistant", state.vpMissionError);
+  }
+  render();
+}
+
+async function sendVpAssistantMessage(message, options = {}) {
+  const text = String(message || options.message || "").trim();
+  if (!text || state.vpAssistantSending) return;
+  pushVpMessage("user", text, { source: options.source || "typed" });
+  state.vpAssistantInput = "";
+  state.vpAssistantError = null;
+  state.vpAssistantSending = true;
+  state.vpAssistantStatus = "Thinking";
+  render();
+
+  const normalized = text.toLowerCase();
+  try {
+    if (normalized.includes("launch mission") || normalized.includes("start mission")) {
+      await launchVpMission("vp-floating-terminal");
+      pushVpMessage("assistant", "Mission command received. Use refresh to monitor it.");
+      return;
+    }
+
+    if (normalized.includes("refresh mission") || normalized.includes("mission status")) {
+      await refreshVpMission();
+      pushVpMessage("assistant", "Mission status refreshed.");
+      return;
+    }
+
+    if (normalized.includes("open media") || normalized.includes("media review")) {
+      setCurrentSection("media-output");
+      pushVpMessage("assistant", "Opening Media Review now.");
+      return;
+    }
+
+    if (normalized.includes("open executive") || normalized.includes("executive workspace")) {
+      setCurrentSection("executive-workspace");
+      pushVpMessage("assistant", "Executive Workspace is open.");
+      return;
+    }
+
+    const payload = {
+      question: text,
+      context: {
+        currentSection: state.currentSection,
+        vpMission: state.vpMission ? {
+          missionId: state.vpMission.missionId,
+          status: state.vpMission.status,
+          targetCount: state.vpMission.targetCount,
+          publishedCount: state.vpMission.publishedCount,
+          originSectionId: state.vpMission.originSectionId
+        } : null,
+        products: products.slice(0, 5).map((p) => ({ name: p.name, category: p.category, score: p.score, angle: p.angle })),
+        topHooks: winningHooks.slice(0, 5).map((h) => h.text),
+        creativeCount: creatives.length
+      }
+    };
+
+    const res = await fetch("/api/agent/copilot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`copilot returned ${res.status}`);
+    const data = await res.json();
+    const reply = data.answer || "No answer returned.";
+    state.vpAssistantStatus = data.source === "gpt-4o" ? "GPT-4o" : "Rule-based fallback";
+    pushVpMessage("assistant", reply, { nextActions: Array.isArray(data.nextActions) ? data.nextActions : [] });
+    speakVpReply(reply);
+  } catch (error) {
+    state.vpAssistantStatus = "Offline";
+    pushVpMessage("assistant", error.message || "VP assistant unavailable right now.");
+  } finally {
+    state.vpAssistantSending = false;
+    render();
+  }
+}
+
 function sectionWithBoundary(rendererFn, sectionId) {
   try {
     return rendererFn();
@@ -8756,28 +9217,7 @@ function bindEvents() {
   const launchVpMissionBtn = document.getElementById("launch-vp-mission-btn");
   if (launchVpMissionBtn) {
     launchVpMissionBtn.addEventListener("click", async () => {
-      state.vpMissionLoading = true;
-      state.vpMissionError = null;
-      render();
-      try {
-        const res = await fetch("/api/agents/vp-mission", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targetCount: 3, originSectionId: "executive-workspace" })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          state.vpMission = data.mission || null;
-          state.syncMessage = "VP mission launched from Executive Workspace.";
-          state.syncLevel = "connected";
-        } else {
-          state.vpMissionError = "VP mission launch failed.";
-        }
-      } catch (error) {
-        state.vpMissionError = error.message || "VP mission launch failed.";
-      }
-      state.vpMissionLoading = false;
-      render();
+      await launchVpMission("executive-workspace");
     });
   }
 
@@ -8791,19 +9231,128 @@ function bindEvents() {
   const refreshVpMissionBtn = document.getElementById("refresh-vp-mission-btn");
   if (refreshVpMissionBtn) {
     refreshVpMissionBtn.addEventListener("click", async () => {
-      if (!state.vpMission || !state.vpMission.missionId) return;
-      refreshVpMissionBtn.disabled = true;
-      try {
-        const res = await fetch(`/api/agents/vp-mission/${state.vpMission.missionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          state.vpMission = data.mission || state.vpMission;
-          state.vpMissionError = null;
+      await refreshVpMission();
+    });
+  }
+
+  const vpAssistantOpenBtn = document.getElementById("vp-assistant-open-btn");
+  if (vpAssistantOpenBtn) {
+    vpAssistantOpenBtn.addEventListener("click", () => {
+      setVpAssistantOpen(true);
+      render();
+    });
+  }
+
+  const vpMinimizeBtn = document.getElementById("vp-minimize-btn");
+  if (vpMinimizeBtn) {
+    vpMinimizeBtn.addEventListener("click", () => {
+      setVpAssistantCollapsed(!state.vpAssistantCollapsed);
+      render();
+    });
+  }
+
+  const vpCloseBtn = document.getElementById("vp-close-btn");
+  if (vpCloseBtn) {
+    vpCloseBtn.addEventListener("click", () => {
+      setVpAssistantOpen(false);
+      render();
+    });
+  }
+  bindVpAssistantDrag();
+
+  const vpLaunchMissionBtn = document.getElementById("vp-launch-mission-btn");
+  if (vpLaunchMissionBtn) {
+    vpLaunchMissionBtn.addEventListener("click", async () => {
+      await launchVpMission("vp-floating-terminal");
+    });
+  }
+
+  const vpRefreshMissionBtn = document.getElementById("vp-refresh-mission-btn");
+  if (vpRefreshMissionBtn) {
+    vpRefreshMissionBtn.addEventListener("click", async () => {
+      await refreshVpMission();
+    });
+  }
+
+  const vpOpenMediaOutputBtn = document.getElementById("vp-open-media-output-btn");
+  if (vpOpenMediaOutputBtn) {
+    vpOpenMediaOutputBtn.addEventListener("click", () => {
+      setCurrentSection("media-output");
+    });
+  }
+
+  const vpAssistantInput = document.getElementById("vp-assistant-input");
+  if (vpAssistantInput) {
+    vpAssistantInput.addEventListener("input", () => {
+      state.vpAssistantInput = vpAssistantInput.value;
+    });
+    vpAssistantInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const trimmed = state.vpAssistantInput.trim();
+        if (trimmed) {
+          void sendVpAssistantMessage(trimmed, { source: "typed" });
         }
-      } catch (error) {
-        state.vpMissionError = error.message || "Could not refresh VP mission.";
       }
-      refreshVpMissionBtn.disabled = false;
+    });
+  }
+
+  const vpSendBtn = document.getElementById("vp-send-btn");
+  if (vpSendBtn) {
+    vpSendBtn.addEventListener("click", () => {
+      const trimmed = state.vpAssistantInput.trim();
+      if (!trimmed) return;
+      void sendVpAssistantMessage(trimmed, { source: "typed" });
+    });
+  }
+
+  const vpMicBtn = document.getElementById("vp-mic-btn");
+  if (vpMicBtn) {
+    vpMicBtn.addEventListener("click", () => {
+      if (state.vpAssistantListening) {
+        stopVpListening();
+        render();
+        return;
+      }
+      const recognition = getVpSpeechRecognition();
+      if (!recognition) {
+        state.vpAssistantError = "Speech recognition is not supported in this browser.";
+        render();
+        return;
+      }
+      vpSpeechPending = "";
+      try {
+        recognition.start();
+      } catch (error) {
+        state.vpAssistantError = error.message || "Could not start voice input.";
+        render();
+      }
+    });
+  }
+
+  const vpSpeakToggle = document.getElementById("vp-speak-toggle");
+  if (vpSpeakToggle) {
+    vpSpeakToggle.addEventListener("change", () => {
+      state.vpAssistantSpeaking = vpSpeakToggle.checked;
+      if (!state.vpAssistantSpeaking && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      render();
+    });
+  }
+
+  const vpClearThreadBtn = document.getElementById("vp-clear-thread-btn");
+  if (vpClearThreadBtn) {
+    vpClearThreadBtn.addEventListener("click", () => {
+      state.vpAssistantMessages = [
+        {
+          role: "assistant",
+          text: "VP online. You can talk to me or use the mission controls below.",
+          createdAt: new Date().toISOString(),
+          source: "system"
+        }
+      ];
+      state.vpAssistantError = null;
       render();
     });
   }
@@ -9827,6 +10376,8 @@ function renderWorkspaceShell() {
         ${renderSection("renderQualityValidator")}
       ` : ""}
     </main>
+
+    ${renderVpAssistant()}
   `;
 }
 

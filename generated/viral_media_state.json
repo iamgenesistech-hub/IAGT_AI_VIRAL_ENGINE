@@ -1,0 +1,4959 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-03T01:24:17.598Z",
+  "updatedAt": "2026-07-03T01:24:19.067Z",
+  "publishingMode": "Manual Approval",
+  "jordanAvatar": {
+    "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+    "requestedAvatarId": "dda48749d0bb4eabbee2f95969dee343",
+    "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+    "available": true,
+    "status": "configured",
+    "lastCheckedAt": null,
+    "lastError": "",
+    "name": "Jordan",
+    "configuredAt": "2026-07-03T01:24:17.596Z"
+  },
+  "products": [
+    {
+      "id": "7863161487402",
+      "shopifyProductId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 1,
+      "productImageUrl": "",
+      "productPageUrl": "https://iamgenesistech.myshopify.com/products/coq10-ubiquinone",
+      "status": "Media Assets Ready",
+      "jordanVideoStatus": "Media Assets Ready",
+      "aiCinematicStatus": "Media Assets Ready",
+      "exportFormats": [
+        "9:16",
+        "1:1",
+        "16:9",
+        "9:16",
+        "9:16"
+      ],
+      "publishedPlatforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Shopify Product Page",
+        "Email",
+        "Retargeting Ads",
+        "TikTok",
+        "Instagram Reels",
+        "YouTube Shorts",
+        "Pinterest",
+        "Shopify Homepage",
+        "Shopify Collection Page"
+      ],
+      "viralScore": 95,
+      "conversionScore": 100,
+      "engagementScore": 96,
+      "boardReviewStatus": "Needs Review",
+      "learningLoopStatus": "Learning Loop Updated",
+      "lastGeneratedAt": "2026-07-03T01:24:19.045Z",
+      "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "7863161389098",
+      "shopifyProductId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 2,
+      "productImageUrl": "",
+      "productPageUrl": "https://iamgenesistech.myshopify.com/products/omega-3-fish-oil",
+      "status": "Media Assets Ready",
+      "jordanVideoStatus": "Media Assets Ready",
+      "aiCinematicStatus": "Media Assets Ready",
+      "exportFormats": [
+        "9:16",
+        "1:1",
+        "16:9",
+        "9:16",
+        "9:16"
+      ],
+      "publishedPlatforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Shopify Product Page",
+        "Email",
+        "Retargeting Ads",
+        "TikTok",
+        "Instagram Reels",
+        "YouTube Shorts",
+        "Pinterest",
+        "Shopify Homepage",
+        "Shopify Collection Page"
+      ],
+      "viralScore": 95,
+      "conversionScore": 100,
+      "engagementScore": 96,
+      "boardReviewStatus": "Needs Review",
+      "learningLoopStatus": "Learning Loop Updated",
+      "lastGeneratedAt": "2026-07-03T01:24:19.051Z",
+      "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "productMediaAssets": [
+    {
+      "id": "asset-product-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "assetType": "product_image",
+      "assetName": "CoQ10 (Ubiquinone) product image",
+      "sourceUrl": "",
+      "storageUrl": "",
+      "previewUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "asset-product-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "assetType": "product_image",
+      "assetName": "Omega 3 Fish Oil product image",
+      "sourceUrl": "",
+      "storageUrl": "",
+      "previewUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "videoCampaigns": [
+    {
+      "id": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 1,
+      "publishMode": "Manual Approval",
+      "videoType": "Jordan Avatar Trust Video + AI Cinematic Viral Commercial",
+      "platformPriority": [
+        {
+          "platform": "Facebook Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 10,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Instagram Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Shopify Product Page",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Email",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 4,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Retargeting Ads",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 6,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        }
+      ],
+      "targetPlatforms": [
+        {
+          "platform": "TikTok",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "priority": 10,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Instagram Reels",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "priority": 8,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "YouTube Shorts",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "priority": 6,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Pinterest",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "priority": 4,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Shopify Homepage",
+          "aspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "priority": 4,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Shopify Collection Page",
+          "aspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "priority": 3,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        }
+      ],
+      "status": "Media Assets Ready",
+      "boardReviewStatus": "Approved",
+      "learningLoopStatus": "Learning Loop Updated",
+      "viralScore": 95,
+      "conversionScore": 100,
+      "engagementScore": 96,
+      "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+      "lastGeneratedAt": "2026-07-03T01:24:19.045Z",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 2,
+      "publishMode": "Manual Approval",
+      "videoType": "Jordan Avatar Trust Video + AI Cinematic Viral Commercial",
+      "platformPriority": [
+        {
+          "platform": "Facebook Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 10,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Instagram Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Shopify Product Page",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Email",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 4,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Retargeting Ads",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 6,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        }
+      ],
+      "targetPlatforms": [
+        {
+          "platform": "TikTok",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "priority": 10,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Instagram Reels",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "priority": 8,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "YouTube Shorts",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "priority": 6,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Pinterest",
+          "aspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "priority": 4,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Shopify Homepage",
+          "aspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "priority": 4,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        },
+        {
+          "platform": "Shopify Collection Page",
+          "aspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "priority": 3,
+          "recommendedVideoType": "AI Cinematic Viral Commercial",
+          "reason": "Discovery and viral reach placement"
+        }
+      ],
+      "status": "Media Assets Ready",
+      "boardReviewStatus": "Approved",
+      "learningLoopStatus": "Learning Loop Updated",
+      "viralScore": 95,
+      "conversionScore": 100,
+      "engagementScore": 96,
+      "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+      "lastGeneratedAt": "2026-07-03T01:24:19.051Z",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "campaign_undefined_1783041859067",
+      "product": {
+        "id": "7863161487402",
+        "shopifyProductId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 1,
+        "productImageUrl": "",
+        "productPageUrl": "https://iamgenesistech.myshopify.com/products/coq10-ubiquinone",
+        "status": "Media Assets Ready",
+        "jordanVideoStatus": "Media Assets Ready",
+        "aiCinematicStatus": "Media Assets Ready",
+        "exportFormats": [
+          "9:16",
+          "1:1",
+          "16:9",
+          "9:16",
+          "9:16"
+        ],
+        "publishedPlatforms": [
+          "Facebook Feed",
+          "Instagram Feed",
+          "Shopify Product Page",
+          "Email",
+          "Retargeting Ads",
+          "TikTok",
+          "Instagram Reels",
+          "YouTube Shorts",
+          "Pinterest",
+          "Shopify Homepage",
+          "Shopify Collection Page"
+        ],
+        "viralScore": 95,
+        "conversionScore": 100,
+        "engagementScore": 96,
+        "boardReviewStatus": "Needs Review",
+        "learningLoopStatus": "Learning Loop Updated",
+        "lastGeneratedAt": "2026-07-03T01:24:19.045Z",
+        "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+        "campaignId": "vmc-coq10-ubiquinone",
+        "createdAt": "2026-07-03T01:24:19.045Z",
+        "updatedAt": "2026-07-03T01:24:19.045Z"
+      },
+      "campaign": {
+        "id": "vmc-coq10-ubiquinone",
+        "productId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 1,
+        "publishMode": "Manual Approval",
+        "videoType": "Jordan Avatar Trust Video + AI Cinematic Viral Commercial",
+        "platformPriority": [
+          {
+            "platform": "Facebook Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 10,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Instagram Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Shopify Product Page",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 25,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Email",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 4,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Retargeting Ads",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 6,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          }
+        ],
+        "targetPlatforms": [
+          {
+            "platform": "TikTok",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 18,
+            "priority": 10,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Instagram Reels",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 18,
+            "priority": 8,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "YouTube Shorts",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 20,
+            "priority": 6,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Pinterest",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 20,
+            "priority": 4,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Shopify Homepage",
+            "aspectRatio": "16:9",
+            "idealLengthSeconds": 8,
+            "priority": 4,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Shopify Collection Page",
+            "aspectRatio": "16:9",
+            "idealLengthSeconds": 8,
+            "priority": 3,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          }
+        ],
+        "status": "Media Assets Ready",
+        "boardReviewStatus": "Approved",
+        "learningLoopStatus": "Learning Loop Updated",
+        "viralScore": 95,
+        "conversionScore": 100,
+        "engagementScore": 96,
+        "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+        "lastGeneratedAt": "2026-07-03T01:24:19.045Z",
+        "createdAt": "2026-07-03T01:24:19.045Z",
+        "updatedAt": "2026-07-03T01:24:19.045Z"
+      },
+      "brief": {
+        "id": "brief-coq10-ubiquinone",
+        "campaignId": "vmc-coq10-ubiquinone",
+        "productId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 1,
+        "targetCustomer": "premium shoppers who want a clear, trustworthy product upgrade",
+        "mainProblemSolved": "reduces friction and makes the product decision feel obvious",
+        "topBenefits": [
+          "supports daily routine consistency",
+          "helps maintain momentum without complexity",
+          "designed to support a premium customer experience"
+        ],
+        "emotionalTrigger": "clarity",
+        "productProofPoints": [
+          "CoQ10 (Ubiquinone) is a premium wellness formula from I AM GENESIS TECH crafted to supports cellular energy production and cardiovascular health with coq10",
+          "Designed for consistent daily use, this formula fits naturally into a high-quality routine with added focus on cellular energy; heart support; antioxidant protection; mitochondrial support",
+          "Key Benefits supports cellular energy production and cardiovascular health with coq10 cellular energy; heart support; antioxidant protection; mitochondrial support Premium support aligned with General Health and Wellness Collection Built for customers focused on Cellular Energy Key Ingredients Selected to support supports cellular energy production and cardiovascular health with coq10"
+        ],
+        "ingredientHighlights": [],
+        "bestUseCase": "everyday premium use case with minimal friction",
+        "customerTransformation": "from unsure to clear on the value",
+        "suggestedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) is worth a closer look.",
+        "suggestedCTA": "Tap to view the product and see why it fits the routine.",
+        "platformPriority": [
+          {
+            "platform": "Facebook Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 10,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Instagram Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Shopify Product Page",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 25,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Email",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 4,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Retargeting Ads",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 6,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          }
+        ],
+        "videoTypeRecommendation": {
+          "primary": "Jordan Avatar Trust Video",
+          "secondary": "AI Cinematic Viral Commercial",
+          "note": "Use both where possible; trust for conversion and cinematic for discovery."
+        },
+        "complianceSafeClaims": [
+          "supports a consistent routine",
+          "helps maintain everyday wellness",
+          "designed to support a premium customer experience"
+        ],
+        "disclaimerLanguage": "Results vary. Individual experience depends on routine, usage, and context.",
+        "tone": "premium, clear, confident, trustworthy",
+        "status": "Brief Generated",
+        "createdAt": "2026-07-03T01:24:19.031Z",
+        "updatedAt": "2026-07-03T01:24:19.031Z"
+      },
+      "jordanScript": {
+        "id": "script-jordan-coq10-ubiquinone",
+        "campaignId": "vmc-coq10-ubiquinone",
+        "productId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "videoType": "Jordan Avatar Trust Video",
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "hookOptions": [
+          "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+          "CoQ10 (Ubiquinone) is built to make the next step feel obvious.",
+          "Here is why CoQ10 (Ubiquinone) fits a daily routine better than guesswork."
+        ],
+        "ctaOptions": [
+          "Tap to view CoQ10 (Ubiquinone) on the product page.",
+          "Shop now to see the full details and usage guidance."
+        ],
+        "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+        "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "spokenScript": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "captionText": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "sceneNotes": [
+          "Open on Jordan speaking directly to camera.",
+          "Show the product image beside the avatar with safe text above or below the head.",
+          "Add a clean product-page CTA end card."
+        ],
+        "status": "Script Generated",
+        "createdAt": "2026-07-03T01:24:19.031Z",
+        "updatedAt": "2026-07-03T01:24:19.031Z"
+      },
+      "aiConcept": {
+        "id": "concept-cinematic-coq10-ubiquinone",
+        "campaignId": "vmc-coq10-ubiquinone",
+        "productId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "videoType": "AI Cinematic Viral Commercial",
+        "conceptTitle": "CoQ10 (Ubiquinone) | Premium Viral Commercial",
+        "hookOptions": [
+          "This is the kind of product people stop scrolling for.",
+          "A premium product deserves a premium first impression.",
+          "In the first three seconds, the product does the talking."
+        ],
+        "selectedHook": "This is the kind of product people stop scrolling for.",
+        "ctaOptions": [
+          "Tap to view CoQ10 (Ubiquinone) on the product page.",
+          "Shop now to see the full details and usage guidance."
+        ],
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography",
+        "captionOverlays": [
+          "Premium product. Clear routine.",
+          "Built for the first scroll stop.",
+          "Product-as-hero visual pacing.",
+          "Tap to shop the full detail page."
+        ],
+        "musicSuggestion": "pulse-driven cinematic percussion with glossy synth accents",
+        "endCard": "Shop now and see why it fits the routine",
+        "status": "Media Assets Ready",
+        "createdAt": "2026-07-03T01:24:19.032Z",
+        "updatedAt": "2026-07-03T01:24:19.032Z"
+      },
+      "scores": {
+        "jordan": {
+          "hookStrength": 9,
+          "firstThreeSecondImpact": 6.3,
+          "visualMotionStrength": 5,
+          "productClarity": 9,
+          "benefitClarity": 8,
+          "ctaStrength": 8,
+          "captionReadability": 6,
+          "emotionalPull": 3,
+          "platformFit": 8,
+          "trendAlignment": 3,
+          "brandConsistency": 5,
+          "complianceSafety": 10,
+          "rewatchPotential": 2,
+          "sharePotential": 2,
+          "conversionPotential": 10,
+          "viralScore": 77,
+          "conversionScore": 100,
+          "engagementScore": 52,
+          "id": "score-jordan-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "videoType": "Jordan Avatar Trust Video"
+        },
+        "cinematic": {
+          "hookStrength": 15,
+          "firstThreeSecondImpact": 10,
+          "visualMotionStrength": 10,
+          "productClarity": 9,
+          "benefitClarity": 5,
+          "ctaStrength": 8,
+          "captionReadability": 6,
+          "emotionalPull": 6,
+          "platformFit": 8,
+          "trendAlignment": 5,
+          "brandConsistency": 5,
+          "complianceSafety": 10,
+          "rewatchPotential": 5,
+          "sharePotential": 5,
+          "conversionPotential": 10,
+          "viralScore": 95,
+          "conversionScore": 98,
+          "engagementScore": 96,
+          "id": "score-cinematic-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "videoType": "AI Cinematic Viral Commercial"
+        }
+      },
+      "exports": [
+        {
+          "id": "export-primary_master-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "primary_master",
+          "exportLabel": "Vertical master",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.040Z",
+          "updatedAt": "2026-07-03T01:24:19.040Z"
+        },
+        {
+          "id": "export-feed_square-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "aspectRatio": "1:1",
+          "width": 1080,
+          "height": 1080,
+          "exportType": "feed_square",
+          "exportLabel": "Feed square",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.040Z",
+          "updatedAt": "2026-07-03T01:24:19.040Z"
+        },
+        {
+          "id": "export-widescreen-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "aspectRatio": "16:9",
+          "width": 1920,
+          "height": 1080,
+          "exportType": "widescreen",
+          "exportLabel": "Widescreen",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.040Z",
+          "updatedAt": "2026-07-03T01:24:19.040Z"
+        },
+        {
+          "id": "export-shopify_loop-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "shopify_loop",
+          "exportLabel": "Loop cut",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.040Z",
+          "updatedAt": "2026-07-03T01:24:19.040Z"
+        },
+        {
+          "id": "export-motion_preview-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "motion_preview",
+          "exportLabel": "Motion preview",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.040Z",
+          "updatedAt": "2026-07-03T01:24:19.040Z"
+        }
+      ],
+      "publishing": [
+        {
+          "id": "publish-coq10-ubiquinone-facebook-feed",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Facebook Feed",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "caption": "CoQ10 (Ubiquinone) | Facebook Feed",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T01:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-instagram-feed",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Instagram Feed",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "caption": "CoQ10 (Ubiquinone) | Instagram Feed",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T02:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-shopify-product-page",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Shopify Product Page",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "caption": "CoQ10 (Ubiquinone) | Shopify Product Page",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T03:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-email",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Email",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "caption": "CoQ10 (Ubiquinone) | Email",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T04:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-retargeting-ads",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Retargeting Ads",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "caption": "CoQ10 (Ubiquinone) | Retargeting Ads",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T05:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-tiktok",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "TikTok",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "caption": "CoQ10 (Ubiquinone) | TikTok",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T01:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-instagram-reels",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Instagram Reels",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "caption": "CoQ10 (Ubiquinone) | Instagram Reels",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T02:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-youtube-shorts",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "YouTube Shorts",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "caption": "CoQ10 (Ubiquinone) | YouTube Shorts",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T03:24:19.041Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.041Z",
+          "updatedAt": "2026-07-03T01:24:19.041Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-pinterest",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Pinterest",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "caption": "CoQ10 (Ubiquinone) | Pinterest",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T04:24:19.042Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.042Z",
+          "updatedAt": "2026-07-03T01:24:19.042Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-shopify-homepage",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Shopify Homepage",
+          "preferredAspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "caption": "CoQ10 (Ubiquinone) | Shopify Homepage",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T05:24:19.042Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.042Z",
+          "updatedAt": "2026-07-03T01:24:19.042Z"
+        },
+        {
+          "id": "publish-coq10-ubiquinone-shopify-collection-page",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Shopify Collection Page",
+          "preferredAspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "caption": "CoQ10 (Ubiquinone) | Shopify Collection Page",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#coq10ubiquinone"
+          ],
+          "cta": "Tap to view CoQ10 (Ubiquinone)",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T06:24:19.042Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.042Z",
+          "updatedAt": "2026-07-03T01:24:19.042Z"
+        }
+      ],
+      "boardReviews": [
+        {
+          "id": "board-coq10-ubiquinone-jordan-avatar-trust-video",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "approvalScore": 82,
+          "recommendedImprovements": [
+            "Keep the premium tone and clear product positioning.",
+            "Strengthen the first three seconds and add one stronger curiosity hook.",
+            "Keep all language support-based and avoid medical claims.",
+            "Show the product name and what it solves immediately.",
+            "Make the CTA direct and visible in the last card.",
+            "Keep motion premium and avoid clutter.",
+            "Match the platform format to the video type.",
+            "Lead with confidence, clarity, and low friction.",
+            "Attach the product page link and maintain purchase confidence.",
+            "Use the top-performing structure as the template for scaling."
+          ],
+          "revisedHook": "Lead with a faster, more specific hook for CoQ10 (Ubiquinone).",
+          "revisedCta": "",
+          "revisedPlatformStrategy": "Prioritize Facebook Feed, Instagram Feed, Shopify Product Page, and Retargeting.",
+          "regenerationReason": "",
+          "finalPublishDecision": "Needs Review",
+          "roles": [
+            {
+              "role": "Brand Strategist",
+              "score": 5,
+              "recommendation": "Keep the premium tone and clear product positioning."
+            },
+            {
+              "role": "Viral Growth Advisor",
+              "score": 6,
+              "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+            },
+            {
+              "role": "Supplement Compliance Advisor",
+              "score": 10,
+              "recommendation": "Keep all language support-based and avoid medical claims."
+            },
+            {
+              "role": "Product Positioning Advisor",
+              "score": 9,
+              "recommendation": "Show the product name and what it solves immediately."
+            },
+            {
+              "role": "Conversion Copywriter",
+              "score": 10,
+              "recommendation": "Make the CTA direct and visible in the last card."
+            },
+            {
+              "role": "Creative Director",
+              "score": 5,
+              "recommendation": "Keep motion premium and avoid clutter."
+            },
+            {
+              "role": "Platform Algorithm Analyst",
+              "score": 8,
+              "recommendation": "Match the platform format to the video type."
+            },
+            {
+              "role": "Customer Psychology Advisor",
+              "score": 3,
+              "recommendation": "Lead with confidence, clarity, and low friction."
+            },
+            {
+              "role": "Shopify Sales Advisor",
+              "score": 10,
+              "recommendation": "Attach the product page link and maintain purchase confidence."
+            },
+            {
+              "role": "AI Workflow Optimizer",
+              "score": 5.2,
+              "recommendation": "Use the top-performing structure as the template for scaling."
+            }
+          ],
+          "status": "Needs Review",
+          "createdAt": "2026-07-03T01:24:19.043Z",
+          "updatedAt": "2026-07-03T01:24:19.043Z"
+        },
+        {
+          "id": "board-coq10-ubiquinone-ai-cinematic-viral-commercial",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "approvalScore": 97,
+          "recommendedImprovements": [
+            "Keep the premium tone and clear product positioning.",
+            "Strengthen the first three seconds and add one stronger curiosity hook.",
+            "Keep all language support-based and avoid medical claims.",
+            "Show the product name and what it solves immediately.",
+            "Make the CTA direct and visible in the last card.",
+            "Keep motion premium and avoid clutter.",
+            "Match the platform format to the video type.",
+            "Lead with confidence, clarity, and low friction.",
+            "Attach the product page link and maintain purchase confidence.",
+            "Use the top-performing structure as the template for scaling."
+          ],
+          "revisedHook": "",
+          "revisedCta": "",
+          "revisedPlatformStrategy": "Prioritize TikTok, Reels, Shorts, and Pinterest for discovery.",
+          "regenerationReason": "",
+          "finalPublishDecision": "Approved",
+          "roles": [
+            {
+              "role": "Brand Strategist",
+              "score": 5,
+              "recommendation": "Keep the premium tone and clear product positioning."
+            },
+            {
+              "role": "Viral Growth Advisor",
+              "score": 10,
+              "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+            },
+            {
+              "role": "Supplement Compliance Advisor",
+              "score": 10,
+              "recommendation": "Keep all language support-based and avoid medical claims."
+            },
+            {
+              "role": "Product Positioning Advisor",
+              "score": 9,
+              "recommendation": "Show the product name and what it solves immediately."
+            },
+            {
+              "role": "Conversion Copywriter",
+              "score": 10,
+              "recommendation": "Make the CTA direct and visible in the last card."
+            },
+            {
+              "role": "Creative Director",
+              "score": 10,
+              "recommendation": "Keep motion premium and avoid clutter."
+            },
+            {
+              "role": "Platform Algorithm Analyst",
+              "score": 8,
+              "recommendation": "Match the platform format to the video type."
+            },
+            {
+              "role": "Customer Psychology Advisor",
+              "score": 6,
+              "recommendation": "Lead with confidence, clarity, and low friction."
+            },
+            {
+              "role": "Shopify Sales Advisor",
+              "score": 9.8,
+              "recommendation": "Attach the product page link and maintain purchase confidence."
+            },
+            {
+              "role": "AI Workflow Optimizer",
+              "score": 9.6,
+              "recommendation": "Use the top-performing structure as the template for scaling."
+            }
+          ],
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.043Z",
+          "updatedAt": "2026-07-03T01:24:19.043Z"
+        }
+      ],
+      "learningLoop": [
+        {
+          "id": "insight-coq10-ubiquinone-jordan-avatar-trust-video",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "question": "Which direction performed best for CoQ10 (Ubiquinone)?",
+          "answer": "CTA clarity and product clarity were strongest.",
+          "metricName": "conversion_score",
+          "metricValue": 100,
+          "insightJson": {
+            "boardDecision": "Needs Review",
+            "recommendation": "Keep the premium tone and clear product positioning.",
+            "strongestMetric": "conversion_score",
+            "nextAction": "Revise the creative and regenerate."
+          },
+          "status": "Learning Loop Updated",
+          "createdAt": "2026-07-03T01:24:19.044Z",
+          "updatedAt": "2026-07-03T01:24:19.044Z"
+        },
+        {
+          "id": "insight-coq10-ubiquinone-ai-cinematic-viral-commercial",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "question": "Which direction performed best for CoQ10 (Ubiquinone)?",
+          "answer": "CTA clarity and product clarity were strongest.",
+          "metricName": "conversion_score",
+          "metricValue": 98,
+          "insightJson": {
+            "boardDecision": "Approved",
+            "recommendation": "Keep the premium tone and clear product positioning.",
+            "strongestMetric": "conversion_score",
+            "nextAction": "Schedule the approved asset."
+          },
+          "status": "Learning Loop Updated",
+          "createdAt": "2026-07-03T01:24:19.044Z",
+          "updatedAt": "2026-07-03T01:24:19.044Z"
+        }
+      ],
+      "mediaAssets": [
+        {
+          "id": "asset-product-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "assetType": "product_image",
+          "assetName": "CoQ10 (Ubiquinone) product image",
+          "sourceUrl": "",
+          "storageUrl": "",
+          "previewUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.045Z",
+          "updatedAt": "2026-07-03T01:24:19.045Z"
+        }
+      ],
+      "renderJobs": [
+        {
+          "id": "job-jordan-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "jobType": "Jordan Avatar Trust Video",
+          "provider": "heygen",
+          "jobPayload": {
+            "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+            "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+            "script": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+            "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+            "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page."
+          },
+          "externalJobId": "",
+          "jobStatus": "Media Assets Ready",
+          "status": "Media Assets Ready",
+          "retryCount": 0,
+          "renderStatus": "Media Assets Ready",
+          "reason": "",
+          "createdAt": "2026-07-03T01:24:19.044Z",
+          "updatedAt": "2026-07-03T01:24:19.044Z"
+        },
+        {
+          "id": "job-cinematic-coq10-ubiquinone",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productId": "7863161487402",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "jobType": "AI Cinematic Viral Commercial",
+          "provider": "quality-bits",
+          "jobPayload": {
+            "conceptTitle": "CoQ10 (Ubiquinone) | Premium Viral Commercial",
+            "hook": "This is the kind of product people stop scrolling for.",
+            "sceneList": [
+              {
+                "scene": 1,
+                "description": "Fast premium opener with product silhouette and kinetic typography."
+              },
+              {
+                "scene": 2,
+                "description": "Macro product hero shot with motion blur and glowing highlight pass."
+              },
+              {
+                "scene": 3,
+                "description": "Ingredient or benefit visualization with clean motion and contrast."
+              },
+              {
+                "scene": 4,
+                "description": "Transformation moment with product centered and text safe above/below the face area."
+              },
+              {
+                "scene": 5,
+                "description": "End card with CTA and shop link."
+              }
+            ],
+            "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+            "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+          },
+          "externalJobId": "",
+          "jobStatus": "Media Assets Ready",
+          "status": "Media Assets Ready",
+          "retryCount": 0,
+          "renderStatus": "Media Assets Ready",
+          "reason": "",
+          "createdAt": "2026-07-03T01:24:19.044Z",
+          "updatedAt": "2026-07-03T01:24:19.044Z"
+        }
+      ],
+      "regenerationQueue": [],
+      "hookTests": [
+        {
+          "id": "hook-coq10-ubiquinone-1",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "hookText": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+          "hookScore": 9,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.045Z",
+          "updatedAt": "2026-07-03T01:24:19.045Z"
+        },
+        {
+          "id": "hook-coq10-ubiquinone-2",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "hookText": "This is the kind of product people stop scrolling for.",
+          "hookScore": 15,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.045Z",
+          "updatedAt": "2026-07-03T01:24:19.045Z"
+        }
+      ],
+      "ctaTests": [
+        {
+          "id": "cta-coq10-ubiquinone-1",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "Jordan Avatar Trust Video",
+          "ctaText": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+          "ctaScore": 8,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.045Z",
+          "updatedAt": "2026-07-03T01:24:19.045Z"
+        },
+        {
+          "id": "cta-coq10-ubiquinone-2",
+          "campaignId": "vmc-coq10-ubiquinone",
+          "productHandle": "coq10-ubiquinone",
+          "productName": "CoQ10 (Ubiquinone)",
+          "sku": "ROC805",
+          "videoType": "AI Cinematic Viral Commercial",
+          "ctaText": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+          "ctaScore": 8,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.046Z",
+          "updatedAt": "2026-07-03T01:24:19.046Z"
+        }
+      ],
+      "createdAt": "2026-07-03T01:24:19.067Z",
+      "status": "brief_generated"
+    },
+    {
+      "id": "campaign_undefined_1783041859067",
+      "product": {
+        "id": "7863161389098",
+        "shopifyProductId": "7863161389098",
+        "productHandle": "omega-3-fish-oil",
+        "productName": "Omega 3 Fish Oil",
+        "sku": "ROC814",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 2,
+        "productImageUrl": "",
+        "productPageUrl": "https://iamgenesistech.myshopify.com/products/omega-3-fish-oil",
+        "status": "Media Assets Ready",
+        "jordanVideoStatus": "Media Assets Ready",
+        "aiCinematicStatus": "Media Assets Ready",
+        "exportFormats": [
+          "9:16",
+          "1:1",
+          "16:9",
+          "9:16",
+          "9:16"
+        ],
+        "publishedPlatforms": [
+          "Facebook Feed",
+          "Instagram Feed",
+          "Shopify Product Page",
+          "Email",
+          "Retargeting Ads",
+          "TikTok",
+          "Instagram Reels",
+          "YouTube Shorts",
+          "Pinterest",
+          "Shopify Homepage",
+          "Shopify Collection Page"
+        ],
+        "viralScore": 95,
+        "conversionScore": 100,
+        "engagementScore": 96,
+        "boardReviewStatus": "Needs Review",
+        "learningLoopStatus": "Learning Loop Updated",
+        "lastGeneratedAt": "2026-07-03T01:24:19.051Z",
+        "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+        "campaignId": "vmc-omega-3-fish-oil",
+        "createdAt": "2026-07-03T01:24:19.051Z",
+        "updatedAt": "2026-07-03T01:24:19.051Z"
+      },
+      "campaign": {
+        "id": "vmc-omega-3-fish-oil",
+        "productId": "7863161389098",
+        "productHandle": "omega-3-fish-oil",
+        "productName": "Omega 3 Fish Oil",
+        "sku": "ROC814",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 2,
+        "publishMode": "Manual Approval",
+        "videoType": "Jordan Avatar Trust Video + AI Cinematic Viral Commercial",
+        "platformPriority": [
+          {
+            "platform": "Facebook Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 10,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Instagram Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Shopify Product Page",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 25,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Email",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 4,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Retargeting Ads",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 6,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          }
+        ],
+        "targetPlatforms": [
+          {
+            "platform": "TikTok",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 18,
+            "priority": 10,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Instagram Reels",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 18,
+            "priority": 8,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "YouTube Shorts",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 20,
+            "priority": 6,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Pinterest",
+            "aspectRatio": "9:16",
+            "idealLengthSeconds": 20,
+            "priority": 4,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Shopify Homepage",
+            "aspectRatio": "16:9",
+            "idealLengthSeconds": 8,
+            "priority": 4,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          },
+          {
+            "platform": "Shopify Collection Page",
+            "aspectRatio": "16:9",
+            "idealLengthSeconds": 8,
+            "priority": 3,
+            "recommendedVideoType": "AI Cinematic Viral Commercial",
+            "reason": "Discovery and viral reach placement"
+          }
+        ],
+        "status": "Media Assets Ready",
+        "boardReviewStatus": "Approved",
+        "learningLoopStatus": "Learning Loop Updated",
+        "viralScore": 95,
+        "conversionScore": 100,
+        "engagementScore": 96,
+        "nextRecommendedAction": "Queue render jobs and submit approved assets.",
+        "lastGeneratedAt": "2026-07-03T01:24:19.051Z",
+        "createdAt": "2026-07-03T01:24:19.051Z",
+        "updatedAt": "2026-07-03T01:24:19.051Z"
+      },
+      "brief": {
+        "id": "brief-omega-3-fish-oil",
+        "campaignId": "vmc-omega-3-fish-oil",
+        "productId": "7863161389098",
+        "productHandle": "omega-3-fish-oil",
+        "productName": "Omega 3 Fish Oil",
+        "sku": "ROC814",
+        "collectionName": "Best Sellers",
+        "productCategory": "Best Sellers",
+        "bestSellerRank": 2,
+        "targetCustomer": "premium shoppers who want a clear, trustworthy product upgrade",
+        "mainProblemSolved": "reduces friction and makes the product decision feel obvious",
+        "topBenefits": [
+          "supports daily routine consistency",
+          "helps maintain momentum without complexity",
+          "designed to support a premium customer experience"
+        ],
+        "emotionalTrigger": "clarity",
+        "productProofPoints": [
+          "Omega 3 Fish Oil is a premium wellness formula from I AM GENESIS TECH crafted to supports cardiovascular and cognitive health with concentrated omega 3s",
+          "Designed for consistent daily use, this formula fits naturally into a high-quality routine with added focus on epa dha support; heart health; brain support; triglyceride management",
+          "Key Benefits supports cardiovascular and cognitive health with concentrated omega 3s epa dha support; heart health; brain support; triglyceride management Premium support aligned with General Health and Wellness Collection Built for customers focused on Heart and Brain Key Ingredients Selected to support supports cardiovascular and cognitive health with concentrated omega 3s"
+        ],
+        "ingredientHighlights": [
+          "Omega"
+        ],
+        "bestUseCase": "everyday premium use case with minimal friction",
+        "customerTransformation": "from unsure to clear on the value",
+        "suggestedHook": "If you want a simpler routine, Omega 3 Fish Oil is worth a closer look.",
+        "suggestedCTA": "Tap to view the product and see why it fits the routine.",
+        "platformPriority": [
+          {
+            "platform": "Facebook Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 10,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Instagram Feed",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 20,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Shopify Product Page",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 25,
+            "priority": 8,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Email",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 4,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          },
+          {
+            "platform": "Retargeting Ads",
+            "aspectRatio": "1:1",
+            "idealLengthSeconds": 15,
+            "priority": 6,
+            "recommendedVideoType": "Jordan Avatar Trust Video",
+            "reason": "Trust and education placement"
+          }
+        ],
+        "videoTypeRecommendation": {
+          "primary": "Jordan Avatar Trust Video",
+          "secondary": "AI Cinematic Viral Commercial",
+          "note": "Use both where possible; trust for conversion and cinematic for discovery."
+        },
+        "complianceSafeClaims": [
+          "supports a consistent routine",
+          "helps maintain everyday wellness",
+          "designed to support a premium customer experience"
+        ],
+        "disclaimerLanguage": "Results vary. Individual experience depends on routine, usage, and context.",
+        "tone": "premium, clear, confident, trustworthy",
+        "status": "Brief Generated",
+        "createdAt": "2026-07-03T01:24:19.049Z",
+        "updatedAt": "2026-07-03T01:24:19.049Z"
+      },
+      "jordanScript": {
+        "id": "script-jordan-omega-3-fish-oil",
+        "campaignId": "vmc-omega-3-fish-oil",
+        "productId": "7863161389098",
+        "productHandle": "omega-3-fish-oil",
+        "productName": "Omega 3 Fish Oil",
+        "sku": "ROC814",
+        "videoType": "Jordan Avatar Trust Video",
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "hookOptions": [
+          "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+          "Omega 3 Fish Oil is built to make the next step feel obvious.",
+          "Here is why Omega 3 Fish Oil fits a daily routine better than guesswork."
+        ],
+        "ctaOptions": [
+          "Tap to view Omega 3 Fish Oil on the product page.",
+          "Shop now to see the full details and usage guidance."
+        ],
+        "selectedHook": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+        "selectedCta": "Tap to view Omega 3 Fish Oil on the product page.",
+        "spokenScript": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Omega 3 Fish Oil is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "captionText": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Tap to view Omega 3 Fish Oil on the product page.",
+        "sceneNotes": [
+          "Open on Jordan speaking directly to camera.",
+          "Show the product image beside the avatar with safe text above or below the head.",
+          "Add a clean product-page CTA end card."
+        ],
+        "status": "Script Generated",
+        "createdAt": "2026-07-03T01:24:19.049Z",
+        "updatedAt": "2026-07-03T01:24:19.049Z"
+      },
+      "aiConcept": {
+        "id": "concept-cinematic-omega-3-fish-oil",
+        "campaignId": "vmc-omega-3-fish-oil",
+        "productId": "7863161389098",
+        "productHandle": "omega-3-fish-oil",
+        "productName": "Omega 3 Fish Oil",
+        "sku": "ROC814",
+        "videoType": "AI Cinematic Viral Commercial",
+        "conceptTitle": "Omega 3 Fish Oil | Premium Viral Commercial",
+        "hookOptions": [
+          "This is the kind of product people stop scrolling for.",
+          "A premium product deserves a premium first impression.",
+          "In the first three seconds, the product does the talking."
+        ],
+        "selectedHook": "This is the kind of product people stop scrolling for.",
+        "ctaOptions": [
+          "Tap to view Omega 3 Fish Oil on the product page.",
+          "Shop now to see the full details and usage guidance."
+        ],
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography",
+        "captionOverlays": [
+          "Premium product. Clear routine.",
+          "Built for the first scroll stop.",
+          "Product-as-hero visual pacing.",
+          "Tap to shop the full detail page."
+        ],
+        "musicSuggestion": "pulse-driven cinematic percussion with glossy synth accents",
+        "endCard": "Shop now and see why it fits the routine",
+        "status": "Media Assets Ready",
+        "createdAt": "2026-07-03T01:24:19.049Z",
+        "updatedAt": "2026-07-03T01:24:19.049Z"
+      },
+      "scores": {
+        "jordan": {
+          "hookStrength": 12,
+          "firstThreeSecondImpact": 8.399999999999999,
+          "visualMotionStrength": 5,
+          "productClarity": 9,
+          "benefitClarity": 8,
+          "ctaStrength": 8,
+          "captionReadability": 5,
+          "emotionalPull": 3,
+          "platformFit": 8,
+          "trendAlignment": 3,
+          "brandConsistency": 5,
+          "complianceSafety": 10,
+          "rewatchPotential": 2,
+          "sharePotential": 4,
+          "conversionPotential": 10,
+          "viralScore": 82,
+          "conversionScore": 100,
+          "engagementScore": 65,
+          "id": "score-jordan-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "videoType": "Jordan Avatar Trust Video"
+        },
+        "cinematic": {
+          "hookStrength": 15,
+          "firstThreeSecondImpact": 10,
+          "visualMotionStrength": 10,
+          "productClarity": 9,
+          "benefitClarity": 5,
+          "ctaStrength": 8,
+          "captionReadability": 6,
+          "emotionalPull": 6,
+          "platformFit": 8,
+          "trendAlignment": 5,
+          "brandConsistency": 5,
+          "complianceSafety": 10,
+          "rewatchPotential": 5,
+          "sharePotential": 5,
+          "conversionPotential": 10,
+          "viralScore": 95,
+          "conversionScore": 98,
+          "engagementScore": 96,
+          "id": "score-cinematic-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "videoType": "AI Cinematic Viral Commercial"
+        }
+      },
+      "exports": [
+        {
+          "id": "export-primary_master-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "primary_master",
+          "exportLabel": "Vertical master",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "export-feed_square-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "aspectRatio": "1:1",
+          "width": 1080,
+          "height": 1080,
+          "exportType": "feed_square",
+          "exportLabel": "Feed square",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "export-widescreen-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "aspectRatio": "16:9",
+          "width": 1920,
+          "height": 1080,
+          "exportType": "widescreen",
+          "exportLabel": "Widescreen",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "export-shopify_loop-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "shopify_loop",
+          "exportLabel": "Loop cut",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "export-motion_preview-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "aspectRatio": "9:16",
+          "width": 1080,
+          "height": 1920,
+          "exportType": "motion_preview",
+          "exportLabel": "Motion preview",
+          "fileUrl": "",
+          "storageUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        }
+      ],
+      "publishing": [
+        {
+          "id": "publish-omega-3-fish-oil-facebook-feed",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Facebook Feed",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "caption": "Omega 3 Fish Oil | Facebook Feed",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T01:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-instagram-feed",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Instagram Feed",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "caption": "Omega 3 Fish Oil | Instagram Feed",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T02:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-shopify-product-page",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Shopify Product Page",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "caption": "Omega 3 Fish Oil | Shopify Product Page",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T03:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-email",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Email",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "caption": "Omega 3 Fish Oil | Email",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T04:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-retargeting-ads",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "platform": "Retargeting Ads",
+          "preferredAspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "caption": "Omega 3 Fish Oil | Retargeting Ads",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T05:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-tiktok",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "TikTok",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "caption": "Omega 3 Fish Oil | TikTok",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T01:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-instagram-reels",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Instagram Reels",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 18,
+          "caption": "Omega 3 Fish Oil | Instagram Reels",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T02:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-youtube-shorts",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "YouTube Shorts",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "caption": "Omega 3 Fish Oil | YouTube Shorts",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T03:24:19.050Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.050Z",
+          "updatedAt": "2026-07-03T01:24:19.050Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-pinterest",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Pinterest",
+          "preferredAspectRatio": "9:16",
+          "idealLengthSeconds": 20,
+          "caption": "Omega 3 Fish Oil | Pinterest",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T04:24:19.051Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-shopify-homepage",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Shopify Homepage",
+          "preferredAspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "caption": "Omega 3 Fish Oil | Shopify Homepage",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T05:24:19.051Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "publish-omega-3-fish-oil-shopify-collection-page",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "platform": "Shopify Collection Page",
+          "preferredAspectRatio": "16:9",
+          "idealLengthSeconds": 8,
+          "caption": "Omega 3 Fish Oil | Shopify Collection Page",
+          "hashtags": [
+            "#IAGT",
+            "#EVICS",
+            "#Shopify",
+            "#omega3fishoil"
+          ],
+          "cta": "Tap to view Omega 3 Fish Oil",
+          "thumbnailUrl": "",
+          "scheduledAt": "2026-07-03T06:24:19.051Z",
+          "publishedUrl": "",
+          "postId": "",
+          "performanceMetrics": {},
+          "nextAction": "Manual approval",
+          "status": "Manual Approval",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "boardReviews": [
+        {
+          "id": "board-omega-3-fish-oil-jordan-avatar-trust-video",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "approvalScore": 87,
+          "recommendedImprovements": [
+            "Keep the premium tone and clear product positioning.",
+            "Strengthen the first three seconds and add one stronger curiosity hook.",
+            "Keep all language support-based and avoid medical claims.",
+            "Show the product name and what it solves immediately.",
+            "Make the CTA direct and visible in the last card.",
+            "Keep motion premium and avoid clutter.",
+            "Match the platform format to the video type.",
+            "Lead with confidence, clarity, and low friction.",
+            "Attach the product page link and maintain purchase confidence.",
+            "Use the top-performing structure as the template for scaling."
+          ],
+          "revisedHook": "",
+          "revisedCta": "",
+          "revisedPlatformStrategy": "Prioritize Facebook Feed, Instagram Feed, Shopify Product Page, and Retargeting.",
+          "regenerationReason": "",
+          "finalPublishDecision": "Needs Review",
+          "roles": [
+            {
+              "role": "Brand Strategist",
+              "score": 5,
+              "recommendation": "Keep the premium tone and clear product positioning."
+            },
+            {
+              "role": "Viral Growth Advisor",
+              "score": 8,
+              "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+            },
+            {
+              "role": "Supplement Compliance Advisor",
+              "score": 10,
+              "recommendation": "Keep all language support-based and avoid medical claims."
+            },
+            {
+              "role": "Product Positioning Advisor",
+              "score": 9,
+              "recommendation": "Show the product name and what it solves immediately."
+            },
+            {
+              "role": "Conversion Copywriter",
+              "score": 10,
+              "recommendation": "Make the CTA direct and visible in the last card."
+            },
+            {
+              "role": "Creative Director",
+              "score": 5,
+              "recommendation": "Keep motion premium and avoid clutter."
+            },
+            {
+              "role": "Platform Algorithm Analyst",
+              "score": 8,
+              "recommendation": "Match the platform format to the video type."
+            },
+            {
+              "role": "Customer Psychology Advisor",
+              "score": 3,
+              "recommendation": "Lead with confidence, clarity, and low friction."
+            },
+            {
+              "role": "Shopify Sales Advisor",
+              "score": 10,
+              "recommendation": "Attach the product page link and maintain purchase confidence."
+            },
+            {
+              "role": "AI Workflow Optimizer",
+              "score": 6.5,
+              "recommendation": "Use the top-performing structure as the template for scaling."
+            }
+          ],
+          "status": "Needs Review",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "board-omega-3-fish-oil-ai-cinematic-viral-commercial",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "approvalScore": 97,
+          "recommendedImprovements": [
+            "Keep the premium tone and clear product positioning.",
+            "Strengthen the first three seconds and add one stronger curiosity hook.",
+            "Keep all language support-based and avoid medical claims.",
+            "Show the product name and what it solves immediately.",
+            "Make the CTA direct and visible in the last card.",
+            "Keep motion premium and avoid clutter.",
+            "Match the platform format to the video type.",
+            "Lead with confidence, clarity, and low friction.",
+            "Attach the product page link and maintain purchase confidence.",
+            "Use the top-performing structure as the template for scaling."
+          ],
+          "revisedHook": "",
+          "revisedCta": "",
+          "revisedPlatformStrategy": "Prioritize TikTok, Reels, Shorts, and Pinterest for discovery.",
+          "regenerationReason": "",
+          "finalPublishDecision": "Approved",
+          "roles": [
+            {
+              "role": "Brand Strategist",
+              "score": 5,
+              "recommendation": "Keep the premium tone and clear product positioning."
+            },
+            {
+              "role": "Viral Growth Advisor",
+              "score": 10,
+              "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+            },
+            {
+              "role": "Supplement Compliance Advisor",
+              "score": 10,
+              "recommendation": "Keep all language support-based and avoid medical claims."
+            },
+            {
+              "role": "Product Positioning Advisor",
+              "score": 9,
+              "recommendation": "Show the product name and what it solves immediately."
+            },
+            {
+              "role": "Conversion Copywriter",
+              "score": 10,
+              "recommendation": "Make the CTA direct and visible in the last card."
+            },
+            {
+              "role": "Creative Director",
+              "score": 10,
+              "recommendation": "Keep motion premium and avoid clutter."
+            },
+            {
+              "role": "Platform Algorithm Analyst",
+              "score": 8,
+              "recommendation": "Match the platform format to the video type."
+            },
+            {
+              "role": "Customer Psychology Advisor",
+              "score": 6,
+              "recommendation": "Lead with confidence, clarity, and low friction."
+            },
+            {
+              "role": "Shopify Sales Advisor",
+              "score": 9.8,
+              "recommendation": "Attach the product page link and maintain purchase confidence."
+            },
+            {
+              "role": "AI Workflow Optimizer",
+              "score": 9.6,
+              "recommendation": "Use the top-performing structure as the template for scaling."
+            }
+          ],
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "learningLoop": [
+        {
+          "id": "insight-omega-3-fish-oil-jordan-avatar-trust-video",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "question": "Which direction performed best for Omega 3 Fish Oil?",
+          "answer": "CTA clarity and product clarity were strongest.",
+          "metricName": "conversion_score",
+          "metricValue": 100,
+          "insightJson": {
+            "boardDecision": "Needs Review",
+            "recommendation": "Keep the premium tone and clear product positioning.",
+            "strongestMetric": "conversion_score",
+            "nextAction": "Revise the creative and regenerate."
+          },
+          "status": "Learning Loop Updated",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "insight-omega-3-fish-oil-ai-cinematic-viral-commercial",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "question": "Which direction performed best for Omega 3 Fish Oil?",
+          "answer": "CTA clarity and product clarity were strongest.",
+          "metricName": "conversion_score",
+          "metricValue": 98,
+          "insightJson": {
+            "boardDecision": "Approved",
+            "recommendation": "Keep the premium tone and clear product positioning.",
+            "strongestMetric": "conversion_score",
+            "nextAction": "Schedule the approved asset."
+          },
+          "status": "Learning Loop Updated",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "mediaAssets": [
+        {
+          "id": "asset-product-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "assetType": "product_image",
+          "assetName": "Omega 3 Fish Oil product image",
+          "sourceUrl": "",
+          "storageUrl": "",
+          "previewUrl": "",
+          "status": "Media Assets Ready",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "renderJobs": [
+        {
+          "id": "job-jordan-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "jobType": "Jordan Avatar Trust Video",
+          "provider": "heygen",
+          "jobPayload": {
+            "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+            "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+            "script": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Omega 3 Fish Oil is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+            "selectedHook": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+            "selectedCta": "Tap to view Omega 3 Fish Oil on the product page."
+          },
+          "externalJobId": "",
+          "jobStatus": "Media Assets Ready",
+          "status": "Media Assets Ready",
+          "retryCount": 0,
+          "renderStatus": "Media Assets Ready",
+          "reason": "",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "job-cinematic-omega-3-fish-oil",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productId": "7863161389098",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "jobType": "AI Cinematic Viral Commercial",
+          "provider": "quality-bits",
+          "jobPayload": {
+            "conceptTitle": "Omega 3 Fish Oil | Premium Viral Commercial",
+            "hook": "This is the kind of product people stop scrolling for.",
+            "sceneList": [
+              {
+                "scene": 1,
+                "description": "Fast premium opener with product silhouette and kinetic typography."
+              },
+              {
+                "scene": 2,
+                "description": "Macro product hero shot with motion blur and glowing highlight pass."
+              },
+              {
+                "scene": 3,
+                "description": "Ingredient or benefit visualization with clean motion and contrast."
+              },
+              {
+                "scene": 4,
+                "description": "Transformation moment with product centered and text safe above/below the face area."
+              },
+              {
+                "scene": 5,
+                "description": "End card with CTA and shop link."
+              }
+            ],
+            "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+            "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+          },
+          "externalJobId": "",
+          "jobStatus": "Media Assets Ready",
+          "status": "Media Assets Ready",
+          "retryCount": 0,
+          "renderStatus": "Media Assets Ready",
+          "reason": "",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "regenerationQueue": [],
+      "hookTests": [
+        {
+          "id": "hook-omega-3-fish-oil-1",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "hookText": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+          "hookScore": 12,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "hook-omega-3-fish-oil-2",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "hookText": "This is the kind of product people stop scrolling for.",
+          "hookScore": 15,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        }
+      ],
+      "ctaTests": [
+        {
+          "id": "cta-omega-3-fish-oil-1",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "Jordan Avatar Trust Video",
+          "ctaText": "Tap to view Omega 3 Fish Oil on the product page.",
+          "ctaScore": 8,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.051Z",
+          "updatedAt": "2026-07-03T01:24:19.051Z"
+        },
+        {
+          "id": "cta-omega-3-fish-oil-2",
+          "campaignId": "vmc-omega-3-fish-oil",
+          "productHandle": "omega-3-fish-oil",
+          "productName": "Omega 3 Fish Oil",
+          "sku": "ROC814",
+          "videoType": "AI Cinematic Viral Commercial",
+          "ctaText": "Tap to view Omega 3 Fish Oil on the product page.",
+          "ctaScore": 8,
+          "winner": true,
+          "status": "Approved",
+          "createdAt": "2026-07-03T01:24:19.052Z",
+          "updatedAt": "2026-07-03T01:24:19.052Z"
+        }
+      ],
+      "createdAt": "2026-07-03T01:24:19.067Z",
+      "status": "brief_generated"
+    }
+  ],
+  "briefs": [
+    {
+      "id": "brief-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 1,
+      "targetCustomer": "premium shoppers who want a clear, trustworthy product upgrade",
+      "mainProblemSolved": "reduces friction and makes the product decision feel obvious",
+      "topBenefits": [
+        "supports daily routine consistency",
+        "helps maintain momentum without complexity",
+        "designed to support a premium customer experience"
+      ],
+      "emotionalTrigger": "clarity",
+      "productProofPoints": [
+        "CoQ10 (Ubiquinone) is a premium wellness formula from I AM GENESIS TECH crafted to supports cellular energy production and cardiovascular health with coq10",
+        "Designed for consistent daily use, this formula fits naturally into a high-quality routine with added focus on cellular energy; heart support; antioxidant protection; mitochondrial support",
+        "Key Benefits supports cellular energy production and cardiovascular health with coq10 cellular energy; heart support; antioxidant protection; mitochondrial support Premium support aligned with General Health and Wellness Collection Built for customers focused on Cellular Energy Key Ingredients Selected to support supports cellular energy production and cardiovascular health with coq10"
+      ],
+      "ingredientHighlights": [],
+      "bestUseCase": "everyday premium use case with minimal friction",
+      "customerTransformation": "from unsure to clear on the value",
+      "suggestedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) is worth a closer look.",
+      "suggestedCTA": "Tap to view the product and see why it fits the routine.",
+      "platformPriority": [
+        {
+          "platform": "Facebook Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 10,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Instagram Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Shopify Product Page",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Email",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 4,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Retargeting Ads",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 6,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        }
+      ],
+      "videoTypeRecommendation": {
+        "primary": "Jordan Avatar Trust Video",
+        "secondary": "AI Cinematic Viral Commercial",
+        "note": "Use both where possible; trust for conversion and cinematic for discovery."
+      },
+      "complianceSafeClaims": [
+        "supports a consistent routine",
+        "helps maintain everyday wellness",
+        "designed to support a premium customer experience"
+      ],
+      "disclaimerLanguage": "Results vary. Individual experience depends on routine, usage, and context.",
+      "tone": "premium, clear, confident, trustworthy",
+      "status": "Brief Generated",
+      "createdAt": "2026-07-03T01:24:19.031Z",
+      "updatedAt": "2026-07-03T01:24:19.031Z"
+    },
+    {
+      "id": "brief-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "collectionName": "Best Sellers",
+      "productCategory": "Best Sellers",
+      "bestSellerRank": 2,
+      "targetCustomer": "premium shoppers who want a clear, trustworthy product upgrade",
+      "mainProblemSolved": "reduces friction and makes the product decision feel obvious",
+      "topBenefits": [
+        "supports daily routine consistency",
+        "helps maintain momentum without complexity",
+        "designed to support a premium customer experience"
+      ],
+      "emotionalTrigger": "clarity",
+      "productProofPoints": [
+        "Omega 3 Fish Oil is a premium wellness formula from I AM GENESIS TECH crafted to supports cardiovascular and cognitive health with concentrated omega 3s",
+        "Designed for consistent daily use, this formula fits naturally into a high-quality routine with added focus on epa dha support; heart health; brain support; triglyceride management",
+        "Key Benefits supports cardiovascular and cognitive health with concentrated omega 3s epa dha support; heart health; brain support; triglyceride management Premium support aligned with General Health and Wellness Collection Built for customers focused on Heart and Brain Key Ingredients Selected to support supports cardiovascular and cognitive health with concentrated omega 3s"
+      ],
+      "ingredientHighlights": [
+        "Omega"
+      ],
+      "bestUseCase": "everyday premium use case with minimal friction",
+      "customerTransformation": "from unsure to clear on the value",
+      "suggestedHook": "If you want a simpler routine, Omega 3 Fish Oil is worth a closer look.",
+      "suggestedCTA": "Tap to view the product and see why it fits the routine.",
+      "platformPriority": [
+        {
+          "platform": "Facebook Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 10,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Instagram Feed",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 20,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Shopify Product Page",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 25,
+          "priority": 8,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Email",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 4,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        },
+        {
+          "platform": "Retargeting Ads",
+          "aspectRatio": "1:1",
+          "idealLengthSeconds": 15,
+          "priority": 6,
+          "recommendedVideoType": "Jordan Avatar Trust Video",
+          "reason": "Trust and education placement"
+        }
+      ],
+      "videoTypeRecommendation": {
+        "primary": "Jordan Avatar Trust Video",
+        "secondary": "AI Cinematic Viral Commercial",
+        "note": "Use both where possible; trust for conversion and cinematic for discovery."
+      },
+      "complianceSafeClaims": [
+        "supports a consistent routine",
+        "helps maintain everyday wellness",
+        "designed to support a premium customer experience"
+      ],
+      "disclaimerLanguage": "Results vary. Individual experience depends on routine, usage, and context.",
+      "tone": "premium, clear, confident, trustworthy",
+      "status": "Brief Generated",
+      "createdAt": "2026-07-03T01:24:19.049Z",
+      "updatedAt": "2026-07-03T01:24:19.049Z"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "script_jordan_7863161487402_1783041858607",
+      "productId": "7863161487402",
+      "videoType": "jordan_avatar",
+      "script": {
+        "id": "script-jordan-coq10-ubiquinone",
+        "campaignId": "vmc-coq10-ubiquinone",
+        "productId": "7863161487402",
+        "productHandle": "coq10-ubiquinone",
+        "productName": "CoQ10 (Ubiquinone)",
+        "sku": "ROC805",
+        "videoType": "Jordan Avatar Trust Video",
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "hookOptions": [
+          "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+          "CoQ10 (Ubiquinone) is built to make the next step feel obvious.",
+          "Here is why CoQ10 (Ubiquinone) fits a daily routine better than guesswork."
+        ],
+        "ctaOptions": [
+          "Tap to view CoQ10 (Ubiquinone) on the product page.",
+          "Shop now to see the full details and usage guidance."
+        ],
+        "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+        "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "spokenScript": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "captionText": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "sceneNotes": [
+          "Open on Jordan speaking directly to camera.",
+          "Show the product image beside the avatar with safe text above or below the head.",
+          "Add a clean product-page CTA end card."
+        ],
+        "status": "Script Generated",
+        "createdAt": "2026-07-03T01:24:18.605Z",
+        "updatedAt": "2026-07-03T01:24:18.605Z"
+      },
+      "createdAt": "2026-07-03T01:24:18.607Z"
+    },
+    {
+      "id": "script-jordan-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+      "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+      "hookOptions": [
+        "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+        "CoQ10 (Ubiquinone) is built to make the next step feel obvious.",
+        "Here is why CoQ10 (Ubiquinone) fits a daily routine better than guesswork."
+      ],
+      "ctaOptions": [
+        "Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "Shop now to see the full details and usage guidance."
+      ],
+      "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+      "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+      "spokenScript": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+      "captionText": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. Tap to view CoQ10 (Ubiquinone) on the product page.",
+      "sceneNotes": [
+        "Open on Jordan speaking directly to camera.",
+        "Show the product image beside the avatar with safe text above or below the head.",
+        "Add a clean product-page CTA end card."
+      ],
+      "status": "Script Generated",
+      "createdAt": "2026-07-03T01:24:19.031Z",
+      "updatedAt": "2026-07-03T01:24:19.031Z"
+    },
+    {
+      "id": "script-jordan-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+      "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+      "hookOptions": [
+        "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+        "Omega 3 Fish Oil is built to make the next step feel obvious.",
+        "Here is why Omega 3 Fish Oil fits a daily routine better than guesswork."
+      ],
+      "ctaOptions": [
+        "Tap to view Omega 3 Fish Oil on the product page.",
+        "Shop now to see the full details and usage guidance."
+      ],
+      "selectedHook": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+      "selectedCta": "Tap to view Omega 3 Fish Oil on the product page.",
+      "spokenScript": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Omega 3 Fish Oil is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+      "captionText": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Tap to view Omega 3 Fish Oil on the product page.",
+      "sceneNotes": [
+        "Open on Jordan speaking directly to camera.",
+        "Show the product image beside the avatar with safe text above or below the head.",
+        "Add a clean product-page CTA end card."
+      ],
+      "status": "Script Generated",
+      "createdAt": "2026-07-03T01:24:19.049Z",
+      "updatedAt": "2026-07-03T01:24:19.049Z"
+    }
+  ],
+  "concepts": [
+    {
+      "id": "concept-cinematic-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "conceptTitle": "CoQ10 (Ubiquinone) | Premium Viral Commercial",
+      "hookOptions": [
+        "This is the kind of product people stop scrolling for.",
+        "A premium product deserves a premium first impression.",
+        "In the first three seconds, the product does the talking."
+      ],
+      "selectedHook": "This is the kind of product people stop scrolling for.",
+      "ctaOptions": [
+        "Tap to view CoQ10 (Ubiquinone) on the product page.",
+        "Shop now to see the full details and usage guidance."
+      ],
+      "sceneList": [
+        {
+          "scene": 1,
+          "description": "Fast premium opener with product silhouette and kinetic typography."
+        },
+        {
+          "scene": 2,
+          "description": "Macro product hero shot with motion blur and glowing highlight pass."
+        },
+        {
+          "scene": 3,
+          "description": "Ingredient or benefit visualization with clean motion and contrast."
+        },
+        {
+          "scene": 4,
+          "description": "Transformation moment with product centered and text safe above/below the face area."
+        },
+        {
+          "scene": 5,
+          "description": "End card with CTA and shop link."
+        }
+      ],
+      "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+      "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography",
+      "captionOverlays": [
+        "Premium product. Clear routine.",
+        "Built for the first scroll stop.",
+        "Product-as-hero visual pacing.",
+        "Tap to shop the full detail page."
+      ],
+      "musicSuggestion": "pulse-driven cinematic percussion with glossy synth accents",
+      "endCard": "Shop now and see why it fits the routine",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.032Z",
+      "updatedAt": "2026-07-03T01:24:19.032Z"
+    },
+    {
+      "id": "concept-cinematic-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "conceptTitle": "Omega 3 Fish Oil | Premium Viral Commercial",
+      "hookOptions": [
+        "This is the kind of product people stop scrolling for.",
+        "A premium product deserves a premium first impression.",
+        "In the first three seconds, the product does the talking."
+      ],
+      "selectedHook": "This is the kind of product people stop scrolling for.",
+      "ctaOptions": [
+        "Tap to view Omega 3 Fish Oil on the product page.",
+        "Shop now to see the full details and usage guidance."
+      ],
+      "sceneList": [
+        {
+          "scene": 1,
+          "description": "Fast premium opener with product silhouette and kinetic typography."
+        },
+        {
+          "scene": 2,
+          "description": "Macro product hero shot with motion blur and glowing highlight pass."
+        },
+        {
+          "scene": 3,
+          "description": "Ingredient or benefit visualization with clean motion and contrast."
+        },
+        {
+          "scene": 4,
+          "description": "Transformation moment with product centered and text safe above/below the face area."
+        },
+        {
+          "scene": 5,
+          "description": "End card with CTA and shop link."
+        }
+      ],
+      "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+      "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography",
+      "captionOverlays": [
+        "Premium product. Clear routine.",
+        "Built for the first scroll stop.",
+        "Product-as-hero visual pacing.",
+        "Tap to shop the full detail page."
+      ],
+      "musicSuggestion": "pulse-driven cinematic percussion with glossy synth accents",
+      "endCard": "Shop now and see why it fits the routine",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.049Z",
+      "updatedAt": "2026-07-03T01:24:19.049Z"
+    }
+  ],
+  "scores": [
+    {
+      "id": "score-jordan-coq10-ubiquinone",
+      "hookStrength": 9,
+      "firstThreeSecondImpact": 6.3,
+      "visualMotionStrength": 5,
+      "productClarity": 9,
+      "benefitClarity": 8,
+      "ctaStrength": 8,
+      "captionReadability": 6,
+      "emotionalPull": 3,
+      "platformFit": 8,
+      "trendAlignment": 3,
+      "brandConsistency": 5,
+      "complianceSafety": 10,
+      "rewatchPotential": 2,
+      "sharePotential": 2,
+      "conversionPotential": 10,
+      "viralScore": 77,
+      "conversionScore": 100,
+      "engagementScore": 52,
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "videoType": "Jordan Avatar Trust Video"
+    },
+    {
+      "id": "score-cinematic-coq10-ubiquinone",
+      "hookStrength": 15,
+      "firstThreeSecondImpact": 10,
+      "visualMotionStrength": 10,
+      "productClarity": 9,
+      "benefitClarity": 5,
+      "ctaStrength": 8,
+      "captionReadability": 6,
+      "emotionalPull": 6,
+      "platformFit": 8,
+      "trendAlignment": 5,
+      "brandConsistency": 5,
+      "complianceSafety": 10,
+      "rewatchPotential": 5,
+      "sharePotential": 5,
+      "conversionPotential": 10,
+      "viralScore": 95,
+      "conversionScore": 98,
+      "engagementScore": 96,
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "videoType": "AI Cinematic Viral Commercial"
+    },
+    {
+      "id": "score-jordan-omega-3-fish-oil",
+      "hookStrength": 12,
+      "firstThreeSecondImpact": 8.399999999999999,
+      "visualMotionStrength": 5,
+      "productClarity": 9,
+      "benefitClarity": 8,
+      "ctaStrength": 8,
+      "captionReadability": 5,
+      "emotionalPull": 3,
+      "platformFit": 8,
+      "trendAlignment": 3,
+      "brandConsistency": 5,
+      "complianceSafety": 10,
+      "rewatchPotential": 2,
+      "sharePotential": 4,
+      "conversionPotential": 10,
+      "viralScore": 82,
+      "conversionScore": 100,
+      "engagementScore": 65,
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "videoType": "Jordan Avatar Trust Video"
+    },
+    {
+      "id": "score-cinematic-omega-3-fish-oil",
+      "hookStrength": 15,
+      "firstThreeSecondImpact": 10,
+      "visualMotionStrength": 10,
+      "productClarity": 9,
+      "benefitClarity": 5,
+      "ctaStrength": 8,
+      "captionReadability": 6,
+      "emotionalPull": 6,
+      "platformFit": 8,
+      "trendAlignment": 5,
+      "brandConsistency": 5,
+      "complianceSafety": 10,
+      "rewatchPotential": 5,
+      "sharePotential": 5,
+      "conversionPotential": 10,
+      "viralScore": 95,
+      "conversionScore": 98,
+      "engagementScore": 96,
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "videoType": "AI Cinematic Viral Commercial"
+    }
+  ],
+  "renders": [
+    {
+      "id": "job-jordan-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "jobType": "Jordan Avatar Trust Video",
+      "provider": "heygen",
+      "jobPayload": {
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "script": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+        "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page."
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "job-cinematic-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "jobType": "AI Cinematic Viral Commercial",
+      "provider": "quality-bits",
+      "jobPayload": {
+        "conceptTitle": "CoQ10 (Ubiquinone) | Premium Viral Commercial",
+        "hook": "This is the kind of product people stop scrolling for.",
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "job-jordan-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "jobType": "Jordan Avatar Trust Video",
+      "provider": "heygen",
+      "jobPayload": {
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "script": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Omega 3 Fish Oil is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "selectedHook": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+        "selectedCta": "Tap to view Omega 3 Fish Oil on the product page."
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "job-cinematic-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "jobType": "AI Cinematic Viral Commercial",
+      "provider": "quality-bits",
+      "jobPayload": {
+        "conceptTitle": "Omega 3 Fish Oil | Premium Viral Commercial",
+        "hook": "This is the kind of product people stop scrolling for.",
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "exports": [
+    {
+      "id": "export-primary_master-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "primary_master",
+      "exportLabel": "Vertical master",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.040Z",
+      "updatedAt": "2026-07-03T01:24:19.040Z"
+    },
+    {
+      "id": "export-feed_square-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "aspectRatio": "1:1",
+      "width": 1080,
+      "height": 1080,
+      "exportType": "feed_square",
+      "exportLabel": "Feed square",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.040Z",
+      "updatedAt": "2026-07-03T01:24:19.040Z"
+    },
+    {
+      "id": "export-widescreen-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "aspectRatio": "16:9",
+      "width": 1920,
+      "height": 1080,
+      "exportType": "widescreen",
+      "exportLabel": "Widescreen",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.040Z",
+      "updatedAt": "2026-07-03T01:24:19.040Z"
+    },
+    {
+      "id": "export-shopify_loop-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "shopify_loop",
+      "exportLabel": "Loop cut",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.040Z",
+      "updatedAt": "2026-07-03T01:24:19.040Z"
+    },
+    {
+      "id": "export-motion_preview-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "motion_preview",
+      "exportLabel": "Motion preview",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.040Z",
+      "updatedAt": "2026-07-03T01:24:19.040Z"
+    },
+    {
+      "id": "export-primary_master-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "primary_master",
+      "exportLabel": "Vertical master",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "export-feed_square-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "aspectRatio": "1:1",
+      "width": 1080,
+      "height": 1080,
+      "exportType": "feed_square",
+      "exportLabel": "Feed square",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "export-widescreen-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "aspectRatio": "16:9",
+      "width": 1920,
+      "height": 1080,
+      "exportType": "widescreen",
+      "exportLabel": "Widescreen",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "export-shopify_loop-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "shopify_loop",
+      "exportLabel": "Loop cut",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "export-motion_preview-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "aspectRatio": "9:16",
+      "width": 1080,
+      "height": 1920,
+      "exportType": "motion_preview",
+      "exportLabel": "Motion preview",
+      "fileUrl": "",
+      "storageUrl": "",
+      "status": "Media Assets Ready",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    }
+  ],
+  "publishing": [
+    {
+      "id": "publish-coq10-ubiquinone-facebook-feed",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Facebook Feed",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 20,
+      "caption": "CoQ10 (Ubiquinone) | Facebook Feed",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T01:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-instagram-feed",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Instagram Feed",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 20,
+      "caption": "CoQ10 (Ubiquinone) | Instagram Feed",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T02:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-shopify-product-page",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Shopify Product Page",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 25,
+      "caption": "CoQ10 (Ubiquinone) | Shopify Product Page",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T03:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-email",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Email",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 15,
+      "caption": "CoQ10 (Ubiquinone) | Email",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T04:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-retargeting-ads",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Retargeting Ads",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 15,
+      "caption": "CoQ10 (Ubiquinone) | Retargeting Ads",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T05:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-tiktok",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "TikTok",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 18,
+      "caption": "CoQ10 (Ubiquinone) | TikTok",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T01:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-instagram-reels",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Instagram Reels",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 18,
+      "caption": "CoQ10 (Ubiquinone) | Instagram Reels",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T02:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-youtube-shorts",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "YouTube Shorts",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 20,
+      "caption": "CoQ10 (Ubiquinone) | YouTube Shorts",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T03:24:19.041Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.041Z",
+      "updatedAt": "2026-07-03T01:24:19.041Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-pinterest",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Pinterest",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 20,
+      "caption": "CoQ10 (Ubiquinone) | Pinterest",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T04:24:19.042Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.042Z",
+      "updatedAt": "2026-07-03T01:24:19.042Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-shopify-homepage",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Shopify Homepage",
+      "preferredAspectRatio": "16:9",
+      "idealLengthSeconds": 8,
+      "caption": "CoQ10 (Ubiquinone) | Shopify Homepage",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T05:24:19.042Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.042Z",
+      "updatedAt": "2026-07-03T01:24:19.042Z"
+    },
+    {
+      "id": "publish-coq10-ubiquinone-shopify-collection-page",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Shopify Collection Page",
+      "preferredAspectRatio": "16:9",
+      "idealLengthSeconds": 8,
+      "caption": "CoQ10 (Ubiquinone) | Shopify Collection Page",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#coq10ubiquinone"
+      ],
+      "cta": "Tap to view CoQ10 (Ubiquinone)",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T06:24:19.042Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.042Z",
+      "updatedAt": "2026-07-03T01:24:19.042Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-facebook-feed",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Facebook Feed",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 20,
+      "caption": "Omega 3 Fish Oil | Facebook Feed",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T01:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-instagram-feed",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Instagram Feed",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 20,
+      "caption": "Omega 3 Fish Oil | Instagram Feed",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T02:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-shopify-product-page",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Shopify Product Page",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 25,
+      "caption": "Omega 3 Fish Oil | Shopify Product Page",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T03:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-email",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Email",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 15,
+      "caption": "Omega 3 Fish Oil | Email",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T04:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-retargeting-ads",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Retargeting Ads",
+      "preferredAspectRatio": "1:1",
+      "idealLengthSeconds": 15,
+      "caption": "Omega 3 Fish Oil | Retargeting Ads",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T05:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-tiktok",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "TikTok",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 18,
+      "caption": "Omega 3 Fish Oil | TikTok",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T01:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-instagram-reels",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Instagram Reels",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 18,
+      "caption": "Omega 3 Fish Oil | Instagram Reels",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T02:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-youtube-shorts",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "YouTube Shorts",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 20,
+      "caption": "Omega 3 Fish Oil | YouTube Shorts",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T03:24:19.050Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.050Z",
+      "updatedAt": "2026-07-03T01:24:19.050Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-pinterest",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Pinterest",
+      "preferredAspectRatio": "9:16",
+      "idealLengthSeconds": 20,
+      "caption": "Omega 3 Fish Oil | Pinterest",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T04:24:19.051Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-shopify-homepage",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Shopify Homepage",
+      "preferredAspectRatio": "16:9",
+      "idealLengthSeconds": 8,
+      "caption": "Omega 3 Fish Oil | Shopify Homepage",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T05:24:19.051Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "publish-omega-3-fish-oil-shopify-collection-page",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "Shopify Collection Page",
+      "preferredAspectRatio": "16:9",
+      "idealLengthSeconds": 8,
+      "caption": "Omega 3 Fish Oil | Shopify Collection Page",
+      "hashtags": [
+        "#IAGT",
+        "#EVICS",
+        "#Shopify",
+        "#omega3fishoil"
+      ],
+      "cta": "Tap to view Omega 3 Fish Oil",
+      "thumbnailUrl": "",
+      "scheduledAt": "2026-07-03T06:24:19.051Z",
+      "publishedUrl": "",
+      "postId": "",
+      "performanceMetrics": {},
+      "nextAction": "Manual approval",
+      "status": "Manual Approval",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "performanceMetrics": [],
+  "learningLoop": [
+    {
+      "id": "insight-coq10-ubiquinone-jordan-avatar-trust-video",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "question": "Which direction performed best for CoQ10 (Ubiquinone)?",
+      "answer": "CTA clarity and product clarity were strongest.",
+      "metricName": "conversion_score",
+      "metricValue": 100,
+      "insightJson": {
+        "boardDecision": "Needs Review",
+        "recommendation": "Keep the premium tone and clear product positioning.",
+        "strongestMetric": "conversion_score",
+        "nextAction": "Revise the creative and regenerate."
+      },
+      "status": "Learning Loop Updated",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "insight-coq10-ubiquinone-ai-cinematic-viral-commercial",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "question": "Which direction performed best for CoQ10 (Ubiquinone)?",
+      "answer": "CTA clarity and product clarity were strongest.",
+      "metricName": "conversion_score",
+      "metricValue": 98,
+      "insightJson": {
+        "boardDecision": "Approved",
+        "recommendation": "Keep the premium tone and clear product positioning.",
+        "strongestMetric": "conversion_score",
+        "nextAction": "Schedule the approved asset."
+      },
+      "status": "Learning Loop Updated",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "insight-omega-3-fish-oil-jordan-avatar-trust-video",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "question": "Which direction performed best for Omega 3 Fish Oil?",
+      "answer": "CTA clarity and product clarity were strongest.",
+      "metricName": "conversion_score",
+      "metricValue": 100,
+      "insightJson": {
+        "boardDecision": "Needs Review",
+        "recommendation": "Keep the premium tone and clear product positioning.",
+        "strongestMetric": "conversion_score",
+        "nextAction": "Revise the creative and regenerate."
+      },
+      "status": "Learning Loop Updated",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "insight-omega-3-fish-oil-ai-cinematic-viral-commercial",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "question": "Which direction performed best for Omega 3 Fish Oil?",
+      "answer": "CTA clarity and product clarity were strongest.",
+      "metricName": "conversion_score",
+      "metricValue": 98,
+      "insightJson": {
+        "boardDecision": "Approved",
+        "recommendation": "Keep the premium tone and clear product positioning.",
+        "strongestMetric": "conversion_score",
+        "nextAction": "Schedule the approved asset."
+      },
+      "status": "Learning Loop Updated",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "boardReviews": [
+    {
+      "id": "board-coq10-ubiquinone-jordan-avatar-trust-video",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "approvalScore": 82,
+      "recommendedImprovements": [
+        "Keep the premium tone and clear product positioning.",
+        "Strengthen the first three seconds and add one stronger curiosity hook.",
+        "Keep all language support-based and avoid medical claims.",
+        "Show the product name and what it solves immediately.",
+        "Make the CTA direct and visible in the last card.",
+        "Keep motion premium and avoid clutter.",
+        "Match the platform format to the video type.",
+        "Lead with confidence, clarity, and low friction.",
+        "Attach the product page link and maintain purchase confidence.",
+        "Use the top-performing structure as the template for scaling."
+      ],
+      "revisedHook": "Lead with a faster, more specific hook for CoQ10 (Ubiquinone).",
+      "revisedCta": "",
+      "revisedPlatformStrategy": "Prioritize Facebook Feed, Instagram Feed, Shopify Product Page, and Retargeting.",
+      "regenerationReason": "",
+      "finalPublishDecision": "Needs Review",
+      "roles": [
+        {
+          "role": "Brand Strategist",
+          "score": 5,
+          "recommendation": "Keep the premium tone and clear product positioning."
+        },
+        {
+          "role": "Viral Growth Advisor",
+          "score": 6,
+          "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+        },
+        {
+          "role": "Supplement Compliance Advisor",
+          "score": 10,
+          "recommendation": "Keep all language support-based and avoid medical claims."
+        },
+        {
+          "role": "Product Positioning Advisor",
+          "score": 9,
+          "recommendation": "Show the product name and what it solves immediately."
+        },
+        {
+          "role": "Conversion Copywriter",
+          "score": 10,
+          "recommendation": "Make the CTA direct and visible in the last card."
+        },
+        {
+          "role": "Creative Director",
+          "score": 5,
+          "recommendation": "Keep motion premium and avoid clutter."
+        },
+        {
+          "role": "Platform Algorithm Analyst",
+          "score": 8,
+          "recommendation": "Match the platform format to the video type."
+        },
+        {
+          "role": "Customer Psychology Advisor",
+          "score": 3,
+          "recommendation": "Lead with confidence, clarity, and low friction."
+        },
+        {
+          "role": "Shopify Sales Advisor",
+          "score": 10,
+          "recommendation": "Attach the product page link and maintain purchase confidence."
+        },
+        {
+          "role": "AI Workflow Optimizer",
+          "score": 5.2,
+          "recommendation": "Use the top-performing structure as the template for scaling."
+        }
+      ],
+      "status": "Needs Review",
+      "createdAt": "2026-07-03T01:24:19.043Z",
+      "updatedAt": "2026-07-03T01:24:19.043Z"
+    },
+    {
+      "id": "board-coq10-ubiquinone-ai-cinematic-viral-commercial",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "approvalScore": 97,
+      "recommendedImprovements": [
+        "Keep the premium tone and clear product positioning.",
+        "Strengthen the first three seconds and add one stronger curiosity hook.",
+        "Keep all language support-based and avoid medical claims.",
+        "Show the product name and what it solves immediately.",
+        "Make the CTA direct and visible in the last card.",
+        "Keep motion premium and avoid clutter.",
+        "Match the platform format to the video type.",
+        "Lead with confidence, clarity, and low friction.",
+        "Attach the product page link and maintain purchase confidence.",
+        "Use the top-performing structure as the template for scaling."
+      ],
+      "revisedHook": "",
+      "revisedCta": "",
+      "revisedPlatformStrategy": "Prioritize TikTok, Reels, Shorts, and Pinterest for discovery.",
+      "regenerationReason": "",
+      "finalPublishDecision": "Approved",
+      "roles": [
+        {
+          "role": "Brand Strategist",
+          "score": 5,
+          "recommendation": "Keep the premium tone and clear product positioning."
+        },
+        {
+          "role": "Viral Growth Advisor",
+          "score": 10,
+          "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+        },
+        {
+          "role": "Supplement Compliance Advisor",
+          "score": 10,
+          "recommendation": "Keep all language support-based and avoid medical claims."
+        },
+        {
+          "role": "Product Positioning Advisor",
+          "score": 9,
+          "recommendation": "Show the product name and what it solves immediately."
+        },
+        {
+          "role": "Conversion Copywriter",
+          "score": 10,
+          "recommendation": "Make the CTA direct and visible in the last card."
+        },
+        {
+          "role": "Creative Director",
+          "score": 10,
+          "recommendation": "Keep motion premium and avoid clutter."
+        },
+        {
+          "role": "Platform Algorithm Analyst",
+          "score": 8,
+          "recommendation": "Match the platform format to the video type."
+        },
+        {
+          "role": "Customer Psychology Advisor",
+          "score": 6,
+          "recommendation": "Lead with confidence, clarity, and low friction."
+        },
+        {
+          "role": "Shopify Sales Advisor",
+          "score": 9.8,
+          "recommendation": "Attach the product page link and maintain purchase confidence."
+        },
+        {
+          "role": "AI Workflow Optimizer",
+          "score": 9.6,
+          "recommendation": "Use the top-performing structure as the template for scaling."
+        }
+      ],
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.043Z",
+      "updatedAt": "2026-07-03T01:24:19.043Z"
+    },
+    {
+      "id": "board-omega-3-fish-oil-jordan-avatar-trust-video",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "approvalScore": 87,
+      "recommendedImprovements": [
+        "Keep the premium tone and clear product positioning.",
+        "Strengthen the first three seconds and add one stronger curiosity hook.",
+        "Keep all language support-based and avoid medical claims.",
+        "Show the product name and what it solves immediately.",
+        "Make the CTA direct and visible in the last card.",
+        "Keep motion premium and avoid clutter.",
+        "Match the platform format to the video type.",
+        "Lead with confidence, clarity, and low friction.",
+        "Attach the product page link and maintain purchase confidence.",
+        "Use the top-performing structure as the template for scaling."
+      ],
+      "revisedHook": "",
+      "revisedCta": "",
+      "revisedPlatformStrategy": "Prioritize Facebook Feed, Instagram Feed, Shopify Product Page, and Retargeting.",
+      "regenerationReason": "",
+      "finalPublishDecision": "Needs Review",
+      "roles": [
+        {
+          "role": "Brand Strategist",
+          "score": 5,
+          "recommendation": "Keep the premium tone and clear product positioning."
+        },
+        {
+          "role": "Viral Growth Advisor",
+          "score": 8,
+          "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+        },
+        {
+          "role": "Supplement Compliance Advisor",
+          "score": 10,
+          "recommendation": "Keep all language support-based and avoid medical claims."
+        },
+        {
+          "role": "Product Positioning Advisor",
+          "score": 9,
+          "recommendation": "Show the product name and what it solves immediately."
+        },
+        {
+          "role": "Conversion Copywriter",
+          "score": 10,
+          "recommendation": "Make the CTA direct and visible in the last card."
+        },
+        {
+          "role": "Creative Director",
+          "score": 5,
+          "recommendation": "Keep motion premium and avoid clutter."
+        },
+        {
+          "role": "Platform Algorithm Analyst",
+          "score": 8,
+          "recommendation": "Match the platform format to the video type."
+        },
+        {
+          "role": "Customer Psychology Advisor",
+          "score": 3,
+          "recommendation": "Lead with confidence, clarity, and low friction."
+        },
+        {
+          "role": "Shopify Sales Advisor",
+          "score": 10,
+          "recommendation": "Attach the product page link and maintain purchase confidence."
+        },
+        {
+          "role": "AI Workflow Optimizer",
+          "score": 6.5,
+          "recommendation": "Use the top-performing structure as the template for scaling."
+        }
+      ],
+      "status": "Needs Review",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "board-omega-3-fish-oil-ai-cinematic-viral-commercial",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "approvalScore": 97,
+      "recommendedImprovements": [
+        "Keep the premium tone and clear product positioning.",
+        "Strengthen the first three seconds and add one stronger curiosity hook.",
+        "Keep all language support-based and avoid medical claims.",
+        "Show the product name and what it solves immediately.",
+        "Make the CTA direct and visible in the last card.",
+        "Keep motion premium and avoid clutter.",
+        "Match the platform format to the video type.",
+        "Lead with confidence, clarity, and low friction.",
+        "Attach the product page link and maintain purchase confidence.",
+        "Use the top-performing structure as the template for scaling."
+      ],
+      "revisedHook": "",
+      "revisedCta": "",
+      "revisedPlatformStrategy": "Prioritize TikTok, Reels, Shorts, and Pinterest for discovery.",
+      "regenerationReason": "",
+      "finalPublishDecision": "Approved",
+      "roles": [
+        {
+          "role": "Brand Strategist",
+          "score": 5,
+          "recommendation": "Keep the premium tone and clear product positioning."
+        },
+        {
+          "role": "Viral Growth Advisor",
+          "score": 10,
+          "recommendation": "Strengthen the first three seconds and add one stronger curiosity hook."
+        },
+        {
+          "role": "Supplement Compliance Advisor",
+          "score": 10,
+          "recommendation": "Keep all language support-based and avoid medical claims."
+        },
+        {
+          "role": "Product Positioning Advisor",
+          "score": 9,
+          "recommendation": "Show the product name and what it solves immediately."
+        },
+        {
+          "role": "Conversion Copywriter",
+          "score": 10,
+          "recommendation": "Make the CTA direct and visible in the last card."
+        },
+        {
+          "role": "Creative Director",
+          "score": 10,
+          "recommendation": "Keep motion premium and avoid clutter."
+        },
+        {
+          "role": "Platform Algorithm Analyst",
+          "score": 8,
+          "recommendation": "Match the platform format to the video type."
+        },
+        {
+          "role": "Customer Psychology Advisor",
+          "score": 6,
+          "recommendation": "Lead with confidence, clarity, and low friction."
+        },
+        {
+          "role": "Shopify Sales Advisor",
+          "score": 9.8,
+          "recommendation": "Attach the product page link and maintain purchase confidence."
+        },
+        {
+          "role": "AI Workflow Optimizer",
+          "score": 9.6,
+          "recommendation": "Use the top-performing structure as the template for scaling."
+        }
+      ],
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "creativeTemplates": [
+    {
+      "id": "template-jordan-trust",
+      "templateName": "Jordan Avatar Trust Video",
+      "videoType": "Jordan Avatar Trust Video",
+      "platform": "Facebook Feed",
+      "status": "Approved",
+      "templateJson": {
+        "structure": [
+          "hook",
+          "problem",
+          "benefit",
+          "proof",
+          "cta"
+        ],
+        "tone": "confident, trustworthy, clear, premium",
+        "safeZones": [
+          "top",
+          "bottom"
+        ],
+        "lengthSeconds": 20
+      }
+    },
+    {
+      "id": "template-ai-cinematic",
+      "templateName": "AI Cinematic Viral Commercial",
+      "videoType": "AI Cinematic Viral Commercial",
+      "platform": "TikTok",
+      "status": "Approved",
+      "templateJson": {
+        "structure": [
+          "hook",
+          "scene_1",
+          "scene_2",
+          "scene_3",
+          "end_card"
+        ],
+        "tone": "cinematic, energetic, luxury wellness, thumb-stopping",
+        "safeZones": [
+          "top",
+          "bottom"
+        ],
+        "lengthSeconds": 18
+      }
+    }
+  ],
+  "hookTests": [
+    {
+      "id": "hook-coq10-ubiquinone-1",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "hookText": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+      "hookScore": 9,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "hook-coq10-ubiquinone-2",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "hookText": "This is the kind of product people stop scrolling for.",
+      "hookScore": 15,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "hook-omega-3-fish-oil-1",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "hookText": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+      "hookScore": 12,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "hook-omega-3-fish-oil-2",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "hookText": "This is the kind of product people stop scrolling for.",
+      "hookScore": 15,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "ctaTests": [
+    {
+      "id": "cta-coq10-ubiquinone-1",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "Jordan Avatar Trust Video",
+      "ctaText": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+      "ctaScore": 8,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.045Z",
+      "updatedAt": "2026-07-03T01:24:19.045Z"
+    },
+    {
+      "id": "cta-coq10-ubiquinone-2",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "videoType": "AI Cinematic Viral Commercial",
+      "ctaText": "Tap to view CoQ10 (Ubiquinone) on the product page.",
+      "ctaScore": 8,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.046Z",
+      "updatedAt": "2026-07-03T01:24:19.046Z"
+    },
+    {
+      "id": "cta-omega-3-fish-oil-1",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "Jordan Avatar Trust Video",
+      "ctaText": "Tap to view Omega 3 Fish Oil on the product page.",
+      "ctaScore": 8,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "cta-omega-3-fish-oil-2",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "videoType": "AI Cinematic Viral Commercial",
+      "ctaText": "Tap to view Omega 3 Fish Oil on the product page.",
+      "ctaScore": 8,
+      "winner": true,
+      "status": "Approved",
+      "createdAt": "2026-07-03T01:24:19.052Z",
+      "updatedAt": "2026-07-03T01:24:19.052Z"
+    }
+  ],
+  "audienceSegments": [
+    {
+      "id": "segment-warm-retargeting",
+      "segmentName": "Warm Retargeting",
+      "status": "Approved",
+      "segmentProfile": {
+        "intent": "People who viewed a product page or watched a prior video",
+        "message": "Trust-first explanation and clear CTA"
+      },
+      "platformPriority": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Retargeting Ads"
+      ]
+    },
+    {
+      "id": "segment-discovery-scroll-stoppers",
+      "segmentName": "Discovery Scroll Stoppers",
+      "status": "Approved",
+      "segmentProfile": {
+        "intent": "New audiences in feed and short-form discovery",
+        "message": "Fast hook, premium motion, visual first impression"
+      },
+      "platformPriority": [
+        "TikTok",
+        "Instagram Reels",
+        "YouTube Shorts",
+        "Pinterest"
+      ]
+    },
+    {
+      "id": "segment-shopify-high-intent",
+      "segmentName": "Shopify High Intent",
+      "status": "Approved",
+      "segmentProfile": {
+        "intent": "Shoppers already on product pages or collections",
+        "message": "Product proof, value clarity, purchase confidence"
+      },
+      "platformPriority": [
+        "Shopify Product Page",
+        "Shopify Homepage",
+        "Shopify Collection Page",
+        "Email"
+      ]
+    }
+  ],
+  "mediaGenerationJobs": [
+    {
+      "id": "job-jordan-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "jobType": "Jordan Avatar Trust Video",
+      "provider": "heygen",
+      "jobPayload": {
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "script": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist. CoQ10 (Ubiquinone) is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "selectedHook": "If you want a simpler routine, CoQ10 (Ubiquinone) belongs on your shortlist.",
+        "selectedCta": "Tap to view CoQ10 (Ubiquinone) on the product page."
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "job-cinematic-coq10-ubiquinone",
+      "campaignId": "vmc-coq10-ubiquinone",
+      "productId": "7863161487402",
+      "productHandle": "coq10-ubiquinone",
+      "productName": "CoQ10 (Ubiquinone)",
+      "sku": "ROC805",
+      "jobType": "AI Cinematic Viral Commercial",
+      "provider": "quality-bits",
+      "jobPayload": {
+        "conceptTitle": "CoQ10 (Ubiquinone) | Premium Viral Commercial",
+        "hook": "This is the kind of product people stop scrolling for.",
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.044Z",
+      "updatedAt": "2026-07-03T01:24:19.044Z"
+    },
+    {
+      "id": "job-jordan-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "jobType": "Jordan Avatar Trust Video",
+      "provider": "heygen",
+      "jobPayload": {
+        "avatarId": "20d2910e3d2b4890b676a4259d80c6a0",
+        "voiceId": "fd407cedebcc4f29bdbd75ba45c01ea7",
+        "script": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist. Omega 3 Fish Oil is designed to support a more consistent routine without making it complicated. It is easy to understand, easy to use, and the product page lays out the details clearly. If you want a confident next step, tap below and take a look.",
+        "selectedHook": "If you want a simpler routine, Omega 3 Fish Oil belongs on your shortlist.",
+        "selectedCta": "Tap to view Omega 3 Fish Oil on the product page."
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    },
+    {
+      "id": "job-cinematic-omega-3-fish-oil",
+      "campaignId": "vmc-omega-3-fish-oil",
+      "productId": "7863161389098",
+      "productHandle": "omega-3-fish-oil",
+      "productName": "Omega 3 Fish Oil",
+      "sku": "ROC814",
+      "jobType": "AI Cinematic Viral Commercial",
+      "provider": "quality-bits",
+      "jobPayload": {
+        "conceptTitle": "Omega 3 Fish Oil | Premium Viral Commercial",
+        "hook": "This is the kind of product people stop scrolling for.",
+        "sceneList": [
+          {
+            "scene": 1,
+            "description": "Fast premium opener with product silhouette and kinetic typography."
+          },
+          {
+            "scene": 2,
+            "description": "Macro product hero shot with motion blur and glowing highlight pass."
+          },
+          {
+            "scene": 3,
+            "description": "Ingredient or benefit visualization with clean motion and contrast."
+          },
+          {
+            "scene": 4,
+            "description": "Transformation moment with product centered and text safe above/below the face area."
+          },
+          {
+            "scene": 5,
+            "description": "End card with CTA and shop link."
+          }
+        ],
+        "visualStyle": "cinematic, luxury wellness, fast pacing, premium contrast, electric blue and gold accents",
+        "motionDirection": "high-energy cuts, subtle parallax, product hero zooms, and polished typography"
+      },
+      "externalJobId": "",
+      "jobStatus": "Media Assets Ready",
+      "status": "Media Assets Ready",
+      "retryCount": 0,
+      "renderStatus": "Media Assets Ready",
+      "reason": "",
+      "createdAt": "2026-07-03T01:24:19.051Z",
+      "updatedAt": "2026-07-03T01:24:19.051Z"
+    }
+  ],
+  "regenerationQueue": [],
+  "summary": {
+    "totalProducts": 2,
+    "briefGenerated": 2,
+    "scriptsGenerated": 2,
+    "mediaAssetsReady": 2,
+    "rendering": 0,
+    "renderComplete": 0,
+    "needsReview": 0,
+    "approved": 2,
+    "scheduled": 0,
+    "published": 0,
+    "learningLoopUpdated": 4,
+    "needsRegeneration": 0
+  }
+}

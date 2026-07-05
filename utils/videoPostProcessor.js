@@ -100,14 +100,17 @@ async function postProcessVideo({
       inputs.push('-i', productPath);
       // Overlay product image at bottom-right, scaled to 20% of video width
       // Video is 1080x1920 (9:16), so product = ~200px wide
-      filterComplex = `${productLayerFilter};[0:v][prod]overlay=W-w-40:H-h-280[withprod];[withprod]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+      // Brand label and product name are placed in the bottom-safe zone (below avatar neck).
+      // For 9:16 portrait (1080x1920): neck ends ~y=950; safe labels at h-text_h-180 and h-text_h-130.
+      filterComplex = `${productLayerFilter};[0:v][prod]overlay=W-w-40:H-h-280[withprod];[withprod]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=h-text_h-180:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=h-text_h-130:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     } catch {
       // If product download fails, just add CTA text
-      filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+      // If product download fails, just add CTA text — labels still in bottom-safe zone
+      filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=h-text_h-180:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=h-text_h-130:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     }
   } else {
-    // No product image — just add CTA text overlay
-    filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=40:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=92:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+    // No product image — just add CTA text overlay, labels in bottom-safe zone
+    filterComplex = `[0:v]drawtext=text='${brand}':fontsize=34:fontcolor=white:borderw=2:bordercolor=0x00c7f5@0.5:box=1:boxcolor=0x07111bcc:x=40:y=h-text_h-180:font=Sans[brandtxt];[brandtxt]drawtext=text='${productName}':fontsize=36:fontcolor=white:borderw=2:bordercolor=0x000000@0.7:box=1:boxcolor=0x111722bb:x=40:y=h-text_h-130:font=Sans[producttxt];[producttxt]drawtext=text='${escapeFFmpegText(cta)}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
   }
 
   // Run ffmpeg
@@ -147,9 +150,12 @@ function escapeFFmpegText(text) {
   return text.replace(/'/g, "'\\''").replace(/:/g, '\\:').replace(/\\/g, '\\\\');
 }
 
+// All text overlays are locked to the bottom-safe zone only.
+// For 9:16 portrait (1080×1920) the avatar head/neck occupies roughly y=0–950.
+// Safe bottom zone: y > h-text_h-200 (approx y > 1720 for a 40px-tall label).
+// 'top' is intentionally removed — it would overlay the avatar's face/crown.
 function resolveFaceSafeTextPlacement(textOverlayPosition) {
-  const pos = String(textOverlayPosition || '').trim().toLowerCase();
-  if (pos === 'top') return { x: 'w-text_w-40', y: '48' };
+  // Always bottom-safe regardless of requested position
   return { x: '40', y: 'h-text_h-92' };
 }
 

@@ -19,6 +19,9 @@ const {
   buildCampaignFromProduct,
   buildBatchCampaigns,
   buildMediaLibraryItems,
+  scrapeSimilarAdsForCatalog,
+  getSimilarAds,
+  buildScriptReferenceDecision,
   normalizeProductRecord,
   computeSummary
 } = require('../utils/viralMediaEngine');
@@ -72,6 +75,108 @@ function createViralMediaRouter() {
         success: true,
         count: products.length,
         products: products.map(p => normalizeProductRecord(p, state)),
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      return sendJson(res, 500, {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // ========== SIMILAR ADS SCRAPING ==========
+  router.post('/similar-ads/scrape', async (req, res) => {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const limit = Number(body.limit || body.productLimit || 25);
+      const perProduct = Number(body.perProduct || body.topPerProduct || 3);
+      const result = await scrapeSimilarAdsForCatalog({
+        limit: limit,
+        perProduct: perProduct,
+        resultsPerQuery: Number(body.resultsPerQuery || 8)
+      });
+      return sendJson(res, 200, {
+        success: true,
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      return sendJson(res, 500, {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/similar-ads', (req, res) => {
+    try {
+      const productRef = req.query.productHandle || req.query.productId || req.query.productName || '';
+      const items = getSimilarAds(productRef, {
+        limit: Number(req.query.limit || 300)
+      });
+      return sendJson(res, 200, {
+        success: true,
+        count: items.length,
+        productRef: productRef || null,
+        items: items,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      return sendJson(res, 500, {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/products/:productHandle/similar-ads', (req, res) => {
+    try {
+      const productHandle = String(req.params.productHandle || '').trim();
+      if (!productHandle) {
+        return sendJson(res, 400, {
+          success: false,
+          error: 'Missing productHandle.'
+        });
+      }
+      const items = getSimilarAds(productHandle, {
+        limit: Number(req.query.limit || 12)
+      });
+      const scriptDecision = buildScriptReferenceDecision(productHandle, {
+        minimumScore: Number(req.query.minimumScore || 70)
+      });
+      return sendJson(res, 200, {
+        success: true,
+        productHandle: productHandle,
+        count: items.length,
+        topFormats: Array.from(new Set(items.map((item) => item.formatLabel))).slice(0, 3),
+        items: items,
+        scriptDecision: scriptDecision,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      return sendJson(res, 500, {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/agents/script-references', (req, res) => {
+    try {
+      const productRef = String(req.query.productHandle || req.query.productId || req.query.productName || '').trim();
+      if (!productRef) {
+        return sendJson(res, 400, {
+          success: false,
+          error: 'Provide productHandle, productId, or productName.'
+        });
+      }
+      const decision = buildScriptReferenceDecision(productRef, {
+        minimumScore: Number(req.query.minimumScore || 70)
+      });
+      return sendJson(res, 200, {
+        success: true,
+        ...decision,
         timestamp: new Date().toISOString()
       });
     } catch (error) {

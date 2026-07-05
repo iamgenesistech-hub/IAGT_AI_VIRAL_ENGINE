@@ -192,7 +192,7 @@ function buildAPlusVideoAgentPrompt(prompt, context = {}) {
     `Create an A+ portrait product video for ${platform}, about ${duration}, for ${companyLabel}'s ${productName}.`,
     'Use a natural direct-to-camera story, not a rigid timestamped scene list. The presenter should sound confident, conversational, and premium -- like a creator sharing a product they genuinely believe belongs in a daily routine.',
     'Open with a bold, scroll-stopping statement. Flow into a simple product benefit, a clean product reveal, the actual primary product mockup, and a direct shop-today call to action. Avoid medical claims, guarantees, cure/treat language, military-owned/operated claims, and clutter.',
-    'The company label must be visible in the frame throughout the render. Text overlays must appear only above the avatar/character head (top margin) or below the neck (bottom margin), never across the face/head/neck region. The CTA must end on the real purchase destination or product page.',
+    'The company label must be visible in the frame throughout the render. Text overlays must appear ONLY below the avatar\'s neck (bottom 20% of frame — below y=1530 in a 1080×1920 portrait video). Text must NEVER appear across the face, head, or neck of the avatar. No text in the upper 80% of the frame.',
     'Let Video Agent handle production choices, but keep the feel high-contrast, polished, premium, caption-friendly, and optimized for TikTok/Reels/Shorts.',
     productPageUrl ? `Destination: ${productPageUrl}` : '',
     `Core brief: ${cleanPrompt}`,

@@ -4,11 +4,77 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EVICS Executive Command Workspace</title>
+    <meta name="evics-workspace-build" content="2026-07-04T10:55:00Z" />
     <meta name="description" content="EVICS executive command workspace with live operational monitors." />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="media-output.css" />
+    <!-- Critical inline CSS: shows brand immediately before app.js fires -->
+    <style>
+      #evics-boot-splash {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        color: #eff5fb;
+        gap: 18px;
+        padding: 40px;
+      }
+      #evics-boot-splash .splash-logo {
+        display: grid;
+        place-items: center;
+        width: 56px; height: 56px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f0d898 0%, #d9bf7a 55%, #9a7a32 100%);
+        color: #070b11;
+        font-weight: 900;
+        font-size: 18px;
+        letter-spacing: -0.5px;
+        box-shadow: 0 0 22px rgba(217,191,122,.3);
+      }
+      #evics-boot-splash .splash-title { font-size: 18px; font-weight: 700; color: #eff5fb; }
+      #evics-boot-splash .splash-sub { font-size: 12px; color: #90a4bb; letter-spacing: 0.08em; text-transform: uppercase; }
+      #evics-boot-splash .splash-spinner {
+        width: 28px; height: 28px;
+        border: 3px solid rgba(0,199,245,.15);
+        border-top-color: #00c7f5;
+        border-radius: 50%;
+        animation: evics-spin 0.8s linear infinite;
+      }
+      @keyframes evics-spin { to { transform: rotate(360deg); } }
+      #evics-error-banner {
+        display: none;
+        margin: 24px;
+        padding: 20px 24px;
+        border: 1px solid rgba(255,90,104,.35);
+        background: rgba(255,90,104,.08);
+        border-radius: 8px;
+        color: #eff5fb;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      #evics-error-banner strong { color: #ff5a68; display: block; margin-bottom: 6px; }
+      #evics-error-banner code { font-size: 12px; color: #90a4bb; display: block; margin-top: 8px; word-break: break-all; }
+    </style>
   </head>
   <body class="exec-shell-body">
+    <!-- Global JS error capture — must run before any script loads -->
+    <script>
+      window.__evicsBootErrors = [];
+      window.onerror = function (msg, src, line, col, err) {
+        window.__evicsBootErrors.push({ msg: msg, src: src, line: line, col: col });
+        var banner = document.getElementById('evics-error-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.innerHTML = '<strong>⚠ EVICS Boot Error — Dashboard loading failed</strong>'
+            + 'A script error prevented the workspace from loading. Reload to retry, or check the browser console for details.'
+            + '<code>' + msg + ' (' + src + ':' + line + ')</code>';
+        }
+        var splash = document.getElementById('evics-boot-splash');
+        if (splash) splash.style.display = 'none';
+      };
+    </script>
+
     <header class="exec-shell-header">
       <div class="exec-shell-brand">
         <span class="exec-mark">EVICS</span>
@@ -28,8 +94,24 @@
     </header>
 
     <main class="exec-shell-main">
+      <!-- Loading splash shown until app.js calls render() and hides it -->
+      <div id="evics-boot-splash">
+        <div class="splash-logo">EVICS</div>
+        <div class="splash-title">I AM GENESIS TECH</div>
+        <div class="splash-sub">Elite Viral Intelligence Control System</div>
+        <div class="splash-spinner"></div>
+        <div class="splash-sub" id="evics-boot-status">Loading workspace…</div>
+      </div>
+      <div id="evics-error-banner"></div>
       <div id="app"></div>
     </main>
+
+    <noscript>
+      <div style="padding:40px;color:#eff5fb;background:#070b11;font-family:sans-serif">
+        <strong>JavaScript Required</strong><br>
+        EVICS requires JavaScript to run. Please enable JavaScript in your browser.
+      </div>
+    </noscript>
 
     <script src="config.js"></script>
     <script src="supabase.js"></script>
@@ -37,17 +119,41 @@
     <script src="app.js"></script>
     <script>
       (function () {
-        const pulse = document.getElementById('evicsPulse');
+        var pulse = document.getElementById('evicsPulse');
+        var splash = document.getElementById('evics-boot-splash');
+        var bootStatus = document.getElementById('evics-boot-status');
 
-        async function refreshExecutiveMonitors() {
+        // Hide splash once app has rendered content into #app
+        function checkAppMounted() {
+          var app = document.getElementById('app');
+          if (app && app.children.length > 0) {
+            if (splash) splash.style.display = 'none';
+            return true;
+          }
+          return false;
+        }
+
+        var mountCheck = setInterval(function () {
+          if (checkAppMounted()) clearInterval(mountCheck);
+        }, 100);
+
+        // Safety timeout: if nothing renders in 8 seconds, show fallback message
+        setTimeout(function () {
+          clearInterval(mountCheck);
+          if (!checkAppMounted()) {
+            if (bootStatus) bootStatus.textContent = 'Workspace still loading — check network or try a hard refresh (Ctrl+Shift+R).';
+          }
+        }, 8000);
+
+        function refreshExecutiveMonitors() {
           try {
-            pulse.textContent = `Live at ${new Date().toLocaleTimeString()} · Executive telemetry active`;
-          } catch (error) {
-            pulse.textContent = 'Monitor sync degraded';
+            if (pulse) pulse.textContent = 'Live at ' + new Date().toLocaleTimeString() + ' \u00b7 Executive telemetry active';
+          } catch (e) {
+            if (pulse) pulse.textContent = 'Monitor sync degraded';
           }
         }
 
-        async function bootstrapMediaProof() {
+        function bootstrapMediaProof() {
           try { document.body.classList.add('titanium-ui'); } catch (e) {}
           function ready() {
             try {
@@ -55,14 +161,13 @@
                 window.loadMediaOutputs();
                 setTimeout(function () {
                   try {
-                    const proofId = 'proof-evics-sea-moss';
                     if (window.mocState && window.mocState.items && window.mocState.items.length) {
-                      const found = window.mocState.items.find(function (i) {
-                        return i && (i.id === proofId || (i.title && i.title.indexOf('Sea Moss') !== -1));
+                      var found = window.mocState.items.find(function (i) {
+                        return i && (i.title && i.title.indexOf('Sea Moss') !== -1);
                       });
                       if (found) {
                         window.mocState.selectedId = found.id;
-                        window.render();
+                        if (window.render) window.render();
                       }
                     }
                   } catch (e) {}

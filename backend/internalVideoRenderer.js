@@ -15,15 +15,33 @@ const JORDAN_FALLBACK_AVATAR = 'Abigail_expressive_2024112501';
 
 // ─── TEXT OVERLAY PLACEMENT RULE (ABSOLUTE) ──────────────────────────────────
 // NO text may overlay the avatar's face/head/neck area.
-// Text must appear: above the head, below the neck, left side, or right side.
-// This rule is enforced pre-render in caption/overlay configuration.
+// For 9:16 portrait (1080×1920): avatar head occupies roughly y=0–950 (top 50% of frame).
+// Safe zone: y > 950 (below neck). Bottom 200px (y > 1720) is ultra-safe for labels.
+// FFmpeg safe y values: brand label → h-text_h-180, product name → h-text_h-130,
+// CTA → h-text_h-80. 'top' position is FORBIDDEN.
 const TEXT_OVERLAY_RULE = {
   rule: 'NO_TEXT_OVER_FACE',
-  description: 'Text overlays must never cross the avatar face, head, or neck. Place above head, below neck, or to the sides only.',
-  allowed_positions: ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
-  forbidden_positions: ['center', 'middle', 'face-area'],
+  description: 'Text overlays must NEVER cross the avatar face, head, or neck. Place ONLY below the neck (bottom 20% of frame).',
+  allowed_positions: ['bottom', 'bottom-left', 'bottom-right'],
+  forbidden_positions: ['top', 'center', 'middle', 'face-area', 'head-area', 'neck-area'],
+  portrait_safe_zone: {
+    frame_width: 1080,
+    frame_height: 1920,
+    safe_y_start: 950,
+    safe_y_ultra: 1720,
+    ffmpeg_brand_y: 'h-text_h-180',
+    ffmpeg_product_y: 'h-text_h-130',
+    ffmpeg_cta_y: 'h-text_h-80'
+  },
   enforced: true
 };
+
+// Enforce face-safe text position: always returns 'bottom'.
+// Any caller passing 'top' or any other position will have it corrected.
+function enforceFaceSafeTextPosition(requestedPosition) {
+  const safe = new Set(['bottom', 'bottom-left', 'bottom-right']);
+  return safe.has(String(requestedPosition || '').toLowerCase()) ? requestedPosition : 'bottom';
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -403,6 +421,7 @@ module.exports = {
   validateJordanAvatar,
   resolveAvatarId,
   TEXT_OVERLAY_RULE,
+  enforceFaceSafeTextPosition,
   JORDAN_AVATAR_ID,
   JORDAN_VOICE_ID,
   JORDAN_FALLBACK_AVATAR

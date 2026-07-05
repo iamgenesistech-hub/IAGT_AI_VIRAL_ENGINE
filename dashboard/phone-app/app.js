@@ -445,7 +445,7 @@
       renderAvatarLibraryPreview(null);
       return;
     }
-    if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `${items.length} paid avatar${items.length === 1 ? '' : 's'} loaded`;
+    if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `${items.length} avatar${items.length === 1 ? '' : 's'} loaded`;
     avatarLibraryGrid.innerHTML = items.map((item) => {
       const selected = String(item.id) === String(supportState.selectedAvatarLibraryId || '');
       const thumb = item.photoUrl || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#08111b"/><text x="50%" y="50%" text-anchor="middle" fill="#8fb7c9" font-family="Arial, sans-serif" font-size="24">No photo</text></svg>')}`;
