@@ -118,9 +118,8 @@ async function uploadToGcs(localPath, gcsPath, contentType) {
     return null;
   }
   await resp.json().catch(() => ({}));
-  // Generate a signed URL valid for 7 days using the IAM signBlob API
-  const signedUrl = await generateSignedUrl(gcsPath, token);
-  return signedUrl || `https://storage.googleapis.com/${GCS_BUCKET}/${gcsPath}`;
+  console.log(`[GCS] Uploaded: ${gcsPath} (${fileBuffer.length} bytes)`);
+  return `gs://${GCS_BUCKET}/${gcsPath}`;
 }
 
 async function generateSignedUrl(gcsPath, token) {
@@ -5337,13 +5336,13 @@ app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), asy
     const filename = req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const localUrl = `${protocol}://${host}/uploads/${filename}`;
-    // Upload to GCS for persistent, publicly accessible URL
+    const proxyUrl = `${protocol}://${host}/uploads/${filename}`;
+    // Upload to GCS for persistent storage (server proxies access via /uploads/:filename)
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
-    const gcsUrl = await uploadToGcs(req.file.path, gcsPath, contentType);
-    const photoUrl = gcsUrl || localUrl;
-    res.json({ success: true, photoUrl, gcsUrl, localUrl, filename, size: req.file.size });
+    await uploadToGcs(req.file.path, gcsPath, contentType);
+    // Always return the proxy URL — the GCS fallback route handles serving the file
+    res.json({ success: true, photoUrl: proxyUrl, localUrl: proxyUrl, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -5356,14 +5355,14 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), asy
     const filename = req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const localUrl = `${protocol}://${host}/uploads/${filename}`;
+    const proxyUrl = `${protocol}://${host}/uploads/${filename}`;
     const voiceFilePath = req.file.path;
-    // Upload to GCS for persistent, publicly accessible URL
+    // Upload to GCS for persistent storage (server proxies access via /uploads/:filename)
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'audio/webm';
-    const gcsUrl = await uploadToGcs(req.file.path, gcsPath, contentType);
-    const voiceFileUrl = gcsUrl || localUrl;
-    res.json({ success: true, voiceFileUrl, gcsUrl, localUrl, voiceFilePath, filename, size: req.file.size });
+    await uploadToGcs(req.file.path, gcsPath, contentType);
+    // Always return the proxy URL — the GCS fallback route handles serving the file
+    res.json({ success: true, voiceFileUrl: proxyUrl, localUrl: proxyUrl, voiceFilePath, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
