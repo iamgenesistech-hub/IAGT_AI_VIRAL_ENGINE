@@ -49,6 +49,8 @@
   const attireBottomColorSelect = document.getElementById('phoneAttireBottomColor');
   const attireUsePhotoCheckbox = document.getElementById('phoneAttireUsePhoto');
   const attireGrid = document.getElementById('phoneAttireGrid');
+  const createAvatarBtn = document.getElementById('phoneCreateAvatarBtn');
+  const createAvatarStatus = document.getElementById('phoneCreateAvatarStatus');
   const avatarLibraryMonitor = document.getElementById('phoneAvatarLibraryMonitor');
   const avatarLibraryGrid = document.getElementById('phoneAvatarLibraryGrid');
   const avatarLibraryPreview = document.getElementById('phoneAvatarLibraryPreview');
@@ -1322,6 +1324,85 @@
       } finally {
         avatarVoiceRerecordBtn.disabled = false;
         setTimeout(() => avatarVoiceRerecordBtn.classList.remove('pressing'), 120);
+      }
+    });
+  }
+
+  // ── Create Avatar button ──────────────────────────────────────────────────
+  if (createAvatarBtn) {
+    createAvatarBtn.addEventListener('click', async () => {
+      // Validate required inputs
+      if (!supportState.avatarSetup.photoUrl) {
+        if (createAvatarStatus) {
+          createAvatarStatus.textContent = '⚠️ Please upload a profile picture first.';
+          createAvatarStatus.className = 'create-avatar-status status-error';
+        }
+        return;
+      }
+      if (!supportState.avatarSetup.voiceFilePath && !supportState.avatarSetup.voiceFileUrl) {
+        if (createAvatarStatus) {
+          createAvatarStatus.textContent = '⚠️ Please upload or record a voice sample first.';
+          createAvatarStatus.className = 'create-avatar-status status-error';
+        }
+        return;
+      }
+
+      // Gather attire selections
+      const attire = {
+        usePhotoClothing: attireUsePhotoCheckbox ? attireUsePhotoCheckbox.checked : false,
+        top: attireTopSelect ? attireTopSelect.value : 'dress-shirt',
+        topColor: attireTopColorSelect ? attireTopColorSelect.value : 'black',
+        bottom: attireBottomSelect ? attireBottomSelect.value : 'dress-pants',
+        bottomColor: attireBottomColorSelect ? attireBottomColorSelect.value : 'black',
+        overallStyle: attireStyleSelect ? attireStyleSelect.value : 'business-casual'
+      };
+
+      createAvatarBtn.disabled = true;
+      setControlState(createAvatarBtn, 'running');
+      if (createAvatarStatus) {
+        createAvatarStatus.textContent = '⏳ Sending avatar request to Affiliate Hub…';
+        createAvatarStatus.className = 'create-avatar-status';
+      }
+
+      try {
+        const payload = await apiJson('/api/affiliate/avatar/create', {
+          method: 'POST',
+          body: JSON.stringify({
+            affiliateId: supportState.affiliateCode,
+            affiliateName: supportState.affiliateName,
+            name: `${supportState.affiliateName || supportState.affiliateCode} Avatar`,
+            photoUrl: supportState.avatarSetup.photoUrl,
+            voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
+            voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
+            attire: attire,
+            source: 'phone-app'
+          })
+        });
+
+        setControlState(createAvatarBtn, 'completed', 2000);
+        if (createAvatarStatus) {
+          createAvatarStatus.textContent = '✅ Avatar creation request sent! Your avatar is being generated. Check the Avatar Library below for your proof video.';
+          createAvatarStatus.className = 'create-avatar-status status-success';
+        }
+        if (payload.requestId || payload.avatarId) {
+          supportState.avatarSetup.requestId = String(payload.requestId || payload.avatarId);
+          localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
+        }
+        if (payload.avatar) {
+          supportState.avatarSetup.createdAvatar = payload.avatar;
+        }
+        persistAvatarSetup();
+        renderAvatarSetup();
+        sessionInfo.textContent = 'Avatar creation request submitted to Affiliate Hub.';
+      } catch (error) {
+        setControlState(createAvatarBtn, 'off');
+        if (createAvatarStatus) {
+          createAvatarStatus.textContent = `❌ Error: ${error.message}`;
+          createAvatarStatus.className = 'create-avatar-status status-error';
+        }
+        sessionInfo.textContent = `Avatar creation failed: ${error.message}`;
+      } finally {
+        createAvatarBtn.disabled = false;
       }
     });
   }
