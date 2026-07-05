@@ -5370,10 +5370,12 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
 
 // GET /api/affiliate/avatar/voice-reference-script
 app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
+  res.set('Cache-Control', 'no-store, max-age=0');
   res.json({
     success: true,
+    version: '2026-07-05-generic-v2',
     script: {
-      scriptText: 'Hey, I wanted to share something that has genuinely made a difference for me. What I like about this item is that it is simple to use, easy to stay consistent with, and it fits real life without feeling complicated.\n\nIt feels natural, it is easy to explain, and it becomes part of your routine quickly. If you have been looking for something practical that helps you keep moving forward, this is worth checking out today.',
+      scriptText: 'I have been really excited to share this because it is simple, useful, and easy to talk about in a natural way. What I like most is that it fits into everyday life without making things complicated.\n\nIt feels genuine, it is easy to explain, and it gives you a clear reason to keep coming back to it. If you want something practical that people can understand right away, this is a great choice to talk about today.',
       tone: 'enthusiastic',
       duration: '20-30 seconds',
       tips: [
