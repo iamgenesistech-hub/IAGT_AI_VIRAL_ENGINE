@@ -62,6 +62,9 @@ const persistenceEngine = require('./persistenceEngine');
 const stripeEngine = require('./stripeEngine');
 const mountBillingRoutes = require('./billingRoutes');
 
+// HeyGen Cost Tracking Engine — track every API dollar spent before counting profit.
+const costTracker = require('./costTrackingEngine');
+
 // OpenAI client — initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
 function getOpenAI() {
@@ -1640,6 +1643,33 @@ registerGovernanceRoutes(app);
 
 // ===== REGISTER STRIPE BILLING ROUTES =====
 mountBillingRoutes(app);
+
+// ===== HEYGEN COST TRACKING ADMIN ROUTES =====
+
+// GET /api/admin/costs — full cost summary + unit economics
+app.get('/api/admin/costs', (req, res) => {
+  try {
+    const summary = costTracker.getCostSummary();
+    const unitEconomics = costTracker.getUnitEconomics();
+    res.json({ success: true, summary, unitEconomics });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/admin/costs/affiliate?code=X — per-affiliate cost breakdown
+app.get('/api/admin/costs/affiliate', (req, res) => {
+  const code = req.query.code || req.query.affiliateCode || '';
+  if (!code) return res.status(400).json({ success: false, error: 'code required' });
+  res.json({ success: true, ...costTracker.getAffiliateCosts(code) });
+});
+
+// GET /api/admin/costs/unit-economics — standalone unit economics
+app.get('/api/admin/costs/unit-economics', (req, res) => {
+  res.json({ success: true, plans: costTracker.getUnitEconomics() });
+});
+
+console.log('✅ [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====
 const viralMediaRouter = createViralMediaRouter();
@@ -5876,6 +5906,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       voiceFileUrl: resolvedVoiceUrl,
       attire: resolvedAttire
     });
+    // Track HeyGen costs for this avatar creation
+    const avatarCode = String(affiliateId || '').trim().toUpperCase() || 'UNKNOWN';
+    costTracker.logCost({ operation: 'TALKING_PHOTO', affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Talking photo registration' });
+    costTracker.logCost({ operation: 'PROOF_VIDEO',   affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Avatar proof video', durationSeconds: 8 });
+    if (resolvedVoiceUrl && avatarPayload?.voice_clone_id) {
+      costTracker.logCost({ operation: 'VOICE_CLONE', affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Voice clone creation' });
+    }
     } else {
     avatarPayload = {
       avatar_item: {
@@ -6434,6 +6471,15 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
 
     // Increment monthly video usage count for billing enforcement
     stripeEngine.incrementVideoUsage(cleanCode).catch(() => {});
+
+    // Track HeyGen cost for this video render
+    costTracker.logCost({
+      operation: 'VIDEO_GENERATE',
+      affiliateCode: cleanCode,
+      jobId: videoJobId,
+      durationSeconds: costTracker.HEYGEN_RATES.DEFAULT_VIDEO_SECS,
+      notes: `${resolvedPlatform} product video — ${resolvedProductTitle}`
+    });
 
     res.json({
       success: true,
@@ -8661,6 +8707,8 @@ app.listen(PORT, () => {
     } catch (e) {
       console.warn('[Persist] Could not restore video records from GCS:', e.message);
     }
+    // Restore cost log from GCS
+    costTracker.restoreCostLogFromGcs().catch(() => {});
   })();
 
   // Bootstrap the Sacred Intelligence Governance Engine — load the AI Oath and
