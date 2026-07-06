@@ -2,6 +2,7 @@
 import { API_BASE } from '@/constants/config';
 import {
   AvatarGalleryItem,
+  AffiliateProfile,
   AvatarRequest,
   AttireSelection,
   Product,
@@ -29,6 +30,35 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const data = await res.json();
   if (!res.ok || !data.success) throw new Error(data.error || `POST ${path} failed (${res.status})`);
   return data as T;
+}
+
+function normalizeVideoStatus(rawStatus: unknown): VideoJob['status'] {
+  const status = String(rawStatus || '').toLowerCase();
+  if (status === 'completed' || status === 'complete' || status === 'done') return 'completed';
+  if (status === 'failed' || status === 'error' || status === 'enqueue_failed') return 'failed';
+  return 'rendering';
+}
+
+function normalizeVideoJob(raw: any): VideoJob {
+  const resolvedStatus = normalizeVideoStatus(raw?.status);
+  const resolvedVideoJobId = String(raw?.videoJobId || raw?.jobId || '');
+  const resolvedCreatedAt = raw?.createdAt || raw?.queuedAt || new Date().toISOString();
+  return {
+    ...raw,
+    videoJobId: resolvedVideoJobId,
+    status: resolvedStatus,
+    createdAt: resolvedCreatedAt,
+  } as VideoJob;
+}
+
+async function postJson(path: string, body: unknown): Promise<{ status: number; data: any }> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
 }
 
 // ── File upload (multipart FormData) ─────────────────────────────────────────
@@ -84,6 +114,7 @@ export async function fetchProducts(): Promise<Product[]> {
 
 export async function queueAvatarRequest(params: {
   affiliateCode: string;
+  profileId?: string;
   name: string;
   photoUrl: string;
   voiceFileUrl?: string;
@@ -99,6 +130,7 @@ export async function queueAvatarRequest(params: {
 
 export async function createAvatar(params: {
   affiliateCode: string;
+  profileId?: string;
   affiliateId?: string;
   name: string;
   photoUrl: string;
@@ -156,21 +188,68 @@ export async function generateProductVideo(params: {
   platform?: string;
   customScript?: string;
 }): Promise<{ videoJobId: string; status: string; script: string; qualityScore: number }> {
-  return apiPost('/api/affiliate/product-video/generate', params);
+  const asyncAttempt = await postJson('/api/affiliate/product-video/generate-async', params);
+  if (asyncAttempt.status >= 200 && asyncAttempt.status < 300 && asyncAttempt.data?.success) {
+    const asyncJob = normalizeVideoJob({
+      ...asyncAttempt.data,
+      videoJobId: asyncAttempt.data.videoJobId || asyncAttempt.data.jobId,
+      status: asyncAttempt.data.status || 'queued',
+      script: asyncAttempt.data.script || params.customScript || '',
+      qualityScore: asyncAttempt.data.qualityScore ?? 0,
+    });
+    return {
+      videoJobId: asyncJob.videoJobId,
+      status: asyncJob.status,
+      script: asyncJob.script || '',
+      qualityScore: typeof asyncJob.qualityScore === 'number' ? asyncJob.qualityScore : 0,
+    };
+  }
+
+  // Backward-compatible fallback while queue endpoint rolls out across environments.
+  if (asyncAttempt.status !== 404) {
+    const err = asyncAttempt.data?.error || `POST /api/affiliate/product-video/generate-async failed (${asyncAttempt.status})`;
+    const asyncError = new Error(err);
+    const shouldFallback = asyncAttempt.status === 400 || asyncAttempt.status === 405;
+    if (!shouldFallback) throw asyncError;
+  }
+
+  const legacy = await apiPost<{ videoJobId: string; status: string; script: string; qualityScore: number }>(
+    '/api/affiliate/product-video/generate',
+    params
+  );
+  return {
+    videoJobId: legacy.videoJobId,
+    status: normalizeVideoStatus(legacy.status),
+    script: legacy.script,
+    qualityScore: legacy.qualityScore,
+  };
 }
 
 export async function fetchVideoStatus(videoJobId: string, affiliateCode: string): Promise<VideoJob> {
-  const data = await apiGet<VideoJob & { success: boolean }>(
+  const data = await apiGet<(VideoJob & { success?: boolean }) | { jobId: string; status: string }>(
     `/api/affiliate/product-video/status/${videoJobId}?affiliateCode=${encodeURIComponent(affiliateCode)}`
   );
-  return data;
+  return normalizeVideoJob({
+    ...data,
+    videoJobId: (data as any).videoJobId || (data as any).jobId || videoJobId,
+  });
 }
 
 export async function fetchVideoLibrary(affiliateCode: string): Promise<VideoJob[]> {
-  const data = await apiGet<{ videos: VideoJob[] }>(
+  const modernData = await apiGet<{ videos?: any[]; jobs?: any[] }>(
     `/api/affiliate/product-videos?affiliateCode=${encodeURIComponent(affiliateCode)}`
+  ).catch(() => null);
+  if (modernData && Array.isArray(modernData.videos)) {
+    return modernData.videos.map((video) => normalizeVideoJob(video));
+  }
+  if (modernData && Array.isArray(modernData.jobs)) {
+    return modernData.jobs.map((job) => normalizeVideoJob(job));
+  }
+
+  const queueData = await apiGet<{ jobs?: any[] }>(
+    `/api/affiliate/product-video/list?affiliateCode=${encodeURIComponent(affiliateCode)}`
   );
-  return data.videos ?? [];
+  return (queueData.jobs ?? []).map((job) => normalizeVideoJob(job));
 }
 
 // ── SEO / Algorithm ──────────────────────────────────────────────────────────
@@ -207,4 +286,26 @@ export async function fetchTrendingTags(platform: string, limit = 5): Promise<st
 export async function fetchHealth(): Promise<{ status: string; version: string }> {
   const res = await fetch(`${API_BASE}/status`);
   return res.json();
+}
+
+// ── Affiliate profile ─────────────────────────────────────────────────────────
+
+export async function fetchAffiliateProfile(affiliateCode: string): Promise<AffiliateProfile> {
+  const data = await apiGet<{ profile: AffiliateProfile }>(
+    `/api/affiliate/profile/${encodeURIComponent(affiliateCode)}`
+  );
+  return data.profile;
+}
+
+export async function updateAffiliateProfile(params: {
+  affiliateCode: string;
+  name?: string;
+  pictureUrl?: string | null;
+  profileId?: string;
+  voiceCloneId?: string | null;
+  voiceId?: string | null;
+  voiceFileUrl?: string | null;
+}): Promise<AffiliateProfile> {
+  const data = await apiPost<{ profile: AffiliateProfile }>('/api/affiliate/profile', params);
+  return data.profile;
 }

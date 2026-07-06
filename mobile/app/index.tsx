@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { saveSession } from '@/lib/storage';
-import { fetchHealth } from '@/lib/api';
+import { fetchHealth, fetchAffiliateProfile } from '@/lib/api';
 import { COLORS } from '@/constants/config';
 
 export default function LoginScreen() {
@@ -25,7 +25,16 @@ export default function LoginScreen() {
     try {
       // Verify backend is reachable
       await fetchHealth();
-      await saveSession({ affiliateCode: code, affiliateName: name });
+      const profile = await fetchAffiliateProfile(code);
+      await saveSession({
+        affiliateCode: code,
+        affiliateName: name,
+        profileId: profile.profileId || code,
+        profilePhotoUrl: profile.profilePhotoUrl || profile.pictureUrl || undefined,
+        voiceFileUrl: profile.voiceFileUrl || undefined,
+        voiceId: profile.voiceId || profile.voiceCloneId || undefined,
+        voiceCloneId: profile.voiceCloneId || undefined,
+      });
       router.replace('/(tabs)');
     } catch (e: unknown) {
       Alert.alert('Connection Error', 'Could not reach the EVICS platform. Check your connection and try again.');

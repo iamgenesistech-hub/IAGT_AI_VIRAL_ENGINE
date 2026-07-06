@@ -57,7 +57,7 @@ try {
 console.log('\nTest 3: Checking server.js initialization...');
 try {
   const serverContent = fs.readFileSync(path.join(__dirname, 'backend', 'server.js'), 'utf8');
-  if (serverContent.includes('phase2Integration.initialize(app, admin)')) {
+  if (serverContent.includes('phase2Integration.initialize(app)')) {
     console.log('  ✓ PASS: server.js initializes phase2Integration');
     passCount++;
   } else {

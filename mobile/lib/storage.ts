@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AffiliateSession } from './types';
 
 const SESSION_KEY = 'evics_session';
+const APP_STORAGE_PREFIX = 'evics_';
 
 export async function saveSession(session: AffiliateSession): Promise<void> {
+  await clearSession();
   await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
@@ -19,7 +21,17 @@ export async function getSession(): Promise<AffiliateSession | null> {
 }
 
 export async function clearSession(): Promise<void> {
-  await AsyncStorage.removeItem(SESSION_KEY);
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const evicsKeys = keys.filter((key) => key === SESSION_KEY || key.startsWith(APP_STORAGE_PREFIX));
+    if (evicsKeys.length > 0) {
+      await AsyncStorage.multiRemove(evicsKeys);
+    } else {
+      await AsyncStorage.removeItem(SESSION_KEY);
+    }
+  } catch {
+    await AsyncStorage.removeItem(SESSION_KEY);
+  }
 }
 
 export async function setItem(key: string, value: unknown): Promise<void> {

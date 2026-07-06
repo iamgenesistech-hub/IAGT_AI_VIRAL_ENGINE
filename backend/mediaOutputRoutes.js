@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { buildPublicMediaUrlFromReference } = require('./mediaUrl');
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -60,29 +61,13 @@ function normalizeMediaOutput(row) {
 }
 
 function buildStorageUrl(value) {
-  if (!value) return null;
-  const text = String(value);
-  if (text.startsWith('gs://')) {
-    const withoutScheme = text.replace(/^gs:\/\//, '');
-    const slashIndex = withoutScheme.indexOf('/');
-    const bucket = slashIndex === -1 ? withoutScheme : withoutScheme.slice(0, slashIndex);
-    const objectPath = slashIndex === -1 ? '' : withoutScheme.slice(slashIndex + 1);
-    return objectPath
-      ? `https://storage.googleapis.com/${bucket}/${encodeURI(objectPath)}`
-      : `https://storage.googleapis.com/${bucket}`;
-  }
-  if (text.startsWith('https://storage.cloud.google.com/')) {
-    return text.replace('https://storage.cloud.google.com/', 'https://storage.googleapis.com/');
-  }
-  return null;
+  return buildPublicMediaUrlFromReference(value);
 }
 
 function resolveStorageLink(value, fallbackPlayback = null) {
   const candidate = nullIfBlank(value);
-  if (!candidate) return buildStorageUrl(fallbackPlayback);
-  if (candidate.startsWith('gs://')) return buildStorageUrl(candidate);
-  if (candidate.startsWith('http://') || candidate.startsWith('https://')) return candidate;
-  return candidate;
+  if (!candidate) return buildPublicMediaUrlFromReference(fallbackPlayback);
+  return buildPublicMediaUrlFromReference(candidate);
 }
 
 function slugify(value) {

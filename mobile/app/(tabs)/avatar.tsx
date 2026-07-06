@@ -7,8 +7,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { getSession } from '@/lib/storage';
-import { uploadPhoto, uploadVoice, createAvatar, fetchAvatarGallery, fetchAvatarRequest } from '@/lib/api';
+import { getSession, saveSession } from '@/lib/storage';
+import { uploadPhoto, uploadVoice, createAvatar, fetchAvatarGallery, fetchAvatarRequest, updateAffiliateProfile } from '@/lib/api';
 import { AffiliateSession, AvatarGalleryItem, AvatarRequest, AttireSelection } from '@/lib/types';
 import { COLORS } from '@/constants/config';
 
@@ -34,7 +34,10 @@ export default function AvatarScreen() {
   const [creating, setCreating] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPlayingId, setPreviewPlayingId] = useState<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -42,7 +45,13 @@ export default function AvatarScreen() {
       setSession(s);
       if (s) loadGallery(s.affiliateCode);
     })();
-    return () => { if (pollTimer.current) clearInterval(pollTimer.current); };
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+      if (previewSoundRef.current) {
+        previewSoundRef.current.unloadAsync().catch(() => {});
+        previewSoundRef.current = null;
+      }
+    };
   }, []);
 
   async function loadGallery(code: string) {
@@ -127,11 +136,78 @@ export default function AvatarScreen() {
     try {
       const url = await uploadVoice(voiceUri);
       setVoiceUrl(url);
+      if (session) {
+        const updatedProfile = await updateAffiliateProfile({
+          affiliateCode: session.affiliateCode,
+          profileId: session.profileId || session.affiliateCode,
+          name: session.affiliateName,
+          voiceFileUrl: url,
+          pictureUrl: photoUrl || undefined,
+          voiceId: session.voiceId || session.voiceCloneId || undefined,
+          voiceCloneId: session.voiceCloneId || undefined,
+        });
+        const nextSession = {
+          ...session,
+          voiceFileUrl: url,
+          profilePhotoUrl: session.profilePhotoUrl || photoUrl || undefined,
+          voiceId: updatedProfile.voiceId || updatedProfile.voiceCloneId || session.voiceId,
+          voiceCloneId: updatedProfile.voiceCloneId || session.voiceCloneId,
+        };
+        setSession(nextSession);
+        await saveSession(nextSession);
+      }
       setStep('attire');
     } catch (e: unknown) {
       Alert.alert('Upload failed', (e as Error).message ?? 'Voice upload failed.');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function stopVoicePreview() {
+    if (previewSoundRef.current) {
+      await previewSoundRef.current.stopAsync().catch(() => {});
+      await previewSoundRef.current.unloadAsync().catch(() => {});
+      previewSoundRef.current = null;
+    }
+    setPreviewPlayingId(null);
+    setPreviewLoading(false);
+  }
+
+  async function playVoicePreview(item: AvatarGalleryItem) {
+    const previewUrl = item.voiceFileUrl || session?.voiceFileUrl || null;
+    if (!previewUrl) {
+      Alert.alert('No voice file', 'This avatar does not have a voice file to preview.');
+      return;
+    }
+    if (previewLoading) return;
+    if (previewPlayingId === item.requestId) {
+      await stopVoicePreview();
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      if (previewSoundRef.current) {
+        await previewSoundRef.current.unloadAsync().catch(() => {});
+        previewSoundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: previewUrl }, { shouldPlay: true });
+      previewSoundRef.current = sound;
+      setPreviewPlayingId(item.requestId);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          setPreviewPlayingId(null);
+          setPreviewLoading(false);
+          sound.unloadAsync().catch(() => {});
+          previewSoundRef.current = null;
+        }
+      });
+    } catch (error: unknown) {
+      Alert.alert('Playback failed', (error as Error).message || 'Could not play the voice preview.');
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -150,6 +226,7 @@ export default function AvatarScreen() {
     try {
       const req = await createAvatar({
         affiliateCode: session.affiliateCode,
+        profileId: session.affiliateCode,
         name: session.affiliateName,
         photoUrl,
         voiceFileUrl: voiceUrl ?? undefined,
@@ -171,12 +248,72 @@ export default function AvatarScreen() {
             Alert.alert('Avatar creation failed', updated.error ?? 'Unknown error.');
             setStep('review');
           }
+
         } catch {}
       }, 8000);
     } catch (e: unknown) {
       setCreating(false);
       setStep('review');
       Alert.alert('Creation failed', (e as Error).message);
+    }
+  }
+
+  async function assignAvatarPicture(item: AvatarGalleryItem) {
+    if (!session) return;
+    if (!item.photoUrl) {
+      Alert.alert('No photo', 'This avatar does not have a photo URL to assign.');
+      return;
+    }
+    try {
+      const updatedProfile = await updateAffiliateProfile({
+        affiliateCode: session.affiliateCode,
+        profileId: session.profileId || session.affiliateCode,
+        name: session.affiliateName,
+        pictureUrl: item.photoUrl,
+        voiceFileUrl: item.voiceFileUrl || voiceUrl || undefined,
+      });
+      const nextSession = {
+        ...session,
+        profilePhotoUrl: item.photoUrl,
+        voiceFileUrl: item.voiceFileUrl || voiceUrl || session.voiceFileUrl,
+        voiceId: updatedProfile.voiceId || updatedProfile.voiceCloneId || session.voiceId,
+        voiceCloneId: updatedProfile.voiceCloneId || session.voiceCloneId,
+      };
+      setSession(nextSession);
+      await saveSession(nextSession);
+      Alert.alert('Profile picture updated', 'Your selected avatar photo is now assigned to the profile.');
+    } catch (e: unknown) {
+      Alert.alert('Update failed', (e as Error).message);
+    }
+  }
+
+  async function assignAvatarVoice(item: AvatarGalleryItem) {
+    if (!session) return;
+    const voiceCloneId = item.avatar?.voiceCloneId || null;
+    if (!voiceCloneId) {
+      Alert.alert('No voice ID', 'This avatar does not have a usable voice clone ID.');
+      return;
+    }
+    try {
+      const updatedProfile = await updateAffiliateProfile({
+        affiliateCode: session.affiliateCode,
+        profileId: session.profileId || session.affiliateCode,
+        name: session.affiliateName,
+        voiceCloneId,
+        voiceId: voiceCloneId,
+        voiceFileUrl: voiceUrl || undefined,
+      });
+      const nextSession = {
+        ...session,
+        voiceId: updatedProfile.voiceId || updatedProfile.voiceCloneId || voiceCloneId,
+        voiceCloneId: updatedProfile.voiceCloneId || voiceCloneId,
+        voiceFileUrl: voiceUrl || session.voiceFileUrl,
+      };
+      setSession(nextSession);
+      await saveSession(nextSession);
+      Alert.alert('Voice ID updated', 'Your selected avatar voice is now assigned to the profile.');
+    } catch (e: unknown) {
+      Alert.alert('Update failed', (e as Error).message);
     }
   }
 
@@ -415,6 +552,37 @@ export default function AvatarScreen() {
                   <Text style={styles.galleryMeta}>🎤 Voice: {item.voiceCloneStatus}</Text>
                 )}
                 {item.productTitle && <Text style={styles.galleryMeta}>{item.productTitle}</Text>}
+                <View style={styles.galleryActions}>
+                  <TouchableOpacity
+                    style={[styles.galleryActionBtn, !item.photoUrl && styles.galleryActionBtnDisabled]}
+                    onPress={() => assignAvatarPicture(item)}
+                    disabled={!item.photoUrl}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.galleryActionText}>Assign Picture</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.galleryActionBtn,
+                      (!item.voiceFileUrl && !session?.voiceFileUrl) && styles.galleryActionBtnDisabled,
+                    ]}
+                    onPress={() => playVoicePreview(item)}
+                    disabled={!item.voiceFileUrl && !session?.voiceFileUrl}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.galleryActionText}>
+                      {previewPlayingId === item.requestId ? 'Stop Voice' : 'Play Voice'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.galleryActionBtn, !(item.avatar?.voiceCloneId) && styles.galleryActionBtnDisabled]}
+                    onPress={() => assignAvatarVoice(item)}
+                    disabled={!item.avatar?.voiceCloneId}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.galleryActionText}>Assign Voice ID</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}
@@ -515,6 +683,17 @@ const styles = StyleSheet.create({
   galleryInfo: { flex: 1, gap: 4 },
   galleryName: { color: COLORS.text, fontSize: 15, fontWeight: '700' },
   galleryMeta: { color: COLORS.textMuted, fontSize: 12 },
+  galleryActions: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' },
+  galleryActionBtn: {
+    borderWidth: 1,
+    borderColor: COLORS.primary + '55',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: COLORS.primaryDim,
+  },
+  galleryActionBtnDisabled: { opacity: 0.4 },
+  galleryActionText: { color: COLORS.primary, fontSize: 11, fontWeight: '800' },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   badgeGreen: { backgroundColor: '#16a34a33' },
   badgeYellow: { backgroundColor: '#f59e0b33' },

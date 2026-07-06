@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Affiliate Login — EVICS</title>
+  <style>
+    :root {
+      --bg: #050910;
+      --surface: #111b2d;
+      --border: rgba(150, 176, 214, 0.35);
+      --text: #eef5ff;
+      --muted: #a3b6cc;
+      --accent: #8a7bff;
+      --danger: #ff7a90;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: Inter, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% 0, rgba(138, 123, 255, .2), transparent 32%),
+                  radial-gradient(circle at 90% 0, rgba(66, 216, 182, .16), transparent 36%),
+                  var(--bg);
+    }
+    .card {
+      width: min(460px, calc(100vw - 30px));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(17, 27, 45, .95), rgba(10, 18, 31, .97));
+      padding: 24px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, .35);
+    }
+    h1 { margin: 0 0 10px; font-size: 1.45rem; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    label { display: block; font-size: .85rem; margin: 0 0 6px; color: #c7d8eb; }
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #091323;
+      color: var(--text);
+      padding: 11px 12px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus {
+      border-color: rgba(138, 123, 255, .7);
+      box-shadow: 0 0 0 3px rgba(138, 123, 255, .22);
+    }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 11px;
+      padding: 12px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #130e2a;
+      background: linear-gradient(135deg, var(--accent), #d5b9ff);
+    }
+    .status {
+      min-height: 20px;
+      margin-top: 12px;
+      font-size: .9rem;
+      color: var(--muted);
+    }
+    .status.error { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Affiliate Login</h1>
+    <p>Login is required before accessing the Phone App workspace or Affiliate Hub.</p>
+    <form id="loginForm">
+      <label for="affiliateCode">Affiliate Code</label>
+      <input id="affiliateCode" name="affiliateCode" type="text" placeholder="e.g. ROLAND787" required />
+      <label for="affiliateName">Display Name (optional)</label>
+      <input id="affiliateName" name="affiliateName" type="text" placeholder="Your name" />
+      <button type="submit" id="loginBtn">Continue</button>
+      <div id="status" class="status"></div>
+    </form>
+  </main>
+  <script>
+    (function () {
+      const form = document.getElementById('loginForm');
+      const codeInput = document.getElementById('affiliateCode');
+      const nameInput = document.getElementById('affiliateName');
+      const status = document.getElementById('status');
+      const btn = document.getElementById('loginBtn');
+      const params = new URLSearchParams(window.location.search);
+      const next = String(params.get('next') || '/phone-app').trim();
+      const safeNext = next.startsWith('/') ? next : '/phone-app';
+      const storedCode = localStorage.getItem('evicsAffiliateCode') || '';
+      const storedName = localStorage.getItem('evicsAffiliateName') || '';
+      if (storedCode) codeInput.value = storedCode;
+      if (storedName) nameInput.value = storedName;
+
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        status.className = 'status';
+        status.textContent = 'Signing in...';
+        btn.disabled = true;
+        const affiliateCode = String(codeInput.value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 64);
+        const affiliateName = String(nameInput.value || '').trim().slice(0, 64);
+        try {
+          const response = await fetch('/api/affiliate/session/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ affiliateCode, affiliateName, next: safeNext })
+          });
+          const payload = await response.json().catch(function () { return {}; });
+          if (!response.ok || payload.success === false || !payload.session) {
+            throw new Error(payload.error || 'Login failed. Check your affiliate code and try again.');
+          }
+          localStorage.setItem('evicsAffiliateCode', payload.session.affiliateCode || affiliateCode);
+          localStorage.setItem('evicsAffiliateName', payload.session.affiliateName || affiliateName || payload.session.affiliateCode || affiliateCode);
+          window.location.href = payload.redirectUrl || safeNext;
+        } catch (error) {
+          status.className = 'status error';
+          status.textContent = error.message || 'Unable to sign in.';
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

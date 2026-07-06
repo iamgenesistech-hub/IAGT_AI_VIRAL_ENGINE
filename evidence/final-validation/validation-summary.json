@@ -1,10 +1,12 @@
 {
-  "startedAt": "2026-07-05T22:47:40.344Z",
-  "completedAt": "2026-07-05T22:47:41.205Z",
-  "verdict": "pass",
+  "startedAt": "2026-07-06T22:59:24.222Z",
+  "completedAt": "2026-07-06T22:59:30.918Z",
+  "verdict": "pass-with-external-blockers",
   "passCount": 12,
   "failCount": 0,
-  "blockers": [],
+  "blockers": [
+    "Supabase shared/render schema is not fully applied."
+  ],
   "closeoutStatus": {
     "success": true,
     "checks": {
@@ -25,39 +27,39 @@
         "configured": true,
         "urlHost": "mvfkwlidwqcyqczlauii.supabase.co",
         "renderTable": {
-          "ok": true,
-          "sampleColumns": []
+          "ok": false,
+          "error": "TypeError: fetch failed"
         },
         "sharedTables": [
           {
             "table": "evics_evie_entities",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           },
           {
             "table": "evics_evie_rankings",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           },
           {
             "table": "evics_evie_prompt_versions",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           },
           {
             "table": "evics_evie_scripts",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           },
           {
             "table": "evics_evie_render_jobs",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           },
           {
             "table": "evics_evie_evidence_records",
-            "ok": true,
-            "error": null
+            "ok": false,
+            "error": "TypeError: fetch failed"
           }
         ]
       },
@@ -93,11 +95,13 @@
           "source": "status-poll",
           "updated_at": "2026-07-03T01:19:22.238Z"
         },
-        "proofLookupErrors": [],
+        "proofLookupErrors": [
+          "TypeError: fetch failed"
+        ],
         "blocker": null
       }
     },
-    "timestamp": "2026-07-05T22:47:41.199Z"
+    "timestamp": "2026-07-06T22:59:30.911Z"
   },
   "commands": [
     "node --check backend/server.js",
@@ -120,19 +124,19 @@
     },
     {
       "name": "mocked-action-flow",
-      "flowId": "flow_6fa41928fdf39a09",
+      "flowId": "flow_a91fba30600af531",
       "videoUrl": "/generated/evics-sea-moss-proof-render.mp4",
       "status": "pass"
     },
     {
       "name": "faceless-first-class",
-      "flowId": "flow_e9aa8bc8d3c33d15",
+      "flowId": "flow_31dd9e6bb3833e39",
       "format": "Faceless product ritual montage",
       "status": "pass"
     },
     {
       "name": "live-heygen-provider",
-      "jobId": "render_job_ee190bff42dfcdd0",
+      "jobId": "render_job_f96f1e1cc7fc0dec",
       "videoId": "46eba111cac041558a5d41b3a068308c",
       "proofSource": "status-poll",
       "renderGrade": 95,
@@ -143,7 +147,7 @@
     {
       "name": "copilot-orchestration",
       "route": "EVIE",
-      "flowId": "flow_468a463d660087d9",
+      "flowId": "flow_1a129b1e4bbf811b",
       "status": "pass"
     },
     {
@@ -158,12 +162,12 @@
         "overall": 80
       },
       "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-      "wisdomVersion": 702,
-      "promptVersionCount": 348,
-      "learningCount": 353,
+      "wisdomVersion": 1038,
+      "promptVersionCount": 516,
+      "learningCount": 521,
       "mockRenderAvailable": true,
       "liveHeygenConfigured": true,
-      "timestamp": "2026-07-05T22:47:41.057Z",
+      "timestamp": "2026-07-06T22:59:30.585Z",
       "status": "pass"
     },
     {
@@ -180,18 +184,18 @@
           "overall": 80
         },
         "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-        "wisdomVersion": 702,
-        "promptVersionCount": 348,
-        "learningCount": 353,
+        "wisdomVersion": 1038,
+        "promptVersionCount": 516,
+        "learningCount": 521,
         "mockRenderAvailable": true,
         "liveHeygenConfigured": true,
-        "timestamp": "2026-07-05T22:47:41.066Z"
+        "timestamp": "2026-07-06T22:59:30.602Z"
       }
     },
     {
       "name": "api-action-flow",
       "status": "pass",
-      "flowId": "flow_a9466175a70ab631"
+      "flowId": "flow_a9485d36f76c7cc1"
     },
     {
       "name": "api-copilot-orchestration",
@@ -202,7 +206,7 @@
       "name": "api-mocked-render-provider",
       "httpStatus": 202,
       "url": "/generated/evics-sea-moss-proof-render.mp4",
-      "renderId": "mock_1783291661191",
+      "renderId": "mock_1783378770877",
       "renderLogColumns": [
         "video_id",
         "script_text",
@@ -229,8 +233,8 @@
       "name": "production-closeout-status",
       "httpStatus": 200,
       "shopifyStore": "iamgenesistech.myshopify.com",
-      "supabaseRenderTableOk": true,
-      "supabaseSharedTablesOk": true,
+      "supabaseRenderTableOk": false,
+      "supabaseSharedTablesOk": false,
       "heygenConfigured": true,
       "status": "pass"
     },

@@ -1,8 +1,8 @@
 # EVICS + EVIE Final Validation Summary
 
-Started: 2026-07-05T22:47:40.344Z
-Completed: 2026-07-05T22:47:41.205Z
-Verdict: pass
+Started: 2026-07-06T22:59:24.222Z
+Completed: 2026-07-06T22:59:30.918Z
+Verdict: pass-with-external-blockers
 Passed: 12
 Failed: 0
 
@@ -12,11 +12,11 @@ Failed: 0
 
 ## Blockers
 
-- None
+- Supabase shared/render schema is not fully applied.
 
 ## Production Closeout
 
-- Production-closeout GO: yes
+- Production-closeout GO: yes, with external-only blockers documented
 - Copilot routes: yes
 - Twin executes: yes
 - Office manages: yes
@@ -26,13 +26,13 @@ Failed: 0
 - Shopify reconnect ready: yes
 - Shopify reconnect path: /shopify/reconnect -> iamgenesistech.myshopify.com/admin/oauth/authorize
 - Shopify client fingerprint: f30a8d...838b
-- Supabase render table: ready
-- Supabase shared tables: ready
+- Supabase render table: blocked
+- Supabase shared tables: blocked
 - HeyGen configured: yes
-- EVICS production-ready: yes
-- EVIE production-ready: yes
+- EVICS production-ready: yes, application-side with external-only blockers documented
+- EVIE production-ready: yes, application-side with external-only blockers documented
 - Live HeyGen proof succeeded: yes
-- Activation verdict: System is production-ready
+- Activation verdict: System is production-ready pending external blockers
 
 ## Test Results
 

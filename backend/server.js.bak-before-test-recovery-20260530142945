@@ -367,7 +367,7 @@ app.post('/api/assembly/drafts', async (req, res) => {
         components: JSON.stringify(draft.components),
         duration: draft.duration || '15s',
         style: draft.style || 'UGC',
-        voice: draft.voice || 'Female',
+        voice: draft.voice || 'Male',
         background: draft.background || 'Music',
         aspect: draft.aspect || '9:16',
         saved_at: draft.savedAt || new Date().toISOString()

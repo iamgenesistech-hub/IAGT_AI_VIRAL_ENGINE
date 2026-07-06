@@ -4,7 +4,117 @@
 // Uses the GCP metadata server for auth (no credentials needed on Cloud Run).
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+const cacheEngine = require('./cacheEngine');
+
 const GCS_BUCKET = process.env.GCS_BUCKET || 'evics-storage-evics-api';
+const VIDEO_JOBS_GCS_PATH = 'evics-data/video_jobs.json';
+const LOCAL_VIDEO_JOBS_PATH = path.join(__dirname, '..', 'generated', 'local_video_jobs.json');
+const VIDEO_JOB_TTL_SECONDS = 24 * 60 * 60;
+const _jobStore = new Map();
+let _localLoaded = false;
+let _cacheInitPromise = null;
+
+function normalizeAffiliateCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function jobKey(jobId, affiliateCode) {
+  return `${normalizeAffiliateCode(affiliateCode)}::${String(jobId || '').trim()}`;
+}
+
+function videoJobCacheKey(jobId, affiliateCode) {
+  const owner = normalizeAffiliateCode(affiliateCode);
+  const id = String(jobId || '').trim();
+  return `video-job:${owner}:${id}`;
+}
+
+function videoJobIndexCacheKey(affiliateCode) {
+  return `video-job-index:${normalizeAffiliateCode(affiliateCode)}`;
+}
+
+async function ensureCacheReady() {
+  if (_cacheInitPromise) return _cacheInitPromise;
+  _cacheInitPromise = cacheEngine.initCacheEngine().catch((err) => {
+    console.warn(`[Persist] Cache init warning: ${err.message}`);
+  });
+  return _cacheInitPromise;
+}
+
+async function cacheVideoJobRecord(record) {
+  const affiliateCode = normalizeAffiliateCode(record?.affiliateCode);
+  const jobId = String(record?.jobId || '').trim();
+  if (!affiliateCode || !jobId) return;
+
+  await ensureCacheReady();
+  const cacheKey = videoJobCacheKey(jobId, affiliateCode);
+  await cacheEngine.setJson(cacheKey, { ...record }, VIDEO_JOB_TTL_SECONDS);
+
+  const indexKey = videoJobIndexCacheKey(affiliateCode);
+  const currentIndex = await cacheEngine.getJson(indexKey).catch(() => null);
+  const nextIndex = Array.isArray(currentIndex) ? currentIndex.filter((id) => id !== jobId) : [];
+  nextIndex.unshift(jobId);
+  await cacheEngine.setJson(indexKey, nextIndex.slice(0, 1000), VIDEO_JOB_TTL_SECONDS);
+}
+
+function ensureLocalDir() {
+  const dir = path.dirname(LOCAL_VIDEO_JOBS_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function loadLocalJobs() {
+  if (_localLoaded) return;
+  _localLoaded = true;
+  try {
+    if (!fs.existsSync(LOCAL_VIDEO_JOBS_PATH)) return;
+    const raw = fs.readFileSync(LOCAL_VIDEO_JOBS_PATH, 'utf8');
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return;
+    for (const row of parsed) {
+      const owner = normalizeAffiliateCode(row?.affiliateCode);
+      const id = String(row?.jobId || '').trim();
+      if (!owner || !id) continue;
+      _jobStore.set(jobKey(id, owner), { ...row, affiliateCode: owner, jobId: id });
+    }
+  } catch (err) {
+    console.warn(`[Persist] Failed loading local jobs: ${err.message}`);
+  }
+}
+
+function writeLocalJobs() {
+  try {
+    ensureLocalDir();
+    const rows = Array.from(_jobStore.values()).sort((a, b) =>
+      String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+    );
+    fs.writeFileSync(LOCAL_VIDEO_JOBS_PATH, JSON.stringify(rows, null, 2), 'utf8');
+  } catch (err) {
+    console.warn(`[Persist] Failed writing local jobs: ${err.message}`);
+  }
+}
+
+async function syncJobsFromGcs() {
+  const rows = await gcsRead(VIDEO_JOBS_GCS_PATH);
+  if (!Array.isArray(rows)) return;
+  for (const row of rows) {
+    const owner = normalizeAffiliateCode(row?.affiliateCode);
+    const id = String(row?.jobId || '').trim();
+    if (!owner || !id) continue;
+    const key = jobKey(id, owner);
+    if (!_jobStore.has(key)) {
+      const normalized = { ...row, affiliateCode: owner, jobId: id };
+      _jobStore.set(key, normalized);
+      await cacheVideoJobRecord(normalized);
+    }
+  }
+  writeLocalJobs();
+}
+
+async function flushJobsToGcs() {
+  const rows = Array.from(_jobStore.values());
+  await gcsWrite(VIDEO_JOBS_GCS_PATH, rows);
+}
 
 async function _getToken() {
   try {
@@ -117,4 +227,121 @@ async function gcsDownloadUrl(sourceUrl, destGcsPath, contentType = 'video/mp4')
   }
 }
 
-module.exports = { gcsRead, gcsWrite, gcsDownloadUrl };
+async function createVideoJob(jobRecord) {
+  loadLocalJobs();
+  const affiliateCode = normalizeAffiliateCode(jobRecord?.affiliateCode);
+  const jobId = String(jobRecord?.jobId || '').trim();
+  if (!affiliateCode) throw new Error('createVideoJob requires affiliateCode');
+  if (!jobId) throw new Error('createVideoJob requires jobId');
+
+  const nowIso = new Date().toISOString();
+  const next = {
+    ...jobRecord,
+    affiliateCode,
+    jobId,
+    createdAt: jobRecord.createdAt || nowIso,
+    updatedAt: nowIso,
+  };
+  _jobStore.set(jobKey(jobId, affiliateCode), next);
+  await cacheVideoJobRecord(next);
+  writeLocalJobs();
+  await flushJobsToGcs();
+  return next;
+}
+
+async function getVideoJob(jobId, affiliateCode) {
+  loadLocalJobs();
+  const owner = normalizeAffiliateCode(affiliateCode);
+  const id = String(jobId || '').trim();
+  if (!owner || !id) return null;
+
+  const key = jobKey(id, owner);
+  const inMemory = _jobStore.get(key);
+  if (inMemory) return { ...inMemory };
+
+  await ensureCacheReady();
+  const cached = await cacheEngine.getJson(videoJobCacheKey(id, owner)).catch(() => null);
+  if (cached) {
+    _jobStore.set(key, { ...cached, affiliateCode: owner, jobId: id });
+    return { ...cached, affiliateCode: owner, jobId: id };
+  }
+
+  await syncJobsFromGcs();
+  const fromCloud = _jobStore.get(key);
+  return fromCloud ? { ...fromCloud } : null;
+}
+
+async function updateVideoJob(jobId, affiliateCode, patch) {
+  const current = await getVideoJob(jobId, affiliateCode);
+  if (!current) {
+    throw new Error(`Video job not found: ${jobId} (${normalizeAffiliateCode(affiliateCode)})`);
+  }
+  const nowIso = new Date().toISOString();
+  const next = {
+    ...current,
+    ...(patch || {}),
+    jobId: current.jobId,
+    affiliateCode: current.affiliateCode,
+    updatedAt: nowIso,
+  };
+  _jobStore.set(jobKey(current.jobId, current.affiliateCode), next);
+  await cacheVideoJobRecord(next);
+  writeLocalJobs();
+  await flushJobsToGcs();
+  return next;
+}
+
+async function listVideoJobsByAffiliate(affiliateCode, limit = 20, offset = 0) {
+  loadLocalJobs();
+  const owner = normalizeAffiliateCode(affiliateCode);
+  if (!owner) return [];
+
+  await syncJobsFromGcs();
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+
+  await ensureCacheReady();
+  const cachedIndex = await cacheEngine.getJson(videoJobIndexCacheKey(owner)).catch(() => null);
+  if (Array.isArray(cachedIndex) && cachedIndex.length) {
+    const cachedRows = [];
+    for (const jobId of cachedIndex) {
+      const row = await cacheEngine.getJson(videoJobCacheKey(jobId, owner)).catch(() => null);
+      if (!row) continue;
+      cachedRows.push({ ...row, affiliateCode: owner, jobId: String(jobId).trim() });
+      if (cachedRows.length >= (safeOffset + safeLimit)) break;
+    }
+    if (cachedRows.length > safeOffset) {
+      return cachedRows.slice(safeOffset, safeOffset + safeLimit);
+    }
+  }
+
+  const rows = Array.from(_jobStore.values())
+    .filter((row) => normalizeAffiliateCode(row.affiliateCode) === owner)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+
+  for (const row of rows.slice(0, 1000)) {
+    await cacheVideoJobRecord(row);
+  }
+
+  return rows.slice(safeOffset, safeOffset + safeLimit).map((row) => ({ ...row }));
+}
+
+async function archiveHeyGenVideo(affiliateCode, jobId, sourceUrl) {
+  const owner = normalizeAffiliateCode(affiliateCode);
+  const id = String(jobId || '').trim();
+  if (!owner) throw new Error('archiveHeyGenVideo requires affiliateCode');
+  if (!id) throw new Error('archiveHeyGenVideo requires jobId');
+  if (!sourceUrl) throw new Error('archiveHeyGenVideo requires sourceUrl');
+  return gcsDownloadUrl(sourceUrl, `evics-videos/${owner}/${id}.mp4`, 'video/mp4');
+}
+
+module.exports = {
+  gcsRead,
+  gcsWrite,
+  gcsDownloadUrl,
+  createVideoJob,
+  getVideoJob,
+  updateVideoJob,
+  listVideoJobsByAffiliate,
+  archiveHeyGenVideo,
+};

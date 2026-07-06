@@ -2,12 +2,30 @@
 export interface AffiliateSession {
   affiliateCode: string;
   affiliateName: string;
+  profileId?: string;
   profilePhotoUrl?: string;
+  voiceFileUrl?: string;
+  voiceId?: string;
+  voiceCloneId?: string;
+}
+
+export interface AffiliateProfile {
+  affiliateCode: string;
+  profileId?: string;
+  name: string;
+  pictureUrl?: string | null;
+  profilePhotoUrl?: string | null;
+  voiceCloneId?: string | null;
+  voiceId?: string | null;
+  voiceFileUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AvatarRequest {
   requestId: string;
   affiliateCode: string;
+  profileId?: string;
   name: string;
   photoUrl: string;
   voiceFileUrl?: string;
@@ -29,6 +47,8 @@ export interface AvatarRecord {
   avatarId: string;
   name: string;
   photoUrl: string;
+  voiceFileUrl?: string | null;
+  profileId?: string;
   voiceCloneId?: string;
   voiceCloneStatus?: string;
   talkingPhotoId?: string;
@@ -41,6 +61,8 @@ export interface AvatarGalleryItem {
   requestId: string;
   name: string;
   photoUrl: string;
+  voiceFileUrl?: string | null;
+  profileId?: string;
   status: string;
   createdAt: string;
   avatar?: AvatarRecord;
@@ -58,6 +80,11 @@ export interface AttireSelection {
   bottomColor?: string;
   overallStyle?: string;
   usePhotoClothing?: boolean;
+  mode?: 'detailed' | 'overall';
+  overallFormality?: string;
+  overallFit?: string;
+  overallSeason?: string;
+  overallPresentation?: string;
 }
 
 export interface Product {

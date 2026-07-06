@@ -53,8 +53,8 @@ gcloud run deploy evics-api --source . --region us-central1 --allow-unauthentica
 **Steps:**
 1. Log in at [https://app.heygen.com](https://app.heygen.com)
 2. Go to **Settings → API** → confirm your API key matches what's in `backend/.env` (`HEYGEN_API_KEY`)
-3. Go to **Avatars** → confirm "Abigail_expressive_2024112501" appears in your library
-4. If the avatar is missing: Go to **Avatars → Avatar Library → Browse → Abigail** and click **Use This Avatar** to add her to your workspace
+3. Go to **Avatars** → confirm "Tyler-incasualsuit-20220721" appears in your library
+4. If the avatar is missing: Go to **Avatars → Avatar Library → Browse → Tyler** and click **Use This Avatar** to add it to your workspace
 5. Check your plan has enough credits for video generation (minimum: Pro plan)
 
 **Link:** [https://app.heygen.com/settings](https://app.heygen.com/settings)  
@@ -96,7 +96,7 @@ gcloud run deploy evics-api --source . --region us-central1 --allow-unauthentica
    |---|---|
    | `PORT` | `4175` |
    | `HEYGEN_API_KEY` | *(from backend/.env)* |
-   | `HEYGEN_AVATAR_ID` | `Abigail_expressive_2024112501` |
+   | `HEYGEN_AVATAR_ID` | `Tyler-incasualsuit-20220721` |
    | `HEYGEN_VOICE_ID` | `f8c69e517f424cafaecde32dde57096b` |
    | `SUPABASE_URL` | `https://mvfkwlidwqcyqczlauii.supabase.co` |
    | `SUPABASE_SERVICE_ROLE_KEY` | *(from backend/.env)* |

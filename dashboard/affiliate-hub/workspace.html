@@ -270,10 +270,13 @@
           const attireEl = document.getElementById('attireDisplay');
           if (attireEl) {
             const a = avatarRequest.attire;
+            const genderLabel = a.gender ? `${String(a.gender).charAt(0).toUpperCase()}${String(a.gender).slice(1)} guardrail | ` : '';
             if (a.usePhoto) {
-              attireEl.textContent = 'Attire: Using clothing from profile photo';
+              attireEl.textContent = `Attire: ${genderLabel}Using clothing from profile photo`;
+            } else if (String(a.mode || '').toLowerCase() === 'overall') {
+              attireEl.textContent = `Attire: ${genderLabel}Overall style only | ${a.style || 'professional'} | Formality: ${a.overallFormality || '—'} | Fit: ${a.overallFit || '—'} | Season: ${a.overallSeason || '—'} | Presentation: ${a.overallPresentation || '—'} | AI will build the best complete outfit from these preferences without crossing into the opposite gender clothing set.`;
             } else {
-              attireEl.textContent = `Attire: ${a.style || 'professional'} | Top: ${a.top || '—'} (${a.topColor || '—'}) | Bottom: ${a.bottom || '—'} (${a.bottomColor || '—'})`;
+              attireEl.textContent = `Attire: ${genderLabel}Detailed pieces only | Top: ${a.top || '—'} (${a.topColor || '—'}) | Bottom: ${a.bottom || '—'} (${a.bottomColor || '—'})`;
             }
             attireEl.style.display = 'block';
           }

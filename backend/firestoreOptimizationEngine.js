@@ -18,6 +18,13 @@
  * Grade Impact: Data C → B+ (optimization + sharding)
  */
 
+let FieldValue = null;
+try {
+  ({ FieldValue } = require('@google-cloud/firestore'));
+} catch {
+  FieldValue = null;
+}
+
 class FirestoreOptimizationEngine {
   constructor(options = {}) {
     this.batchWindow = options.batchWindow || 100; // ms
@@ -73,19 +80,35 @@ class FirestoreOptimizationEngine {
     const batchSize = batch.length;
 
     try {
-      // In production: Use Firestore.batch()
-      // For now: Execute sequentially (fallback)
-      for (const write of batch) {
-        try {
-          // Simulate write execution
+      if (this.firestoreClient && typeof this.firestoreClient.batch === 'function' && typeof this.firestoreClient.doc === 'function') {
+        const firestoreBatch = this.firestoreClient.batch();
+        for (const write of batch) {
+          const docRef = this.firestoreClient.doc(`${write.collection}/${write.document}`);
           this.observability?.debug(`Firestore: ${write.operation} ${write.collection}/${write.document}`, {
             batchSize,
             totalPending: this.writePending.length,
           });
-
-          write.resolve({ success: true });
-        } catch (err) {
-          write.reject(err);
+          if (write.operation === 'delete') {
+            firestoreBatch.delete(docRef);
+          } else if (write.operation === 'update') {
+            firestoreBatch.set(docRef, write.data, { merge: true });
+          } else {
+            firestoreBatch.set(docRef, write.data);
+          }
+        }
+        await firestoreBatch.commit();
+        batch.forEach((write) => write.resolve({ success: true, backend: 'firestore' }));
+      } else {
+        for (const write of batch) {
+          try {
+            this.observability?.debug(`Firestore: ${write.operation} ${write.collection}/${write.document}`, {
+              batchSize,
+              totalPending: this.writePending.length,
+            });
+            write.resolve({ success: true, backend: 'memory-fallback' });
+          } catch (err) {
+            write.reject(err);
+          }
         }
       }
 
@@ -124,6 +147,15 @@ class FirestoreOptimizationEngine {
     const collection = `counters/${affiliateId}/${counterName}`;
     const document = `shard-${shardId}`;
 
+    if (this.firestoreClient && typeof this.firestoreClient.doc === 'function' && FieldValue && typeof FieldValue.increment === 'function') {
+      const docRef = this.firestoreClient.doc(`${collection}/${document}`);
+      await docRef.set({
+        value: FieldValue.increment(amount),
+        lastUpdated: new Date().toISOString(),
+      }, { merge: true });
+      return { success: true, backend: 'firestore' };
+    }
+
     return this.queueWrite(collection, document, {
       value: amount,
       lastUpdated: new Date().toISOString(),
@@ -148,8 +180,9 @@ class FirestoreOptimizationEngine {
    */
   async transaction(updateFn) {
     try {
-      // In production: Use Firestore.transaction()
-      const result = await updateFn();
+      const result = this.firestoreClient && typeof this.firestoreClient.runTransaction === 'function'
+        ? await this.firestoreClient.runTransaction((transaction) => updateFn(transaction))
+        : await updateFn();
       return result;
     } catch (err) {
       this.observability?.error(`Transaction failed: ${err.message}`, 'DATABASE_ERROR');

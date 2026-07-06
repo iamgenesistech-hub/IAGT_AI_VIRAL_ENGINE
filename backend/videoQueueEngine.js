@@ -7,6 +7,7 @@
  */
 
 const { CloudTasksClient } = require('@google-cloud/tasks');
+const fs = require('fs');
 
 // ── Configuration ──
 const PROJECT = process.env.GCP_PROJECT || 'your-project-id';
@@ -17,10 +18,30 @@ const RENDER_HANDLER_URL = process.env.RENDER_HANDLER_URL ||
 
 // ── Cloud Tasks Client ──
 let _tasksClient = null;
+let _queueDisabledReason = null;
+
+function getCredentialPath() {
+  return String(process.env.GOOGLE_APPLICATION_CREDENTIALS || '').replace(/\r/g, '').trim();
+}
+
+function cloudTasksAvailable() {
+  if (_queueDisabledReason) return false;
+  const credentialPath = getCredentialPath();
+  if (credentialPath && !fs.existsSync(credentialPath)) {
+    _queueDisabledReason = `GOOGLE_APPLICATION_CREDENTIALS file not found: ${credentialPath}`;
+    console.warn(`[VideoQueue] Cloud Tasks disabled: ${_queueDisabledReason}`);
+    return false;
+  }
+  return true;
+}
 
 function getTasksClient() {
+  if (!cloudTasksAvailable()) return null;
   if (!_tasksClient) {
-    _tasksClient = new CloudTasksClient();
+    const credentialPath = getCredentialPath();
+    _tasksClient = credentialPath
+      ? new CloudTasksClient({ keyFilename: credentialPath })
+      : new CloudTasksClient();
   }
   return _tasksClient;
 }
@@ -40,6 +61,9 @@ function getTasksClient() {
 async function enqueueRenderJob(jobId, renderPayload) {
   try {
     const client = getTasksClient();
+    if (!client) {
+      throw new Error(_queueDisabledReason || 'Cloud Tasks client is unavailable');
+    }
     const parent = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
 
     // Payload to send to render worker
@@ -92,6 +116,14 @@ async function enqueueRenderJob(jobId, renderPayload) {
 async function getQueueStats() {
   try {
     const client = getTasksClient();
+    if (!client) {
+      return {
+        queueSize: 0,
+        oldestTaskLeaseExpireTime: null,
+        rateLimitPerSecond: 0,
+        error: _queueDisabledReason || 'Cloud Tasks client unavailable'
+      };
+    }
     const parent = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
 
     const [queue] = await client.getQueue({ name: parent });
@@ -124,6 +156,7 @@ async function getQueueStats() {
 async function configureQueueRetryPolicy() {
   try {
     const client = getTasksClient();
+    if (!client) return;
     const parent = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
 
     const queue = {
@@ -153,6 +186,9 @@ async function configureQueueRetryPolicy() {
 async function pauseQueue() {
   try {
     const client = getTasksClient();
+    if (!client) {
+      throw new Error(_queueDisabledReason || 'Cloud Tasks client is unavailable');
+    }
     const name = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
     await client.pauseQueue({ name });
     console.log('[VideoQueue] Queue paused');
@@ -170,6 +206,9 @@ async function pauseQueue() {
 async function resumeQueue() {
   try {
     const client = getTasksClient();
+    if (!client) {
+      throw new Error(_queueDisabledReason || 'Cloud Tasks client is unavailable');
+    }
     const name = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
     await client.resumeQueue({ name });
     console.log('[VideoQueue] Queue resumed');
@@ -188,6 +227,9 @@ async function resumeQueue() {
 async function purgeQueue() {
   try {
     const client = getTasksClient();
+    if (!client) {
+      throw new Error(_queueDisabledReason || 'Cloud Tasks client is unavailable');
+    }
     const name = client.queuePath(PROJECT, QUEUE_REGION, QUEUE_NAME);
     await client.purgeQueue({ name });
     console.warn('[VideoQueue] Queue purged (all tasks deleted)');

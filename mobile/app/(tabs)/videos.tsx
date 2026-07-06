@@ -8,6 +8,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '@/lib/storage';
 import { fetchVideoLibrary, fetchVideoStatus } from '@/lib/api';
+import { resolveMediaUrl } from '@/lib/media';
 import { AffiliateSession, VideoJob, MetadataPackage } from '@/lib/types';
 import { COLORS, PLATFORMS } from '@/constants/config';
 
@@ -57,9 +58,7 @@ export default function VideosScreen() {
   }
 
   function getVideoUrl(video: VideoJob): string | null {
-    return video.gcsVideoUrl
-      ? `https://storage.googleapis.com/${video.gcsVideoUrl.replace('gs://', '').split('/')[0]}/${video.gcsVideoUrl.replace('gs://', '').split('/').slice(1).join('/')}`
-      : video.videoUrl ?? null;
+    return resolveMediaUrl(video.gcsVideoUrl || video.videoUrl || null);
   }
 
   function getPlatformMeta(video: VideoJob): MetadataPackage | null {

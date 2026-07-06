@@ -1,28 +1,46 @@
 // app/(tabs)/settings.tsx — Account settings, session management, platform info.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Alert, Image, Linking,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession, clearSession } from '@/lib/storage';
-import { fetchHealth } from '@/lib/api';
-import { AffiliateSession } from '@/lib/types';
+import { fetchHealth, fetchAffiliateProfile } from '@/lib/api';
+import { AffiliateSession, AffiliateProfile } from '@/lib/types';
 import { COLORS, API_BASE } from '@/constants/config';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const [session, setSession] = useState<AffiliateSession | null>(null);
+  const [profile, setProfile] = useState<AffiliateProfile | null>(null);
   const [health, setHealth] = useState<{ status: string; version: string } | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const s = await getSession();
-      setSession(s);
-      try { setHealth(await fetchHealth()); } catch {}
-    })();
+  const load = useCallback(async () => {
+    const s = await getSession();
+    setSession(s);
+    if (s?.affiliateCode) {
+      try {
+        const profileData = await fetchAffiliateProfile(s.affiliateCode);
+        const mergedSession = {
+          ...s,
+          profileId: profileData.profileId || s.profileId || s.affiliateCode,
+          profilePhotoUrl: profileData.profilePhotoUrl || profileData.pictureUrl || s.profilePhotoUrl,
+          voiceFileUrl: profileData.voiceFileUrl || s.voiceFileUrl,
+          voiceId: profileData.voiceId || profileData.voiceCloneId || s.voiceId,
+          voiceCloneId: profileData.voiceCloneId || s.voiceCloneId,
+        };
+        setProfile(profileData);
+        setSession(mergedSession);
+      } catch {}
+    }
+    try { setHealth(await fetchHealth()); } catch {}
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function handleLogout() {
     Alert.alert(
@@ -48,11 +66,15 @@ export default function SettingsScreen() {
 
       {/* Profile Card */}
       <View style={styles.profileCard}>
-        <View style={styles.profileAvatar}>
-          <Text style={styles.profileInitial}>
-            {session?.affiliateName?.charAt(0)?.toUpperCase() ?? 'A'}
-          </Text>
-        </View>
+        {profile?.pictureUrl || session?.profilePhotoUrl ? (
+          <Image source={{ uri: profile?.pictureUrl || session?.profilePhotoUrl || '' }} style={styles.profileAvatarImage} />
+        ) : (
+          <View style={styles.profileAvatar}>
+            <Text style={styles.profileInitial}>
+              {session?.affiliateName?.charAt(0)?.toUpperCase() ?? 'A'}
+            </Text>
+          </View>
+        )}
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{session?.affiliateName ?? '—'}</Text>
           <Text style={styles.profileCode}>{session?.affiliateCode ?? '—'}</Text>
@@ -79,6 +101,17 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <SettingRow icon="person" label="Affiliate ID" value={session?.affiliateCode ?? '—'} />
         <SettingRow icon="id-card" label="Name" value={session?.affiliateName ?? '—'} />
+        <SettingRow icon="image" label="Profile Picture" value={profile?.pictureUrl ? 'Assigned' : 'Not assigned'} />
+        <SettingRow icon="musical-notes" label="Voice File" value={profile?.voiceFileUrl ? 'Assigned' : 'Not assigned'} />
+        <SettingRow icon="mic" label="Voice ID" value={profile?.voiceId || profile?.voiceCloneId || 'Not assigned'} />
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push('/profile-editor')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.actionButtonText}>Open Profile Editor</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.settingRow}
           onPress={() => Linking.openURL(`${API_BASE}/admin-hub`)}
@@ -175,6 +208,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1,
     borderColor: COLORS.border, padding: 16, marginBottom: 24,
   },
+  profileAvatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
   profileAvatar: {
     width: 60, height: 60, borderRadius: 30,
     backgroundColor: COLORS.primaryDim, borderWidth: 2, borderColor: COLORS.primary,
@@ -198,6 +238,21 @@ const styles = StyleSheet.create({
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowLabel: { color: COLORS.text, fontSize: 14 },
   rowValue: { color: COLORS.textMuted, fontSize: 13 },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '55',
+    backgroundColor: COLORS.primaryDim,
+  },
+  actionButtonText: { color: COLORS.primary, fontSize: 14, fontWeight: '800' },
   oathBanner: {
     backgroundColor: COLORS.accentDim, borderRadius: 12, borderWidth: 1,
     borderColor: COLORS.accent + '44', padding: 16, marginBottom: 20,

@@ -585,7 +585,14 @@
       phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Loading voice reference script…';
     }
     // Sync attire selects with state
-    if (attireGenderSelect) attireGenderSelect.value = getLockedAttireGender();
+    // IMPORTANT: Preserve existing selection if it exists (user may have just selected it)
+    const currentDropdownValue = attireGenderSelect ? attireGenderSelect.value : '';
+    const lockedGender = getLockedAttireGender();
+    const genderToUse = currentDropdownValue && normalizeAttireGender(currentDropdownValue)
+      ? currentDropdownValue
+      : lockedGender || supportState.avatarSetup.attire.gender || supportState.avatarSetup.attire.lastGender || '';
+    
+    if (attireGenderSelect) attireGenderSelect.value = genderToUse;
     if (attireUsePhotoCheckbox) attireUsePhotoCheckbox.checked = supportState.avatarSetup.attire.usePhoto;
     if (attireModeSelect) attireModeSelect.value = supportState.avatarSetup.attire.mode || 'detailed';
     if (attireTopSelect) attireTopSelect.value = supportState.avatarSetup.attire.top;
@@ -604,7 +611,12 @@
   function updateAttireModeUI() {
     const usePhoto = Boolean(supportState.avatarSetup.attire.usePhoto);
     const mode = String(supportState.avatarSetup.attire.mode || 'detailed');
-    const gender = getLockedAttireGender();
+    const currentDropdownValue = attireGenderSelect ? attireGenderSelect.value : '';
+    const lockedGender = getLockedAttireGender();
+    const gender = currentDropdownValue && normalizeAttireGender(currentDropdownValue)
+      ? currentDropdownValue
+      : (lockedGender || supportState.avatarSetup.attire.gender || supportState.avatarSetup.attire.lastGender || '');
+    
     if (gender) {
       supportState.avatarSetup.attire.gender = gender;
       supportState.avatarSetup.attire.lastGender = gender;

@@ -23,7 +23,7 @@ const governance = require('./sacredIntelligenceGovernance');
 // HeyGen API calls
 const {
   startHeyGenRender,
-  pollHeyGenVideo
+  getHeyGenVideoStatus
 } = require('./internalVideoRenderer');
 
 const app = express();
@@ -116,16 +116,20 @@ app.post('/api/internal/render-worker', async (req, res) => {
       workerName: WORKER_NAME,
       workerStartedAt: new Date().toISOString()
     });
+    workerMetrics.jobsStarted++;
     console.log(`[Worker] Job ${jobId} marked IN_PROGRESS`);
 
     // ── 3. Call HeyGen API to start render ──
     let renderResult;
     try {
       renderResult = await startHeyGenRender({
-        avatarId,
+        avatar_id: avatarId,
         script,
-        backgroundUrl,
-        captionEnabled: true // Captions boost SEO/retention
+        voice_id: req.body.voiceId || process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7',
+        config: {
+          background: backgroundUrl ? { type: 'image', value: backgroundUrl } : { type: 'color', value: '#0a0a0a' },
+          caption: true
+        }
       });
     } catch (err) {
       console.error(`[Worker] HeyGen render start failed:`, err.message);
@@ -138,7 +142,7 @@ app.post('/api/internal/render-worker', async (req, res) => {
       return res.status(500).json({ error: 'HeyGen API error' });
     }
 
-    const { videoJobId: heygenJobId, videoUrl } = renderResult;
+    const heygenJobId = renderResult.video_id;
     console.log(`[Worker] HeyGen render started: ${heygenJobId}`);
 
     // ── 4. Update job with HeyGen job ID ──
@@ -166,7 +170,7 @@ app.post('/api/internal/render-worker', async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, HEYGEN_POLL_INTERVAL));
 
       try {
-        heygenStatus = await pollHeyGenVideo(heygenJobId);
+        heygenStatus = await getHeyGenVideoStatus(heygenJobId);
       } catch (err) {
         console.error(`[Worker] HeyGen poll failed (attempt ${pollAttempt + 1}):`, err.message);
         pollAttempt++;

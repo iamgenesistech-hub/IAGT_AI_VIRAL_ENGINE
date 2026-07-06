@@ -526,7 +526,7 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 .avatar-library-preview {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   padding: 16px;
@@ -537,6 +537,7 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 .avatar-library-preview-media {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 .avatar-library-preview-image,
 .avatar-library-preview-video {
@@ -549,10 +550,13 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 .avatar-library-preview-image {
   aspect-ratio: 1 / 1;
   object-fit: cover;
+  min-height: 220px;
 }
 .avatar-library-preview-video {
-  min-height: 300px;
-  max-height: 450px;
+  aspect-ratio: 16 / 9;
+  min-height: 220px;
+  max-height: 340px;
+  object-fit: cover;
 }
 .avatar-library-preview-copy {
   display: grid;

@@ -4,10 +4,11 @@ import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   RefreshControl, Image, Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession, clearSession } from '@/lib/storage';
-import { fetchHealth, fetchAvatarGallery, fetchVideoLibrary } from '@/lib/api';
+import { fetchHealth, fetchAffiliateProfile, fetchAvatarGallery, fetchVideoLibrary } from '@/lib/api';
 import { AffiliateSession, AvatarGalleryItem, VideoJob } from '@/lib/types';
 import { COLORS } from '@/constants/config';
 
@@ -19,16 +20,29 @@ export default function HomeScreen() {
   const [videos, setVideos] = useState<VideoJob[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const s = await getSession();
     setSession(s);
     if (!s) return;
+    try {
+      const profile = await fetchAffiliateProfile(s.affiliateCode);
+      const mergedSession = {
+        ...s,
+        profileId: profile.profileId || s.profileId || s.affiliateCode,
+        profilePhotoUrl: profile.profilePhotoUrl || profile.pictureUrl || s.profilePhotoUrl,
+        voiceFileUrl: profile.voiceFileUrl || s.voiceFileUrl,
+        voiceId: profile.voiceId || profile.voiceCloneId || s.voiceId,
+        voiceCloneId: profile.voiceCloneId || s.voiceCloneId,
+      };
+      setSession(mergedSession);
+    } catch {}
     try { setHealth(await fetchHealth()); } catch {}
     try { setAvatars(await fetchAvatarGallery(s.affiliateCode)); } catch {}
     try { setVideos(await fetchVideoLibrary(s.affiliateCode)); } catch {}
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -41,6 +55,7 @@ export default function HomeScreen() {
   const renderingVideos = videos.filter(v => v.status === 'rendering').length;
   const latestVideo = videos.find(v => v.status === 'completed');
   const latestAvatar = avatars[0];
+  const profilePhotoUrl = session?.profilePhotoUrl || latestAvatar?.photoUrl;
 
   return (
     <ScrollView
@@ -55,8 +70,8 @@ export default function HomeScreen() {
           <Text style={styles.name}>{session?.affiliateName ?? '—'}</Text>
           <Text style={styles.code}>{session?.affiliateCode ?? ''}</Text>
         </View>
-        {latestAvatar?.photoUrl ? (
-          <Image source={{ uri: latestAvatar.photoUrl }} style={styles.profilePic} />
+        {profilePhotoUrl ? (
+          <Image source={{ uri: profilePhotoUrl }} style={styles.profilePic} />
         ) : (
           <View style={styles.profilePlaceholder}>
             <Ionicons name="person" size={28} color={COLORS.primary} />
@@ -83,6 +98,7 @@ export default function HomeScreen() {
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
       <View style={styles.actionsGrid}>
+        <QuickAction icon="create" label="Edit Profile Assignment" color={COLORS.primary} onPress={() => router.push('/profile-editor')} />
         <QuickAction icon="person-add" label="Create Avatar" color={COLORS.accent} onPress={() => router.push('/(tabs)/avatar')} />
         <QuickAction icon="videocam" label="Generate Video" color={COLORS.primary} onPress={() => router.push('/(tabs)/products')} />
         <QuickAction icon="grid" label="Browse Products" color={COLORS.success} onPress={() => router.push('/(tabs)/products')} />

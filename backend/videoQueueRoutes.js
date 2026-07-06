@@ -49,7 +49,8 @@ async function registerVideoQueueRoutes(app, deps = {}) {
         avatarId,
         productId,
         script,
-        backgroundUrl
+        backgroundUrl,
+        voiceId
       } = req.body;
 
       // Validate required fields
@@ -75,6 +76,7 @@ async function registerVideoQueueRoutes(app, deps = {}) {
         avatarId,
         productId,
         script,
+        voiceId: voiceId || null,
         backgroundUrl: backgroundUrl || null,
         status: 'QUEUED',
         createdAt: new Date().toISOString(),
@@ -97,7 +99,8 @@ async function registerVideoQueueRoutes(app, deps = {}) {
           avatarId,
           productId,
           script,
-          backgroundUrl
+          backgroundUrl,
+          voiceId: voiceId || undefined
         });
         console.log(`[QueueAPI] Job enqueued to Cloud Tasks: ${taskInfo.taskName}`);
       } catch (err) {

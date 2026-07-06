@@ -1,6 +1,11 @@
 // constants/config.ts
 // Live Cloud Run backend — all API calls go here.
 export const API_BASE = 'https://evics-api-480958062306.us-central1.run.app';
+export const MEDIA_PUBLIC_BASE_URL = String(
+  process.env.EXPO_PUBLIC_MEDIA_PUBLIC_BASE_URL ||
+  process.env.EXPO_PUBLIC_MEDIA_CDN_BASE_URL ||
+  ''
+).trim().replace(/\/+$/, '');
 
 export const COLORS = {
   bg: '#0a0a0a',

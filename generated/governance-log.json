@@ -1,0 +1,48 @@
+[
+  {
+    "id": "gov_1783299888451_f6xoql",
+    "agentName": "log_test_agent",
+    "workflowName": "log-test",
+    "timestamp": "2026-07-06T01:04:48.450Z",
+    "approvalStatus": "approved",
+    "approved": true,
+    "revisionRequired": false,
+    "revisionReason": "Output meets the EVICS Sacred Intelligence Standard.",
+    "violations": [],
+    "scores": {
+      "loveScore": 88,
+      "truthScore": 100,
+      "integrityScore": 100,
+      "dignityScore": 100,
+      "manipulationRisk": 0,
+      "exploitationRisk": 0,
+      "clarityScore": 88,
+      "educationalValueScore": 58
+    },
+    "originalOutput": "A clear and honest wellness message for testing the log.",
+    "finalApprovedOutput": "A clear and honest wellness message for testing the log."
+  },
+  {
+    "id": "gov_1783302099861_2v4174",
+    "agentName": "log_test_agent",
+    "workflowName": "log-test",
+    "timestamp": "2026-07-06T01:41:39.859Z",
+    "approvalStatus": "approved",
+    "approved": true,
+    "revisionRequired": false,
+    "revisionReason": "Output meets the EVICS Sacred Intelligence Standard.",
+    "violations": [],
+    "scores": {
+      "loveScore": 88,
+      "truthScore": 100,
+      "integrityScore": 100,
+      "dignityScore": 100,
+      "manipulationRisk": 0,
+      "exploitationRisk": 0,
+      "clarityScore": 88,
+      "educationalValueScore": 58
+    },
+    "originalOutput": "A clear and honest wellness message for testing the log.",
+    "finalApprovedOutput": "A clear and honest wellness message for testing the log."
+  }
+]
