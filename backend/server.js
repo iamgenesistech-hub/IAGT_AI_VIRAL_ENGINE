@@ -820,6 +820,20 @@ function makeAvatarRequestId() {
   return `avreq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeAffiliateCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 64);
+}
+
+function affiliateRecordCode(record) {
+  if (!record || typeof record !== 'object') return '';
+  return normalizeAffiliateCode(
+    record.affiliateCode ||
+    record.affiliateId ||
+    record.avatar?.affiliateCode ||
+    record.avatar?.affiliateId
+  );
+}
+
 function getAvatarRequests() {
   return readJsonArraySafe(AFFILIATE_AVATAR_REQUESTS_PATH);
 }
@@ -829,6 +843,14 @@ function saveAvatarRequests(records) {
 }
 
 function upsertAvatarRequest(record) {
+  const ownerCode = affiliateRecordCode(record);
+  if (ownerCode) {
+    record.affiliateCode = ownerCode;
+    record.affiliateId = normalizeAffiliateCode(record.affiliateId || ownerCode) || ownerCode;
+    if (record.avatar && typeof record.avatar === 'object') {
+      record.avatar.affiliateCode = ownerCode;
+    }
+  }
   const current = getAvatarRequests();
   const next = current.filter((item) => item.requestId !== record.requestId);
   next.unshift(record);
@@ -839,14 +861,17 @@ function upsertAvatarRequest(record) {
   return record;
 }
 
-function findAvatarRequest(requestId) {
-  return getAvatarRequests().find((item) => item.requestId === requestId) || null;
+function findAvatarRequest(requestId, affiliateCode = '') {
+  const request = getAvatarRequests().find((item) => item.requestId === requestId) || null;
+  const expectedCode = normalizeAffiliateCode(affiliateCode);
+  if (!request || !expectedCode) return request;
+  return affiliateRecordCode(request) === expectedCode ? request : null;
 }
 
 function findLatestAvatarRequest(affiliateCode) {
-  const code = String(affiliateCode || '').trim().toUpperCase();
+  const code = normalizeAffiliateCode(affiliateCode);
   if (!code) return null;
-  return getAvatarRequests().find((item) => String(item.affiliateCode || '').trim().toUpperCase() === code) || null;
+  return getAvatarRequests().find((item) => affiliateRecordCode(item) === code) || null;
 }
 
 // ── Affiliate Profile Management ────────────────────────────────────────────
@@ -859,17 +884,17 @@ function saveAffiliateProfiles(records) {
 }
 
 function getAffiliateProfile(affiliateCode) {
-  const code = String(affiliateCode || '').trim().toUpperCase();
+  const code = normalizeAffiliateCode(affiliateCode);
   if (!code) return null;
   const profiles = getAffiliateProfiles();
-  return profiles.find((p) => String(p.affiliateCode || '').trim().toUpperCase() === code) || null;
+  return profiles.find((p) => normalizeAffiliateCode(p.affiliateCode) === code) || null;
 }
 
 function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '') {
-  const code = String(affiliateCode || '').trim().toUpperCase();
+  const code = normalizeAffiliateCode(affiliateCode);
   if (!code) throw new Error('affiliateCode is required');
   const profiles = getAffiliateProfiles();
-  const existing = profiles.find((p) => String(p.affiliateCode || '').trim().toUpperCase() === code);
+  const existing = profiles.find((p) => normalizeAffiliateCode(p.affiliateCode) === code);
   const updated = {
     affiliateCode: code,
     name: String(name || code).trim().slice(0, 128),
@@ -909,6 +934,7 @@ function buildAvatarGalleryItem(record) {
   return {
     id: avatarId,
     requestId: record.requestId || null,
+    affiliateCode: affiliateRecordCode(record),
     name: record.name || avatar.name || 'Affiliate avatar',
     style: avatar.style || record.style || 'professional',
     photoUrl: avatar.photoUrl || record.photoUrl || null,
@@ -929,11 +955,11 @@ function buildAvatarGalleryItem(record) {
 }
 
 function getAvatarGalleryRecords(affiliateCode) {
-  const code = String(affiliateCode || '').trim().toUpperCase();
+  const code = normalizeAffiliateCode(affiliateCode);
   if (!code) return [];
   const seen = new Set();
   return getAvatarRequests()
-    .filter((record) => String(record.affiliateCode || '').trim().toUpperCase() === code)
+    .filter((record) => affiliateRecordCode(record) === code)
     .filter((record) => record && record.avatar && typeof record.avatar === 'object')
     .sort((left, right) => {
       const leftTime = new Date(left.completedAt || left.updatedAt || left.createdAt || 0).getTime();
@@ -1464,15 +1490,25 @@ app.get('/api/evidence/heygen', (_req, res) => {
       : Array.isArray(payload.history)
         ? payload.history
         : [];
-  const latest = normalizeHeyGenProofRecord(payload.latest || proofs[0] || null);
-  const normalizedProofs = proofs.map((item) => normalizeHeyGenProofRecord(item)).filter(Boolean);
+  const hasAffiliateScope = Object.prototype.hasOwnProperty.call(_req.query, 'affiliateCode') || Object.prototype.hasOwnProperty.call(_req.query, 'code');
+  const requestedCode = normalizeAffiliateCode(_req.query.affiliateCode || _req.query.code || '');
+  if (hasAffiliateScope && !requestedCode) {
+    return res.json({ success: true, source: '/generated/live_heygen_proofs.json', available: false, latest: null, proofs: [], count: 0 });
+  }
+  const normalizedProofs = proofs
+    .map((item) => normalizeHeyGenProofRecord(item))
+    .filter(Boolean)
+    .filter((item) => !requestedCode || normalizeAffiliateCode(item.affiliateCode || item.affiliateId) === requestedCode);
+  const latest = requestedCode
+    ? normalizedProofs[0] || null
+    : normalizeHeyGenProofRecord(payload.latest || proofs[0] || null);
   res.json({
     success: true,
     source: '/generated/live_heygen_proofs.json',
     available: Boolean(latest),
     latest,
     proofs: normalizedProofs.slice(0, 10),
-    count: proofs.length
+    count: requestedCode ? normalizedProofs.length : proofs.length
   });
 });
 
@@ -5334,6 +5370,10 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
 
   const aid = avatarId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
   const vid = process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
+  const ownerCode = normalizeAffiliateCode(affiliateCode || affiliateId || '');
+  if (!ownerCode) {
+    return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar video generation' });
+  }
 
   // ── 1. Generate elite viral script ──────────────────────────────────────────
   let scr = script;
@@ -5341,7 +5381,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
     try {
       const scriptResult = await generateViralScript({
         title: productTitle, product: product || { title: productTitle },
-        platform, affiliateCode
+        platform, affiliateCode: ownerCode
       });
       scr = scriptResult.scriptText;
     } catch (e) {
@@ -5409,7 +5449,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
         video_id: render.video_id, productTitle, productPageUrl,
         companyLabel: 'I AM GENESIS TECH',
         script: scr, background: bgConfig, processedImageUrl,
-        affiliateCode: affiliateCode || '',
+        affiliateCode: ownerCode,
         productImageUrl: productImageUrl || null,
         textOverlayPosition: 'bottom',
         status: 'rendering', created_at: new Date().toISOString()
@@ -5426,13 +5466,19 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
 app.get('/api/affiliate/avatar/video-status/:videoId', async (req, res) => {
   noStore(res);
   try {
+    const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+    if (!affiliateCode) {
+      return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar video status access' });
+    }
+    const cf = path.join(MEDIA_CACHE_DIR, `${req.params.videoId}.json`);
+    const meta = fs.existsSync(cf) ? JSON.parse(fs.readFileSync(cf, 'utf8')) : null;
+    if (!meta || normalizeAffiliateCode(meta.affiliateCode || meta.affiliateId || '') !== affiliateCode) {
+      return res.status(404).json({ success: false, error: 'Avatar proof video not found for this affiliate.' });
+    }
     const s = await getHeyGenVideoStatus(req.params.videoId);
 
     // If completed, trigger post-processing (product overlay + CTA)
     if ((s.status === 'completed' || s.status === 'done') && s.video_url) {
-      const cf = path.join(MEDIA_CACHE_DIR, `${req.params.videoId}.json`);
-      const meta = fs.existsSync(cf) ? JSON.parse(fs.readFileSync(cf, 'utf8')) : {};
-
       // Check if already post-processed
       if (!meta.processedVideoUrl) {
         // Fire post-processing in background (don't block response)
@@ -5621,7 +5667,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       source,
       returnTo
     } = req.body || {};
-    const cleanedCode = String(affiliateCode || affiliateId || '').trim().toUpperCase();
+    const cleanedCode = normalizeAffiliateCode(affiliateCode || affiliateId || '');
     if (!cleanedCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
     if (!photoUrl) return res.status(400).json({ success: false, error: 'photoUrl is required' });
     const requestId = makeAvatarRequestId();
@@ -5669,14 +5715,17 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
 
 // GET /api/affiliate/avatar/request/:requestId — retrieve a queued/completed avatar request
 app.get('/api/affiliate/avatar/request/:requestId', (req, res) => {
-  const request = findAvatarRequest(req.params.requestId);
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar request access' });
+  const request = findAvatarRequest(req.params.requestId, affiliateCode);
   if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
   res.json({ success: true, request });
 });
 
 // GET /api/affiliate/avatar/request/latest — fetch the latest request for an affiliate
 app.get('/api/affiliate/avatar/request/latest', (req, res) => {
-  const affiliateCode = String(req.query.affiliateCode || '').trim().toUpperCase();
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
   const request = findLatestAvatarRequest(affiliateCode);
   if (!request) return res.json({ success: true, request: null });
   res.json({ success: true, request });
@@ -5685,8 +5734,17 @@ app.get('/api/affiliate/avatar/request/latest', (req, res) => {
 // GET /api/affiliate/avatar-gallery — list up to 10 paid avatars for the affiliate
 app.get('/api/affiliate/avatar-gallery', (req, res) => {
   noStore(res);
-  const affiliateCode = String(req.query.affiliateCode || req.query.affiliateId || '').trim().toUpperCase();
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
   if (!affiliateCode) return res.json({ success: true, avatars: [] });
+  const avatars = getAvatarGalleryRecords(affiliateCode);
+  res.json({ success: true, avatars, count: avatars.length });
+});
+
+// Expo app alias: same guarded avatar gallery endpoint.
+app.get('/api/affiliate/avatar/gallery', (req, res) => {
+  noStore(res);
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
+  if (!affiliateCode) return res.json({ success: true, avatars: [], count: 0 });
   const avatars = getAvatarGalleryRecords(affiliateCode);
   res.json({ success: true, avatars, count: avatars.length });
 });
@@ -5694,7 +5752,7 @@ app.get('/api/affiliate/avatar-gallery', (req, res) => {
 // GET /api/affiliate/profile/:affiliateCode — fetch affiliate profile (name + picture)
 app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
   noStore(res);
-  const affiliateCode = String(req.params.affiliateCode || '').trim().toUpperCase();
+  const affiliateCode = normalizeAffiliateCode(req.params.affiliateCode || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
   const profile = getAffiliateProfile(affiliateCode);
   if (!profile) {
@@ -5735,8 +5793,9 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
   } = req.body || {};
   const resolvedRequest = requestId ? findAvatarRequest(requestId) : null;
   // AFFILIATE ISOLATION: verify the requesting affiliate owns this avatar request
-  const ownerCode = String(affiliateCode || resolvedRequest?.affiliateCode || '').trim().toUpperCase();
-  if (resolvedRequest && affiliateCode && ownerCode !== String(resolvedRequest.affiliateCode || '').trim().toUpperCase()) {
+  const ownerCode = normalizeAffiliateCode(affiliateCode);
+  if (!ownerCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar proof access' });
+  if (resolvedRequest && ownerCode !== affiliateRecordCode(resolvedRequest)) {
     return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
   }
   const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501').trim();
@@ -5801,6 +5860,25 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
         }
       });
     }
+    if (render.video_id) {
+      fs.writeFileSync(
+        path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
+        JSON.stringify({
+          video_id: render.video_id,
+          requestId: resolvedRequest?.requestId || requestId || null,
+          affiliateCode: ownerCode,
+          productTitle: resolvedRequest?.productTitle || '',
+          productPageUrl: resolvedRequest?.productPageUrl || '',
+          script: resolvedScript,
+          productImageUrl: resolvedRequest?.productImageUrl || null,
+          processedImageUrl: null,
+          companyLabel: 'I AM GENESIS TECH',
+          textOverlayPosition: 'bottom',
+          status: 'rendering',
+          created_at: new Date().toISOString()
+        }, null, 2)
+      );
+    }
     if (resolvedRequest) {
       upsertAvatarRequest({
         ...resolvedRequest,
@@ -5835,10 +5913,12 @@ app.post('/api/affiliate/avatar/proof-complete', (req, res) => {
   noStore(res);
   const { requestId, videoId, videoUrl, thumbnailUrl, affiliateCode } = req.body || {};
   if (!requestId) return res.status(400).json({ success: false, error: 'requestId is required' });
+  const ownerCode = normalizeAffiliateCode(affiliateCode);
+  if (!ownerCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar proof completion' });
   const request = findAvatarRequest(requestId);
   if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
   // AFFILIATE ISOLATION: verify ownership if affiliateCode provided
-  if (affiliateCode && request.affiliateCode && String(affiliateCode).trim().toUpperCase() !== String(request.affiliateCode).trim().toUpperCase()) {
+  if (affiliateRecordCode(request) !== ownerCode) {
     return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
   }
   const next = upsertAvatarRequest({
@@ -5882,6 +5962,13 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const safeReturnTo = String(returnTo || '').trim();
     const normalizedReturnTo = safeReturnTo.startsWith('/') ? safeReturnTo : '';
     const requestRecord = findAvatarRequest(finalRequestId);
+    const requestedAffiliateCode = normalizeAffiliateCode(affiliateId || requestRecord?.affiliateCode || requestRecord?.affiliateId || '');
+    if (!requestedAffiliateCode) {
+      return res.status(400).json({ success: false, error: 'affiliateId or affiliateCode is required' });
+    }
+    if (requestRecord && affiliateRecordCode(requestRecord) && affiliateRecordCode(requestRecord) !== requestedAffiliateCode) {
+      return res.status(403).json({ success: false, error: 'This avatar request belongs to a different affiliate account.' });
+    }
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
     const resolvedPhotoUrl = photoUrl || requestRecord?.photoUrl || null;
     const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
@@ -5907,7 +5994,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       attire: resolvedAttire
     });
     // Track HeyGen costs for this avatar creation
-    const avatarCode = String(affiliateId || '').trim().toUpperCase() || 'UNKNOWN';
+    const avatarCode = requestedAffiliateCode || 'UNKNOWN';
     costTracker.logCost({ operation: 'TALKING_PHOTO', affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Talking photo registration' });
     costTracker.logCost({ operation: 'PROOF_VIDEO',   affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Avatar proof video', durationSeconds: 8 });
     if (resolvedVoiceUrl && avatarPayload?.voice_clone_id) {
@@ -5945,7 +6032,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     avatarId: finalAvatarId,
     avatarItemId: avatarItem.id || null,
     avatarGroupId: avatarGroup.id || null,
-    affiliateCode: String(affiliateId || '').trim().toUpperCase(),
+    affiliateCode: requestedAffiliateCode,
     name: resolvedName,
     style: style || 'avatar',
     photoUrl: resolvedPhotoUrl || null,
@@ -6005,8 +6092,8 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     upsertAvatarRequest({
       ...(requestRecord || {}),
       requestId: finalRequestId,
-      affiliateCode: String(affiliateId || requestRecord?.affiliateCode || '').trim().toUpperCase(),
-      affiliateId: affiliateId || requestRecord?.affiliateId || null,
+      affiliateCode: requestedAffiliateCode,
+      affiliateId: requestedAffiliateCode,
       name: avatar.name,
       photoUrl: avatar.photoUrl,
       voiceFileUrl: avatar.voiceFileUrl,
@@ -6264,6 +6351,8 @@ const PRODUCT_VIDEO_RECORDS = new Map();
 
 function upsertProductVideoRecord(record) {
   if (!record || !record.videoJobId) return record;
+  const ownerCode = normalizeAffiliateCode(record.affiliateCode || record.affiliateId || record.avatar?.affiliateCode || '');
+  if (ownerCode) record.affiliateCode = ownerCode;
   PRODUCT_VIDEO_RECORDS.set(record.videoJobId, { ...record });
   // Write-through backup to GCS so video records survive Cloud Run redeploys
   const allRecords = Array.from(PRODUCT_VIDEO_RECORDS.values());
@@ -6271,16 +6360,19 @@ function upsertProductVideoRecord(record) {
   return record;
 }
 
-function findProductVideoRecord(videoJobId) {
-  return PRODUCT_VIDEO_RECORDS.get(videoJobId) || null;
+function findProductVideoRecord(videoJobId, affiliateCode = '') {
+  const record = PRODUCT_VIDEO_RECORDS.get(videoJobId) || null;
+  const expectedCode = normalizeAffiliateCode(affiliateCode);
+  if (!record || !expectedCode) return record;
+  return normalizeAffiliateCode(record.affiliateCode || record.affiliateId || '') === expectedCode ? record : null;
 }
 
 function getProductVideosByAffiliate(affiliateCode) {
   if (!affiliateCode) return [];
-  const upper = affiliateCode.toUpperCase();
+  const upper = normalizeAffiliateCode(affiliateCode);
   const results = [];
   for (const rec of PRODUCT_VIDEO_RECORDS.values()) {
-    if (String(rec.affiliateCode || '').toUpperCase() === upper) results.push(rec);
+    if (normalizeAffiliateCode(rec.affiliateCode || rec.affiliateId || '') === upper) results.push(rec);
   }
   return results.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
@@ -6557,7 +6649,9 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
 // GET /api/affiliate/product-video/status/:videoJobId — check rendering status
 app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
   noStore(res);
-  const record = findProductVideoRecord(req.params.videoJobId);
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for product video status access' });
+  const record = findProductVideoRecord(req.params.videoJobId, affiliateCode);
   if (!record) {
     return res.status(404).json({ success: false, error: 'Product video job not found.' });
   }
@@ -6598,7 +6692,7 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
 // GET /api/affiliate/product-videos — list all product videos for an affiliate
 app.get('/api/affiliate/product-videos', (req, res) => {
   noStore(res);
-  const affiliateCode = String(req.query.affiliateCode || '').trim().toUpperCase();
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
   if (!affiliateCode) return res.json({ success: true, videos: [], count: 0 });
   const videos = getProductVideosByAffiliate(affiliateCode).map(ensureVideoMetadata);
   res.json({ success: true, videos, count: videos.length });
@@ -6660,7 +6754,11 @@ app.post('/api/algorithm/srt', (req, res) => {
 
 // GET /api/affiliate/product-video/:videoJobId/captions.srt — YouTube caption file.
 app.get('/api/affiliate/product-video/:videoJobId/captions.srt', (req, res) => {
-  const record = findProductVideoRecord(req.params.videoJobId);
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+  if (!affiliateCode) {
+    return res.status(400).json({ success: false, error: 'affiliateCode is required for caption access.' });
+  }
+  const record = findProductVideoRecord(req.params.videoJobId, affiliateCode);
   if (!record || !record.script) {
     return res.status(404).json({ success: false, error: 'Product video (or its script) not found.' });
   }
@@ -7034,10 +7132,18 @@ app.get('/api/high-commission/products', async (req, res) => {
 app.get('/api/renders/phone-app', (req, res) => {
   noStore(res);
   try {
+    const hasAffiliateScope = Object.prototype.hasOwnProperty.call(req.query, 'affiliateCode') || Object.prototype.hasOwnProperty.call(req.query, 'code');
+    const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+    if (hasAffiliateScope && !affiliateCode) {
+      return res.json({ success: true, count: 0, renders: [] });
+    }
     const files = fs.readdirSync(MEDIA_CACHE_DIR).filter(f => f.endsWith('.json'));
     const renders = files.map(f => {
       try { return JSON.parse(fs.readFileSync(path.join(MEDIA_CACHE_DIR, f), 'utf8')); } catch { return null; }
-    }).filter(Boolean).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    })
+      .filter(Boolean)
+      .filter((item) => !affiliateCode || normalizeAffiliateCode(item.affiliateCode || item.affiliateId || '') === affiliateCode)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     res.json({ success: true, count: renders.length, renders: renders.slice(0, 50) });
   } catch {
     res.json({ success: true, count: 0, renders: [] });

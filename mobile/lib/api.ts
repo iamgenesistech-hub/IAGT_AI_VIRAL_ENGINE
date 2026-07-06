@@ -117,16 +117,18 @@ export async function createAvatar(params: {
   return data.request;
 }
 
-export async function fetchAvatarRequest(requestId: string): Promise<AvatarRequest> {
-  const data = await apiGet<{ request: AvatarRequest }>(`/api/affiliate/avatar/request/${requestId}`);
+export async function fetchAvatarRequest(requestId: string, affiliateCode: string): Promise<AvatarRequest> {
+  const data = await apiGet<{ request: AvatarRequest }>(
+    `/api/affiliate/avatar/request/${requestId}?affiliateCode=${encodeURIComponent(affiliateCode)}`
+  );
   return data.request;
 }
 
 export async function fetchAvatarGallery(affiliateCode: string): Promise<AvatarGalleryItem[]> {
-  const data = await apiGet<{ gallery: AvatarGalleryItem[] }>(
+  const data = await apiGet<{ avatars?: AvatarGalleryItem[]; gallery?: AvatarGalleryItem[] }>(
     `/api/affiliate/avatar/gallery?affiliateCode=${encodeURIComponent(affiliateCode)}`
   );
-  return data.gallery ?? [];
+  return data.avatars ?? data.gallery ?? [];
 }
 
 export async function fetchLatestAvatarRequest(affiliateCode: string): Promise<AvatarRequest | null> {
@@ -157,9 +159,9 @@ export async function generateProductVideo(params: {
   return apiPost('/api/affiliate/product-video/generate', params);
 }
 
-export async function fetchVideoStatus(videoJobId: string): Promise<VideoJob> {
+export async function fetchVideoStatus(videoJobId: string, affiliateCode: string): Promise<VideoJob> {
   const data = await apiGet<VideoJob & { success: boolean }>(
-    `/api/affiliate/product-video/status/${videoJobId}`
+    `/api/affiliate/product-video/status/${videoJobId}?affiliateCode=${encodeURIComponent(affiliateCode)}`
   );
   return data;
 }

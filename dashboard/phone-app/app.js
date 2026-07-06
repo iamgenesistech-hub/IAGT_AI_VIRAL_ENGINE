@@ -256,6 +256,29 @@
     return payload;
   }
 
+  function normalizeAffiliateCode(value) {
+    return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 64);
+  }
+
+  function activeAffiliateCode() {
+    return normalizeAffiliateCode(supportState.affiliateCode);
+  }
+
+  function recordAffiliateCode(item) {
+    return normalizeAffiliateCode(item && (
+      item.affiliateCode ||
+      item.affiliateId ||
+      item.avatar?.affiliateCode ||
+      item.request?.affiliateCode
+    ));
+  }
+
+  function isOwnedByActiveAffiliate(item) {
+    const activeCode = activeAffiliateCode();
+    const ownerCode = recordAffiliateCode(item);
+    return Boolean(activeCode && ownerCode && ownerCode === activeCode);
+  }
+
   function avatarStorageKey() {
     return `evicsPhoneAvatarSetup:${supportState.affiliateCode || 'default'}`;
   }
@@ -430,6 +453,7 @@
     return {
       id: String(item && (item.id || item.avatarId || item.requestId) || '').trim(),
       requestId: String(item && item.requestId || '').trim(),
+      affiliateCode: normalizeAffiliateCode(item && (item.affiliateCode || item.affiliateId)),
       name: String(item && item.name || 'Affiliate avatar'),
       style: String(item && item.style || 'professional'),
       photoUrl,
@@ -537,7 +561,9 @@
       if (!response.ok || payload.success === false) {
         throw new Error(payload.error || `Request failed: ${response.status}`);
       }
-      supportState.avatarLibrary = Array.isArray(payload.avatars) ? payload.avatars.map(normalizeAvatarLibraryItem).filter((item) => item.id) : [];
+      supportState.avatarLibrary = Array.isArray(payload.avatars)
+        ? payload.avatars.map(normalizeAvatarLibraryItem).filter((item) => item.id && isOwnedByActiveAffiliate(item))
+        : [];
       if (!supportState.avatarLibrary.length) {
         supportState.selectedAvatarLibraryId = '';
       } else if (!supportState.avatarLibrary.some((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''))) {
@@ -554,7 +580,7 @@
 
   async function waitForAvatarProof(videoId) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const response = await fetch(`/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}`, {
+      const response = await fetch(`/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, {
         headers: { Accept: 'application/json' }
       });
       const payload = await response.json().catch(() => ({}));
@@ -646,7 +672,9 @@
       const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.success === false) throw new Error(payload.error || `Request failed: ${response.status}`);
-      supportState.productVideos = Array.isArray(payload.videos) ? payload.videos : [];
+      supportState.productVideos = Array.isArray(payload.videos)
+        ? payload.videos.filter((item) => isOwnedByActiveAffiliate(item))
+        : [];
       renderProductVideoGallery();
     } catch (error) {
       supportState.productVideos = [];
@@ -764,7 +792,7 @@
         </div>
       </div>` : '';
     const srtBtn = item && item.videoJobId
-      ? `<a class="caption-srt-btn" href="/api/affiliate/product-video/${encodeURIComponent(item.videoJobId)}/captions.srt" download>⬇︎ Download .srt captions (YouTube SEO)</a>`
+      ? `<a class="caption-srt-btn" href="/api/affiliate/product-video/${encodeURIComponent(item.videoJobId)}/captions.srt?affiliateCode=${encodeURIComponent(activeAffiliateCode())}" download>⬇︎ Download .srt captions (YouTube SEO)</a>`
       : '';
     const titleBlock = pkg.titleMatters
       ? `<div class="caption-field">
@@ -934,7 +962,7 @@
     for (let i = 0; i < 25; i++) {
       await sleep(5000);
       try {
-        const response = await fetch(`/api/affiliate/product-video/status/${encodeURIComponent(videoJobId)}`, { headers: { Accept: 'application/json' } });
+        const response = await fetch(`/api/affiliate/product-video/status/${encodeURIComponent(videoJobId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, { headers: { Accept: 'application/json' } });
         const payload = await response.json().catch(() => ({}));
         if (payload.status === 'completed' && payload.videoUrl) return payload;
         if (payload.status === 'failed') throw new Error(payload.error || 'Rendering failed');
@@ -1310,6 +1338,9 @@
       const data = await res.json().catch(() => ({}));
       if (data.success && data.profile) {
         const profile = data.profile;
+        if (normalizeAffiliateCode(profile.affiliateCode) !== activeAffiliateCode()) {
+          throw new Error('Profile ownership mismatch. Reload with the correct affiliate link.');
+        }
         if (affiliateProfileBanner) {
           affiliateProfileBanner.style.display = 'flex';
           if (affiliateProfileName) affiliateProfileName.textContent = profile.name || supportState.affiliateCode;
@@ -1337,9 +1368,12 @@
   async function syncAvatarRequestStatus() {
     const requestId = getAvatarRequestIdFromUrl();
     if (!requestId) return;
-    const payload = await apiJson(`/api/affiliate/avatar/request/${encodeURIComponent(requestId)}`);
+    const payload = await apiJson(`/api/affiliate/avatar/request/${encodeURIComponent(requestId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`);
     const request = payload.request || null;
     if (!request) return;
+    if (!isOwnedByActiveAffiliate(request)) {
+      throw new Error('Avatar request ownership mismatch. This request is not assigned to the active affiliate ID.');
+    }
     supportState.avatarSetup.requestId = request.requestId || requestId;
     supportState.avatarSetup.returnTo = request.returnTo || supportState.avatarSetup.returnTo || '/phone-app';
     supportState.avatarSetup.selectedProductId = String(request.productId || supportState.avatarSetup.selectedProductId || '');
@@ -1482,14 +1516,16 @@
     setControlState(controlEl, 'running');
     try {
       const [renderRes, healthRes, proofRes] = await Promise.all([
-        fetch('/api/renders/phone-app', { headers: { Accept: 'application/json' } }),
+        fetch(`/api/renders/phone-app?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, { headers: { Accept: 'application/json' } }),
         fetch('/api/health', { headers: { Accept: 'application/json' } }),
-        fetch('/api/evidence/heygen', { headers: { Accept: 'application/json' } })
+        fetch(`/api/evidence/heygen?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, { headers: { Accept: 'application/json' } })
       ]);
       const rendersPayload = await renderRes.json();
       const healthPayload = await healthRes.json();
       const proofPayload = await proofRes.json();
-      const renders = Array.isArray(rendersPayload.renders) ? rendersPayload.renders : [];
+      const renders = Array.isArray(rendersPayload.renders)
+        ? rendersPayload.renders.filter((item) => isOwnedByActiveAffiliate(item))
+        : [];
 
       renderMonitor.textContent = `Tracked jobs: ${renders.length} · feed source: /api/renders/phone-app`;
       healthMonitor.textContent = `Backend health: ${(healthPayload.status || 'unknown').toUpperCase()} · uptime ${(healthPayload.uptime || healthPayload.uptime_seconds || 0)}s`;
@@ -1973,7 +2009,11 @@
       hydrateAvatarSetup();
       renderAvatarSetup();
       await loadVoiceReferenceScript();
-      await syncAvatarRequestStatus();
+      try {
+        await syncAvatarRequestStatus();
+      } catch (error) {
+        sessionInfo.textContent = `Avatar sync blocked: ${error.message}`;
+      }
       await loadAvatarLibrary();
       await loadProducts();
       await loadProductVideos();
@@ -2282,5 +2322,9 @@
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void heartbeatSupport(); }, 15000);
   setInterval(() => { void refreshConversation(); }, 8000);
-  setInterval(() => { void syncAvatarRequestStatus(); }, 10000);
+  setInterval(() => {
+    void syncAvatarRequestStatus().catch((error) => {
+      if (sessionInfo) sessionInfo.textContent = `Avatar sync blocked: ${error.message}`;
+    });
+  }, 10000);
 })();

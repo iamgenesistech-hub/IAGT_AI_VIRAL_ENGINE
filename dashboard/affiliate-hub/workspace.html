@@ -252,7 +252,8 @@
       const statusEl = document.getElementById('avatarHandoffStatus');
       const createBtn = document.getElementById('createAvatarFromPhoneBtn');
       try {
-        const res = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(requestId)}`);
+        const ownerCode = encodeURIComponent((affiliateCode || document.getElementById('codeInput').value || '').trim().toUpperCase());
+        const res = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(requestId)}?affiliateCode=${ownerCode}`);
         const data = await res.json();
         if (!res.ok || data.success === false) throw new Error(data.error || 'Unable to load avatar request');
         avatarRequest = data.request || null;
@@ -296,7 +297,8 @@
       const statusEl = document.getElementById('avatarHandoffStatus');
       const createBtn = document.getElementById('createAvatarFromPhoneBtn');
       if (!avatarRequest && avatarRequestId) {
-        const loaded = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(avatarRequestId)}`);
+        const ownerCode = encodeURIComponent((affiliateCode || document.getElementById('codeInput').value || '').trim().toUpperCase());
+        const loaded = await fetch(`${API}/api/affiliate/avatar/request/${encodeURIComponent(avatarRequestId)}?affiliateCode=${ownerCode}`);
         const loadedPayload = await loaded.json();
         avatarRequest = loadedPayload.request || null;
       }
@@ -344,9 +346,9 @@
       const proofMonitor = document.getElementById('monitorProof');
       try {
         const [renderRes, tierRes, proofRes] = await Promise.all([
-          fetch(`${API}/api/renders/phone-app`, { headers: { Accept: 'application/json' } }),
+          fetch(`${API}/api/renders/phone-app?affiliateCode=${encodeURIComponent(affiliateCode || '')}`, { headers: { Accept: 'application/json' } }),
           fetch(`${API}/api/affiliates/tier-progress?affiliateCode=${encodeURIComponent(affiliateCode || 'ROLAND787')}`, { headers: { Accept: 'application/json' } }),
-          fetch(`${API}/api/evidence/heygen`, { headers: { Accept: 'application/json' } })
+          fetch(`${API}/api/evidence/heygen?affiliateCode=${encodeURIComponent(affiliateCode || '')}`, { headers: { Accept: 'application/json' } })
         ]);
         const renders = await renderRes.json();
         const tier = await tierRes.json();
@@ -555,7 +557,7 @@
     async function pollVideo(videoId) {
       const started = Date.now();
       while (Date.now() - started < 180000) {
-        const res = await fetch(`${API}/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}`);
+        const res = await fetch(`${API}/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}?affiliateCode=${encodeURIComponent(affiliateCode || '')}`);
         const data = await res.json();
         const status = (data.status || data.videoStatus || '').toLowerCase();
         if (status === 'completed' || status === 'complete' || status === 'ready') {

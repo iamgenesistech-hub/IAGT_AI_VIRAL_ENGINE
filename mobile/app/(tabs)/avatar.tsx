@@ -159,7 +159,7 @@ export default function AvatarScreen() {
       // Poll until completed
       pollTimer.current = setInterval(async () => {
         try {
-          const updated = await fetchAvatarRequest(req.requestId);
+          const updated = await fetchAvatarRequest(req.requestId, session.affiliateCode);
           if (updated.status === 'completed') {
             clearInterval(pollTimer.current!);
             setStep('done');

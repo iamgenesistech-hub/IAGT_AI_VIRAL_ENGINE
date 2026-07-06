@@ -30,7 +30,7 @@ export default function VideosScreen() {
       const renderingJobs = vids.filter(v => v.status === 'rendering');
       for (const job of renderingJobs) {
         try {
-          const updated = await fetchVideoStatus(job.videoJobId);
+          const updated = await fetchVideoStatus(job.videoJobId, s.affiliateCode);
           if (updated.status !== 'rendering') {
             setVideos(prev => prev.map(v => v.videoJobId === job.videoJobId ? updated : v));
           }
