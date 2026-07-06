@@ -12,6 +12,7 @@
     "test:legacy-scraper": "node scrapers/viralScraper.js"
   },
   "dependencies": {
+    "@google-cloud/tasks": "^4.2.0",
     "@shopify/shopify-api": "^13.0.0",
     "@shopify/shopify-app-express": "^7.0.0",
     "@supabase/supabase-js": "^2.57.4",
