@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "EVICS Affiliate",
+    "slug": "evics-affiliate-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "evics",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.iamgenesistech.evics",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to capture your profile photo for your AI avatar.",
+        "NSMicrophoneUsageDescription": "Used to record your voice sample to clone your voice for your AI avatar.",
+        "NSPhotoLibraryUsageDescription": "Used to select your profile photo for your AI avatar."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.iamgenesistech.evics",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow EVICS to access your photos for your AI avatar.",
+          "cameraPermission": "Allow EVICS to use your camera to capture your profile photo."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow EVICS to record your voice sample for your AI avatar."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
