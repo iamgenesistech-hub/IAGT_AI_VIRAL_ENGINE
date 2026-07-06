@@ -1117,13 +1117,20 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   const avatarId = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
   // Voice clone with retry (3 attempts, exponential back-off).
-  // Non-blocking: avatar is still created even if voice clone fails.
+  // CRITICAL: Voice cloning must succeed if voiceFileUrl was provided
   let voiceCloneId = null;
   let voiceCloneStatus = null;
   if (voiceFileUrl) {
     const cloneResult = await cloneVoiceWithRetry(voiceFileUrl, `${name || 'EVICS Affiliate'} Voice`);
     voiceCloneId = cloneResult.voiceCloneId;
     voiceCloneStatus = cloneResult.voiceCloneStatus;
+    
+    // If voice cloning failed, log error but continue (voice can use default)
+    if (!voiceCloneId) {
+      console.error(`[Avatar] WARNING: Voice cloning failed for "${name}". Avatar will use default voice. Voice file URL: ${voiceFileUrl}`);
+    } else {
+      console.log(`[Avatar] Voice cloning successful: ${voiceCloneId}`);
+    }
   }
 
   return {
@@ -5801,41 +5808,36 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
   if (resolvedRequest && ownerCode !== affiliateRecordCode(resolvedRequest)) {
     return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
   }
-  const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501').trim();
-  if (!resolvedAvatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
+  
+  // GUARD RAILS: Require proper avatar setup with talking_photo_id (custom avatar created with user photo+voice)
+  const storedTalkingPhotoId = resolvedRequest?.avatar?.talkingPhotoId || resolvedRequest?.talkingPhotoId || null;
+  if (!storedTalkingPhotoId) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Avatar is not properly configured for proof rendering',
+      details: 'You must first create a custom avatar with your photo and voice in the phone app or Affiliate Hub before generating a proof video.'
+    });
+  }
+  
+  const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId).trim();
+  if (!resolvedAvatarId) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Avatar ID is required for proof generation',
+      details: 'Please ensure your custom avatar has been properly created before attempting to generate a proof video.'
+    });
+  }
+  
   const resolvedScript = String(script || "This is my avatar, and it's time to get this blessing flowing! I'm ready to show up with confidence and keep this blessing flowing.").trim();
   if (!process.env.HEYGEN_API_KEY) {
-    const demoVideoUrl = '/generated/evics-sea-moss-proof-render.mp4';
-    if (resolvedRequest) {
-      upsertAvatarRequest({
-        ...resolvedRequest,
-        avatar: {
-          ...(resolvedRequest.avatar || {}),
-          proofVideoId: `demo-${Date.now()}`,
-          proofVideoUrl: demoVideoUrl,
-          proofThumbnailUrl: resolvedRequest.photoUrl || resolvedRequest.avatar?.photoUrl || null,
-          proofScript: resolvedScript,
-          proofStatus: 'completed',
-          proofCompletedAt: new Date().toISOString()
-        },
-        updatedAt: new Date().toISOString()
-      });
-    }
-    return res.json({
-      success: true,
-      status: 'completed',
-      videoId: `demo-${Date.now()}`,
-      videoUrl: demoVideoUrl,
-      thumbnailUrl: resolvedRequest?.photoUrl || resolvedRequest?.avatar?.photoUrl || null,
-      script: resolvedScript,
-      avatarId: resolvedAvatarId,
-      requestId: resolvedRequest?.requestId || null,
-      affiliateCode: ownerCode || null
+    return res.status(503).json({ 
+      success: false, 
+      error: 'HeyGen API access is currently unavailable',
+      details: 'Proof video generation requires the EVICS-HeyGen Production API key to be configured.'
     });
   }
   try {
     // Use the affiliate's registered talking_photo_id for video generation
-    const storedTalkingPhotoId = resolvedRequest?.avatar?.talkingPhotoId || resolvedRequest?.talkingPhotoId || null;
     let render;
     if (storedTalkingPhotoId) {
       const v2Resp = await heygenApiJson('/v2/video/generate', {
@@ -5851,10 +5853,12 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
       });
       render = { video_id: v2Resp?.data?.video_id || null };
     } else {
+      // Fallback to standard render if talking_photo_id is not available (should not happen due to guard rails)
+      const voiceId = resolvedRequest?.avatar?.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
       render = await startHeyGenRender({
         script: resolvedScript,
         avatar_id: resolvedAvatarId,
-        voice_id: process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b',
+        voice_id: voiceId,
         config: {
           aspect: '9:16',
           background: { type: 'color', color: '#0b1016' },
@@ -5988,14 +5992,37 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       resolvedAttire.usePhoto = Boolean(resolvedAttire.usePhotoClothing);
     }
 
-    let avatarPayload;
-    if (process.env.HEYGEN_API_KEY) {
-    avatarPayload = await createHeyGenAffiliateAvatar({
+    // GUARD RAILS: Require both photo and voice for custom avatar creation
+    if (!resolvedPhotoUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Photo URL is required to create a custom avatar. Provide a profile picture from the phone app.' 
+      });
+    }
+    if (!resolvedVoiceUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Voice file URL is required to create a custom avatar. Record and upload your voice from the phone app.' 
+      });
+    }
+
+    // CRITICAL: HeyGen API is required for custom affiliate avatars with user-provided inputs
+    if (!process.env.HEYGEN_API_KEY) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'HeyGen API access is currently unavailable. Please try again later.',
+        details: 'Custom avatar creation requires the EVICS-HeyGen Production API key to be configured.'
+      });
+    }
+
+    // Create affiliate avatar with user-provided photo and voice
+    const avatarPayload = await createHeyGenAffiliateAvatar({
       name: resolvedName,
       photoUrl: resolvedPhotoUrl,
       voiceFileUrl: resolvedVoiceUrl,
       attire: resolvedAttire
     });
+    
     // Track HeyGen costs for this avatar creation
     const avatarCode = requestedAffiliateCode || 'UNKNOWN';
     costTracker.logCost({ operation: 'TALKING_PHOTO', affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Talking photo registration' });
@@ -6003,33 +6030,17 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     if (resolvedVoiceUrl && avatarPayload?.voice_clone_id) {
       costTracker.logCost({ operation: 'VOICE_CLONE', affiliateCode: avatarCode, jobId: finalRequestId, notes: 'Voice clone creation' });
     }
-    } else {
-    avatarPayload = {
-      avatar_item: {
-        id: process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501',
-        name: resolvedName,
-        avatar_type: 'photo_avatar',
-        group_id: 'local-demo-group',
-        preview_image_url: resolvedPhotoUrl,
-        supported_api_engines: ['avatar_4_quality', 'avatar_4_turbo'],
-        tags: []
-      },
-      avatar_group: {
-        id: 'local-demo-group',
-        name: resolvedName,
-        looks_count: 1,
-        consent_status: null,
-        created_at: Date.now()
-      },
-      voice_clone_id: resolvedVoiceUrl ? `voice_clone_${Date.now()}` : null,
-      voice_clone_status: resolvedVoiceUrl ? 'queued' : null,
-      source_provider: 'demo'
-    };
-    }
 
     const avatarItem = avatarPayload.avatar_item || {};
     const avatarGroup = avatarPayload.avatar_group || {};
-    const finalAvatarId = avatarItem.id || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
+    const finalAvatarId = avatarItem.id || null;
+    if (!finalAvatarId) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Avatar creation failed: No avatar ID returned from HeyGen API',
+        details: 'The HeyGen API did not return a valid avatar ID. Please check your HeyGen configuration.'
+      });
+    }
     const avatar = {
     id: finalAvatarId,
     avatarId: finalAvatarId,
