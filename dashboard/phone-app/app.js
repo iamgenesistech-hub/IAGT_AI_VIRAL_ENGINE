@@ -751,6 +751,21 @@
     }).join('');
 
     const bestTime = Array.isArray(pkg.postingTime) ? pkg.postingTime.join(', ') : (pkg.postingTime || '');
+    const disc = pkg.discoverability || null;
+    const discClass = disc ? (disc.score >= 85 ? 'disc-excellent' : disc.score >= 70 ? 'disc-strong' : disc.score >= 50 ? 'disc-fair' : 'disc-weak') : '';
+    const discGrade = disc ? (disc.grade.charAt(0).toUpperCase() + disc.grade.slice(1)) : '';
+    const discTip = disc && disc.suggestions && disc.suggestions.length ? disc.suggestions[0] : 'Fully optimized for reach 🚀';
+    const discBlock = disc ? `
+      <div class="caption-disc ${discClass}">
+        <div class="caption-disc-score"><span class="disc-num">${disc.score}</span><span class="disc-den">/100</span></div>
+        <div class="caption-disc-meta">
+          <strong>Discoverability: ${escapeHtml(discGrade)}</strong>
+          <span>${escapeHtml(discTip)}</span>
+        </div>
+      </div>` : '';
+    const srtBtn = item && item.videoJobId
+      ? `<a class="caption-srt-btn" href="/api/affiliate/product-video/${encodeURIComponent(item.videoJobId)}/captions.srt" download>⬇︎ Download .srt captions (YouTube SEO)</a>`
+      : '';
     const titleBlock = pkg.titleMatters
       ? `<div class="caption-field">
            <div class="caption-field-head"><span>Title (SEO)</span><button type="button" class="caption-copy-mini" data-copy="title">Copy</button></div>
@@ -763,6 +778,7 @@
         <strong>📈 Algorithm-Optimized Post Kit</strong>
         <span class="caption-kit-sub">Tap a platform, then copy your ready-to-post caption &amp; hashtags.</span>
       </div>
+      ${discBlock}
       <div class="caption-pills">${pills}</div>
       ${titleBlock}
       <div class="caption-field">
@@ -779,6 +795,7 @@
       </div>
       ${pkg.formatSpec && pkg.formatSpec.notes ? `<p class="caption-note">💡 ${escapeHtml(pkg.formatSpec.notes)}</p>` : ''}
       <button type="button" class="control-btn caption-copy-all state-off" data-copy="all">📋 Copy full post (caption + hashtags)</button>
+      ${srtBtn}
       <p class="caption-copy-status" id="phoneCaptionCopyStatus"></p>
     `;
 

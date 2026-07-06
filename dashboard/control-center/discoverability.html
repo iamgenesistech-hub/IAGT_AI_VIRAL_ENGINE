@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVICS · Discoverability Score — Pre-Post SEO Grader</title>
+    <style>
+      :root {
+        --bg: #070b11; --surface: #111722; --card: #171f2b; --card2: #1d2735;
+        --card3: #2a3547; --text: #eff5fb; --muted: #90a4bb;
+        --accent: #00c7f5; --gold: #e8c37a; --green: #34d399; --red: #f87171;
+        --border: rgba(255,255,255,.08);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.5;
+      }
+      header {
+        display: flex; align-items: center; gap: 14px;
+        padding: 16px 22px; border-bottom: 1px solid var(--border);
+        background: linear-gradient(180deg, var(--surface), var(--bg));
+        position: sticky; top: 0; z-index: 5;
+      }
+      header .mark {
+        display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px;
+        background: linear-gradient(135deg, #f0d898, #d9bf7a 55%, #9a7a32);
+        color: #070b11; font-weight: 900; font-size: 13px;
+      }
+      header h1 { font-size: 16px; margin: 0; }
+      header small { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+      header .back { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+      main { max-width: 980px; margin: 0 auto; padding: 22px; display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+      .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px;
+      }
+      .card.full { grid-column: 1 / -1; }
+      h2 { font-size: 14px; margin: 0 0 14px; letter-spacing: .3px; }
+      label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; font-weight: 600; }
+      input[type=text], textarea, select {
+        width: 100%; padding: 10px 12px; border-radius: 10px; font-size: 13px;
+        background: var(--card2); border: 1px solid var(--border); color: var(--text); font-family: inherit;
+      }
+      textarea { resize: vertical; min-height: 70px; }
+      .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+      .row .grow { flex: 1 1 200px; }
+      .checks { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
+      .checks label { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: var(--text); font-size: 13px; }
+      button.primary {
+        margin-top: 16px; width: 100%; padding: 12px; border: 0; border-radius: 11px;
+        background: var(--accent); color: #06121a; font-weight: 800; font-size: 14px; cursor: pointer;
+      }
+      button.primary:hover { opacity: .92; }
+      button.ghost {
+        margin-top: 10px; width: 100%; padding: 11px; border-radius: 11px; cursor: pointer;
+        background: var(--card3); color: var(--text); border: 1px solid var(--border); font-weight: 700; font-size: 13px;
+      }
+      .score-wrap { display: flex; align-items: center; gap: 18px; margin-bottom: 6px; }
+      .ring {
+        --val: 0; --col: var(--green);
+        width: 108px; height: 108px; border-radius: 50%; flex: 0 0 auto;
+        background: conic-gradient(var(--col) calc(var(--val) * 1%), rgba(255,255,255,.08) 0);
+        display: grid; place-items: center; position: relative;
+      }
+      .ring::before { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: var(--card); }
+      .ring .num { position: relative; font-size: 30px; font-weight: 900; }
+      .ring .den { position: relative; font-size: 12px; color: var(--muted); }
+      .grade { font-size: 20px; font-weight: 800; }
+      .grade small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+      ul.tips { margin: 14px 0 0; padding-left: 18px; }
+      ul.tips li { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+      .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+      .tag { padding: 6px 10px; border-radius: 999px; background: var(--card2); border: 1px solid var(--border); font-size: 12px; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .placeholder { color: var(--muted); font-size: 13px; }
+      @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="mark">EVICS</div>
+      <div>
+        <h1>Discoverability Score</h1>
+        <small>Pre-Post SEO &amp; Reach Grader</small>
+      </div>
+      <a class="back" href="/workspace">← Command Workspace</a>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>📝 Grade a post before you publish</h2>
+        <div class="row">
+          <div class="grow">
+            <label for="platform">Platform</label>
+            <select id="platform">
+              <option value="tiktok">TikTok</option>
+              <option value="instagram">Instagram Reels</option>
+              <option value="youtube">YouTube Shorts</option>
+              <option value="facebook">Facebook</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="x">X (Twitter)</option>
+            </select>
+          </div>
+        </div>
+        <label for="title">Title (SEO — YouTube/Pinterest)</label>
+        <input type="text" id="title" placeholder="Sea Moss Gel — More Energy in 7 Days #Shorts" />
+        <label for="caption">Caption / Description</label>
+        <textarea id="caption" placeholder="Tired of the afternoon crash? Here's what changed everything… Shop now — link in bio."></textarea>
+        <label for="hashtags">Hashtags (space or comma separated)</label>
+        <input type="text" id="hashtags" placeholder="#SeaMoss #WellnessTok #IAGT" />
+        <label for="script">Spoken script (for hook strength)</label>
+        <textarea id="script" placeholder="Paste the video script here…"></textarea>
+        <div class="checks">
+          <label><input type="checkbox" id="hasCaptions" checked /> Burned-in captions</label>
+          <label><input type="checkbox" id="formatOk" checked /> Vertical 9:16</label>
+          <label><input type="checkbox" id="usedTrendingTag" /> Rode a live trend</label>
+        </div>
+        <button class="primary" id="gradeBtn">Grade Discoverability →</button>
+      </section>
+
+      <section class="card">
+        <h2>📊 Result</h2>
+        <div id="result">
+          <p class="placeholder">Fill in a post and press <strong>Grade</strong> to see its 0–100 reach score and specific fixes.</p>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:18px 0" />
+        <h2>🔥 Live trending tags</h2>
+        <div class="row">
+          <div class="grow">
+            <select id="trendPlatform">
+              <option value="">All platforms</option>
+              <option value="tiktok">TikTok</option>
+              <option value="instagram">Instagram</option>
+              <option value="youtube">YouTube</option>
+              <option value="facebook">Facebook</option>
+            </select>
+          </div>
+          <button class="ghost" id="trendBtn" style="margin-top:0;width:auto;padding:10px 16px">Refresh</button>
+        </div>
+        <div class="tags" id="trendTags"><span class="muted">Loading live trends…</span></div>
+      </section>
+
+      <section class="card full">
+        <h2>🎬 SRT caption export (YouTube upload boost)</h2>
+        <p class="muted">Paste a script and download a timed <code>.srt</code> file. Uploading captions to YouTube is a direct search-ranking win.</p>
+        <label for="srtScript">Script</label>
+        <textarea id="srtScript" placeholder="Paste the spoken script to convert into timed captions…"></textarea>
+        <label for="srtName">File name</label>
+        <input type="text" id="srtName" placeholder="sea-moss-gel" />
+        <button class="ghost" id="srtBtn">⬇︎ Download .srt</button>
+      </section>
+    </main>
+
+    <script>
+      function $(id) { return document.getElementById(id); }
+
+      async function grade() {
+        const btn = $('gradeBtn');
+        btn.disabled = true; btn.textContent = 'Grading…';
+        try {
+          const body = {
+            platform: $('platform').value,
+            title: $('title').value,
+            caption: $('caption').value,
+            hashtags: $('hashtags').value,
+            script: $('script').value,
+            hasCaptions: $('hasCaptions').checked,
+            formatOk: $('formatOk').checked,
+            usedTrendingTag: $('usedTrendingTag').checked
+          };
+          const r = await fetch('/api/algorithm/discoverability', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+          });
+          const data = await r.json();
+          if (!data.success) throw new Error(data.error || 'Grade failed');
+          renderResult(data);
+        } catch (e) {
+          $('result').innerHTML = '<p class="placeholder" style="color:var(--red)">⚠ ' + escapeHtml(e.message) + '</p>';
+        } finally {
+          btn.disabled = false; btn.textContent = 'Grade Discoverability →';
+        }
+      }
+
+      function colorFor(score) {
+        if (score >= 85) return 'var(--green)';
+        if (score >= 70) return 'var(--accent)';
+        if (score >= 50) return 'var(--gold)';
+        return 'var(--red)';
+      }
+
+      function renderResult(data) {
+        const col = colorFor(data.score);
+        const tips = (data.suggestions && data.suggestions.length)
+          ? '<ul class="tips">' + data.suggestions.map(function (s) { return '<li>' + escapeHtml(s) + '</li>'; }).join('') + '</ul>'
+          : '<p class="muted" style="margin-top:12px">✅ No fixes needed — this post is fully optimized for reach.</p>';
+        $('result').innerHTML =
+          '<div class="score-wrap">' +
+            '<div class="ring" style="--val:' + data.score + ';--col:' + col + '">' +
+              '<span class="num">' + data.score + '</span><span class="den">/100</span>' +
+            '</div>' +
+            '<div class="grade" style="color:' + col + '">' + capitalize(data.grade) +
+              '<small>' + escapeHtml(data.platform) + ' reach grade</small>' +
+            '</div>' +
+          '</div>' + tips;
+      }
+
+      async function loadTrends() {
+        const box = $('trendTags');
+        box.innerHTML = '<span class="muted">Loading live trends…</span>';
+        try {
+          const p = $('trendPlatform').value;
+          const r = await fetch('/api/algorithm/trending-tags?limit=10' + (p ? '&platform=' + encodeURIComponent(p) : ''));
+          const data = await r.json();
+          if (!data.success || !data.tags || !data.tags.length) {
+            box.innerHTML = '<span class="muted">No live trends available yet — the metadata engine will use evergreen tags.</span>';
+            return;
+          }
+          box.innerHTML = data.tags.map(function (t) { return '<span class="tag">#' + escapeHtml(String(t).replace(/[^a-z0-9]/gi, '')) + '</span>'; }).join('');
+        } catch (e) {
+          box.innerHTML = '<span class="muted">Could not load trends.</span>';
+        }
+      }
+
+      async function downloadSrt() {
+        const script = $('srtScript').value.trim();
+        if (!script) { alert('Paste a script first.'); return; }
+        try {
+          const r = await fetch('/api/algorithm/srt?download=1', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script: script, filename: $('srtName').value || 'captions' })
+          });
+          if (!r.ok) { const j = await r.json().catch(function () { return {}; }); throw new Error(j.error || 'SRT failed'); }
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = ($('srtName').value || 'captions') + '.srt';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) { alert(e.message); }
+      }
+
+      function capitalize(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+      function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      $('gradeBtn').addEventListener('click', grade);
+      $('trendBtn').addEventListener('click', loadTrends);
+      $('trendPlatform').addEventListener('change', loadTrends);
+      $('srtBtn').addEventListener('click', downloadSrt);
+      loadTrends();
+    </script>
+  </body>
+</html>

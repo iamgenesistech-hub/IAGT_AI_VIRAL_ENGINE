@@ -272,6 +272,8 @@ function generatePlatformMetadata(input = {}) {
     productPageUrl = '',
     platform = 'tiktok',
     trendingTags = [],
+    hasCaptions = true,
+    formatOk = true,
     category: providedCategory
   } = input;
 
@@ -327,6 +329,19 @@ function generatePlatformMetadata(input = {}) {
   const altText = `${productTitle} — ${rule.label} product video by a ${BRAND_NAME} affiliate (${category} wellness)`;
   const spokenKeywords = uniquePreserve([...extractKeywords(productTitle, 4), category]);
 
+  // Pre-post SEO/reach grade (0-100) for this exact platform package.
+  const usedTrendingTag = Array.isArray(trendingTags) && trendingTags.length > 0;
+  const discoverability = computeDiscoverabilityScore({
+    platform,
+    hasCaptions,
+    hashtags,
+    title,
+    description,
+    script: input.script || '',
+    formatOk,
+    usedTrendingTag
+  });
+
   const copyBlock = [
     rule.titleMatters ? `TITLE:\n${title}` : '',
     `CAPTION:\n${description}`
@@ -345,6 +360,7 @@ function generatePlatformMetadata(input = {}) {
     coverText,
     spokenKeywords,
     postingTime: rule.bestTimes,
+    discoverability,
     formatSpec: {
       aspect: rule.aspect,
       dimension: rule.dimension,
@@ -369,7 +385,9 @@ function optimizeForAllPlatforms(input = {}, options = {}) {
       ...input,
       category,
       platform,
-      trendingTags: options.trendingTags || []
+      trendingTags: options.trendingTags || [],
+      hasCaptions: options.hasCaptions !== undefined ? options.hasCaptions : true,
+      formatOk: options.formatOk !== undefined ? options.formatOk : true
     });
   }
   return {
@@ -450,6 +468,60 @@ function capitalize(str) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ── Public: turn a spoken script into a valid .srt caption file ───────────────
+// Deterministic, dependency-free. Estimates cue timings from a natural
+// narration pace and splits on sentence + short word-budget boundaries so the
+// on-screen captions stay readable (and uploadable to YouTube for a search win).
+function srtTimestamp(totalSeconds) {
+  const ms = Math.max(0, Math.round(totalSeconds * 1000));
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const millis = ms % 1000;
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(millis, 3)}`;
+}
+
+function generateSrt(text, options = {}) {
+  const {
+    wordsPerSecond = 2.5,   // ~150 wpm natural narration
+    maxWordsPerCue = 7,     // short, mobile-readable lines
+    minCueSeconds = 1.2,
+    maxCueSeconds = 5,
+    gapSeconds = 0.08,      // tiny breath between cues
+    startOffset = 0
+  } = options;
+
+  const clean = String(text || '').replace(/\r/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  if (!clean) return '';
+
+  // Break into sentences first, then chunk each sentence by a word budget.
+  const sentences = clean.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  const cues = [];
+  for (const sentence of sentences) {
+    const words = sentence.split(/\s+/).filter(Boolean);
+    for (let i = 0; i < words.length; i += maxWordsPerCue) {
+      const cue = words.slice(i, i + maxWordsPerCue).join(' ');
+      if (cue) cues.push(cue);
+    }
+  }
+  if (!cues.length) return '';
+
+  let t = Math.max(0, startOffset);
+  const blocks = [];
+  cues.forEach((cue, idx) => {
+    const wordCount = cue.split(/\s+/).filter(Boolean).length;
+    let dur = wordCount / wordsPerSecond;
+    dur = Math.max(minCueSeconds, Math.min(maxCueSeconds, dur));
+    const start = t;
+    const end = t + dur;
+    t = end + gapSeconds;
+    blocks.push(`${idx + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${cue}`);
+  });
+
+  return blocks.join('\n\n') + '\n';
+}
+
 module.exports = {
   PLATFORM_META_RULES,
   BRAND_TAGS,
@@ -460,5 +532,6 @@ module.exports = {
   hashtagLineOf,
   generatePlatformMetadata,
   optimizeForAllPlatforms,
-  computeDiscoverabilityScore
+  computeDiscoverabilityScore,
+  generateSrt
 };

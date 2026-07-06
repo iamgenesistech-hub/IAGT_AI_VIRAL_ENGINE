@@ -1318,6 +1318,11 @@ app.get('/workspace', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
 
+// Discoverability Score — pre-post SEO/reach grader (Admin tool)
+app.get('/discoverability', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../dashboard/control-center/discoverability.html'));
+});
+
 app.get('/evics', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
@@ -6317,14 +6322,18 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     });
 
     // Algorithm Amplification: build per-platform SEO/discovery metadata packages
-    // (title, description, hashtags, keywords, cover text, posting time, format spec).
-    // TODO(trending-feed): inject live tags from evics_trends here.
+    // (title, description, hashtags, keywords, cover text, posting time, format spec,
+    // and a 0-100 Discoverability Score). Live tags come from the evics_trends feed.
+    const trendingTags = await fetchTrendingTags({ platform: resolvedPlatform, limit: 4 });
     const metadata = buildVideoMetadataPackage({
       productTitle: resolvedProductTitle,
       productPrice: resolvedProductPrice,
       productPageUrl: resolvedProductPage,
       script,
-      primaryPlatform: resolvedPlatform
+      primaryPlatform: resolvedPlatform,
+      trendingTags,
+      hasCaptions: true,
+      formatOk: true
     });
 
     const record = upsertProductVideoRecord({
@@ -6455,17 +6464,144 @@ app.get('/api/affiliate/product-videos', (req, res) => {
   res.json({ success: true, videos, count: videos.length });
 });
 
+// ── Algorithm / SEO amplification routes ─────────────────────────────────────
+
+// POST /api/algorithm/discoverability — pre-post SEO/reach grader (0-100 + tips).
+// Admin "Discoverability Score" tool. Accepts a caption package or raw fields.
+app.post('/api/algorithm/discoverability', (req, res) => {
+  noStore(res);
+  try {
+    const b = req.body || {};
+    const result = algorithmOptimization.computeDiscoverabilityScore({
+      platform: b.platform || 'tiktok',
+      hasCaptions: b.hasCaptions !== undefined ? !!b.hasCaptions : true,
+      hashtags: Array.isArray(b.hashtags)
+        ? b.hashtags
+        : String(b.hashtags || '').split(/[\s,]+/).filter(Boolean),
+      title: b.title || '',
+      description: b.description || b.caption || '',
+      script: b.script || '',
+      formatOk: b.formatOk !== undefined ? !!b.formatOk : true,
+      usedTrendingTag: !!b.usedTrendingTag
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/algorithm/trending-tags — live hashtag-ready tokens from evics_trends.
+app.get('/api/algorithm/trending-tags', async (req, res) => {
+  noStore(res);
+  const platform = req.query.platform ? String(req.query.platform).toLowerCase() : null;
+  const limit = Math.min(12, Math.max(1, parseInt(req.query.limit, 10) || 6));
+  const tags = await fetchTrendingTags({ platform, limit });
+  res.json({ success: true, platform: platform || 'all', count: tags.length, tags });
+});
+
+// POST /api/algorithm/srt — turn any script/caption into a downloadable .srt.
+app.post('/api/algorithm/srt', (req, res) => {
+  try {
+    const b = req.body || {};
+    const srt = algorithmOptimization.generateSrt(b.script || b.text || '', b.options || {});
+    if (!srt) return res.status(400).json({ success: false, error: 'No script/text provided.' });
+    if (String(req.query.download || '') === '1') {
+      const name = (b.filename || 'captions').replace(/[^a-z0-9._-]+/gi, '_');
+      res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}.srt"`);
+      return res.send(srt);
+    }
+    noStore(res);
+    res.json({ success: true, srt });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/affiliate/product-video/:videoJobId/captions.srt — YouTube caption file.
+app.get('/api/affiliate/product-video/:videoJobId/captions.srt', (req, res) => {
+  const record = findProductVideoRecord(req.params.videoJobId);
+  if (!record || !record.script) {
+    return res.status(404).json({ success: false, error: 'Product video (or its script) not found.' });
+  }
+  try {
+    const srt = algorithmOptimization.generateSrt(record.script);
+    const base = String(record.productTitle || 'captions').replace(/[^a-z0-9._-]+/gi, '_').slice(0, 60);
+    res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${base}.srt"`);
+    res.send(srt);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Build per-platform algorithm/SEO metadata packages for a product video.
 // Deterministic, dependency-free (see backend/algorithmOptimizationEngine.js).
-function buildVideoMetadataPackage({ productTitle, productPrice, productPageUrl, script, primaryPlatform, trendingTags = [] }) {
+function buildVideoMetadataPackage({ productTitle, productPrice, productPageUrl, script, primaryPlatform, trendingTags = [], hasCaptions = true, formatOk = true }) {
   try {
     return algorithmOptimization.optimizeForAllPlatforms(
       { productTitle, productPrice, productPageUrl, script },
-      { primaryPlatform: primaryPlatform || 'tiktok', trendingTags }
+      { primaryPlatform: primaryPlatform || 'tiktok', trendingTags, hasCaptions, formatOk }
     );
   } catch (err) {
     console.warn('[AlgoOptimize] metadata build failed:', err.message);
     return null;
+  }
+}
+
+// Live trending-tag feed — derive current hashtag-ready tokens from evics_trends.
+// Safe by design: never throws; returns [] when the table is empty/unavailable so
+// metadata generation always proceeds. Prefers recent, high-viral-score rows and,
+// when a platform is given, that platform's trends first (then global as filler).
+async function fetchTrendingTags({ platform, limit = 4 } = {}) {
+  try {
+    if (!SupabaseConnector || typeof SupabaseConnector.from !== 'function') return [];
+    const runQuery = async (byPlatform) => {
+      let q = SupabaseConnector
+        .from('evics_trends')
+        .select('title, hook, category, platform, viral_score, created_at')
+        .order('viral_score', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (byPlatform && platform) q = q.eq('platform', platform);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return Array.isArray(data) ? data : [];
+    };
+
+    let rows = platform ? await runQuery(true) : [];
+    if (rows.length < 6) {
+      const global = await runQuery(false);
+      const seen = new Set(rows.map((r) => `${r.title}|${r.category}`));
+      for (const r of global) {
+        const key = `${r.title}|${r.category}`;
+        if (!seen.has(key)) { rows.push(r); seen.add(key); }
+      }
+    }
+    if (!rows.length) return [];
+
+    // Turn category + title/hook keywords into a small, deduped tag set.
+    const tokens = [];
+    for (const r of rows) {
+      if (r.category) tokens.push(r.category);
+      const kws = algorithmOptimization.extractKeywords(`${r.title || ''} ${r.hook || ''}`, 2);
+      for (const k of kws) tokens.push(k);
+    }
+    const seen = new Set();
+    const tags = [];
+    for (const tok of tokens) {
+      const norm = String(tok || '').trim();
+      if (!norm) continue;
+      const key = norm.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      tags.push(norm);
+      if (tags.length >= limit) break;
+    }
+    return tags;
+  } catch (err) {
+    console.warn('[TrendingFeed] fetchTrendingTags failed (using none):', err.message);
+    return [];
   }
 }
 
