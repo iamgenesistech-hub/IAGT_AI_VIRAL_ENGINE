@@ -58,6 +58,10 @@ const { registerGovernanceRoutes } = require('./governanceRoutes');
 // GCS-backed persistence — avatar + video records survive Cloud Run redeploys.
 const persistenceEngine = require('./persistenceEngine');
 
+// Stripe billing engine — subscription plans, checkout, webhooks, enforcement.
+const stripeEngine = require('./stripeEngine');
+const mountBillingRoutes = require('./billingRoutes');
+
 // OpenAI client — initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
 function getOpenAI() {
@@ -1633,6 +1637,9 @@ registerMediaOutputRoutes(app, SupabaseConnector);
 
 // ===== REGISTER SACRED INTELLIGENCE GOVERNANCE ROUTES =====
 registerGovernanceRoutes(app);
+
+// ===== REGISTER STRIPE BILLING ROUTES =====
+mountBillingRoutes(app);
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====
 const viralMediaRouter = createViralMediaRouter();
@@ -6096,33 +6103,52 @@ app.get('/api/affiliate/avatar/voice-identity-oath', (_req, res) => {
   });
 });
 
-// GET /api/affiliate/billing/info
-app.get('/api/affiliate/billing/info', (req, res) => {
+// GET /api/affiliate/billing/info — redirects to new billing engine
+app.get('/api/affiliate/billing/info', async (req, res) => {
   const code = req.query.code || '';
-  // Placeholder billing info — will be connected to Stripe when API keys are set
-  res.json({
-    success: true,
-    plan: 'Starter',
-    subscriptionStatus: 'Active',
-    nextBillingDate: '—',
-    balance: '0.00',
-    lifetimeEarned: '0.00',
-    lastPayoutDate: '—',
-    purchases: []
-  });
+  try {
+    const planInfo = await stripeEngine.getPlanForAffiliate(code);
+    res.json({
+      success: true,
+      plan: planInfo.plan.name,
+      planId: planInfo.planId,
+      subscriptionStatus: planInfo.subscriptionStatus,
+      videosUsed: planInfo.videosUsed,
+      videosRemaining: planInfo.videosRemaining === Infinity ? 'Unlimited' : planInfo.videosRemaining,
+      videosPerMonth: planInfo.plan.videosPerMonth === Infinity ? 'Unlimited' : planInfo.plan.videosPerMonth,
+      watermark: planInfo.plan.watermark,
+      voiceClone: planInfo.plan.voiceClone,
+      nextBillingDate: '—',
+      balance: '0.00',
+      lifetimeEarned: '0.00',
+      lastPayoutDate: '—',
+      purchases: []
+    });
+  } catch {
+    res.json({ success: true, plan: 'Free', planId: 'free', subscriptionStatus: 'free', purchases: [] });
+  }
 });
 
-// POST /api/affiliate/billing/checkout
-app.post('/api/affiliate/billing/checkout', (req, res) => {
-  const { affiliateCode, item, price } = req.body || {};
-  console.log(`[Billing] Checkout request: ${item} ($${(price / 100).toFixed(2)}) for ${affiliateCode}`);
-  // When Stripe is configured, create a Checkout Session here
-  res.json({
-    success: true,
-    message: 'Stripe checkout will be activated once payment processing is configured. Your request has been noted.',
-    item,
-    price
-  });
+// POST /api/affiliate/billing/checkout — proxy to Stripe engine
+app.post('/api/affiliate/billing/checkout', async (req, res) => {
+  const { affiliateCode, item, price, planId } = req.body || {};
+  console.log(`[Billing] Checkout request: ${item || planId} for ${affiliateCode}`);
+  // Map legacy 'item' names to planIds
+  const resolvedPlan = planId || (item?.toLowerCase().includes('creator') ? 'creator' : item?.toLowerCase().includes('elite') ? 'elite' : null);
+  if (!resolvedPlan || !stripeEngine.PLANS[resolvedPlan] || resolvedPlan === 'free') {
+    return res.json({
+      success: true,
+      message: 'Specify planId as "creator" or "elite" to initiate Stripe checkout.',
+      item,
+      price
+    });
+  }
+  try {
+    const result = await stripeEngine.createCheckoutSession({ affiliateCode, planId: resolvedPlan });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // POST /api/affiliate/billing/manage-subscription
@@ -6240,6 +6266,22 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
 
     const cleanCode = String(affiliateCode || '').trim().toUpperCase();
     if (!cleanCode) return res.status(400).json({ success: false, error: 'affiliateCode is required.' });
+
+    // ── Plan enforcement: check monthly video limit ───────────────────────────
+    const planInfo = await stripeEngine.getPlanForAffiliate(cleanCode);
+    if (!planInfo.canGenerateVideo) {
+      const plan = planInfo.plan;
+      return res.status(402).json({
+        success: false,
+        error: `You have used all ${plan.videosPerMonth} videos included in your ${plan.name} plan this month.`,
+        limitReached: true,
+        planId: planInfo.planId,
+        videosUsed: planInfo.videosUsed,
+        videosPerMonth: plan.videosPerMonth,
+        upgradeRequired: true,
+        upgradeMessage: 'Upgrade to Creator ($29/mo) for 20 videos/month, or Elite ($79/mo) for unlimited videos.',
+      });
+    }
 
     // Resolve the avatar from the request record
     let avatarRecord = null;
@@ -6389,6 +6431,9 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       completedAt: null,
       error: null
     });
+
+    // Increment monthly video usage count for billing enforcement
+    stripeEngine.incrementVideoUsage(cleanCode).catch(() => {});
 
     res.json({
       success: true,

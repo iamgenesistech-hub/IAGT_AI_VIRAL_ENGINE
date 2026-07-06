@@ -86,7 +86,20 @@ export default function ProductsScreen() {
         [{ text: 'View Videos', onPress: () => router.push('/(tabs)/videos') }]
       );
     } catch (e: unknown) {
-      Alert.alert('Generation failed', (e as Error).message);
+      const msg = (e as Error).message || '';
+      // Handle plan limit 402 response surfaced as error
+      if (msg.includes('plan this month') || msg.includes('limitReached') || msg.includes('Upgrade')) {
+        Alert.alert(
+          '🚀 Upgrade Required',
+          msg,
+          [
+            { text: 'View Plans', onPress: () => router.push('/(tabs)/upgrade') },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert('Generation failed', msg);
+      }
     } finally {
       setGenerating(false);
     }

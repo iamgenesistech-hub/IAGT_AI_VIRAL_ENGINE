@@ -21,6 +21,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.5.2",
     "multer": "^2.2.0",
-    "openai": "^4.104.0"
+    "openai": "^4.104.0",
+    "stripe": "^22.3.0"
   }
 }
