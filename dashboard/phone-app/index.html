@@ -16,11 +16,8 @@
       </div>
     </div>
     <nav class="exec-shell-nav">
-      <a href="/workspace">EVICS</a>
-      <a href="/viral-media">Viral Media</a>
       <a href="/affiliate">Affiliate Hub</a>
       <a href="/phone-app" aria-current="page">Phone App</a>
-      <a href="/admin-hub">Affiliate AdminHub</a>
     </nav>
     <div class="exec-shell-pulse" id="phonePulse">Connecting monitors…</div>
   </header>
@@ -113,16 +110,12 @@
                 <button type="button" id="phoneAvatarVoiceRerecord" class="control-btn state-off">Re-record</button>
                 <button type="button" id="phoneAvatarVoiceUpload" class="control-btn state-off">Upload voice file</button>
               </div>
-              <audio id="phoneAvatarVoicePreview" class="avatar-voice-preview hidden" controls preload="metadata"></audio>
               <div class="voice-volume-row hidden" id="phoneVoiceVolumeRow">
                 <label for="phoneVoiceVolume" class="voice-volume-label">🔊 Volume</label>
                 <input type="range" id="phoneVoiceVolume" class="voice-volume-slider" min="0" max="100" value="80" step="5" />
                 <span id="phoneVoiceVolumeValue" class="voice-volume-value">80%</span>
               </div>
-              <div class="avatar-file-row hidden" id="phoneAvatarVoiceFileRow">
-                <a id="phoneAvatarVoiceFileLink" href="#" target="_blank" rel="noopener">Open recorded voice file</a>
-                <button type="button" id="phoneAvatarVoiceCopyLink" class="control-btn state-off">Copy link</button>
-              </div>
+              <p class="avatar-help" id="phoneAvatarVoiceTimestamp">Last voice file: not recorded yet.</p>
             </div>
           </div>
           <div class="panel attire-panel">
@@ -132,87 +125,199 @@
                 <p>Choose how your avatar will be dressed when presenting products.</p>
               </div>
             </div>
+            <div class="attire-mode-row">
+              <label for="phoneAttireGender">Avatar gender guardrail</label>
+              <select id="phoneAttireGender">
+                <option value="">Select avatar gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <p class="create-avatar-status" id="phoneAttireGenderHint" style="margin: -4px 0 12px 0;">
+              Choose male or female first so only that gender's attire selections appear. Or choose to use the clothing already shown in the uploaded profile picture.
+            </p>
             <div class="attire-use-photo-row">
               <label class="attire-checkbox-label">
                 <input type="checkbox" id="phoneAttireUsePhoto" />
-                <span>Use the clothing from my profile picture</span>
+                <span>Use the clothing shown in my uploaded profile picture</span>
               </label>
             </div>
+            <p class="create-avatar-status" style="margin: -4px 0 12px 0;">
+              Choose either detailed attire or overall attire. If overall attire is selected, AI will build the best full outfit it can. It is either-or, not both.
+            </p>
+            <div class="attire-mode-row">
+              <label for="phoneAttireMode">Custom attire mode</label>
+              <select id="phoneAttireMode">
+                <option value="detailed">Detailed attire pieces</option>
+                <option value="overall">Overall attire direction</option>
+              </select>
+            </div>
             <div class="attire-grid" id="phoneAttireGrid">
-              <!-- TOP row -->
-              <div class="attire-row">
-                <h3 class="attire-row-label">Top</h3>
-                <div class="attire-row-fields">
-                  <div class="attire-group">
-                    <label for="phoneAttireTop">Style</label>
-                    <select id="phoneAttireTop">
-                      <option value="corporate-blazer">Corporate Blazer</option>
-                      <option value="dress-shirt">Dress Shirt</option>
-                      <option value="polo-shirt">Polo Shirt</option>
-                      <option value="t-shirt">T-Shirt</option>
-                      <option value="blouse">Blouse</option>
-                      <option value="executive-jacket">Executive Jacket</option>
-                      <option value="casual-hoodie">Casual Hoodie</option>
-                    </select>
+              <div class="attire-panel-group" id="phoneAttireDetailedSection">
+                <div class="attire-row">
+                  <h3 class="attire-row-label">Top</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group">
+                      <label for="phoneAttireTop">Style</label>
+                      <select id="phoneAttireTop">
+                        <option value="">Select avatar gender first</option>
+                        <option value="corporate-blazer">Corporate Blazer</option>
+                        <option value="dress-shirt">Dress Shirt</option>
+                        <option value="button-down-shirt">Button-Down Shirt</option>
+                        <option value="polo-shirt">Polo Shirt</option>
+                        <option value="t-shirt">T-Shirt</option>
+                        <option value="blouse">Blouse</option>
+                        <option value="cardigan">Cardigan</option>
+                        <option value="sweater">Sweater</option>
+                        <option value="executive-jacket">Executive Jacket</option>
+                        <option value="casual-hoodie">Casual Hoodie</option>
+                        <option value="vest">Vest</option>
+                        <option value="tunic">Tunic</option>
+                        <option value="wrap-top">Wrap Top</option>
+                      </select>
+                    </div>
+                    <div class="attire-group">
+                      <label for="phoneAttireTopColor">Color</label>
+                      <select id="phoneAttireTopColor">
+                        <option value="black">Black</option>
+                        <option value="white">White</option>
+                        <option value="navy">Navy Blue</option>
+                        <option value="gray">Gray</option>
+                        <option value="charcoal">Charcoal</option>
+                        <option value="light-blue">Light Blue</option>
+                        <option value="burgundy">Burgundy</option>
+                        <option value="cream">Cream</option>
+                        <option value="green">Green</option>
+                        <option value="olive">Olive</option>
+                        <option value="pink">Pink</option>
+                        <option value="purple">Purple</option>
+                        <option value="teal">Teal</option>
+                        <option value="red">Red</option>
+                        <option value="tan">Tan</option>
+                      </select>
+                    </div>
                   </div>
-                  <div class="attire-group">
-                    <label for="phoneAttireTopColor">Color</label>
-                    <select id="phoneAttireTopColor">
-                      <option value="black">Black</option>
-                      <option value="white">White</option>
-                      <option value="navy">Navy Blue</option>
-                      <option value="gray">Gray</option>
-                      <option value="light-blue">Light Blue</option>
-                      <option value="burgundy">Burgundy</option>
-                      <option value="cream">Cream</option>
-                      <option value="green">Green</option>
-                      <option value="pink">Pink</option>
-                    </select>
+                </div>
+                <!-- BOTTOM row -->
+                <div class="attire-row">
+                  <h3 class="attire-row-label">Bottom</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group">
+                      <label for="phoneAttireBottom">Style</label>
+                      <select id="phoneAttireBottom">
+                        <option value="">Select avatar gender first</option>
+                        <option value="dress-pants">Dress Pants</option>
+                        <option value="slacks">Slacks</option>
+                        <option value="chinos">Chinos</option>
+                        <option value="trousers">Trousers</option>
+                        <option value="wide-leg-trousers">Wide-Leg Trousers</option>
+                        <option value="skirt">Skirt</option>
+                        <option value="pencil-skirt">Pencil Skirt</option>
+                        <option value="dress">Dress (full outfit)</option>
+                        <option value="jeans">Jeans</option>
+                        <option value="shorts">Shorts</option>
+                        <option value="joggers">Joggers</option>
+                        <option value="leggings">Leggings</option>
+                        <option value="culottes">Culottes</option>
+                        <option value="cargo-pants">Cargo Pants</option>
+                      </select>
+                    </div>
+                    <div class="attire-group">
+                      <label for="phoneAttireBottomColor">Color</label>
+                      <select id="phoneAttireBottomColor">
+                        <option value="black">Black</option>
+                        <option value="navy">Navy Blue</option>
+                        <option value="gray">Gray</option>
+                        <option value="charcoal">Charcoal</option>
+                        <option value="khaki">Khaki</option>
+                        <option value="white">White</option>
+                        <option value="brown">Brown</option>
+                        <option value="beige">Beige</option>
+                        <option value="olive">Olive</option>
+                        <option value="tan">Tan</option>
+                        <option value="denim-blue">Denim Blue</option>
+                        <option value="burgundy">Burgundy</option>
+                        <option value="purple">Purple</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
-              <!-- BOTTOM row -->
-              <div class="attire-row">
-                <h3 class="attire-row-label">Bottom</h3>
-                <div class="attire-row-fields">
-                  <div class="attire-group">
-                    <label for="phoneAttireBottom">Style</label>
-                    <select id="phoneAttireBottom">
-                      <option value="dress-pants">Dress Pants</option>
-                      <option value="slacks">Slacks</option>
-                      <option value="chinos">Chinos</option>
-                      <option value="shorts">Shorts</option>
-                      <option value="skirt">Skirt</option>
-                      <option value="dress">Dress (full outfit)</option>
-                      <option value="jeans">Jeans</option>
-                    </select>
-                  </div>
-                  <div class="attire-group">
-                    <label for="phoneAttireBottomColor">Color</label>
-                    <select id="phoneAttireBottomColor">
-                      <option value="black">Black</option>
-                      <option value="navy">Navy Blue</option>
-                      <option value="gray">Gray</option>
-                      <option value="khaki">Khaki</option>
-                      <option value="white">White</option>
-                      <option value="brown">Brown</option>
-                      <option value="beige">Beige</option>
-                    </select>
+              <div class="attire-panel-group" id="phoneAttireOverallSection">
+                <div class="attire-row attire-row-full">
+                  <h3 class="attire-row-label">Overall Style</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group attire-group-wide">
+                      <select id="phoneAttireStyle">
+                        <option value="">Select avatar gender first</option>
+                        <option value="corporate-executive">Corporate Executive</option>
+                        <option value="boardroom-formal">Boardroom Formal</option>
+                        <option value="sales-persona">Sales Persona</option>
+                        <option value="business-casual">Business Casual</option>
+                        <option value="creative-professional">Creative Professional</option>
+                        <option value="luxury-elegant">Luxury Elegant</option>
+                        <option value="smart-casual">Smart Casual</option>
+                        <option value="athleisure-premium">Athleisure Premium</option>
+                        <option value="streetwear-polished">Streetwear Polished</option>
+                        <option value="warm-climate-light">Warm Climate / Light Attire</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <!-- OVERALL STYLE row -->
-              <div class="attire-row attire-row-full">
-                <h3 class="attire-row-label">Overall Style</h3>
-                <div class="attire-row-fields">
-                  <div class="attire-group attire-group-wide">
-                    <select id="phoneAttireStyle">
-                      <option value="corporate-executive">Corporate Executive</option>
-                      <option value="salesperson-professional">Salesperson Professional</option>
-                      <option value="business-casual">Business Casual</option>
-                      <option value="casual-presenter">Casual Presenter</option>
-                      <option value="warm-climate-light">Warm Climate / Light Attire</option>
-                    </select>
+                <div class="attire-row attire-row-full">
+                  <h3 class="attire-row-label">Formality</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group attire-group-wide">
+                      <select id="phoneAttireOverallFormality">
+                        <option value="formal">Formal</option>
+                        <option value="business-formal">Business Formal</option>
+                        <option value="business-casual">Business Casual</option>
+                        <option value="casual">Casual</option>
+                        <option value="relaxed">Relaxed</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="attire-row attire-row-full">
+                  <h3 class="attire-row-label">Fit</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group attire-group-wide">
+                      <select id="phoneAttireOverallFit">
+                        <option value="tailored">Tailored</option>
+                        <option value="fitted">Fitted</option>
+                        <option value="classic">Classic</option>
+                        <option value="relaxed">Relaxed</option>
+                        <option value="oversized">Oversized</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="attire-row attire-row-full">
+                  <h3 class="attire-row-label">Season / Vibe</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group attire-group-wide">
+                      <select id="phoneAttireOverallSeason">
+                        <option value="all-season">All Season</option>
+                        <option value="spring">Spring</option>
+                        <option value="summer">Summer</option>
+                        <option value="fall">Fall</option>
+                        <option value="winter">Winter</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="attire-row attire-row-full">
+                  <h3 class="attire-row-label">Presentation</h3>
+                  <div class="attire-row-fields">
+                    <div class="attire-group attire-group-wide">
+                      <select id="phoneAttireOverallPresentation">
+                        <option value="polished">Polished</option>
+                        <option value="powerful">Powerful</option>
+                        <option value="approachable">Approachable</option>
+                        <option value="fashion-forward">Fashion Forward</option>
+                        <option value="minimal">Minimal</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -223,7 +328,7 @@
             <button type="button" id="phoneCreateAvatarBtn" class="control-btn create-avatar-btn state-off">
               🚀 Create My Avatar
             </button>
-            <p class="create-avatar-status" id="phoneCreateAvatarStatus">Upload photo &amp; voice above, select attire, then tap Create.</p>
+            <p class="create-avatar-status" id="phoneCreateAvatarStatus">Upload photo &amp; voice above, choose male or female, then either use the clothing shown in the photo or choose detailed attire or overall attire before tapping Create.</p>
           </div>
 
           <div class="avatar-created-card hidden" id="phoneAvatarCreatedCard">
@@ -260,6 +365,7 @@
                 <p id="phoneAvatarLibraryPreviewPrompt">This is my avatar, and it's time to get this blessing flowing!</p>
                 <div class="avatar-library-actions">
                   <button type="button" id="phoneAvatarLibraryRefresh" class="control-btn state-off">Generate proof</button>
+                  <button type="button" id="phoneAvatarLibraryDelete" class="control-btn state-off" style="background-color: #dc3545;">Delete avatar</button>
                 </div>
               </div>
             </div>

@@ -72,6 +72,7 @@
   const avatarLibraryPreviewMeta = document.getElementById('phoneAvatarLibraryPreviewMeta');
   const avatarLibraryPreviewPrompt = document.getElementById('phoneAvatarLibraryPreviewPrompt');
   const avatarLibraryRefreshBtn = document.getElementById('phoneAvatarLibraryRefresh');
+  const avatarLibraryDeleteBtn = document.getElementById('phoneAvatarLibraryDelete');
   const generateProductVideoBtn = document.getElementById('phoneGenerateProductVideo');
   const productVideoStatus = document.getElementById('phoneProductVideoStatus');
   const productVideoMonitor = document.getElementById('phoneProductVideoMonitor');
@@ -2293,6 +2294,49 @@
       } finally {
         avatarLibraryRefreshBtn.disabled = false;
       }
+    });
+  }
+
+  async function deleteSelectedAvatar() {
+    const selected = (Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : []).find((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''));
+    if (!selected) {
+      sessionInfo.textContent = 'No avatar selected to delete.';
+      return;
+    }
+    const confirmed = confirm(`Delete avatar "${selected.name || 'Untitled'}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    avatarLibraryDeleteBtn.disabled = true;
+    setControlState(avatarLibraryDeleteBtn, 'running');
+    try {
+      const response = await fetch(`/api/affiliate/avatar/${encodeURIComponent(selected.id)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `Delete failed: ${response.status}`);
+      }
+      // Remove from local list
+      supportState.avatarLibrary = supportState.avatarLibrary.filter((item) => String(item.id) !== String(selected.id));
+      supportState.selectedAvatarLibraryId = '';
+      setControlState(avatarLibraryDeleteBtn, 'completed', 1300);
+      sessionInfo.textContent = `Avatar "${selected.name || 'Untitled'}" deleted permanently.`;
+      renderAvatarLibrary();
+      renderAvatarLibraryPreview(null);
+    } catch (error) {
+      setControlState(avatarLibraryDeleteBtn, 'off');
+      sessionInfo.textContent = `Avatar deletion failed: ${error.message}`;
+    } finally {
+      avatarLibraryDeleteBtn.disabled = false;
+    }
+  }
+
+  if (avatarLibraryDeleteBtn) {
+    avatarLibraryDeleteBtn.addEventListener('click', () => {
+      avatarLibraryDeleteBtn.classList.add('pressing');
+      void deleteSelectedAvatar();
+      setTimeout(() => avatarLibraryDeleteBtn.classList.remove('pressing'), 120);
     });
   }
 

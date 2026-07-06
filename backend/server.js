@@ -13,6 +13,7 @@ const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
 const { createViralMediaRouter } = require('./viralMediaRoutesClean');
+const { buildPublicMediaUrlFromObjectPath } = require('./mediaUrl');
 const {
   startHeyGenRender,
   startHeyGenVideoAgent,
@@ -239,8 +240,12 @@ app.get('/viral-media', (_req, res) => res.sendFile(path.join(__dirname, '../das
 app.use('/viral-media', express.static(path.join(__dirname, '../dashboard/viral-media'), {
   setHeaders: function (res) { res.setHeader('Cache-Control', 'no-store'); }
 }));
-app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app')));
-app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub')));
+app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app'), {
+  index: false
+}));
+app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hub'), {
+  index: false
+}));
 
 // Serve uploaded avatar photos and voice files
 app.use('/uploads', express.static(UPLOADS_DIR, {
@@ -327,12 +332,69 @@ app.use('/processed-videos', express.static(path.join(__dirname, '../processed-v
 // Serve generated proof renders and other render artifacts
 app.use('/generated', express.static(path.join(__dirname, '../generated')));
 
+app.get(['/affiliate-login', '/affiliate-login/'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, '../dashboard/affiliate-auth/login.html'));
+});
+
+app.post('/api/affiliate/session/login', (req, res) => {
+  const code = normalizeAffiliateCode(req.body && (req.body.affiliateCode || req.body.code));
+  if (!code) {
+    return res.status(400).json({ success: false, error: 'Affiliate code is required.' });
+  }
+  const profile = getAffiliateProfile(code);
+  const fallbackName = profile && profile.name ? profile.name : code;
+  const requestedName = String((req.body && req.body.affiliateName) || fallbackName).trim().slice(0, 64);
+  const affiliateName = requestedName || fallbackName;
+  const secureCookie = req.secure || String(req.get('x-forwarded-proto') || '').toLowerCase() === 'https';
+  writeAffiliateWebSession(res, { affiliateCode: code, affiliateName }, secureCookie);
+  const next = String((req.body && req.body.next) || '/phone-app').trim();
+  const safeNext = next.startsWith('/') ? next : '/phone-app';
+  const separator = safeNext.includes('?') ? '&' : '?';
+  const redirectUrl = `${safeNext}${separator}affiliateCode=${encodeURIComponent(code)}&affiliateName=${encodeURIComponent(affiliateName)}`;
+  return res.json({
+    success: true,
+    session: { affiliateCode: code, affiliateName },
+    redirectUrl
+  });
+});
+
+app.get('/api/affiliate/session', (req, res) => {
+  const session = readAffiliateWebSession(req);
+  if (!session) {
+    return res.status(401).json({ success: false, authenticated: false, error: 'Authentication required.' });
+  }
+  return res.json({ success: true, authenticated: true, session });
+});
+
+app.post('/api/affiliate/session/logout', (req, res) => {
+  const secureCookie = req.secure || String(req.get('x-forwarded-proto') || '').toLowerCase() === 'https';
+  clearAffiliateWebSession(res, secureCookie);
+  return res.json({ success: true });
+});
+
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
 app.get('/affiliate/workspace', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/workspace.html')));
-app.get('/affiliate', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html')));
-app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub')));
-app.get('/phone-app', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/phone-app/index.html')));
-app.get('/admin-hub', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/admin-hub/index.html')));
+app.get(['/affiliate', '/affiliate/'], (req, res) => {
+  const session = readAffiliateWebSession(req);
+  if (!session) {
+    return res.redirect(`/affiliate-login?next=${encodeURIComponent('/affiliate')}`);
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/index.html'));
+});
+app.use('/affiliate', express.static(path.join(__dirname, '../dashboard/affiliate-hub'), {
+  index: false
+}));
+app.get(['/phone-app', '/phone-app/'], (req, res) => {
+  const session = readAffiliateWebSession(req);
+  if (!session) {
+    return res.redirect(`/affiliate-login?next=${encodeURIComponent('/phone-app')}`);
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(__dirname, '../dashboard/phone-app/index.html'));
+});
+app.get(['/admin-hub', '/admin-hub/'], (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/admin-hub/index.html')));
 app.get('/affiliate-adminhub', (_req, res) => res.redirect('/admin-hub'));
 app.get('/ref/:code', (req, res) => {
   res.redirect(`/affiliate?ref=${encodeURIComponent(req.params.code)}`);
@@ -827,6 +889,68 @@ function normalizeAffiliateCode(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 64);
 }
 
+function parseCookieHeader(req) {
+  const header = String((req && req.headers && req.headers.cookie) || '').trim();
+  if (!header) return {};
+  return header.split(';').reduce((acc, chunk) => {
+    const [rawName, ...rawValueParts] = chunk.split('=');
+    const name = String(rawName || '').trim();
+    if (!name) return acc;
+    const rawValue = rawValueParts.join('=').trim();
+    acc[name] = decodeURIComponent(rawValue || '');
+    return acc;
+  }, {});
+}
+
+function readAffiliateWebSession(req) {
+  try {
+    const cookies = parseCookieHeader(req);
+    const encoded = String(cookies.evics_affiliate_session || '').trim();
+    if (!encoded) return null;
+    const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+    const parsed = JSON.parse(decoded);
+    const affiliateCode = normalizeAffiliateCode(parsed && parsed.affiliateCode);
+    if (!affiliateCode) return null;
+    const affiliateName = String((parsed && parsed.affiliateName) || affiliateCode).trim().slice(0, 64) || affiliateCode;
+    return {
+      affiliateCode,
+      affiliateName,
+      issuedAt: parsed && parsed.issuedAt ? String(parsed.issuedAt) : null
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeAffiliateWebSession(res, session, secureCookie = false) {
+  const payload = Buffer.from(JSON.stringify({
+    affiliateCode: normalizeAffiliateCode(session && session.affiliateCode),
+    affiliateName: String((session && session.affiliateName) || '').trim().slice(0, 64),
+    issuedAt: new Date().toISOString()
+  }), 'utf8').toString('base64url');
+  const parts = [
+    `evics_affiliate_session=${encodeURIComponent(payload)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=2592000'
+  ];
+  if (secureCookie) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearAffiliateWebSession(res, secureCookie = false) {
+  const parts = [
+    'evics_affiliate_session=',
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=0'
+  ];
+  if (secureCookie) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
 function affiliateRecordCode(record) {
   if (!record || typeof record !== 'object') return '';
   return normalizeAffiliateCode(
@@ -893,7 +1017,71 @@ function getAffiliateProfile(affiliateCode) {
   return profiles.find((p) => normalizeAffiliateCode(p.affiliateCode) === code) || null;
 }
 
-function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '') {
+function normalizeAvatarGender(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'male' || normalized === 'man' || normalized === 'men') return 'male';
+  if (normalized === 'female' || normalized === 'woman' || normalized === 'women') return 'female';
+  return '';
+}
+
+const ATTIRE_GENDER_OPTIONS = {
+  top: {
+    male: new Set(['corporate-blazer', 'dress-shirt', 'button-down-shirt', 'polo-shirt', 't-shirt', 'sweater', 'executive-jacket', 'casual-hoodie', 'vest']),
+    female: new Set(['corporate-blazer', 't-shirt', 'blouse', 'cardigan', 'sweater', 'executive-jacket', 'casual-hoodie', 'tunic', 'wrap-top'])
+  },
+  bottom: {
+    male: new Set(['dress-pants', 'slacks', 'chinos', 'trousers', 'jeans', 'shorts', 'joggers', 'cargo-pants']),
+    female: new Set(['dress-pants', 'trousers', 'wide-leg-trousers', 'skirt', 'pencil-skirt', 'dress', 'jeans', 'shorts', 'joggers', 'leggings', 'culottes'])
+  },
+  style: {
+    male: new Set(['corporate-executive', 'boardroom-formal', 'sales-persona', 'business-casual', 'creative-professional', 'luxury-elegant', 'smart-casual', 'athleisure-premium', 'streetwear-polished', 'warm-climate-light']),
+    female: new Set(['corporate-executive', 'boardroom-formal', 'sales-persona', 'business-casual', 'creative-professional', 'luxury-elegant', 'smart-casual', 'athleisure-premium', 'streetwear-polished', 'warm-climate-light'])
+  }
+};
+
+const ATTIRE_GENDER_DEFAULTS = {
+  male: { top: 'corporate-blazer', bottom: 'dress-pants', style: 'corporate-executive' },
+  female: { top: 'blouse', bottom: 'pencil-skirt', style: 'corporate-executive' }
+};
+
+function normalizeAttireChoice(field, value, gender) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const normalizedGender = normalizeAvatarGender(gender);
+  const fieldRules = ATTIRE_GENDER_OPTIONS[field];
+  if (!fieldRules || !normalizedGender) return normalized;
+  if (normalized && fieldRules[normalizedGender].has(normalized)) return normalized;
+  return ATTIRE_GENDER_DEFAULTS[normalizedGender][field] || normalized;
+}
+
+function normalizeAvatarAttire(attire, fallbackGender = '') {
+  if (!attire || typeof attire !== 'object') return null;
+  const gender = normalizeAvatarGender(attire.gender || attire.avatarGender || attire.genderPresentation || fallbackGender);
+  const usePhoto = Boolean(attire.usePhoto || attire.usePhotoClothing);
+  const mode = normalizeAttireMode(attire);
+  const style = normalizeAttireChoice('style', attire.style || attire.overallStyle || 'corporate-executive', gender);
+  return {
+    gender,
+    usePhoto,
+    usePhotoClothing: usePhoto,
+    mode: usePhoto ? 'photo' : mode,
+    top: normalizeAttireChoice('top', attire.top || 'corporate-blazer', gender),
+    bottom: normalizeAttireChoice('bottom', attire.bottom || 'dress-pants', gender),
+    style,
+    overallStyle: style,
+    topColor: String(attire.topColor || 'black').trim().toLowerCase(),
+    bottomColor: String(attire.bottomColor || 'black').trim().toLowerCase(),
+    overallFormality: String(attire.overallFormality || 'business-formal').trim().toLowerCase(),
+    overallFit: String(attire.overallFit || 'tailored').trim().toLowerCase(),
+    overallSeason: String(attire.overallSeason || 'all-season').trim().toLowerCase(),
+    overallPresentation: String(attire.overallPresentation || 'polished').trim().toLowerCase()
+  };
+}
+
+function humanizeAttireValue(value) {
+  return String(value || '').trim().replace(/-/g, ' ');
+}
+
+function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId = '', voiceId = '', avatarGender = '', voiceFileUpdatedAt = '') {
   const code = normalizeAffiliateCode(affiliateCode);
   if (!code) throw new Error('affiliateCode is required');
   const profiles = getAffiliateProfiles();
@@ -901,7 +1089,12 @@ function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '') {
   const updated = {
     affiliateCode: code,
     name: String(name || code).trim().slice(0, 128),
-    pictureUrl: String(pictureUrl || '').trim(),
+    pictureUrl: String(pictureUrl || existing?.pictureUrl || '').trim() || null,
+    voiceFileUrl: String(voiceFileUrl || existing?.voiceFileUrl || '').trim() || null,
+    voiceFileUpdatedAt: String(voiceFileUpdatedAt || existing?.voiceFileUpdatedAt || '').trim() || null,
+    voiceCloneId: String(voiceCloneId || existing?.voiceCloneId || '').trim() || null,
+    voiceId: String(voiceId || existing?.voiceId || '').trim() || null,
+    avatarGender: normalizeAvatarGender(avatarGender || existing?.avatarGender || existing?.gender || '') || null,
     updatedAt: new Date().toISOString()
   };
   if (existing) {
@@ -914,16 +1107,37 @@ function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '') {
   return updated;
 }
 
+function normalizeAttireMode(attire) {
+  const mode = String(attire?.mode || '').toLowerCase();
+  if (attire && (attire.usePhoto || attire.usePhotoClothing)) return 'photo';
+  if (mode === 'overall') return 'overall';
+  if (mode === 'detailed') return 'detailed';
+  if (attire && (attire.overallStyle || attire.overallFormality || attire.overallFit || attire.overallSeason || attire.overallPresentation)) return 'overall';
+  return 'detailed';
+}
+
 function normalizeAvatarGalleryAttire(attire) {
-  if (!attire || typeof attire !== 'object') return null;
-  return {
-    usePhoto: Boolean(attire.usePhoto || attire.usePhotoClothing),
-    top: String(attire.top || ''),
-    bottom: String(attire.bottom || ''),
-    style: String(attire.style || attire.overallStyle || ''),
-    topColor: String(attire.topColor || ''),
-    bottomColor: String(attire.bottomColor || '')
-  };
+  return normalizeAvatarAttire(attire);
+}
+
+function formatAttireSummary(attire) {
+  if (!attire) return 'Professional';
+  const genderPrefix = attire.gender ? `${String(attire.gender).charAt(0).toUpperCase()}${String(attire.gender).slice(1)} · ` : '';
+  if (attire.usePhoto) return `${genderPrefix}Using profile photo clothing`;
+  if (attire.mode === 'overall') {
+    return [
+      genderPrefix + humanizeAttireValue(attire.style || attire.overallStyle || 'overall style'),
+      attire.overallFormality ? `Formality: ${humanizeAttireValue(attire.overallFormality)}` : null,
+      attire.overallFit ? `Fit: ${humanizeAttireValue(attire.overallFit)}` : null,
+      attire.overallSeason ? `Season: ${humanizeAttireValue(attire.overallSeason)}` : null,
+      attire.overallPresentation ? `Presentation: ${humanizeAttireValue(attire.overallPresentation)}` : null
+    ].filter(Boolean).join(' · ');
+  }
+  return [
+    genderPrefix.trim() || null,
+    attire.top ? `${humanizeAttireValue(attire.topColor || '')} ${humanizeAttireValue(attire.top)}`.trim() : null,
+    attire.bottom ? `${humanizeAttireValue(attire.bottomColor || '')} ${humanizeAttireValue(attire.bottom)}`.trim() : null
+  ].filter(Boolean).join(' · ') || 'Professional';
 }
 
 function buildAvatarGalleryItem(record) {
@@ -941,12 +1155,9 @@ function buildAvatarGalleryItem(record) {
     name: record.name || avatar.name || 'Affiliate avatar',
     style: avatar.style || record.style || 'professional',
     photoUrl: avatar.photoUrl || record.photoUrl || null,
+    voiceFileUrl: avatar.voiceFileUrl || record.voiceFileUrl || null,
     attire,
-    attireLabel: attire && (attire.usePhoto)
-      ? 'Using profile photo clothing'
-      : attire
-        ? [attire.style || attire.overallStyle, attire.top ? `${attire.topColor || ''} ${attire.top}`.trim() : null, attire.bottom ? `${attire.bottomColor || ''} ${attire.bottom}`.trim() : null].filter(Boolean).join(' · ') || 'Professional'
-        : 'Professional',
+    attireLabel: formatAttireSummary(attire),
     avatarId,
     heygenAvatarId: avatar.avatarId || avatar.avatarItemId || null,
     voiceCloneStatus: avatar.voiceCloneStatus || record.voiceCloneStatus || null,
@@ -1043,12 +1254,36 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
   }
+  const normalizedAttire = normalizeAvatarAttire(attire);
+  const avatarGender = normalizeAvatarGender(normalizedAttire?.gender);
   // Build attire description for avatar generation prompt/metadata
   let attireDescription = null;
-  if (attire && (attire.usePhotoClothing || attire.usePhoto)) {
-    attireDescription = 'Attire: Use the clothing visible in the uploaded profile photo. Do not change or replace the outfit.';
-  } else if (attire) {
-    attireDescription = `Attire: ${attire.overallStyle || attire.style || 'professional'} style. Top: ${attire.top || 'dress-shirt'} in ${attire.topColor || 'black'}. Bottom: ${attire.bottom || 'dress-pants'} in ${attire.bottomColor || 'black'}.`;
+  const attireMode = normalizeAttireMode(normalizedAttire);
+  const genderInstruction = avatarGender === 'male'
+    ? 'The affiliate is male. Use only male attire and never substitute female garments or female-coded styling.'
+    : avatarGender === 'female'
+      ? 'The affiliate is female. Use only female attire and never substitute male garments or male-coded styling.'
+      : 'Keep the attire congruent with the affiliate gender selection.';
+  if (normalizedAttire && (normalizedAttire.usePhotoClothing || normalizedAttire.usePhoto)) {
+    attireDescription = `${genderInstruction} Attire: Use the clothing visible in the uploaded profile photo. Do not change or replace the outfit.`;
+  } else if (normalizedAttire && attireMode === 'overall') {
+    attireDescription = [
+      genderInstruction,
+      `Attire: Overall style direction is ${normalizedAttire.overallStyle || normalizedAttire.style || 'professional'}.`,
+      normalizedAttire.overallFormality ? `Formality: ${normalizedAttire.overallFormality}.` : null,
+      normalizedAttire.overallFit ? `Fit: ${normalizedAttire.overallFit}.` : null,
+      normalizedAttire.overallSeason ? `Season: ${normalizedAttire.overallSeason}.` : null,
+      normalizedAttire.overallPresentation ? `Presentation: ${normalizedAttire.overallPresentation}.` : null,
+      `Create the best complete ${avatarGender || 'gender-congruent'} outfit possible from these overall preferences only. Do not combine this with detailed top/bottom selections.`
+    ].filter(Boolean).join(' ');
+  } else if (normalizedAttire) {
+    attireDescription = [
+      genderInstruction,
+      `Attire: Detailed outfit selection.`,
+      `Top: ${normalizedAttire.top || 'dress-shirt'} in ${normalizedAttire.topColor || 'black'}.`,
+      `Bottom: ${normalizedAttire.bottom || 'dress-pants'} in ${normalizedAttire.bottomColor || 'black'}.`,
+      'Use only these detailed pieces, keep the outfit cohesive, and do not cross into the opposite gender clothing set.'
+    ].join(' ');
   }
 
   // Step 1: Register the affiliate's photo as a HeyGen talking photo
@@ -1070,7 +1305,9 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
 
   // Step 2: Generate a short proof video using the registered talking photo
   const proofScript = attireDescription
-    ? `This is my avatar dressed in ${attire.overallStyle || attire.style || 'professional'} style, and it's time to get this blessing flowing!`
+    ? (attireMode === 'overall'
+      ? `This is my avatar dressed in ${normalizedAttire.overallStyle || normalizedAttire.style || 'professional'} style, and it's time to get this blessing flowing!`
+      : `This is my avatar dressed in ${normalizedAttire.top || 'dress-shirt'} and ${normalizedAttire.bottom || 'dress-pants'}, and it's time to get this blessing flowing!`)
     : "This is my avatar, and it's time to get this blessing flowing!";
   const defaultVoiceId = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
 
@@ -5629,8 +5866,9 @@ app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), asy
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     await uploadToGcs(req.file.path, gcsPath, contentType);
-    // Always return the proxy URL — the GCS fallback route handles serving the file
-    res.json({ success: true, photoUrl: proxyUrl, localUrl: proxyUrl, filename, size: req.file.size });
+    const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
+    // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
+    res.json({ success: true, photoUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -5640,7 +5878,18 @@ app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), asy
 app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No voice file received' });
-    const filename = req.file.filename;
+    const affiliateCode = normalizeAffiliateCode(req.body && (req.body.affiliateCode || req.body.affiliateId || ''));
+    const ext = (() => {
+      const mime = String(req.file.mimetype || '').toLowerCase();
+      if (mime.includes('webm')) return '.webm';
+      if (mime.includes('mpeg') || mime.includes('mp3')) return '.mp3';
+      if (mime.includes('wav')) return '.wav';
+      if (mime.includes('ogg')) return '.ogg';
+      if (mime.includes('mp4') || mime.includes('m4a')) return '.m4a';
+      const originalExt = path.extname(req.file.originalname || '').toLowerCase();
+      return originalExt || '.webm';
+    })();
+    const filename = affiliateCode ? `${affiliateCode}__voice${ext}` : req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const proxyUrl = `${protocol}://${host}/uploads/${filename}`;
@@ -5649,8 +5898,25 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), asy
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'audio/webm';
     await uploadToGcs(req.file.path, gcsPath, contentType);
-    // Always return the proxy URL — the GCS fallback route handles serving the file
-    res.json({ success: true, voiceFileUrl: proxyUrl, localUrl: proxyUrl, voiceFilePath, filename, size: req.file.size });
+    const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
+    const voiceFileUpdatedAt = new Date().toISOString();
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch {}
+    }
+    if (affiliateCode) {
+      upsertAffiliateProfile(
+        affiliateCode,
+        String(req.body && req.body.affiliateName || affiliateCode),
+        '',
+        deliveryUrl,
+        '',
+        '',
+        '',
+        voiceFileUpdatedAt
+      );
+    }
+    // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
+    res.json({ success: true, voiceFileUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, voiceFilePath, filename, size: req.file.size, voiceFileUpdatedAt, affiliateCode: affiliateCode || null });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -5666,6 +5932,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       photoUrl,
       voiceFileUrl,
       voiceFilePath,
+      voiceFileUpdatedAt,
       productId,
       productHandle,
       productTitle,
@@ -5680,6 +5947,11 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
     const cleanedCode = normalizeAffiliateCode(affiliateCode || affiliateId || '');
     if (!cleanedCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
     if (!photoUrl) return res.status(400).json({ success: false, error: 'photoUrl is required' });
+    const storedProfile = getAffiliateProfile(cleanedCode);
+    const normalizedAttire = normalizeAvatarAttire(attire, storedProfile?.avatarGender || storedProfile?.gender || '');
+    if (!normalizedAttire || !normalizedAttire.gender) {
+      return res.status(400).json({ success: false, error: 'Select male or female before sending the avatar request so attire guardrails can be enforced.' });
+    }
     const requestId = makeAvatarRequestId();
     const baseReturnTo = String(returnTo || `/phone-app?affiliateCode=${encodeURIComponent(cleanedCode)}&affiliateName=${encodeURIComponent(name || cleanedCode)}`).trim();
     const safeReturnTo = baseReturnTo.startsWith('/') ? baseReturnTo : `/phone-app?affiliateCode=${encodeURIComponent(cleanedCode)}&affiliateName=${encodeURIComponent(name || cleanedCode)}`;
@@ -5694,6 +5966,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       photoUrl,
       voiceFileUrl: voiceFileUrl || null,
       voiceFilePath: voiceFilePath || null,
+      voiceFileUpdatedAt: voiceFileUpdatedAt || null,
       productId: productId || null,
       productHandle: productHandle || null,
       productTitle: productTitle || null,
@@ -5701,7 +5974,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       productImageUrl: productImageUrl || null,
       platform: platform || null,
       platformLabel: platformLabel || null,
-      attire: attire && typeof attire === 'object' ? attire : null,
+      attire: normalizedAttire,
       source: source || 'phone-app',
       returnTo: finalReturnTo,
       status: 'queued',
@@ -5772,6 +6045,12 @@ app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
         affiliateCode,
         name: affiliateCode,
         pictureUrl: null,
+        profilePhotoUrl: null,
+        voiceFileUrl: null,
+        voiceFileUpdatedAt: null,
+        voiceCloneId: null,
+        voiceId: null,
+        avatarGender: null,
         createdAt: new Date().toISOString()
       }
     });
@@ -5782,14 +6061,66 @@ app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
 // POST /api/affiliate/profile — update affiliate profile (name + picture)
 app.post('/api/affiliate/profile', (req, res) => {
   try {
-    const { affiliateCode, name, pictureUrl } = req.body || {};
+    const { affiliateCode, name, pictureUrl, voiceFileUrl, voiceCloneId, voiceId, avatarGender, voiceFileUpdatedAt } = req.body || {};
     if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
-    const profile = upsertAffiliateProfile(affiliateCode, name, pictureUrl);
+    const profile = upsertAffiliateProfile(affiliateCode, name, pictureUrl, voiceFileUrl, voiceCloneId, voiceId, avatarGender, voiceFileUpdatedAt);
     res.json({ success: true, profile });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// DELETE /api/affiliate/avatar/:avatarId — permanently delete an avatar
+app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
+  try {
+    const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
+    const avatarId = String(req.params.avatarId || '').trim();
+    
+    if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    if (!avatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
+    
+    // Find the avatar request to verify ownership
+    const avatarRequest = findAvatarRequest(avatarId) || 
+                         (avatarRequests.find((req) => String(req.avatar?.id) === avatarId) ||
+                          avatarRequests.find((req) => String(req.avatar?.avatarId) === avatarId) ||
+                          avatarRequests.find((req) => String(req.avatar?.avatarItemId) === avatarId));
+    
+    if (!avatarRequest) {
+      return res.status(404).json({ success: false, error: 'Avatar not found' });
+    }
+    
+    // AFFILIATE ISOLATION: verify the requesting affiliate owns this avatar
+    const ownerCode = affiliateRecordCode(avatarRequest);
+    if (ownerCode !== affiliateCode) {
+      return res.status(403).json({ success: false, error: 'You can only delete your own avatars' });
+    }
+    
+    // Remove from avatar requests
+    const index = avatarRequests.findIndex((req) => String(req.avatar?.id) === avatarId || 
+                                                     String(req.avatar?.avatarId) === avatarId ||
+                                                     String(req.avatar?.avatarItemId) === avatarId);
+    if (index >= 0) {
+      avatarRequests.splice(index, 1);
+      saveAvatarRequests();
+    }
+    
+    // Clean up GCS files if persistence engine is available
+    if (avatarRequest.avatar?.photoUrl || avatarRequest.avatar?.voiceFileUrl) {
+      try {
+        if (persistenceEngine && persistenceEngine.deleteAvatarFiles) {
+          void persistenceEngine.deleteAvatarFiles(avatarId, affiliateCode);
+        }
+      } catch (err) {
+        console.warn(`File cleanup warning for avatar ${avatarId}:`, err.message);
+      }
+    }
+    
+    res.json({ success: true, deleted: true, avatarId });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 
 // POST /api/affiliate/avatar/proof — generate a short proof render for an avatar
 app.post('/api/affiliate/avatar/proof', async (req, res) => {
@@ -5986,11 +6317,9 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedProductImageUrl = productImageUrl || requestRecord?.productImageUrl || null;
     const resolvedPlatform = platform || requestRecord?.platform || null;
     const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
-    const resolvedAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
-    // Normalize attire field names (client sends usePhotoClothing, server uses usePhoto)
-    if (resolvedAttire && resolvedAttire.usePhotoClothing !== undefined) {
-      resolvedAttire.usePhoto = Boolean(resolvedAttire.usePhotoClothing);
-    }
+    const storedProfile = getAffiliateProfile(requestedAffiliateCode);
+    const rawAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
+    const resolvedAttire = normalizeAvatarAttire(rawAttire, storedProfile?.avatarGender || storedProfile?.gender || '');
 
     // GUARD RAILS: Require both photo and voice for custom avatar creation
     if (!resolvedPhotoUrl) {
@@ -6003,6 +6332,12 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         error: 'Voice file URL is required to create a custom avatar. Record and upload your voice from the phone app.' 
+      });
+    }
+    if (!resolvedAttire || !resolvedAttire.gender) {
+      return res.status(400).json({
+        success: false,
+        error: 'Select male or female before creating the avatar so attire guardrails can be enforced.'
       });
     }
 
@@ -6052,6 +6387,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     photoUrl: resolvedPhotoUrl || null,
     voiceFileUrl: resolvedVoiceUrl || null,
     voiceFilePath: voiceFilePath || null,
+    voiceFileUpdatedAt: requestRecord?.voiceFileUpdatedAt || null,
     voiceCloneId: avatarPayload.voice_clone_id || null,
     voiceCloneStatus: avatarPayload.voice_clone_status || (resolvedVoiceUrl ? 'uploaded' : 'none'),
     talkingPhotoId: avatarPayload.talking_photo_id || avatarItem.talking_photo_id || null,
@@ -6065,11 +6401,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     platform: resolvedPlatform,
     platformLabel: resolvedPlatformLabel,
     attire: resolvedAttire,
-    attireLabel: resolvedAttire
-      ? (resolvedAttire.usePhoto || resolvedAttire.usePhotoClothing)
-        ? 'Using profile photo clothing'
-        : `${resolvedAttire.overallStyle || resolvedAttire.style || 'professional'} · ${resolvedAttire.topColor || ''} ${resolvedAttire.top || 'dress-shirt'} · ${resolvedAttire.bottomColor || ''} ${resolvedAttire.bottom || 'dress-pants'}`.trim()
-      : 'Professional',
+    attireLabel: formatAttireSummary(resolvedAttire),
     status: 'active',
     createdAt: new Date().toISOString(),
     isDefault: true,
@@ -6089,6 +6421,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       style: avatar.style,
       photo_url: avatar.photoUrl,
       voice_file_url: avatar.voiceFileUrl,
+      voice_file_updated_at: avatar.voiceFileUpdatedAt,
       product_id: avatar.productId,
       product_handle: avatar.productHandle,
       product_title: avatar.productTitle,
@@ -6112,6 +6445,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       photoUrl: avatar.photoUrl,
       voiceFileUrl: avatar.voiceFileUrl,
       voiceFilePath: avatar.voiceFilePath,
+      voiceFileUpdatedAt: avatar.voiceFileUpdatedAt || requestRecord?.voiceFileUpdatedAt || null,
       productId: avatar.productId || requestRecord?.productId || null,
       productHandle: avatar.productHandle || requestRecord?.productHandle || null,
       productTitle: avatar.productTitle || requestRecord?.productTitle || null,
@@ -8805,7 +9139,7 @@ app.listen(PORT, () => {
   console.log(`âž¡ï¸  Status:              http://127.0.0.1:${PORT}/status`);
 
   // Initialize Phase 2: Production Hardening
-  const phase2Ready = phase2Integration.initialize(app, admin);
+  const phase2Ready = phase2Integration.initialize(app);
   if (phase2Ready) {
     phase2Integration.mountAuthRoutes(app);
     phase2Integration.mountBillingRoutes(app);
