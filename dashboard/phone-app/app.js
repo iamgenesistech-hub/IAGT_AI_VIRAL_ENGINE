@@ -28,9 +28,7 @@
   const voiceVolumeRow = document.getElementById('phoneVoiceVolumeRow');
   const voiceVolumeSlider = document.getElementById('phoneVoiceVolume');
   const voiceVolumeValue = document.getElementById('phoneVoiceVolumeValue');
-  const avatarVoiceFileRow = document.getElementById('phoneAvatarVoiceFileRow');
-  const avatarVoiceFileLink = document.getElementById('phoneAvatarVoiceFileLink');
-  const avatarVoiceCopyLinkBtn = document.getElementById('phoneAvatarVoiceCopyLink');
+  const avatarVoiceTimestamp = document.getElementById('phoneAvatarVoiceTimestamp');
   const avatarSaveProfileBtn = document.getElementById('phoneAvatarSaveProfile');
   const avatarCreatedCard = document.getElementById('phoneAvatarCreatedCard');
   const avatarCreatedTitle = document.getElementById('phoneAvatarCreatedTitle');
@@ -52,6 +50,15 @@
   const attireStyleSelect = document.getElementById('phoneAttireStyle');
   const attireTopColorSelect = document.getElementById('phoneAttireTopColor');
   const attireBottomColorSelect = document.getElementById('phoneAttireBottomColor');
+  const attireGenderSelect = document.getElementById('phoneAttireGender');
+  const attireGenderHint = document.getElementById('phoneAttireGenderHint');
+  const attireModeSelect = document.getElementById('phoneAttireMode');
+  const attireDetailedSection = document.getElementById('phoneAttireDetailedSection');
+  const attireOverallSection = document.getElementById('phoneAttireOverallSection');
+  const attireOverallFormalitySelect = document.getElementById('phoneAttireOverallFormality');
+  const attireOverallFitSelect = document.getElementById('phoneAttireOverallFit');
+  const attireOverallSeasonSelect = document.getElementById('phoneAttireOverallSeason');
+  const attireOverallPresentationSelect = document.getElementById('phoneAttireOverallPresentation');
   const attireUsePhotoCheckbox = document.getElementById('phoneAttireUsePhoto');
   const attireGrid = document.getElementById('phoneAttireGrid');
   const createAvatarBtn = document.getElementById('phoneCreateAvatarBtn');
@@ -95,6 +102,7 @@
       photoUrl: '',
       voiceFileUrl: '',
       voiceFilePath: '',
+      voiceFileUpdatedAt: '',
       avatarId: '',
       requestId: '',
       createdAvatar: null,
@@ -104,12 +112,19 @@
       selectedProduct: null,
       productReferences: [],
       attire: {
+        gender: '',
+        lastGender: '',
         usePhoto: false,
+        mode: 'detailed',
         top: 'corporate-blazer',
         bottom: 'dress-pants',
         style: 'corporate-executive',
         topColor: 'black',
-        bottomColor: 'black'
+        bottomColor: 'black',
+        overallFormality: 'business-formal',
+        overallFit: 'tailored',
+        overallSeason: 'all-season',
+        overallPresentation: 'polished'
       }
     },
     products: [],
@@ -118,6 +133,24 @@
     selectedAvatarLibraryId: '',
     productVideos: [],
     selectedProductVideoId: ''
+  };
+  const ATTIRE_GENDER_GUARDRAILS = {
+    top: {
+      male: new Set(['corporate-blazer', 'dress-shirt', 'button-down-shirt', 'polo-shirt', 't-shirt', 'sweater', 'executive-jacket', 'casual-hoodie', 'vest']),
+      female: new Set(['corporate-blazer', 't-shirt', 'blouse', 'cardigan', 'sweater', 'executive-jacket', 'casual-hoodie', 'tunic', 'wrap-top'])
+    },
+    bottom: {
+      male: new Set(['dress-pants', 'slacks', 'chinos', 'trousers', 'jeans', 'shorts', 'joggers', 'cargo-pants']),
+      female: new Set(['dress-pants', 'trousers', 'wide-leg-trousers', 'skirt', 'pencil-skirt', 'dress', 'jeans', 'shorts', 'joggers', 'leggings', 'culottes'])
+    },
+    style: {
+      male: new Set(['corporate-executive', 'boardroom-formal', 'sales-persona', 'business-casual', 'creative-professional', 'luxury-elegant', 'smart-casual', 'athleisure-premium', 'streetwear-polished', 'warm-climate-light']),
+      female: new Set(['corporate-executive', 'boardroom-formal', 'sales-persona', 'business-casual', 'creative-professional', 'luxury-elegant', 'smart-casual', 'athleisure-premium', 'streetwear-polished', 'warm-climate-light'])
+    }
+  };
+  const ATTIRE_GENDER_DEFAULTS = {
+    male: { top: 'corporate-blazer', bottom: 'dress-pants', style: 'corporate-executive' },
+    female: { top: 'blouse', bottom: 'pencil-skirt', style: 'corporate-executive' }
   };
 
   function setControlState(el, state, autoOffMs = 0) {
@@ -260,6 +293,110 @@
     return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 64);
   }
 
+  function normalizeAttireGender(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'male' || normalized === 'man' || normalized === 'men') return 'male';
+    if (normalized === 'female' || normalized === 'woman' || normalized === 'women') return 'female';
+    return '';
+  }
+
+  function getLockedAttireGender() {
+    return normalizeAttireGender(supportState.avatarSetup.attire.gender)
+      || normalizeAttireGender(supportState.avatarSetup.attire.lastGender)
+      || loadAttireGenderLock();
+  }
+
+  function setLockedAttireGender(gender) {
+    const normalized = saveAttireGenderLock(gender);
+    supportState.avatarSetup.attire.gender = normalized;
+    supportState.avatarSetup.attire.lastGender = normalized;
+    return normalized;
+  }
+
+  function attireGenderLabel(value) {
+    const normalized = normalizeAttireGender(value);
+    if (normalized === 'male') return 'Male';
+    if (normalized === 'female') return 'Female';
+    return 'Unspecified';
+  }
+
+  function attireValueAllowedForGender(key, gender, value) {
+    const rules = ATTIRE_GENDER_GUARDRAILS[key];
+    if (!rules) return true;
+    const normalizedGender = normalizeAttireGender(gender);
+    if (!normalizedGender) return false;
+    return rules[normalizedGender].has(String(value || '').trim());
+  }
+
+  function applyGenderGuardrailToSelect(selectEl, key, gender, currentValue) {
+    if (!selectEl) return currentValue;
+    const rules = ATTIRE_GENDER_GUARDRAILS[key];
+    if (!rules) return currentValue;
+    const normalizedGender = normalizeAttireGender(gender);
+    Array.from(selectEl.options).forEach((option) => {
+      if (!option.value) return;
+      const allowed = normalizedGender ? rules[normalizedGender].has(option.value) : false;
+      option.hidden = !allowed;
+      option.disabled = !allowed;
+    });
+    const fallbackValue = normalizedGender ? ATTIRE_GENDER_DEFAULTS[normalizedGender][key] : '';
+    const nextValue = normalizedGender && attireValueAllowedForGender(key, normalizedGender, currentValue)
+      ? currentValue
+      : fallbackValue;
+    selectEl.value = nextValue;
+    selectEl.disabled = !normalizedGender;
+    return nextValue;
+  }
+
+  function buildAvatarAttirePayload() {
+    updateAttireModeUI();
+    const gender = normalizeAttireGender(supportState.avatarSetup.attire.gender);
+    if (!gender) {
+      throw new Error('Please choose Male or Female so the avatar only uses matching attire selections.');
+    }
+    const usePhoto = Boolean(supportState.avatarSetup.attire.usePhoto);
+    const mode = usePhoto ? 'photo' : String(supportState.avatarSetup.attire.mode || 'detailed').toLowerCase();
+    const payload = {
+      gender,
+      usePhoto,
+      usePhotoClothing: usePhoto,
+      mode,
+      top: String(supportState.avatarSetup.attire.top || ''),
+      topColor: String(supportState.avatarSetup.attire.topColor || 'black'),
+      bottom: String(supportState.avatarSetup.attire.bottom || ''),
+      bottomColor: String(supportState.avatarSetup.attire.bottomColor || 'black'),
+      style: String(supportState.avatarSetup.attire.style || ''),
+      overallStyle: String(supportState.avatarSetup.attire.style || ''),
+      overallFormality: String(supportState.avatarSetup.attire.overallFormality || ''),
+      overallFit: String(supportState.avatarSetup.attire.overallFit || ''),
+      overallSeason: String(supportState.avatarSetup.attire.overallSeason || ''),
+      overallPresentation: String(supportState.avatarSetup.attire.overallPresentation || '')
+    };
+    if (!usePhoto && payload.mode === 'detailed' && (!payload.top || !payload.bottom)) {
+      throw new Error('Choose a top and bottom that match the selected gender, or use the clothing shown in the uploaded photo.');
+    }
+    if (!usePhoto && payload.mode === 'overall' && !payload.style) {
+      throw new Error('Choose an overall attire direction that matches the selected gender.');
+    }
+    supportState.avatarSetup.attire = {
+      gender: payload.gender,
+      lastGender: payload.gender,
+      usePhoto: payload.usePhoto,
+      mode: payload.mode === 'photo' ? 'detailed' : payload.mode,
+      top: payload.top,
+      bottom: payload.bottom,
+      style: payload.style,
+      topColor: payload.topColor,
+      bottomColor: payload.bottomColor,
+      overallFormality: payload.overallFormality,
+      overallFit: payload.overallFit,
+      overallSeason: payload.overallSeason,
+      overallPresentation: payload.overallPresentation
+    };
+    persistAvatarSetup();
+    return payload;
+  }
+
   function activeAffiliateCode() {
     return normalizeAffiliateCode(supportState.affiliateCode);
   }
@@ -283,8 +420,38 @@
     return `evicsPhoneAvatarSetup:${supportState.affiliateCode || 'default'}`;
   }
 
+  function attireGenderStorageKey() {
+    return `evicsPhoneAttireGender:${supportState.affiliateCode || 'default'}`;
+  }
+
+  function saveAttireGenderLock(gender) {
+    const normalized = normalizeAttireGender(gender);
+    if (normalized) {
+      localStorage.setItem(attireGenderStorageKey(), normalized);
+    } else {
+      localStorage.removeItem(attireGenderStorageKey());
+    }
+    return normalized;
+  }
+
+  function loadAttireGenderLock() {
+    return normalizeAttireGender(localStorage.getItem(attireGenderStorageKey()));
+  }
+
   function persistAvatarSetup() {
     localStorage.setItem(avatarStorageKey(), JSON.stringify(supportState.avatarSetup));
+  }
+
+  function formatVoiceTimestamp(value) {
+    if (!value) return 'Last voice file: not recorded yet.';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Last voice file: not recorded yet.';
+    return `Last voice file: ${date.toLocaleString()}`;
+  }
+
+  function mediaPlaceholder(label) {
+    const safeLabel = String(label || 'Preview unavailable').replace(/[<>]/g, '');
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" rx="36" fill="#08111b"/><rect x="24" y="24" width="752" height="752" rx="28" fill="none" stroke="#1ec8f2" stroke-opacity=".28" stroke-width="6"/><text x="400" y="386" text-anchor="middle" fill="#8fb7c9" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">${safeLabel}</text><text x="400" y="438" text-anchor="middle" fill="#6b7e8f" font-family="Segoe UI, Arial, sans-serif" font-size="18">Media preview unavailable</text></svg>`)}`;
   }
 
   function hydrateAvatarSetup() {
@@ -295,6 +462,7 @@
       supportState.avatarSetup.photoUrl = String(parsed.photoUrl || '');
       supportState.avatarSetup.voiceFileUrl = String(parsed.voiceFileUrl || '');
       supportState.avatarSetup.voiceFilePath = String(parsed.voiceFilePath || '');
+      supportState.avatarSetup.voiceFileUpdatedAt = String(parsed.voiceFileUpdatedAt || '');
       supportState.avatarSetup.avatarId = String(parsed.avatarId || '');
       supportState.avatarSetup.requestId = String(parsed.requestId || '');
       supportState.avatarSetup.createdAvatar = parsed.createdAvatar || null;
@@ -304,14 +472,25 @@
       supportState.avatarSetup.selectedProduct = parsed.selectedProduct || null;
       supportState.avatarSetup.productReferences = Array.isArray(parsed.productReferences) ? parsed.productReferences : [];
       if (parsed.attire && typeof parsed.attire === 'object') {
+        const storedGender = normalizeAttireGender(parsed.attire.gender)
+          || normalizeAttireGender(parsed.attire.lastGender)
+          || loadAttireGenderLock();
         supportState.avatarSetup.attire = {
+          gender: storedGender,
+          lastGender: storedGender,
           usePhoto: Boolean(parsed.attire.usePhoto),
+          mode: String(parsed.attire.mode || 'detailed'),
           top: String(parsed.attire.top || 'corporate-blazer'),
           bottom: String(parsed.attire.bottom || 'dress-pants'),
           style: String(parsed.attire.style || 'corporate-executive'),
           topColor: String(parsed.attire.topColor || 'black'),
-          bottomColor: String(parsed.attire.bottomColor || 'black')
+          bottomColor: String(parsed.attire.bottomColor || 'black'),
+          overallFormality: String(parsed.attire.overallFormality || 'business-formal'),
+          overallFit: String(parsed.attire.overallFit || 'tailored'),
+          overallSeason: String(parsed.attire.overallSeason || 'all-season'),
+          overallPresentation: String(parsed.attire.overallPresentation || 'polished')
         };
+        if (storedGender) saveAttireGenderLock(storedGender);
       }
     } catch (error) {
       console.warn('Invalid stored avatar setup payload', error);
@@ -368,21 +547,13 @@
         if (voiceVolumeRow) voiceVolumeRow.classList.add('hidden');
       }
     }
-    if (avatarVoiceFileRow && avatarVoiceFileLink) {
-      if (supportState.avatarSetup.voiceFileUrl) {
-        avatarVoiceFileLink.href = supportState.avatarSetup.voiceFileUrl;
-        avatarVoiceFileLink.textContent = supportState.avatarSetup.voiceFileUrl;
-        avatarVoiceFileRow.classList.remove('hidden');
-      } else {
-        avatarVoiceFileLink.removeAttribute('href');
-        avatarVoiceFileLink.textContent = 'Open recorded voice file';
-        avatarVoiceFileRow.classList.add('hidden');
-      }
+    if (avatarVoiceTimestamp) {
+      avatarVoiceTimestamp.textContent = formatVoiceTimestamp(supportState.avatarSetup.voiceFileUpdatedAt);
     }
     if (avatarMonitor) {
       const parts = [];
       parts.push(supportState.avatarSetup.photoUrl ? 'Photo uploaded' : 'Photo pending');
-      parts.push(supportState.avatarSetup.voiceFileUrl ? 'Voice uploaded' : 'Voice pending');
+      parts.push(supportState.avatarSetup.voiceFileUrl ? formatVoiceTimestamp(supportState.avatarSetup.voiceFileUpdatedAt) : 'Voice pending');
       parts.push(supportState.avatarSetup.selectedProduct ? `Product: ${supportState.avatarSetup.selectedProduct.title || 'selected'}` : 'Product pending');
       parts.push(`Platform: ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`);
       if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
@@ -413,20 +584,56 @@
       phoneVoiceScript.textContent = supportState.voiceReferenceScript || 'Loading voice reference script…';
     }
     // Sync attire selects with state
+    if (attireGenderSelect) attireGenderSelect.value = getLockedAttireGender();
     if (attireUsePhotoCheckbox) attireUsePhotoCheckbox.checked = supportState.avatarSetup.attire.usePhoto;
-    if (attireGrid) {
-      if (supportState.avatarSetup.attire.usePhoto) {
-        attireGrid.classList.add('disabled');
-      } else {
-        attireGrid.classList.remove('disabled');
-      }
-    }
+    if (attireModeSelect) attireModeSelect.value = supportState.avatarSetup.attire.mode || 'detailed';
     if (attireTopSelect) attireTopSelect.value = supportState.avatarSetup.attire.top;
     if (attireBottomSelect) attireBottomSelect.value = supportState.avatarSetup.attire.bottom;
     if (attireStyleSelect) attireStyleSelect.value = supportState.avatarSetup.attire.style;
     if (attireTopColorSelect) attireTopColorSelect.value = supportState.avatarSetup.attire.topColor;
     if (attireBottomColorSelect) attireBottomColorSelect.value = supportState.avatarSetup.attire.bottomColor;
+    if (attireOverallFormalitySelect) attireOverallFormalitySelect.value = supportState.avatarSetup.attire.overallFormality || 'business-formal';
+    if (attireOverallFitSelect) attireOverallFitSelect.value = supportState.avatarSetup.attire.overallFit || 'tailored';
+    if (attireOverallSeasonSelect) attireOverallSeasonSelect.value = supportState.avatarSetup.attire.overallSeason || 'all-season';
+    if (attireOverallPresentationSelect) attireOverallPresentationSelect.value = supportState.avatarSetup.attire.overallPresentation || 'polished';
+    updateAttireModeUI();
     renderAvatarLibrary();
+  }
+
+  function updateAttireModeUI() {
+    const usePhoto = Boolean(supportState.avatarSetup.attire.usePhoto);
+    const mode = String(supportState.avatarSetup.attire.mode || 'detailed');
+    const gender = getLockedAttireGender();
+    if (gender) {
+      supportState.avatarSetup.attire.gender = gender;
+      supportState.avatarSetup.attire.lastGender = gender;
+    }
+    supportState.avatarSetup.attire.top = applyGenderGuardrailToSelect(attireTopSelect, 'top', gender, supportState.avatarSetup.attire.top);
+    supportState.avatarSetup.attire.bottom = applyGenderGuardrailToSelect(attireBottomSelect, 'bottom', gender, supportState.avatarSetup.attire.bottom);
+    supportState.avatarSetup.attire.style = applyGenderGuardrailToSelect(attireStyleSelect, 'style', gender, supportState.avatarSetup.attire.style);
+    if (attireGenderSelect) attireGenderSelect.value = gender;
+    if (attireGenderHint) {
+      attireGenderHint.textContent = gender
+        ? `${attireGenderLabel(gender)} attire guardrail is active. Only ${gender === 'male' ? "men's" : "women's"} clothing selections are available unless you use the clothing shown in the uploaded profile picture.`
+        : 'Choose male or female first so only that gender\'s attire selections appear. Or choose to use the clothing already shown in the uploaded profile picture.';
+    }
+    if (attireModeSelect) {
+      attireModeSelect.value = mode;
+      attireModeSelect.disabled = usePhoto;
+    }
+    if (attireGrid) {
+      if (usePhoto) {
+        attireGrid.classList.add('disabled');
+      } else {
+        attireGrid.classList.remove('disabled');
+      }
+    }
+    if (attireDetailedSection) {
+      attireDetailedSection.style.display = usePhoto ? 'none' : (mode === 'detailed' ? 'block' : 'none');
+    }
+    if (attireOverallSection) {
+      attireOverallSection.style.display = usePhoto ? 'none' : (mode === 'overall' ? 'block' : 'none');
+    }
   }
 
   function sleep(ms) {
@@ -435,14 +642,23 @@
 
   function formatAttireLabel(attire) {
     if (!attire) return 'Professional';
-    if (attire.usePhoto) return 'Using profile photo clothing';
+    const genderLabel = normalizeAttireGender(attire.gender) ? `${attireGenderLabel(attire.gender)} · ` : '';
+    if (attire.usePhoto) return `${genderLabel}Using profile photo clothing`;
+    if (String(attire.mode || '').toLowerCase() === 'overall') {
+      const parts = [];
+      if (attire.style) parts.push(String(attire.style).replace(/-/g, ' '));
+      if (attire.overallFormality) parts.push(`Formality: ${String(attire.overallFormality).replace(/-/g, ' ')}`);
+      if (attire.overallFit) parts.push(`Fit: ${String(attire.overallFit).replace(/-/g, ' ')}`);
+      if (attire.overallSeason) parts.push(`Season: ${String(attire.overallSeason).replace(/-/g, ' ')}`);
+      if (attire.overallPresentation) parts.push(`Presentation: ${String(attire.overallPresentation).replace(/-/g, ' ')}`);
+      return genderLabel + (parts.length ? parts.join(' · ') : 'Overall style');
+    }
     const parts = [];
-    if (attire.style) parts.push(String(attire.style).replace(/-/g, ' '));
     const top = [attire.top, attire.topColor].filter(Boolean).map((value) => String(value).replace(/-/g, ' ')).join(' ');
     const bottom = [attire.bottom, attire.bottomColor].filter(Boolean).map((value) => String(value).replace(/-/g, ' ')).join(' ');
     if (top) parts.push(`Top: ${top}`);
     if (bottom) parts.push(`Bottom: ${bottom}`);
-    return parts.length ? parts.join(' · ') : 'Professional';
+    return genderLabel + (parts.length ? parts.join(' · ') : 'Professional');
   }
 
   function normalizeAvatarLibraryItem(item) {
@@ -458,12 +674,18 @@
       style: String(item && item.style || 'professional'),
       photoUrl,
       attire: attire ? {
+        gender: normalizeAttireGender(attire.gender),
         usePhoto: Boolean(attire.usePhoto),
+        mode: String(attire.mode || 'detailed'),
         top: String(attire.top || ''),
         bottom: String(attire.bottom || ''),
         style: String(attire.style || ''),
         topColor: String(attire.topColor || ''),
-        bottomColor: String(attire.bottomColor || '')
+        bottomColor: String(attire.bottomColor || ''),
+        overallFormality: String(attire.overallFormality || ''),
+        overallFit: String(attire.overallFit || ''),
+        overallSeason: String(attire.overallSeason || ''),
+        overallPresentation: String(attire.overallPresentation || '')
       } : null,
       attireLabel: String(item && item.attireLabel || formatAttireLabel(attire)),
       avatarId: String(item && (item.avatarId || item.heygenAvatarId || item.id) || '').trim(),
@@ -492,14 +714,27 @@
     const mediaUrl = item.proofThumbnailUrl || item.photoUrl || '';
     if (mediaUrl) {
       avatarLibraryPreviewImage.src = mediaUrl;
+      avatarLibraryPreviewImage.onerror = function () {
+        avatarLibraryPreviewImage.onerror = null;
+        avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'No photo');
+      };
       avatarLibraryPreviewImage.classList.remove('hidden');
     } else {
-      avatarLibraryPreviewImage.removeAttribute('src');
+      avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'No photo');
       avatarLibraryPreviewImage.classList.add('hidden');
     }
 
     if (item.proofVideoUrl) {
       avatarLibraryPreviewVideo.src = item.proofVideoUrl;
+      avatarLibraryPreviewVideo.preload = 'metadata';
+      avatarLibraryPreviewVideo.poster = item.proofThumbnailUrl || item.photoUrl || mediaPlaceholder(item.name || 'Proof video');
+      avatarLibraryPreviewVideo.onerror = function () {
+        avatarLibraryPreviewVideo.onerror = null;
+        avatarLibraryPreviewVideo.removeAttribute('src');
+        avatarLibraryPreviewVideo.classList.add('hidden');
+        avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'Proof unavailable');
+        avatarLibraryPreviewImage.classList.remove('hidden');
+      };
       avatarLibraryPreviewVideo.classList.remove('hidden');
     } else {
       avatarLibraryPreviewVideo.removeAttribute('src');
@@ -524,10 +759,10 @@
     if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `${items.length} avatar${items.length === 1 ? '' : 's'} loaded`;
     avatarLibraryGrid.innerHTML = items.map((item) => {
       const selected = String(item.id) === String(supportState.selectedAvatarLibraryId || '');
-      const thumb = item.photoUrl || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#08111b"/><text x="50%" y="50%" text-anchor="middle" fill="#8fb7c9" font-family="Arial, sans-serif" font-size="24">No photo</text></svg>')}`;
+      const thumb = item.photoUrl || mediaPlaceholder(item.name || 'No photo');
       const status = item.proofVideoUrl ? 'Proof ready' : (item.proofVideoId ? 'Proof rendering' : 'No proof yet');
       return `<button type="button" class="avatar-library-card${selected ? ' selected' : ''}" data-avatar-id="${escapeHtml(item.id)}">
-        <img class="avatar-library-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(item.name)} thumbnail" />
+        <img class="avatar-library-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(item.name)} thumbnail" onerror="this.onerror=null;this.src='${escapeHtml(mediaPlaceholder(item.name || 'No photo'))}'" />
         <strong>${escapeHtml(item.name)}</strong>
         <span>${escapeHtml(item.attireLabel || 'Professional')}</span>
         <span class="avatar-library-status">${escapeHtml(status)}</span>
@@ -1162,10 +1397,16 @@
       }
     }
 
-  async function uploadAvatarAsset(file, endpoint, fieldName) {
+  async function uploadAvatarAsset(file, endpoint, fieldName, extraFields = {}) {
     if (!file) throw new Error('Please choose a file before uploading.');
     const formData = new FormData();
     formData.append(fieldName, file);
+    Object.keys(extraFields || {}).forEach((key) => {
+      const value = extraFields[key];
+      if (value !== undefined && value !== null && String(value).length > 0) {
+        formData.append(key, String(value));
+      }
+    });
     const response = await fetch(endpoint, { method: 'POST', body: formData });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success === false) {
@@ -1176,9 +1417,13 @@
 
   async function uploadRecordedAvatarVoice(blob) {
     const file = new File([blob], `voice-sample-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
-    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice');
+    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice', {
+      affiliateCode: supportState.affiliateCode,
+      affiliateName: supportState.affiliateName
+    });
     supportState.avatarSetup.voiceFileUrl = String(payload.voiceFileUrl || '');
     supportState.avatarSetup.voiceFilePath = String(payload.voiceFilePath || '');
+    supportState.avatarSetup.voiceFileUpdatedAt = String(payload.voiceFileUpdatedAt || new Date().toISOString());
     persistAvatarSetup();
     renderAvatarSetup();
     sessionInfo.textContent = 'Recorded voice sample uploaded and ready.';
@@ -1195,9 +1440,13 @@
 
   async function uploadAvatarVoice() {
     const file = avatarVoiceInput?.files?.[0];
-    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice');
+    const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice', {
+      affiliateCode: supportState.affiliateCode,
+      affiliateName: supportState.affiliateName
+    });
     supportState.avatarSetup.voiceFileUrl = String(payload.voiceFileUrl || '');
     supportState.avatarSetup.voiceFilePath = String(payload.voiceFilePath || '');
+    supportState.avatarSetup.voiceFileUpdatedAt = String(payload.voiceFileUpdatedAt || new Date().toISOString());
     persistAvatarSetup();
     renderAvatarSetup();
     sessionInfo.textContent = 'Affiliate voice file uploaded and ready.';
@@ -1218,6 +1467,7 @@
   function clearVoiceSample() {
     supportState.avatarSetup.voiceFileUrl = '';
     supportState.avatarSetup.voiceFilePath = '';
+    supportState.avatarSetup.voiceFileUpdatedAt = '';
     if (avatarVoiceInput) avatarVoiceInput.value = '';
     if (avatarVoicePreview) {
       avatarVoicePreview.removeAttribute('src');
@@ -1292,6 +1542,7 @@
         photoUrl: supportState.avatarSetup.photoUrl || null,
         voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
         voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
+        voiceFileUpdatedAt: supportState.avatarSetup.voiceFileUpdatedAt || null,
         productId: supportState.avatarSetup.selectedProduct.id || null,
         productHandle: supportState.avatarSetup.selectedProduct.handle || null,
         productTitle: supportState.avatarSetup.selectedProduct.title || null,
@@ -1299,7 +1550,7 @@
         productImageUrl: supportState.avatarSetup.selectedProduct.imageUrl || supportState.avatarSetup.selectedProduct.image || supportState.avatarSetup.selectedProduct.image_url || null,
         platform: supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok',
         platformLabel: platformLabelOf(supportState.avatarSetup.selectedPlatform || platformSelect?.value || 'tiktok'),
-        attire: supportState.avatarSetup.attire,
+        attire: buildAvatarAttirePayload(),
         source: 'phone-app',
         returnTo: `/phone-app?affiliateCode=${encodeURIComponent(supportState.affiliateCode)}&affiliateName=${encodeURIComponent(supportState.affiliateName)}`
       })
@@ -1319,12 +1570,41 @@
     }
   }
 
+  async function ensureAuthenticatedSession() {
+    const nextPath = `/phone-app${window.location.search || ''}`;
+    try {
+      const response = await fetch('/api/affiliate/session', { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false || payload.authenticated !== true || !payload.session) {
+        throw new Error(payload.error || 'Authentication required.');
+      }
+      const sessionCode = normalizeAffiliateCode(payload.session.affiliateCode);
+      if (!sessionCode) throw new Error('Affiliate session missing code.');
+      const sessionName = String(payload.session.affiliateName || sessionCode).trim().slice(0, 64) || sessionCode;
+      supportState.affiliateCode = sessionCode;
+      supportState.affiliateName = sessionName;
+      localStorage.setItem('evicsAffiliateCode', sessionCode);
+      localStorage.setItem('evicsAffiliateName', sessionName);
+      const params = new URLSearchParams(window.location.search);
+      if (normalizeAffiliateCode(params.get('affiliateCode')) !== sessionCode || String(params.get('affiliateName') || '').trim() !== sessionName) {
+        params.set('affiliateCode', sessionCode);
+        params.set('affiliateName', sessionName);
+        const query = params.toString();
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+      }
+      return true;
+    } catch (_error) {
+      window.location.href = `/affiliate-login?next=${encodeURIComponent(nextPath)}`;
+      return false;
+    }
+  }
+
   function resolveAffiliateIdentity() {
     const params = new URLSearchParams(window.location.search);
-    const code = String(params.get('affiliateCode') || params.get('code') || params.get('ref') || localStorage.getItem('evicsAffiliateCode') || '');
+    const code = String(supportState.affiliateCode || params.get('affiliateCode') || params.get('code') || params.get('ref') || localStorage.getItem('evicsAffiliateCode') || '');
     const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40) || '';
     localStorage.setItem('evicsAffiliateCode', cleanCode);
-    const name = String(params.get('affiliateName') || localStorage.getItem('evicsAffiliateName') || cleanCode);
+    const name = String(supportState.affiliateName || params.get('affiliateName') || localStorage.getItem('evicsAffiliateName') || cleanCode);
     const cleanName = name.trim().slice(0, 64) || cleanCode;
     localStorage.setItem('evicsAffiliateName', cleanName);
     supportState.affiliateCode = cleanCode;
@@ -1340,6 +1620,15 @@
         const profile = data.profile;
         if (normalizeAffiliateCode(profile.affiliateCode) !== activeAffiliateCode()) {
           throw new Error('Profile ownership mismatch. Reload with the correct affiliate link.');
+        }
+        if (!supportState.avatarSetup.attire.gender) {
+          const storedGender = normalizeAttireGender(profile.avatarGender || profile.gender);
+          if (storedGender) {
+            setLockedAttireGender(storedGender);
+          }
+        }
+        if (!supportState.avatarSetup.voiceFileUpdatedAt) {
+          supportState.avatarSetup.voiceFileUpdatedAt = String(profile.voiceFileUpdatedAt || profile.updatedAt || profile.createdAt || '');
         }
         if (affiliateProfileBanner) {
           affiliateProfileBanner.style.display = 'flex';
@@ -1379,6 +1668,26 @@
     supportState.avatarSetup.selectedProductId = String(request.productId || supportState.avatarSetup.selectedProductId || '');
     supportState.avatarSetup.selectedPlatform = String(request.platform || supportState.avatarSetup.selectedPlatform || 'tiktok');
     if (platformSelect) platformSelect.value = supportState.avatarSetup.selectedPlatform;
+    if (request.attire && typeof request.attire === 'object') {
+      supportState.avatarSetup.attire = {
+        ...supportState.avatarSetup.attire,
+        gender: normalizeAttireGender(request.attire.gender) || getLockedAttireGender(),
+        lastGender: normalizeAttireGender(request.attire.gender) || getLockedAttireGender(),
+        usePhoto: Boolean(request.attire.usePhoto || request.attire.usePhotoClothing),
+        mode: String(request.attire.mode || supportState.avatarSetup.attire.mode || 'detailed'),
+        top: String(request.attire.top || supportState.avatarSetup.attire.top || ''),
+        bottom: String(request.attire.bottom || supportState.avatarSetup.attire.bottom || ''),
+        style: String(request.attire.style || request.attire.overallStyle || supportState.avatarSetup.attire.style || ''),
+        topColor: String(request.attire.topColor || supportState.avatarSetup.attire.topColor || 'black'),
+        bottomColor: String(request.attire.bottomColor || supportState.avatarSetup.attire.bottomColor || 'black'),
+        overallFormality: String(request.attire.overallFormality || supportState.avatarSetup.attire.overallFormality || 'business-formal'),
+        overallFit: String(request.attire.overallFit || supportState.avatarSetup.attire.overallFit || 'tailored'),
+        overallSeason: String(request.attire.overallSeason || supportState.avatarSetup.attire.overallSeason || 'all-season'),
+        overallPresentation: String(request.attire.overallPresentation || supportState.avatarSetup.attire.overallPresentation || 'polished')
+      };
+      const requestGender = normalizeAttireGender(request.attire.gender) || getLockedAttireGender();
+      if (requestGender) saveAttireGenderLock(requestGender);
+    }
     if (request.productId || request.productTitle) {
       supportState.avatarSetup.selectedProduct = {
         id: request.productId || '',
@@ -1396,6 +1705,7 @@
       supportState.avatarSetup.photoUrl = String(request.avatar.photoUrl || supportState.avatarSetup.photoUrl || '');
       supportState.avatarSetup.voiceFileUrl = String(request.avatar.voiceFileUrl || supportState.avatarSetup.voiceFileUrl || '');
       supportState.avatarSetup.voiceFilePath = String(request.avatar.voiceFilePath || supportState.avatarSetup.voiceFilePath || '');
+      supportState.avatarSetup.voiceFileUpdatedAt = String(request.avatar.voiceFileUpdatedAt || request.avatar.voiceUpdatedAt || supportState.avatarSetup.voiceFileUpdatedAt || '');
       persistAvatarSetup();
       renderAvatarSetup();
       renderSelectedProductDetails();
@@ -1632,20 +1942,26 @@
   if (attireUsePhotoCheckbox) {
     attireUsePhotoCheckbox.addEventListener('change', () => {
       supportState.avatarSetup.attire.usePhoto = attireUsePhotoCheckbox.checked;
-      if (attireGrid) {
-        if (attireUsePhotoCheckbox.checked) {
-          attireGrid.classList.add('disabled');
-        } else {
-          attireGrid.classList.remove('disabled');
-        }
-      }
+      updateAttireModeUI();
       persistAvatarSetup();
     });
   }
   function bindAttireSelect(el, key) {
     if (!el) return;
     el.addEventListener('change', () => {
-      supportState.avatarSetup.attire[key] = el.value;
+      if (key === 'gender') {
+        const nextGender = normalizeAttireGender(el.value);
+        if (nextGender) {
+          setLockedAttireGender(nextGender);
+        } else if (supportState.avatarSetup.attire.lastGender) {
+          supportState.avatarSetup.attire.gender = supportState.avatarSetup.attire.lastGender;
+        }
+      } else {
+        supportState.avatarSetup.attire[key] = el.value;
+      }
+      if (key === 'mode' || key === 'gender') {
+        updateAttireModeUI();
+      }
       persistAvatarSetup();
     });
   }
@@ -1654,6 +1970,12 @@
   bindAttireSelect(attireStyleSelect, 'style');
   bindAttireSelect(attireTopColorSelect, 'topColor');
   bindAttireSelect(attireBottomColorSelect, 'bottomColor');
+  bindAttireSelect(attireGenderSelect, 'gender');
+  bindAttireSelect(attireModeSelect, 'mode');
+  bindAttireSelect(attireOverallFormalitySelect, 'overallFormality');
+  bindAttireSelect(attireOverallFitSelect, 'overallFit');
+  bindAttireSelect(attireOverallSeasonSelect, 'overallSeason');
+  bindAttireSelect(attireOverallPresentationSelect, 'overallPresentation');
 
   if (productSearchInput) {
     let searchTimer = null;
@@ -1799,15 +2121,16 @@
         return;
       }
 
-      // Gather attire selections
-      const attire = {
-        usePhotoClothing: attireUsePhotoCheckbox ? attireUsePhotoCheckbox.checked : false,
-        top: attireTopSelect ? attireTopSelect.value : 'dress-shirt',
-        topColor: attireTopColorSelect ? attireTopColorSelect.value : 'black',
-        bottom: attireBottomSelect ? attireBottomSelect.value : 'dress-pants',
-        bottomColor: attireBottomColorSelect ? attireBottomColorSelect.value : 'black',
-        overallStyle: attireStyleSelect ? attireStyleSelect.value : 'business-casual'
-      };
+      let attire;
+      try {
+        attire = buildAvatarAttirePayload();
+      } catch (error) {
+        if (createAvatarStatus) {
+          createAvatarStatus.textContent = `⚠️ ${error.message}`;
+          createAvatarStatus.className = 'create-avatar-status status-error';
+        }
+        return;
+      }
 
       createAvatarBtn.disabled = true;
       setControlState(createAvatarBtn, 'running');
@@ -1955,18 +2278,6 @@
     productVideoRefreshBtn.addEventListener('click', () => { loadProductVideos(); });
   }
 
-  if (avatarVoiceCopyLinkBtn) {
-    avatarVoiceCopyLinkBtn.addEventListener('click', async () => {
-      if (!supportState.avatarSetup.voiceFileUrl) return;
-      try {
-        await navigator.clipboard.writeText(supportState.avatarSetup.voiceFileUrl);
-        sessionInfo.textContent = 'Voice file link copied to clipboard.';
-      } catch (error) {
-        sessionInfo.textContent = `Copy failed: ${error.message}`;
-      }
-    });
-  }
-
   if (avatarLibraryRefreshBtn) {
     avatarLibraryRefreshBtn.addEventListener('click', async () => {
       const selected = (Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : []).find((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''));
@@ -1990,9 +2301,13 @@
       logoutBtn.classList.add('pressing');
       setControlState(logoutBtn, 'running');
       await endSupportSession();
+      await fetch('/api/affiliate/session/logout', { method: 'POST', headers: { Accept: 'application/json' } }).catch(() => {});
+      localStorage.removeItem('evicsAffiliateCode');
+      localStorage.removeItem('evicsAffiliateName');
       sessionInfo.textContent = `Logged off from live support for ${supportState.affiliateCode}.`;
       setControlState(logoutBtn, 'completed', 1500);
       setTimeout(() => logoutBtn.classList.remove('pressing'), 120);
+      window.location.href = '/affiliate-login?next=%2Fphone-app';
     });
   }
 
@@ -2004,6 +2319,8 @@
 
   async function boot() {
     try {
+      const authenticated = await ensureAuthenticatedSession();
+      if (!authenticated) return;
       resolveAffiliateIdentity();
       await loadAffiliateProfile();
       hydrateAvatarSetup();
