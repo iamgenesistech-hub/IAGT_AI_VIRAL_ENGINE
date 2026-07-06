@@ -62,6 +62,9 @@ const persistenceEngine = require('./persistenceEngine');
 const stripeEngine = require('./stripeEngine');
 const mountBillingRoutes = require('./billingRoutes');
 
+// Phase 2: Production Hardening — JWT auth, RBAC, health checks, cost optimization
+const phase2Integration = require('./phase2Integration');
+
 // HeyGen Cost Tracking Engine — track every API dollar spent before counting profit.
 const costTracker = require('./costTrackingEngine');
 
@@ -8789,6 +8792,17 @@ app.listen(PORT, () => {
   console.log(`âœ… EVICS backend running at http://127.0.0.1:${PORT}`);
   console.log(`âž¡ï¸  Dashboard:           http://127.0.0.1:${PORT}/`);
   console.log(`âž¡ï¸  Status:              http://127.0.0.1:${PORT}/status`);
+
+  // Initialize Phase 2: Production Hardening
+  const phase2Ready = phase2Integration.initialize(app, admin);
+  if (phase2Ready) {
+    phase2Integration.mountAuthRoutes(app);
+    phase2Integration.mountBillingRoutes(app);
+    phase2Integration.markHealthCheckStartupComplete();
+    console.log('🚀 Phase 2: All engines initialized and routes mounted');
+  } else {
+    console.warn('⚠️  Phase 2: Initialization incomplete, some features may be unavailable');
+  }
 
   // Start automation scheduler (viral scan, profit audit, library cleanup, exec report)
   startScheduler(`http://127.0.0.1:${PORT}`);
