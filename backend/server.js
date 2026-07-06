@@ -55,6 +55,9 @@ const {
 const governance = require('./sacredIntelligenceGovernance');
 const { registerGovernanceRoutes } = require('./governanceRoutes');
 
+// GCS-backed persistence — avatar + video records survive Cloud Run redeploys.
+const persistenceEngine = require('./persistenceEngine');
+
 // OpenAI client — initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
 function getOpenAI() {
@@ -822,7 +825,10 @@ function upsertAvatarRequest(record) {
   const current = getAvatarRequests();
   const next = current.filter((item) => item.requestId !== record.requestId);
   next.unshift(record);
-  saveAvatarRequests(next.slice(0, 100));
+  const trimmed = next.slice(0, 100);
+  saveAvatarRequests(trimmed);
+  // Write-through backup to GCS so records survive Cloud Run redeploys
+  persistenceEngine.gcsWrite('evics-data/avatar_requests.json', trimmed).catch(() => {});
   return record;
 }
 
@@ -973,6 +979,30 @@ async function heygenApiJson(endpoint, body) {
   return payload;
 }
 
+// Voice clone with retry — 3 attempts, exponential back-off.
+// Returns { voiceCloneId, voiceCloneStatus }.
+async function cloneVoiceWithRetry(voiceFileUrl, voiceName, maxAttempts = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const voiceResp = await heygenApiJson('/v3/voices/clone', {
+        audio: { type: 'url', url: voiceFileUrl },
+        voice_name: voiceName,
+        remove_background_noise: true
+      });
+      const cloneId = voiceResp?.data?.voice_clone_id || voiceResp?.voice_clone_id || null;
+      if (cloneId) return { voiceCloneId: cloneId, voiceCloneStatus: 'queued' };
+      throw new Error('HeyGen returned no voice_clone_id');
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[VoiceClone] Attempt ${attempt}/${maxAttempts} failed: ${err.message}`);
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+  }
+  console.error(`[VoiceClone] All ${maxAttempts} attempts exhausted: ${lastErr?.message}`);
+  return { voiceCloneId: null, voiceCloneStatus: 'failed' };
+}
+
 async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attire }) {
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
@@ -1050,21 +1080,14 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   const videoId = videoResult?.data?.video_id || null;
   const avatarId = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-  // Voice clone attempt (non-blocking — avatar still created if this fails)
+  // Voice clone with retry (3 attempts, exponential back-off).
+  // Non-blocking: avatar is still created even if voice clone fails.
   let voiceCloneId = null;
   let voiceCloneStatus = null;
   if (voiceFileUrl) {
-    try {
-      const voiceResp = await heygenApiJson('/v3/voices/clone', {
-        audio: { type: 'url', url: voiceFileUrl },
-        voice_name: `${name || 'EVICS Affiliate'} Voice`,
-        remove_background_noise: true
-      });
-      voiceCloneId = voiceResp?.data?.voice_clone_id || voiceResp?.voice_clone_id || null;
-      voiceCloneStatus = voiceCloneId ? 'queued' : null;
-    } catch (_voiceErr) {
-      voiceCloneStatus = 'failed';
-    }
+    const cloneResult = await cloneVoiceWithRetry(voiceFileUrl, `${name || 'EVICS Affiliate'} Voice`);
+    voiceCloneId = cloneResult.voiceCloneId;
+    voiceCloneStatus = cloneResult.voiceCloneStatus;
   }
 
   return {
@@ -6179,6 +6202,9 @@ const PRODUCT_VIDEO_RECORDS = new Map();
 function upsertProductVideoRecord(record) {
   if (!record || !record.videoJobId) return record;
   PRODUCT_VIDEO_RECORDS.set(record.videoJobId, { ...record });
+  // Write-through backup to GCS so video records survive Cloud Run redeploys
+  const allRecords = Array.from(PRODUCT_VIDEO_RECORDS.values());
+  persistenceEngine.gcsWrite('evics-data/video_records.json', allRecords).catch(() => {});
   return record;
 }
 
@@ -6389,14 +6415,26 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
           await new Promise(r => setTimeout(r, 5000));
           const s = await getHeyGenVideoStatus(videoId);
           if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
-            upsertProductVideoRecord({
+            const completedRecord = {
               ...record,
               status: 'completed',
               videoUrl: s.video_url,
               thumbnailUrl: s.thumbnail_url || photoUrl,
               completedAt: new Date().toISOString()
-            });
+            };
+            upsertProductVideoRecord(completedRecord);
             console.log(`[ProductVideo] Completed ${videoJobId}: ${s.video_url.substring(0, 80)}…`);
+            // Archive to GCS — HeyGen CDN URLs expire in 7 days; GCS is permanent
+            persistenceEngine.gcsDownloadUrl(
+              s.video_url,
+              `evics-videos/${cleanCode}/${videoJobId}.mp4`,
+              'video/mp4'
+            ).then(gcsUrl => {
+              if (gcsUrl) {
+                upsertProductVideoRecord({ ...completedRecord, gcsVideoUrl: gcsUrl });
+                console.log(`[ProductVideo] GCS archive ready: ${gcsUrl}`);
+              }
+            }).catch(() => {});
             break;
           }
           if (s && s.status === 'failed') {
@@ -6442,6 +6480,17 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
         record.thumbnailUrl = s.thumbnail_url || record.photoUrl;
         record.completedAt = new Date().toISOString();
         upsertProductVideoRecord(record);
+        // Archive to GCS if not already done
+        if (!record.gcsVideoUrl) {
+          const archiveCode = record.affiliateCode || 'unknown';
+          persistenceEngine.gcsDownloadUrl(
+            s.video_url,
+            `evics-videos/${archiveCode}/${record.videoJobId}.mp4`,
+            'video/mp4'
+          ).then(gcsUrl => {
+            if (gcsUrl) upsertProductVideoRecord({ ...record, gcsVideoUrl: gcsUrl });
+          }).catch(() => {});
+        }
       } else if (s && s.status === 'failed') {
         record.status = 'failed';
         record.error = s.error || 'Rendering failed';
@@ -8546,6 +8595,28 @@ app.listen(PORT, () => {
 
   // Start automation scheduler (viral scan, profit audit, library cleanup, exec report)
   startScheduler(`http://127.0.0.1:${PORT}`);
+
+  // Restore persisted state from GCS — avatar requests and video records survive redeploys
+  (async () => {
+    try {
+      const avatarData = await persistenceEngine.gcsRead('evics-data/avatar_requests.json');
+      if (Array.isArray(avatarData) && avatarData.length) {
+        saveAvatarRequests(avatarData);
+        console.log(`[Persist] ✅ Restored ${avatarData.length} avatar request(s) from GCS.`);
+      }
+    } catch (e) {
+      console.warn('[Persist] Could not restore avatar requests from GCS:', e.message);
+    }
+    try {
+      const videoData = await persistenceEngine.gcsRead('evics-data/video_records.json');
+      if (Array.isArray(videoData) && videoData.length) {
+        for (const rec of videoData) PRODUCT_VIDEO_RECORDS.set(rec.videoJobId, rec);
+        console.log(`[Persist] ✅ Restored ${videoData.length} video record(s) from GCS.`);
+      }
+    } catch (e) {
+      console.warn('[Persist] Could not restore video records from GCS:', e.message);
+    }
+  })();
 
   // Bootstrap the Sacred Intelligence Governance Engine — load the AI Oath and
   // Sacred Intelligence Standard into the system before any AI task runs, and log it.
