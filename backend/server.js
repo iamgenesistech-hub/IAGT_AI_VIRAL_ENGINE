@@ -5524,8 +5524,10 @@ const avatarUpload = multer({
   storage: avatarUploadStorage,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
   fileFilter: (_req, file, cb) => {
-    const allowed = /image\/(jpeg|png|webp|gif)|audio\/(mpeg|mp4|wav|x-m4a|webm|ogg)/;
-    cb(null, allowed.test(file.mimetype || ''));
+    // Accept all images and all audio/video types (video/webm is common for audio recorded via MediaRecorder)
+    const allowed = /^(image\/(jpeg|png|webp|gif)|audio\/(mpeg|mp4|wav|x-m4a|webm|ogg|aac|flac|3gpp)|video\/(webm|mp4|ogg|3gpp))/;
+    const mime = String(file.mimetype || '').toLowerCase().split(';')[0].trim();
+    cb(null, allowed.test(mime) || mime.startsWith('audio/') || mime.startsWith('image/'));
   }
 });
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
@@ -5855,7 +5857,15 @@ app.get('/api/affiliate/avatars', async (req, res) => {
 });
 
 // POST /api/affiliate/avatar/upload-photo — accepts multipart photo from Expo FileSystem.uploadAsync
-app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), async (req, res) => {
+app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
+  avatarUpload.single('photo')(req, res, (err) => {
+    if (err) {
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ success: false, error: err.message || 'File upload error' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No photo file received' });
     const filename = req.file.filename;
@@ -5875,9 +5885,17 @@ app.post('/api/affiliate/avatar/upload-photo', avatarUpload.single('photo'), asy
 });
 
 // POST /api/affiliate/avatar/upload-voice — accepts multipart audio from Expo
-app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), async (req, res) => {
+app.post('/api/affiliate/avatar/upload-voice', (req, res, next) => {
+  avatarUpload.single('voice')(req, res, (err) => {
+    if (err) {
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ success: false, error: err.message || 'File upload error' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, error: 'No voice file received' });
+    if (!req.file) return res.status(400).json({ success: false, error: 'No voice file received. Ensure the file is an audio format (mp3, wav, webm, m4a, ogg).' });
     const affiliateCode = normalizeAffiliateCode(req.body && (req.body.affiliateCode || req.body.affiliateId || ''));
     const ext = (() => {
       const mime = String(req.file.mimetype || '').toLowerCase();
@@ -5893,16 +5911,33 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), asy
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const proxyUrl = `${protocol}://${host}/uploads/${filename}`;
-    const voiceFilePath = req.file.path;
+    // Rename/move the temp file to the affiliate-specific name so the proxy URL works locally
+    const finalLocalPath = path.join(UPLOADS_DIR, filename);
+    try {
+      // Remove old voice file for this affiliate if it exists (keep only latest)
+      if (affiliateCode) {
+        const extensions = ['.webm', '.mp3', '.wav', '.ogg', '.m4a'];
+        for (const oldExt of extensions) {
+          const oldPath = path.join(UPLOADS_DIR, `${affiliateCode}__voice${oldExt}`);
+          if (oldPath !== finalLocalPath && fs.existsSync(oldPath)) {
+            try { fs.unlinkSync(oldPath); } catch {}
+          }
+        }
+      }
+      fs.renameSync(req.file.path, finalLocalPath);
+    } catch {
+      // If rename fails (e.g. cross-device), copy and delete
+      try {
+        fs.copyFileSync(req.file.path, finalLocalPath);
+        try { fs.unlinkSync(req.file.path); } catch {}
+      } catch {}
+    }
     // Upload to GCS for persistent storage (server proxies access via /uploads/:filename)
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'audio/webm';
-    await uploadToGcs(req.file.path, gcsPath, contentType);
+    await uploadToGcs(finalLocalPath, gcsPath, contentType);
     const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
     const voiceFileUpdatedAt = new Date().toISOString();
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch {}
-    }
     if (affiliateCode) {
       upsertAffiliateProfile(
         affiliateCode,
@@ -5916,7 +5951,7 @@ app.post('/api/affiliate/avatar/upload-voice', avatarUpload.single('voice'), asy
       );
     }
     // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
-    res.json({ success: true, voiceFileUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, voiceFilePath, filename, size: req.file.size, voiceFileUpdatedAt, affiliateCode: affiliateCode || null });
+    res.json({ success: true, voiceFileUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, voiceFilePath: proxyUrl, filename, size: req.file.size, voiceFileUpdatedAt, affiliateCode: affiliateCode || null });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
