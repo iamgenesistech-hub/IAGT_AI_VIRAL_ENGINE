@@ -1226,6 +1226,112 @@ async function heygenApiJson(endpoint, body) {
   return payload;
 }
 
+function extractTalkingPhotoId(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  return payload?.data?.talking_photo_id
+    || payload?.talking_photo_id
+    || payload?.data?.talkingPhotoId
+    || payload?.talkingPhotoId
+    || payload?.data?.id
+    || payload?.id
+    || null;
+}
+
+async function registerHeyGenTalkingPhoto(photoUrl, options = {}) {
+  console.log(`[TalkingPhoto] Attempting to register photo: ${photoUrl ? photoUrl.substring(0, 80) + '...' : 'MISSING'}`);
+  
+  // Strategy 1: If we have a proxy URL (backend can serve it), use that first
+  let finalPhotoUrl = null;
+  const proxyUrl = options.proxyUrl || null;
+  const gcsPath = options.gcsPath || null;
+  
+  if (proxyUrl) {
+    // Ensure proxy URL is absolute
+    try {
+      new URL(proxyUrl);
+      console.log(`[TalkingPhoto] Using proxy URL: ${proxyUrl.substring(0, 80)}...`);
+      finalPhotoUrl = proxyUrl;
+    } catch {
+      console.warn(`[TalkingPhoto] Proxy URL is not absolute, attempting alternative strategies`);
+    }
+  }
+
+  // Strategy 2: Try to generate a signed URL for GCS access
+  if (!finalPhotoUrl && photoUrl && photoUrl.includes('storage.googleapis.com')) {
+    try {
+      console.log(`[TalkingPhoto] Photo URL is GCS storage - attempting signed URL generation`);
+      const token = await getGcsAccessToken();
+      if (!token) {
+        console.log(`[TalkingPhoto] getGcsAccessToken returned null - may not be running on Cloud Run with proper credentials`);
+      } else {
+        console.log(`[TalkingPhoto] Access token acquired, generating signed URL...`);
+        const parsedUrl = new URL(photoUrl);
+        const extractedGcsPath = gcsPath || parsedUrl.pathname.replace(/^\/[^\/]+\//, ''); // Remove bucket name
+        const signedUrl = await generateSignedUrl(decodeURIComponent(extractedGcsPath), token);
+        if (signedUrl) {
+          console.log(`[TalkingPhoto] ✅ Signed URL generated successfully: ${signedUrl.substring(0, 80)}...`);
+          finalPhotoUrl = signedUrl;
+        } else {
+          console.log(`[TalkingPhoto] generateSignedUrl returned null`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[TalkingPhoto] Signed URL generation failed: ${err.message}`);
+    }
+  }
+
+  // Strategy 3: Fall back to original public GCS URL (may work if bucket is readable)
+  if (!finalPhotoUrl) {
+    console.log(`[TalkingPhoto] No proxy or signed URL available, using original URL: ${photoUrl.substring(0, 80)}...`);
+    finalPhotoUrl = photoUrl;
+  }
+
+  console.log(`[TalkingPhoto] Final URL for HeyGen: ${finalPhotoUrl ? finalPhotoUrl.substring(0, 80) + '...' : 'MISSING'} (strategy: ${!proxyUrl ? 'fallback' : 'proxy'})`);
+  
+  // Build attempts list with multiple strategies
+  const attempts = [];
+  
+  // Primary: Try with finalPhotoUrl (signed or proxy)
+  attempts.push(
+    { endpoint: '/v2/talking_photo', body: { url: finalPhotoUrl } },
+    { endpoint: '/v2/talking_photo', body: { img_url: finalPhotoUrl } },
+    { endpoint: '/v1/talking_photo', body: { url: finalPhotoUrl } },
+    { endpoint: '/v1/talking_photo', body: { img_url: finalPhotoUrl } },
+    { endpoint: '/v2/talking_photo/create', body: { url: finalPhotoUrl } }
+  );
+  
+  // Fallback: If we had a proxy URL, also try the original GCS URL in case HeyGen can access it
+  if (proxyUrl && proxyUrl !== finalPhotoUrl && photoUrl && photoUrl !== finalPhotoUrl) {
+    console.log(`[TalkingPhoto] Adding fallback attempts with original URL`);
+    attempts.push(
+      { endpoint: '/v2/talking_photo', body: { url: photoUrl } },
+      { endpoint: '/v1/talking_photo', body: { url: photoUrl } }
+    );
+  }
+  
+  const errors = [];
+  for (const attempt of attempts) {
+    try {
+      console.log(`[TalkingPhoto] Trying ${attempt.endpoint} with URL: ${String(attempt.body.url || attempt.body.img_url).substring(0, 60)}...`);
+      const response = await heygenApiJson(attempt.endpoint, attempt.body);
+      const talkingPhotoId = extractTalkingPhotoId(response);
+      if (talkingPhotoId) {
+        console.log(`[TalkingPhoto] ✅ SUCCESS: Registered with ID ${talkingPhotoId} using ${attempt.endpoint}`);
+        return { talkingPhotoId, endpoint: attempt.endpoint };
+      }
+      errors.push(`${attempt.endpoint}: no talking_photo_id returned`);
+    } catch (err) {
+      const status = err?.statusCode ? `HTTP ${err.statusCode}` : 'request failed';
+      errors.push(`${attempt.endpoint}: ${status} ${err.message}`);
+      console.log(`[TalkingPhoto] ${attempt.endpoint} failed: ${err.message}`);
+    }
+  }
+  const error = new Error(`Unable to register talking photo. Attempts: ${errors.join(' | ')}`);
+  error.code = 'HEYGEN_TALKING_PHOTO_REGISTER_FAILED';
+  console.error(`[TalkingPhoto] All attempts failed:`, error.message);
+  throw error;
+}
+
 // Voice clone with retry — 3 attempts, exponential back-off.
 // Returns { voiceCloneId, voiceCloneStatus }.
 async function cloneVoiceWithRetry(voiceFileUrl, voiceName, maxAttempts = 3) {
@@ -1254,11 +1360,41 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
   }
+  console.log(`[Avatar] Original photo URL received: ${photoUrl}`);
+  console.log(`[Avatar] Creating avatar with attire input:`, JSON.stringify(attire || {}, null, 2));
+  
+  // If this is a local GCS URL, upgrade to a signed URL that HeyGen can access
+  let finalPhotoUrlForHeygen = photoUrl;
+  if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+    try {
+      console.log(`[Avatar] Photo URL is GCS storage - upgrading to signed URL for HeyGen access`);
+      const token = await getGcsAccessToken();
+      if (token) {
+        const parsedUrl = new URL(photoUrl);
+        const gcsPath = parsedUrl.pathname.replace(/^\/[^\/]+\//, '');
+        const signedUrl = await generateSignedUrl(decodeURIComponent(gcsPath), token);
+        if (signedUrl) {
+          console.log(`[Avatar] Generated signed URL for HeyGen`);
+          finalPhotoUrlForHeygen = signedUrl;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Avatar] Could not generate signed URL: ${err.message}`);
+    }
+  }
+  console.log(`[Avatar] Photo URL for HeyGen: ${finalPhotoUrlForHeygen ? finalPhotoUrlForHeygen.substring(0, 100) + '...' : 'MISSING'}`);
+  
   const normalizedAttire = normalizeAvatarAttire(attire);
+  console.log(`[Avatar] Normalized attire:`, JSON.stringify(normalizedAttire || {}, null, 2));
+  
   const avatarGender = normalizeAvatarGender(normalizedAttire?.gender);
+  console.log(`[Avatar] Avatar gender resolved to: ${avatarGender}`);
+  
   // Build attire description for avatar generation prompt/metadata
   let attireDescription = null;
   const attireMode = normalizeAttireMode(normalizedAttire);
+  console.log(`[Avatar] Attire mode: ${attireMode}`);
+  
   const genderInstruction = avatarGender === 'male'
     ? 'The affiliate is male. Use only male attire and never substitute female garments or female-coded styling.'
     : avatarGender === 'female'
@@ -1285,22 +1421,110 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       'Use only these detailed pieces, keep the outfit cohesive, and do not cross into the opposite gender clothing set.'
     ].join(' ');
   }
+  
+  console.log(`[Avatar] Built attire description (${attireDescription ? 'PRESENT' : 'MISSING'}):`, attireDescription ? attireDescription.substring(0, 120) + '...' : 'null');
 
   // Step 1: Register the affiliate's photo as a HeyGen talking photo
   let talkingPhotoId = null;
+  let talkingPhotoRegistrationError = null;
   try {
-    const uploadResp = await heygenApiJson('/v2/talking_photo', {
-      url: photoUrl
-    });
-    talkingPhotoId = uploadResp?.data?.talking_photo_id || uploadResp?.talking_photo_id || null;
-    console.log(`[Avatar] Registered talking photo: ${talkingPhotoId || 'no ID returned'}`);
+    // Extract filename from GCS URL and reconstruct proxy URL for fallback
+    let proxyUrl = null;
+    let gcsPath = null;
+    if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+      try {
+        const parsedUrl = new URL(photoUrl);
+        const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+        const filename = pathSegments[pathSegments.length - 1];
+        if (filename) {
+          // Reconstruct proxy URL (Cloud Run will serve it if photos are uploaded)
+          gcsPath = `affiliate-uploads/${filename}`;
+          const appHostname = process.env.EVICS_API_HOSTNAME || 'evics-api-jw5xzlutsq-uc.a.run.app';
+          proxyUrl = `https://${appHostname}/uploads/${filename}`;
+          console.log(`[Avatar] Reconstructed proxy URL for fallback: ${proxyUrl}`);
+        }
+      } catch (e) {
+        console.warn(`[Avatar] Could not reconstruct proxy URL: ${e.message}`);
+      }
+    }
+    const registered = await registerHeyGenTalkingPhoto(photoUrl, { proxyUrl, gcsPath });
+    talkingPhotoId = registered.talkingPhotoId;
+    console.log(`[Avatar] ✅ Registered talking photo via ${registered.endpoint}: ${talkingPhotoId || 'no ID returned'}`);
   } catch (uploadErr) {
-    console.log(`[Avatar] Talking photo upload failed: ${uploadErr.message}. Using fallback ID.`);
+    talkingPhotoRegistrationError = uploadErr;
+    console.warn(`[Avatar] Talking photo registration failed, attempting v3 photo avatar fallback: ${uploadErr.message}`);
   }
 
-  // Fall back to default talking photo if registration failed
   if (!talkingPhotoId) {
-    talkingPhotoId = process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7';
+    try {
+      // Try to upgrade photoUrl to signed URL for better access, with proxy URL fallback
+      let finalPhotoUrl = photoUrl;
+      let proxyUrlForV3 = null;
+      
+      if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+        try {
+          // First, try to get proxy URL
+          const parsedUrl = new URL(photoUrl);
+          const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+          const filename = pathSegments[pathSegments.length - 1];
+          if (filename) {
+            const appHostname = process.env.EVICS_API_HOSTNAME || 'evics-api-jw5xzlutsq-uc.a.run.app';
+            proxyUrlForV3 = `https://${appHostname}/uploads/${filename}`;
+            console.log(`[Avatar] Proxy URL available for v3 fallback: ${proxyUrlForV3}`);
+          }
+        } catch (e) {
+          console.warn(`[Avatar] Could not prepare proxy URL for v3: ${e.message}`);
+        }
+        
+        // Then, try to generate signed URL
+        try {
+          const token = await getGcsAccessToken();
+          if (token) {
+            const parsedUrl = new URL(photoUrl);
+            const gcsPath = parsedUrl.pathname.replace(/^\/[^\/]+\//, '');
+            const signedUrl = await generateSignedUrl(decodeURIComponent(gcsPath), token);
+            if (signedUrl) {
+              console.log(`[Avatar] Using signed URL for v3 avatar creation`);
+              finalPhotoUrl = signedUrl;
+            } else if (proxyUrlForV3) {
+              console.log(`[Avatar] Signed URL failed, using proxy URL for v3 avatar creation`);
+              finalPhotoUrl = proxyUrlForV3;
+            }
+          } else if (proxyUrlForV3) {
+            console.log(`[Avatar] No access token, using proxy URL for v3 avatar creation`);
+            finalPhotoUrl = proxyUrlForV3;
+          }
+        } catch (err) {
+          console.warn(`[Avatar] Could not generate signed URL: ${err.message}`);
+          if (proxyUrlForV3) {
+            console.log(`[Avatar] Using proxy URL as fallback for v3 avatar creation`);
+            finalPhotoUrl = proxyUrlForV3;
+          }
+        }
+      }
+
+      const v3Resp = await heygenApiJson('/v3/avatars', {
+        type: 'photo',
+        name: name || 'EVICS Affiliate Avatar',
+        file: { type: 'url', url: finalPhotoUrl },
+        ...(attireDescription ? { description: attireDescription } : {})
+      });
+      console.log(`[Avatar] HeyGen v3 API called with attire description: ${attireDescription ? 'YES' : 'NO'}`);
+      const normalizedAvatar = normalizeAvatarCreateResponse(v3Resp);
+      return {
+        avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
+        avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
+        voice_clone_id: null,
+        voice_clone_status: null,
+        talking_photo_id: null,
+        source_provider: 'heygen'
+      };
+    } catch (v3Err) {
+      const registrationMessage = talkingPhotoRegistrationError
+        ? talkingPhotoRegistrationError.message
+        : 'HeyGen returned no talking_photo_id.';
+      throw new Error(`Talking photo registration failed: ${registrationMessage}. v3 avatar fallback failed: ${v3Err.message}`);
+    }
   }
 
   // Step 2: Generate a short proof video using the registered talking photo
@@ -5868,6 +6092,8 @@ app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
 }, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No photo file received' });
+    const affiliateCode = normalizeAffiliateCode(req.body && (req.body.affiliateCode || req.body.affiliateId || ''));
+    const affiliateName = String(req.body && (req.body.affiliateName || req.body.name || affiliateCode) || '').trim();
     const filename = req.file.filename;
     const host = req.headers.host || 'localhost:4175';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -5877,6 +6103,9 @@ app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
     const contentType = req.file.mimetype || 'image/jpeg';
     await uploadToGcs(req.file.path, gcsPath, contentType);
     const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
+    if (affiliateCode) {
+      upsertAffiliateProfile(affiliateCode, affiliateName || affiliateCode, deliveryUrl);
+    }
     // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
     res.json({ success: true, photoUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, filename, size: req.file.size });
   } catch (e) {
@@ -6175,9 +6404,11 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
     return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
   }
   
-  // GUARD RAILS: Require proper avatar setup with talking_photo_id (custom avatar created with user photo+voice)
+  // GUARD RAILS: Require proper avatar setup with either talking_photo_id or avatar_id
   const storedTalkingPhotoId = resolvedRequest?.avatar?.talkingPhotoId || resolvedRequest?.talkingPhotoId || null;
-  if (!storedTalkingPhotoId) {
+  const storedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId || '').trim();
+  const hasRenderableIdentity = Boolean(storedTalkingPhotoId || storedAvatarId);
+  if (!hasRenderableIdentity) {
     return res.status(400).json({ 
       success: false, 
       error: 'Avatar is not properly configured for proof rendering',
@@ -6185,8 +6416,8 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
     });
   }
   
-  const resolvedAvatarId = String(avatarId || resolvedRequest?.avatar?.avatarId || resolvedRequest?.avatar?.avatarItemId).trim();
-  if (!resolvedAvatarId) {
+  const resolvedAvatarId = storedAvatarId;
+  if (!storedTalkingPhotoId && !resolvedAvatarId) {
     return res.status(400).json({ 
       success: false, 
       error: 'Avatar ID is required for proof generation',
@@ -6203,7 +6434,7 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
     });
   }
   try {
-    // Use the affiliate's registered talking_photo_id for video generation
+    // Use talking_photo_id when available, otherwise fall back to avatar_id rendering.
     let render;
     if (storedTalkingPhotoId) {
       const v2Resp = await heygenApiJson('/v2/video/generate', {
@@ -6219,7 +6450,6 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
       });
       render = { video_id: v2Resp?.data?.video_id || null };
     } else {
-      // Fallback to standard render if talking_photo_id is not available (should not happen due to guard rails)
       const voiceId = resolvedRequest?.avatar?.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
       render = await startHeyGenRender({
         script: resolvedScript,
@@ -6343,7 +6573,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       return res.status(403).json({ success: false, error: 'This avatar request belongs to a different affiliate account.' });
     }
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
-    const resolvedPhotoUrl = photoUrl || requestRecord?.photoUrl || null;
+    const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || requestRecord?.photoUrl || null);
     const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
     const resolvedProductId = productId || requestRecord?.productId || null;
     const resolvedProductHandle = productHandle || requestRecord?.productHandle || null;
@@ -6355,6 +6585,12 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const storedProfile = getAffiliateProfile(requestedAffiliateCode);
     const rawAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
     const resolvedAttire = normalizeAvatarAttire(rawAttire, storedProfile?.avatarGender || storedProfile?.gender || '');
+     
+    // Log resolved inputs for debugging
+    console.log(`[Avatar Create] Affiliate: ${requestedAffiliateCode}, PhotoURL: ${resolvedPhotoUrl}, VoiceURL: ${resolvedVoiceUrl}`);
+    console.log(`[Avatar Create] Attire received from phone app:`, JSON.stringify(rawAttire || {}, null, 2));
+    console.log(`[Avatar Create] Attire after normalization:`, JSON.stringify(resolvedAttire || {}, null, 2));
+
 
     // GUARD RAILS: Require both photo and voice for custom avatar creation
     if (!resolvedPhotoUrl) {
@@ -6823,8 +7059,14 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     // Resolve avatar metadata
     const avatarName = avatarRecord.name || avatarRecord.avatar?.name || 'Affiliate Avatar';
     const avatarId = avatarRecord.avatar?.avatarId || avatarRecord.avatar?.id || null;
-    // Use the affiliate's registered talking_photo_id (registered during avatar creation)
+    // Prefer talking_photo_id; if unavailable, use avatar_id as render identity.
     const talkingPhotoId = avatarRecord.avatar?.talkingPhotoId || avatarRecord.talkingPhotoId || null;
+    if (!talkingPhotoId && !avatarId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Avatar does not have a usable render identity. Re-create your avatar from your uploaded profile photo before generating product videos.'
+      });
+    }
 
     // Resolve product info
     const resolvedProductTitle = productTitle || avatarRecord.productTitle || 'Premium Product';
@@ -6845,15 +7087,11 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
     let voiceId = cloneVoice || defaultVoice;
 
-    // Build the HeyGen request payload — use affiliate's registered talking_photo_id
+    // Build the HeyGen request payload using the affiliate's render identity.
     const buildPayload = (vid) => {
-      const characterPayload = { type: 'talking_photo' };
-      if (talkingPhotoId) {
-        characterPayload.talking_photo_id = talkingPhotoId;
-      } else {
-        // Fallback: register photo on the fly if no stored ID
-        characterPayload.talking_photo_id = process.env.HEYGEN_TALKING_PHOTO_ID || 'fafbd9b12f8849268c1dccd6c33823d7';
-      }
+      const characterPayload = talkingPhotoId
+        ? { type: 'talking_photo', talking_photo_id: talkingPhotoId }
+        : { type: 'avatar', avatar_id: avatarId, avatar_style: 'normal' };
       return {
         video_inputs: [{
           character: characterPayload,
