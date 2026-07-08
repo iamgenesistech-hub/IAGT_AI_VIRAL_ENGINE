@@ -57,6 +57,7 @@ const governance = require('./sacredIntelligenceGovernance');
 const { registerGovernanceRoutes } = require('./governanceRoutes');
 const { registerNativeAvatarRoutes } = require('./nativeAvatarRoutes');
 const { createNativeAvatarWorker } = require('./nativeAvatarWorker');
+const { createEvicsScraperControlPlane } = require('./evicsScraperControlPlane');
 
 // GCS-backed persistence — avatar + video records survive Cloud Run redeploys.
 const persistenceEngine = require('./persistenceEngine');
@@ -2489,6 +2490,17 @@ console.log('✅ [EVICS] HeyGen cost tracking routes registered at /api/admin/co
 const viralMediaRouter = createViralMediaRouter();
 app.use('/api/viral-media', viralMediaRouter);
 console.log('✅ [EVICS] Viral Media routes registered at /api/viral-media');
+
+// ===== REGISTER EVICS SCRAPER CONTROL PLANE =====
+const scraperControlPlane = createEvicsScraperControlPlane({
+  onResult: (normalized) => {
+    // Write-through: scrape results backed to GCS for intelligence persistence
+    persistenceEngine.gcsWrite('evics-data/scraper_results.json', scraperControlPlane.getResults()).catch(() => {});
+    console.log(`[Scraper] New result indexed — category=${normalized.category} quality=${normalized.signalQuality} url=${normalized.sourceUrl}`);
+  },
+});
+scraperControlPlane.registerRoutes(app);
+scraperControlPlane.startRunner(3000);
 
 // -------------------------
 // /api/products — evics_products table with Shopify live fallback
