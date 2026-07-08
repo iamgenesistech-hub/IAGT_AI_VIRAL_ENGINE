@@ -1946,10 +1946,14 @@
       await loadAvatarLibrary();
     } else if (request.status === 'queued' || request.status === 'processing') {
       sessionInfo.textContent = supportState.avatarSetup.nativeAvatarJobId
-        ? 'Avatar request is processing in native async pipeline. We are tracking progress.'
+        ? 'Avatar creation is in progress. We will update here when it\'s ready — this can take 1–3 minutes.'
         : 'Avatar request is queued in Affiliate Hub. Creating now...';
     } else if (request.status === 'failed') {
-      sessionInfo.textContent = `Avatar request failed: ${request.error || 'Unknown error'}`;
+      const rawErr = String(request.error || '').trim();
+      const friendlyError = rawErr.startsWith('Job timed out')
+        ? 'Avatar creation timed out — the render service did not respond in time. Please try again, and make sure your photo and voice file are both uploaded.'
+        : rawErr || 'Avatar creation failed for an unknown reason.';
+      sessionInfo.textContent = `⚠️ ${friendlyError} Tap "Create My Avatar" to try again.`;
     }
     persistAvatarSetup();
   }
@@ -2475,11 +2479,19 @@
         }
       } catch (error) {
         setControlState(createAvatarBtn, 'off');
+        const rawMsg = String(error.message || '').trim();
+        const friendlyMsg = rawMsg.includes('Voice cloning failed')
+          ? 'Your voice file could not be processed. Please record a clear voice sample (at least 5 seconds) and try again.'
+          : rawMsg.includes('Photo URL is required') || rawMsg.includes('photo')
+            ? 'A profile photo is required. Please upload a photo and try again.'
+            : rawMsg.includes('Voice file URL is required') || rawMsg.includes('voice')
+              ? 'A voice recording is required. Please record or upload your voice and try again.'
+              : rawMsg || 'Avatar creation failed. Please try again.';
         if (createAvatarStatus) {
-          createAvatarStatus.textContent = `❌ Error: ${error.message}`;
+          createAvatarStatus.textContent = `❌ ${friendlyMsg}`;
           createAvatarStatus.className = 'create-avatar-status status-error';
         }
-        sessionInfo.textContent = `Avatar creation failed: ${error.message}`;
+        sessionInfo.textContent = `Avatar creation failed: ${friendlyMsg}`;
       } finally {
         createAvatarBtn.disabled = false;
       }
