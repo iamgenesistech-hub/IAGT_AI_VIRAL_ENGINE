@@ -2431,6 +2431,56 @@ app.get('/api/admin/costs/unit-economics', (req, res) => {
   res.json({ success: true, plans: costTracker.getUnitEconomics() });
 });
 
+// GET /api/admin/identity-chains — per-affiliate identity chain for admin visibility
+// Returns: profileId, voiceCloneId, voiceId, pictureUrl, avatarId, requestId,
+//          proofVideoId, proofStatus, lastUpdated for every known affiliate.
+app.get('/api/admin/identity-chains', (req, res) => {
+  try {
+    const profiles = getAffiliateProfiles();
+    const requests = getAvatarRequests();
+    const chains = profiles.map((profile) => {
+      const code = normalizeAffiliateCode(profile.affiliateCode || '');
+      const relatedRequests = requests.filter((r) => affiliateRecordCode(r) === code);
+      const completedRequest = relatedRequests.find((r) => r.status === 'completed' && r.avatar) || null;
+      const latestRequest = relatedRequests[0] || null;
+      const avatar = completedRequest?.avatar || null;
+      return {
+        profileId: profile.profileId || code,
+        affiliateCode: code,
+        name: profile.name || code,
+        pictureUrl: profile.pictureUrl || null,
+        voiceFileUrl: profile.voiceFileUrl || null,
+        voiceCloneId: profile.voiceCloneId || null,
+        voiceId: profile.voiceId || null,
+        avatarId: avatar?.avatarId || avatar?.id || null,
+        talkingPhotoId: avatar?.talkingPhotoId || null,
+        requestId: completedRequest?.requestId || latestRequest?.requestId || null,
+        requestStatus: latestRequest?.status || null,
+        proofVideoId: avatar?.proofVideoId || null,
+        proofStatus: avatar?.proofStatus || null,
+        proofVideoUrl: avatar?.proofVideoUrl || null,
+        voiceCloneStatus: avatar?.voiceCloneStatus || (profile.voiceCloneId ? 'bound' : 'none'),
+        lastUpdated: profile.updatedAt || profile.createdAt || null,
+        requestCount: relatedRequests.length,
+      };
+    });
+    res.json({ success: true, chains, count: chains.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/admin/avatar-requests — recent avatar requests with full chain detail
+app.get('/api/admin/avatar-requests', (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
+    const requests = getAvatarRequests().slice(0, limit);
+    res.json({ success: true, requests, count: requests.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 console.log('✅ [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====

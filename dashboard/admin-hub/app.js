@@ -314,6 +314,115 @@
     govRefreshBtn.addEventListener('click', () => { void refreshGovernance(govRefreshBtn); });
   }
 
+  // ── Identity Chain panel ────────────────────────────────────────────────
+  const identityChainEl = document.getElementById('adminIdentityChains');
+  const recentRequestsEl = document.getElementById('adminRecentRequests');
+  const identityRefreshBtn = document.getElementById('adminIdentityRefresh');
+
+  function statusBadge(status) {
+    const s = String(status || '').toLowerCase();
+    const color = s === 'completed' ? '#00e5b4' : s === 'failed' ? '#ff4d4d' : s === 'processing' ? '#f5a623' : '#6b7e8f';
+    return `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;background:${color}22;color:${color};border:1px solid ${color}44">${s || 'none'}</span>`;
+  }
+
+  function shortId(id) {
+    const s = String(id || '');
+    return s ? (s.length > 18 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s) : '—';
+  }
+
+  async function refreshIdentityChains(controlEl) {
+    if (controlEl) setControlState(controlEl, 'running');
+    try {
+      const data = await apiJson('/api/admin/identity-chains');
+      const chains = data.chains || [];
+      if (!identityChainEl) return;
+      if (!chains.length) {
+        identityChainEl.innerHTML = '<p class="monitor-info">No affiliate profiles found.</p>';
+      } else {
+        identityChainEl.innerHTML = `
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="color:#1ec8f2;text-align:left;border-bottom:1px solid #1c3044">
+                <th style="padding:6px 8px">Profile ID</th>
+                <th style="padding:6px 8px">Name</th>
+                <th style="padding:6px 8px">Voice Clone ID</th>
+                <th style="padding:6px 8px">Clone Status</th>
+                <th style="padding:6px 8px">Avatar ID</th>
+                <th style="padding:6px 8px">Request ID</th>
+                <th style="padding:6px 8px">Proof</th>
+                <th style="padding:6px 8px">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${chains.map((c) => `
+                <tr style="border-bottom:1px solid #0e2233">
+                  <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9">${c.profileId || '—'}</td>
+                  <td style="padding:5px 8px">${c.name || '—'}</td>
+                  <td style="padding:5px 8px;font-family:monospace;color:${c.voiceCloneId ? '#00e5b4' : '#6b7e8f'}" title="${c.voiceCloneId || ''}">${shortId(c.voiceCloneId)}</td>
+                  <td style="padding:5px 8px">${statusBadge(c.voiceCloneStatus)}</td>
+                  <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9" title="${c.avatarId || ''}">${shortId(c.avatarId)}</td>
+                  <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9" title="${c.requestId || ''}">${shortId(c.requestId)}</td>
+                  <td style="padding:5px 8px">${statusBadge(c.proofStatus || (c.proofVideoId ? 'ready' : 'none'))}</td>
+                  <td style="padding:5px 8px;color:#6b7e8f">${c.lastUpdated ? new Date(c.lastUpdated).toLocaleString() : '—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      }
+      if (controlEl) setControlState(controlEl, 'completed', 1500);
+    } catch (error) {
+      if (identityChainEl) identityChainEl.innerHTML = `<p class="monitor-info" style="color:#ff4d4d">Identity chain unavailable: ${error.message}</p>`;
+      if (controlEl) setControlState(controlEl, 'off');
+    }
+  }
+
+  async function refreshRecentRequests() {
+    try {
+      const data = await apiJson('/api/admin/avatar-requests?limit=20');
+      const requests = data.requests || [];
+      if (!recentRequestsEl) return;
+      if (!requests.length) {
+        recentRequestsEl.innerHTML = '<p class="monitor-info">No avatar requests yet.</p>';
+        return;
+      }
+      recentRequestsEl.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="color:#1ec8f2;text-align:left;border-bottom:1px solid #1c3044">
+              <th style="padding:6px 8px">Request ID</th>
+              <th style="padding:6px 8px">Affiliate</th>
+              <th style="padding:6px 8px">Status</th>
+              <th style="padding:6px 8px">Voice Clone</th>
+              <th style="padding:6px 8px">Error</th>
+              <th style="padding:6px 8px">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${requests.map((r) => {
+              const err = String(r.error || r.avatar?.error || '').trim();
+              const voiceId = r.voiceCloneId || r.avatar?.voiceCloneId || '';
+              return `<tr style="border-bottom:1px solid #0e2233">
+                <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9" title="${r.requestId}">${shortId(r.requestId)}</td>
+                <td style="padding:5px 8px;font-family:monospace">${r.affiliateCode || '—'}</td>
+                <td style="padding:5px 8px">${statusBadge(r.status)}</td>
+                <td style="padding:5px 8px;font-family:monospace;color:${voiceId ? '#00e5b4' : '#6b7e8f'}" title="${voiceId}">${shortId(voiceId)}</td>
+                <td style="padding:5px 8px;color:#ff9999;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${err}">${err || '—'}</td>
+                <td style="padding:5px 8px;color:#6b7e8f">${r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    } catch (error) {
+      if (recentRequestsEl) recentRequestsEl.innerHTML = `<p class="monitor-info" style="color:#ff4d4d">Requests unavailable: ${error.message}</p>`;
+    }
+  }
+
+  if (identityRefreshBtn) {
+    identityRefreshBtn.addEventListener('click', () => {
+      void refreshIdentityChains(identityRefreshBtn);
+      void refreshRecentRequests();
+    });
+  }
+
   if (sendTextBtn) {
     sendTextBtn.addEventListener('click', () => { void sendAdminMessage('text'); });
   }
@@ -327,6 +436,8 @@
       void refresh(refreshBtn);
       void refreshComms(refreshBtn);
       void refreshGovernance(refreshBtn);
+      void refreshIdentityChains(refreshBtn);
+      void refreshRecentRequests();
       setTimeout(() => refreshBtn.classList.remove('pressing'), 120);
     });
   }
@@ -334,7 +445,10 @@
   void refresh(refreshBtn);
   void refreshComms();
   void refreshGovernance();
+  void refreshIdentityChains();
+  void refreshRecentRequests();
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void refreshComms(); }, 8000);
   setInterval(() => { void refreshGovernance(); }, 30000);
+  setInterval(() => { void refreshIdentityChains(); void refreshRecentRequests(); }, 60000);
 })();

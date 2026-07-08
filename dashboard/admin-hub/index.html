@@ -167,6 +167,33 @@
             </div>
           </div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Avatar Identity Chain</h2>
+              <p style="margin:0;font-size:12px;opacity:.7">Profile ID → Voice Clone ID → Avatar ID → Request ID → Proof Status per affiliate</p>
+            </div>
+            <div class="panel-actions">
+              <button type="button" id="adminIdentityRefresh" class="control-btn state-off" style="font-size:12px;padding:4px 12px">Refresh</button>
+            </div>
+          </div>
+          <div id="adminIdentityChains" style="overflow-x:auto">
+            <p class="monitor-info">Loading identity chains…</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Recent Avatar Requests</h2>
+              <p style="margin:0;font-size:12px;opacity:.7">Last 20 avatar create requests with status and error details</p>
+            </div>
+          </div>
+          <div id="adminRecentRequests" style="overflow-x:auto">
+            <p class="monitor-info">Loading requests…</p>
+          </div>
+        </div>
       </main>
     </div>
   </div>
