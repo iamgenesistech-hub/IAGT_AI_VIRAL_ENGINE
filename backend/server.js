@@ -55,6 +55,8 @@ const {
 // EVICS Sacred Intelligence Governance Engine — centralized AI operating standard.
 const governance = require('./sacredIntelligenceGovernance');
 const { registerGovernanceRoutes } = require('./governanceRoutes');
+const { registerNativeAvatarRoutes } = require('./nativeAvatarRoutes');
+const { createNativeAvatarWorker } = require('./nativeAvatarWorker');
 
 // GCS-backed persistence — avatar + video records survive Cloud Run redeploys.
 const persistenceEngine = require('./persistenceEngine');
@@ -452,6 +454,28 @@ function normalizeExternalUrl(value) {
   return String(value || '').trim();
 }
 
+function getConfiguredPublicAppOrigin() {
+  const explicitUrl = String(
+    process.env.EVICS_HOST
+    || process.env.EVICS_PUBLIC_BASE_URL
+    || process.env.PUBLIC_APP_BASE_URL
+    || process.env.BASE_URL
+    || ''
+  ).trim();
+  if (explicitUrl) {
+    if (/^https?:\/\//i.test(explicitUrl)) return explicitUrl.replace(/\/$/, '');
+    return `https://${explicitUrl.replace(/\/$/, '')}`;
+  }
+
+  const hostname = String(process.env.EVICS_API_HOSTNAME || '').trim();
+  if (hostname) {
+    if (/^https?:\/\//i.test(hostname)) return hostname.replace(/\/$/, '');
+    return `https://${hostname.replace(/\/$/, '')}`;
+  }
+
+  return 'https://evics-api-480958062306.us-central1.run.app';
+}
+
 function getPublicAppHost(req) {
   const explicit = String(process.env.EVICS_HOST || process.env.HOST || '').trim();
   if (explicit && /^https?:\/\//i.test(explicit)) return explicit.replace(/\/$/, '');
@@ -462,7 +486,7 @@ function getPublicAppHost(req) {
       return `${proto}://${host}`.replace(/\/$/, '');
     }
   }
-  return 'https://evics-api-480958062306.us-central1.run.app';
+  return getConfiguredPublicAppOrigin();
 }
 
 function absolutizePublicAssetUrl(req, value) {
@@ -954,8 +978,10 @@ function clearAffiliateWebSession(res, secureCookie = false) {
 function affiliateRecordCode(record) {
   if (!record || typeof record !== 'object') return '';
   return normalizeAffiliateCode(
+    record.profileId ||
     record.affiliateCode ||
     record.affiliateId ||
+    record.avatar?.profileId ||
     record.avatar?.affiliateCode ||
     record.avatar?.affiliateId
   );
@@ -972,9 +998,11 @@ function saveAvatarRequests(records) {
 function upsertAvatarRequest(record) {
   const ownerCode = affiliateRecordCode(record);
   if (ownerCode) {
+    record.profileId = normalizeAffiliateCode(record.profileId || ownerCode) || ownerCode;
     record.affiliateCode = ownerCode;
     record.affiliateId = normalizeAffiliateCode(record.affiliateId || ownerCode) || ownerCode;
     if (record.avatar && typeof record.avatar === 'object') {
+      record.avatar.profileId = record.profileId;
       record.avatar.affiliateCode = ownerCode;
     }
   }
@@ -1081,19 +1109,22 @@ function humanizeAttireValue(value) {
   return String(value || '').trim().replace(/-/g, ' ');
 }
 
-function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId = '', voiceId = '', avatarGender = '', voiceFileUpdatedAt = '') {
+function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId, voiceId, avatarGender = '', voiceFileUpdatedAt = '') {
   const code = normalizeAffiliateCode(affiliateCode);
   if (!code) throw new Error('affiliateCode is required');
   const profiles = getAffiliateProfiles();
   const existing = profiles.find((p) => normalizeAffiliateCode(p.affiliateCode) === code);
+  const nextVoiceCloneId = voiceCloneId === undefined ? existing?.voiceCloneId : voiceCloneId;
+  const nextVoiceId = voiceId === undefined ? existing?.voiceId : voiceId;
   const updated = {
+    profileId: code,
     affiliateCode: code,
     name: String(name || code).trim().slice(0, 128),
     pictureUrl: String(pictureUrl || existing?.pictureUrl || '').trim() || null,
     voiceFileUrl: String(voiceFileUrl || existing?.voiceFileUrl || '').trim() || null,
     voiceFileUpdatedAt: String(voiceFileUpdatedAt || existing?.voiceFileUpdatedAt || '').trim() || null,
-    voiceCloneId: String(voiceCloneId || existing?.voiceCloneId || '').trim() || null,
-    voiceId: String(voiceId || existing?.voiceId || '').trim() || null,
+    voiceCloneId: String(nextVoiceCloneId || '').trim() || null,
+    voiceId: String(nextVoiceId || '').trim() || null,
     avatarGender: normalizeAvatarGender(avatarGender || existing?.avatarGender || existing?.gender || '') || null,
     updatedAt: new Date().toISOString()
   };
@@ -1168,12 +1199,68 @@ function buildAvatarGalleryItem(record) {
   };
 }
 
-function getAvatarGalleryRecords(affiliateCode) {
+async function hydrateAvatarRequestFromNativeJob(record) {
+  if (!record || typeof record !== 'object') return record;
+  const processingMode = String(record.processingMode || '').trim().toLowerCase();
+  const nativeAvatarJobId = String(record.nativeAvatarJobId || '').trim();
+  if (processingMode !== 'native_async' || !nativeAvatarJobId) return record;
+  if (!nativeAvatarRuntime || !nativeAvatarRuntime.jobStore || typeof nativeAvatarRuntime.jobStore.getById !== 'function') return record;
+
+  const job = nativeAvatarRuntime.jobStore.getById(nativeAvatarJobId);
+  if (!job) return record;
+  const jobStatus = String(job.status || '').trim().toLowerCase();
+  const recordStatus = String(record.status || '').trim().toLowerCase();
+
+  if (jobStatus === 'completed' && (!record.avatar || recordStatus !== 'completed')) {
+    const result = job.result && typeof job.result === 'object' ? job.result : {};
+    const hydrated = upsertAvatarRequest({
+      ...record,
+      status: 'completed',
+      updatedAt: new Date().toISOString(),
+      completedAt: record.completedAt || new Date().toISOString(),
+      error: null,
+      avatar: {
+        ...(record.avatar || {}),
+        id: String(result.avatarId || record.avatar?.id || record.requestId || '').trim() || record.requestId || null,
+        avatarId: String(result.avatarId || record.avatar?.avatarId || record.requestId || '').trim() || record.requestId || null,
+        avatarItemId: String(result.avatarId || record.avatar?.avatarItemId || record.requestId || '').trim() || record.requestId || null,
+        affiliateCode: affiliateRecordCode(record),
+        name: record.name || record.avatar?.name || 'EVICS Affiliate Avatar',
+        photoUrl: String(record.photoUrl || record.avatar?.photoUrl || result.avatarPreviewImageUrl || '').trim() || null,
+        voiceFileUrl: String(record.voiceFileUrl || record.avatar?.voiceFileUrl || '').trim() || null,
+        talkingPhotoId: String(result.talkingPhotoId || record.avatar?.talkingPhotoId || '').trim() || null,
+        voiceCloneId: String(result.voiceCloneId || record.avatar?.voiceCloneId || '').trim() || null,
+        attire: record.attire || record.avatar?.attire || null,
+        sourceProvider: String(result.provider || record.nativeAvatarProvider || 'heygen'),
+        status: 'active',
+        createdAt: record.avatar?.createdAt || new Date().toISOString(),
+      }
+    });
+    return hydrated;
+  }
+
+  if ((jobStatus === 'failed' || jobStatus === 'cancelled') && recordStatus !== 'failed') {
+    const failed = upsertAvatarRequest({
+      ...record,
+      status: 'failed',
+      updatedAt: new Date().toISOString(),
+      completedAt: record.completedAt || new Date().toISOString(),
+      error: String(job.error || `Native avatar job ${jobStatus}`).trim() || `Native avatar job ${jobStatus}`
+    });
+    return failed;
+  }
+
+  return record;
+}
+
+async function getAvatarGalleryRecords(affiliateCode) {
   const code = normalizeAffiliateCode(affiliateCode);
   if (!code) return [];
   const seen = new Set();
-  return getAvatarRequests()
-    .filter((record) => affiliateRecordCode(record) === code)
+  const rawRecords = getAvatarRequests()
+    .filter((record) => affiliateRecordCode(record) === code);
+  const hydratedRecords = await Promise.all(rawRecords.map((record) => hydrateAvatarRequestFromNativeJob(record)));
+  return hydratedRecords
     .filter((record) => record && record.avatar && typeof record.avatar === 'object')
     .sort((left, right) => {
       const leftTime = new Date(left.completedAt || left.updatedAt || left.createdAt || 0).getTime();
@@ -1356,7 +1443,7 @@ async function cloneVoiceWithRetry(voiceFileUrl, voiceName, maxAttempts = 3) {
   return { voiceCloneId: null, voiceCloneStatus: 'failed' };
 }
 
-async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attire }) {
+async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voiceCloneId = '', voiceId = '', attire }) {
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
   }
@@ -1382,6 +1469,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       console.warn(`[Avatar] Could not generate signed URL: ${err.message}`);
     }
   }
+  
   console.log(`[Avatar] Photo URL for HeyGen: ${finalPhotoUrlForHeygen ? finalPhotoUrlForHeygen.substring(0, 100) + '...' : 'MISSING'}`);
   
   const normalizedAttire = normalizeAvatarAttire(attire);
@@ -1424,6 +1512,32 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   
   console.log(`[Avatar] Built attire description (${attireDescription ? 'PRESENT' : 'MISSING'}):`, attireDescription ? attireDescription.substring(0, 120) + '...' : 'null');
 
+  let resolvedVoiceCloneId = String(voiceCloneId || voiceId || '').trim();
+  let resolvedVoiceCloneStatus = resolvedVoiceCloneId ? 'ready' : null;
+  if (voiceFileUrl) {
+    if (!resolvedVoiceCloneId) {
+      const cloneResult = await cloneVoiceWithRetry(voiceFileUrl, `${name || 'EVICS Affiliate'} Voice`);
+      resolvedVoiceCloneId = cloneResult.voiceCloneId;
+      resolvedVoiceCloneStatus = cloneResult.voiceCloneStatus;
+    }
+    if (!resolvedVoiceCloneId) {
+      throw new Error(`Voice cloning failed for "${name || 'EVICS Affiliate'}". The new voice file was not registered, so the avatar cannot fall back to an unrelated voice.`);
+    }
+  }
+
+  const extractGcsObjectInfo = (urlValue) => {
+    try {
+      const parsedUrl = new URL(urlValue);
+      const rawPath = decodeURIComponent(parsedUrl.pathname || '');
+      const pathWithoutBucket = rawPath.replace(/^\/[^\/]+\//, '');
+      const objectPath = pathWithoutBucket.replace(/^\/+/, '');
+      const filename = objectPath.split('/').filter(Boolean).pop() || null;
+      return { objectPath, filename };
+    } catch {
+      return { objectPath: null, filename: null };
+    }
+  };
+
   // Step 1: Register the affiliate's photo as a HeyGen talking photo
   let talkingPhotoId = null;
   let talkingPhotoRegistrationError = null;
@@ -1433,14 +1547,11 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
     let gcsPath = null;
     if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
       try {
-        const parsedUrl = new URL(photoUrl);
-        const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
-        const filename = pathSegments[pathSegments.length - 1];
+        const { objectPath, filename } = extractGcsObjectInfo(photoUrl);
         if (filename) {
-          // Reconstruct proxy URL (Cloud Run will serve it if photos are uploaded)
-          gcsPath = `affiliate-uploads/${filename}`;
-          const appHostname = process.env.EVICS_API_HOSTNAME || 'evics-api-jw5xzlutsq-uc.a.run.app';
-          proxyUrl = `https://${appHostname}/uploads/${filename}`;
+          gcsPath = objectPath || `affiliate-uploads/${filename}`;
+          const appOrigin = getConfiguredPublicAppOrigin();
+          proxyUrl = `${appOrigin}/uploads/${encodeURIComponent(filename)}`;
           console.log(`[Avatar] Reconstructed proxy URL for fallback: ${proxyUrl}`);
         }
       } catch (e) {
@@ -1464,12 +1575,10 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
         try {
           // First, try to get proxy URL
-          const parsedUrl = new URL(photoUrl);
-          const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
-          const filename = pathSegments[pathSegments.length - 1];
+          const { filename } = extractGcsObjectInfo(photoUrl);
           if (filename) {
-            const appHostname = process.env.EVICS_API_HOSTNAME || 'evics-api-jw5xzlutsq-uc.a.run.app';
-            proxyUrlForV3 = `https://${appHostname}/uploads/${filename}`;
+            const appOrigin = getConfiguredPublicAppOrigin();
+            proxyUrlForV3 = `${appOrigin}/uploads/${encodeURIComponent(filename)}`;
             console.log(`[Avatar] Proxy URL available for v3 fallback: ${proxyUrlForV3}`);
           }
         } catch (e) {
@@ -1514,8 +1623,8 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       return {
         avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
         avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
-        voice_clone_id: null,
-        voice_clone_status: null,
+        voice_clone_id: resolvedVoiceCloneId || null,
+        voice_clone_status: resolvedVoiceCloneStatus,
         talking_photo_id: null,
         source_provider: 'heygen'
       };
@@ -1533,7 +1642,10 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       ? `This is my avatar dressed in ${normalizedAttire.overallStyle || normalizedAttire.style || 'professional'} style, and it's time to get this blessing flowing!`
       : `This is my avatar dressed in ${normalizedAttire.top || 'dress-shirt'} and ${normalizedAttire.bottom || 'dress-pants'}, and it's time to get this blessing flowing!`)
     : "This is my avatar, and it's time to get this blessing flowing!";
-  const defaultVoiceId = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
+  const proofVoiceId = resolvedVoiceCloneId || String(process.env.HEYGEN_VOICE_ID || '').trim();
+  if (!proofVoiceId) {
+    throw new Error('Voice cloning failed and no fallback voice is configured. Aborting avatar creation to avoid using the wrong voice.');
+  }
 
   let videoResult = null;
   try {
@@ -1546,7 +1658,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
         voice: {
           type: 'text',
           input_text: proofScript,
-          voice_id: defaultVoiceId
+          voice_id: proofVoiceId
         }
       }],
       dimension: { width: 720, height: 1280 }
@@ -1564,8 +1676,8 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       return {
         avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
         avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
-        voice_clone_id: null,
-        voice_clone_status: null,
+        voice_clone_id: resolvedVoiceCloneId || null,
+        voice_clone_status: resolvedVoiceCloneStatus,
         talking_photo_id: talkingPhotoId,
         source_provider: 'heygen'
       };
@@ -1577,22 +1689,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
   const videoId = videoResult?.data?.video_id || null;
   const avatarId = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-  // Voice clone with retry (3 attempts, exponential back-off).
-  // CRITICAL: Voice cloning must succeed if voiceFileUrl was provided
-  let voiceCloneId = null;
-  let voiceCloneStatus = null;
-  if (voiceFileUrl) {
-    const cloneResult = await cloneVoiceWithRetry(voiceFileUrl, `${name || 'EVICS Affiliate'} Voice`);
-    voiceCloneId = cloneResult.voiceCloneId;
-    voiceCloneStatus = cloneResult.voiceCloneStatus;
-    
-    // If voice cloning failed, log error but continue (voice can use default)
-    if (!voiceCloneId) {
-      console.error(`[Avatar] WARNING: Voice cloning failed for "${name}". Avatar will use default voice. Voice file URL: ${voiceFileUrl}`);
-    } else {
-      console.log(`[Avatar] Voice cloning successful: ${voiceCloneId}`);
-    }
-  }
+  console.log(`[Avatar] Voice clone ${resolvedVoiceCloneId ? 'resolved' : 'missing'} for profile-bound avatar`);
 
   return {
     avatar_item: {
@@ -1611,8 +1708,8 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, attir
       looks_count: 1,
       created_at: Date.now()
     },
-    voice_clone_id: voiceCloneId,
-    voice_clone_status: voiceCloneStatus,
+    voice_clone_id: resolvedVoiceCloneId,
+    voice_clone_status: resolvedVoiceCloneStatus,
     proof_video_id: videoId,
     talking_photo_id: talkingPhotoId,
     source_provider: 'heygen'
@@ -2144,6 +2241,164 @@ registerEvicsEliteRoutes(app, {
   controlCenterDir: path.join(__dirname, '../dashboard/control-center')
 });
 registerMediaOutputRoutes(app, SupabaseConnector);
+
+let nativeAvatarWorkerRef = null;
+
+const nativeAvatarRuntime = registerNativeAvatarRoutes(app, {
+  createHeyGenJob: async (job) => ({
+    accepted: true,
+    runId: `heygen_job_${job.id}`,
+    externalReference: null,
+    message: 'Queued for async HeyGen avatar creation.',
+  }),
+  createEvicsNativeJob: async (job) => ({
+    accepted: true,
+    runId: `evics_native_${job.id}`,
+    externalReference: null,
+    message: 'Queued for async EVICS native avatar creation.',
+  }),
+  enqueueJob: (jobId) => {
+    if (jobId) nativeAvatarRuntime.jobStore.appendEvent(jobId, 'enqueue_requested', 'Job submitted to native avatar worker');
+    if (nativeAvatarWorkerRef) {
+      nativeAvatarWorkerRef.tick().catch((err) => {
+        console.warn('[NativeAvatarWorker] immediate tick failed:', err.message);
+      });
+    }
+  },
+  getWorkerStats: () => nativeAvatarWorkerRef ? nativeAvatarWorkerRef.getStats() : { running: false, activeJobs: 0, maxConcurrency: 0 },
+});
+
+nativeAvatarWorkerRef = createNativeAvatarWorker({
+  jobStore: nativeAvatarRuntime.jobStore,
+  processJob: async (job) => {
+    const provider = String(job.provider || 'heygen').toLowerCase();
+    const input = job.input || {};
+    const metadata = job.metadata || {};
+    const requestId = String(metadata.requestId || '').trim() || null;
+    const affiliateCode = normalizeAffiliateCode(job.affiliateCode || '');
+    if (provider === 'evics_native') {
+      const result = {
+        avatarId: `evics_native_${job.id}`,
+        previewVideoUrl: null,
+        avatarPreviewImageUrl: String(input.photoUrl || '').trim() || null,
+        provider: 'evics_native',
+        mode: 'stub',
+        message: 'EVICS native provider stub executed successfully.',
+      };
+      if (requestId) {
+        const existing = findAvatarRequest(requestId, affiliateCode);
+        upsertAvatarRequest({
+          ...(existing || {}),
+          requestId,
+          affiliateCode,
+          affiliateId: affiliateCode,
+          name: input.name || existing?.name || 'EVICS Affiliate Avatar',
+          photoUrl: input.photoUrl || existing?.photoUrl || null,
+          voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
+          attire: input.attire || existing?.attire || null,
+          status: 'completed',
+          processingMode: 'native_async',
+          nativeAvatarJobId: job.id,
+          nativeAvatarProvider: 'evics_native',
+          createdAt: existing?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          avatar: {
+            ...(existing?.avatar || {}),
+            id: result.avatarId,
+            avatarId: result.avatarId,
+            affiliateCode,
+            name: input.name || existing?.name || 'EVICS Affiliate Avatar',
+            photoUrl: input.photoUrl || existing?.photoUrl || null,
+            voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
+            attire: input.attire || existing?.attire || null,
+            sourceProvider: 'evics_native',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          },
+          error: null,
+        });
+      }
+      return result;
+    }
+    try {
+      const payload = await createHeyGenAffiliateAvatar({
+        name: input.name,
+        photoUrl: input.photoUrl,
+        voiceFileUrl: input.voiceFileUrl,
+        attire: input.attire || null,
+      });
+      const avatarItem = payload && payload.avatar_item ? payload.avatar_item : {};
+      const result = {
+        avatarId: avatarItem.id || null,
+        previewVideoUrl: null,
+        avatarPreviewImageUrl: String(input.photoUrl || '').trim() || null,
+        provider: 'heygen',
+        providerPayload: payload || null,
+        talkingPhotoId: payload && payload.talking_photo_id ? payload.talking_photo_id : null,
+        voiceCloneId: payload && payload.voice_clone_id ? payload.voice_clone_id : null,
+      };
+      if (requestId) {
+        const existing = findAvatarRequest(requestId, affiliateCode);
+        upsertAvatarRequest({
+          ...(existing || {}),
+          requestId,
+          affiliateCode,
+          affiliateId: affiliateCode,
+          name: input.name || existing?.name || 'EVICS Affiliate Avatar',
+          photoUrl: input.photoUrl || existing?.photoUrl || null,
+          voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
+          attire: input.attire || existing?.attire || null,
+          status: 'completed',
+          processingMode: 'native_async',
+          nativeAvatarJobId: job.id,
+          nativeAvatarProvider: 'heygen',
+          createdAt: existing?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          avatar: {
+            ...(existing?.avatar || {}),
+            id: result.avatarId,
+            avatarId: result.avatarId,
+            affiliateCode,
+            name: input.name || existing?.name || 'EVICS Affiliate Avatar',
+            photoUrl: input.photoUrl || existing?.photoUrl || null,
+            voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
+            talkingPhotoId: result.talkingPhotoId || null,
+            voiceCloneId: result.voiceCloneId || null,
+            attire: input.attire || existing?.attire || null,
+            sourceProvider: 'heygen',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          },
+          error: null,
+        });
+      }
+      return result;
+    } catch (error) {
+      if (requestId) {
+        const existing = findAvatarRequest(requestId, affiliateCode);
+        upsertAvatarRequest({
+          ...(existing || {}),
+          requestId,
+          affiliateCode,
+          affiliateId: affiliateCode,
+          status: 'failed',
+          processingMode: 'native_async',
+          nativeAvatarJobId: job.id,
+          nativeAvatarProvider: 'heygen',
+          updatedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          error: error.message,
+        });
+      }
+      throw error;
+    }
+  },
+  pollIntervalMs: parseInt(process.env.NATIVE_AVATAR_WORKER_POLL_MS || '800', 10),
+  maxConcurrency: Math.max(1, parseInt(process.env.NATIVE_AVATAR_WORKER_CONCURRENCY || '1', 10)),
+});
+nativeAvatarWorkerRef.start();
 
 // ===== REGISTER SACRED INTELLIGENCE GOVERNANCE ROUTES =====
 registerGovernanceRoutes(app);
@@ -6224,6 +6479,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
       : `${safeReturnTo}${safeReturnTo.includes('?') ? '&' : '?'}avatarRequestId=${encodeURIComponent(requestId)}`;
     const record = upsertAvatarRequest({
       requestId,
+      profileId: cleanedCode,
       affiliateCode: cleanedCode,
       affiliateId: affiliateId || cleanedCode,
       name: name || `${cleanedCode} Avatar`,
@@ -6261,38 +6517,38 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
 });
 
 // GET /api/affiliate/avatar/request/:requestId — retrieve a queued/completed avatar request
-app.get('/api/affiliate/avatar/request/:requestId', (req, res) => {
+app.get('/api/affiliate/avatar/request/:requestId', async (req, res) => {
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar request access' });
-  const request = findAvatarRequest(req.params.requestId, affiliateCode);
+  const request = await hydrateAvatarRequestFromNativeJob(findAvatarRequest(req.params.requestId, affiliateCode));
   if (!request) return res.status(404).json({ success: false, error: 'Avatar request not found' });
   res.json({ success: true, request });
 });
 
 // GET /api/affiliate/avatar/request/latest — fetch the latest request for an affiliate
-app.get('/api/affiliate/avatar/request/latest', (req, res) => {
+app.get('/api/affiliate/avatar/request/latest', async (req, res) => {
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
-  const request = findLatestAvatarRequest(affiliateCode);
+  const request = await hydrateAvatarRequestFromNativeJob(findLatestAvatarRequest(affiliateCode));
   if (!request) return res.json({ success: true, request: null });
   res.json({ success: true, request });
 });
 
 // GET /api/affiliate/avatar-gallery — list up to 10 paid avatars for the affiliate
-app.get('/api/affiliate/avatar-gallery', (req, res) => {
+app.get('/api/affiliate/avatar-gallery', async (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
   if (!affiliateCode) return res.json({ success: true, avatars: [] });
-  const avatars = getAvatarGalleryRecords(affiliateCode);
+  const avatars = await getAvatarGalleryRecords(affiliateCode);
   res.json({ success: true, avatars, count: avatars.length });
 });
 
 // Expo app alias: same guarded avatar gallery endpoint.
-app.get('/api/affiliate/avatar/gallery', (req, res) => {
+app.get('/api/affiliate/avatar/gallery', async (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
   if (!affiliateCode) return res.json({ success: true, avatars: [], count: 0 });
-  const avatars = getAvatarGalleryRecords(affiliateCode);
+  const avatars = await getAvatarGalleryRecords(affiliateCode);
   res.json({ success: true, avatars, count: avatars.length });
 });
 
@@ -6306,6 +6562,7 @@ app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
     return res.json({
       success: true,
       profile: {
+        profileId: affiliateCode,
         affiliateCode,
         name: affiliateCode,
         pictureUrl: null,
@@ -6574,7 +6831,11 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     }
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
     const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || requestRecord?.photoUrl || null);
-    const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || null;
+    const storedProfile = getAffiliateProfile(requestedAffiliateCode);
+    const storedVoiceUrl = String(storedProfile?.voiceFileUrl || '').trim();
+    const storedVoiceCloneId = String(storedProfile?.voiceCloneId || '').trim();
+    const storedVoiceId = String(storedProfile?.voiceId || '').trim();
+    const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || storedVoiceUrl || null;
     const resolvedProductId = productId || requestRecord?.productId || null;
     const resolvedProductHandle = productHandle || requestRecord?.productHandle || null;
     const resolvedProductTitle = productTitle || requestRecord?.productTitle || null;
@@ -6582,7 +6843,6 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedProductImageUrl = productImageUrl || requestRecord?.productImageUrl || null;
     const resolvedPlatform = platform || requestRecord?.platform || null;
     const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
-    const storedProfile = getAffiliateProfile(requestedAffiliateCode);
     const rawAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
     const resolvedAttire = normalizeAvatarAttire(rawAttire, storedProfile?.avatarGender || storedProfile?.gender || '');
      
@@ -6612,6 +6872,69 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       });
     }
 
+    const nativeRoutingMode = String(process.env.EVICS_PHONE_AVATAR_CREATE_ROUTING || '').trim().toLowerCase();
+    const nativeAsyncRequested = nativeRoutingMode === 'native_async' && (source === 'phone-app' || source === 'phone_app')
+      || req.body?.nativeAsync === true
+      || String(req.body?.avatarProvider || '').trim().toLowerCase() === 'evics_native'
+      || String(req.body?.avatarProvider || '').trim().toLowerCase() === 'auto';
+
+    if (nativeAsyncRequested && nativeAvatarRuntime && typeof nativeAvatarRuntime.submitJob === 'function') {
+      const submission = await nativeAvatarRuntime.submitJob({
+        affiliateCode: requestedAffiliateCode,
+        requestId: finalRequestId,
+        idempotencyKey: `avatar_create_${finalRequestId}`,
+        provider: String(req.body?.avatarProvider || 'auto').trim().toLowerCase() || 'auto',
+        name: resolvedName,
+        photoUrl: resolvedPhotoUrl,
+        voiceFileUrl: resolvedVoiceUrl,
+        attire: resolvedAttire,
+        requestedBy: source || 'affiliate-hub',
+        source: source || 'affiliate-hub',
+      }, `legacy_avatar_create_${finalRequestId}`);
+
+      upsertAvatarRequest({
+        ...(requestRecord || {}),
+        requestId: finalRequestId,
+        affiliateCode: requestedAffiliateCode,
+        affiliateId: requestedAffiliateCode,
+        name: resolvedName,
+        photoUrl: resolvedPhotoUrl,
+        voiceFileUrl: resolvedVoiceUrl,
+        voiceFilePath: voiceFilePath || requestRecord?.voiceFilePath || null,
+        voiceFileUpdatedAt: requestRecord?.voiceFileUpdatedAt || null,
+        productId: resolvedProductId || requestRecord?.productId || null,
+        productHandle: resolvedProductHandle || requestRecord?.productHandle || null,
+        productTitle: resolvedProductTitle || requestRecord?.productTitle || null,
+        productPageUrl: resolvedProductPageUrl || requestRecord?.productPageUrl || null,
+        productImageUrl: resolvedProductImageUrl || requestRecord?.productImageUrl || null,
+        platform: resolvedPlatform || requestRecord?.platform || null,
+        platformLabel: resolvedPlatformLabel || requestRecord?.platformLabel || null,
+        attire: resolvedAttire || requestRecord?.attire || null,
+        source: requestRecord?.source || source || 'affiliate-hub',
+        returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
+        status: 'processing',
+        processingMode: 'native_async',
+        nativeAvatarJobId: submission.job.id,
+        nativeAvatarProvider: submission.job.provider,
+        createdAt: requestRecord?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null,
+        avatar: requestRecord?.avatar || null,
+        error: null
+      });
+
+      return res.status(202).json({
+        success: true,
+        async: true,
+        requestId: finalRequestId,
+        status: 'processing',
+        nativeAvatarJobId: submission.job.id,
+        provider: submission.job.provider,
+        statusUrl: `/api/native-avatar/jobs/${encodeURIComponent(submission.job.id)}?affiliateCode=${encodeURIComponent(requestedAffiliateCode)}`,
+        message: 'Avatar creation routed to native async pipeline. Poll statusUrl for completion.',
+      });
+    }
+
     // CRITICAL: HeyGen API is required for custom affiliate avatars with user-provided inputs
     if (!process.env.HEYGEN_API_KEY) {
       return res.status(503).json({ 
@@ -6626,6 +6949,8 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       name: resolvedName,
       photoUrl: resolvedPhotoUrl,
       voiceFileUrl: resolvedVoiceUrl,
+      voiceCloneId: storedVoiceCloneId,
+      voiceId: storedVoiceId,
       attire: resolvedAttire
     });
     
@@ -6710,6 +7035,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     upsertAvatarRequest({
       ...(requestRecord || {}),
       requestId: finalRequestId,
+      profileId: requestedAffiliateCode,
       affiliateCode: requestedAffiliateCode,
       affiliateId: requestedAffiliateCode,
       name: avatar.name,
@@ -6737,6 +7063,19 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
       voiceCloneStatus: avatar.voiceCloneStatus,
       error: null
     });
+
+    if (avatar.voiceCloneId) {
+      upsertAffiliateProfile(
+        requestedAffiliateCode,
+        avatar.name,
+        resolvedPhotoUrl || storedProfile?.pictureUrl || '',
+        resolvedVoiceUrl || storedVoiceUrl || '',
+        avatar.voiceCloneId,
+        avatar.voiceCloneId,
+        resolvedAttire?.gender || storedProfile?.avatarGender || '',
+        avatar.voiceFileUpdatedAt || requestRecord?.voiceFileUpdatedAt || ''
+      );
+    }
 
     res.json({
     success: true,
@@ -7042,7 +7381,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     }
     if (!avatarRecord) {
       // Fall back to latest completed avatar for this affiliate ONLY
-      const allRecords = getAvatarGalleryRecords(cleanCode);
+      const allRecords = await getAvatarGalleryRecords(cleanCode);
       if (allRecords.length) {
         avatarRecord = findAvatarRequest(allRecords[0].requestId);
       }

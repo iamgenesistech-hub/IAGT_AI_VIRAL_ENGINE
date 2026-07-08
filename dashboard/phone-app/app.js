@@ -34,6 +34,7 @@
   const avatarCreatedTitle = document.getElementById('phoneAvatarCreatedTitle');
   const avatarCreatedMeta = document.getElementById('phoneAvatarCreatedMeta');
   const avatarReturnLink = document.getElementById('phoneAvatarReturnLink');
+  const avatarBindingBadge = document.getElementById('phoneAvatarBindingBadge');
   const phoneVoiceHelp = document.getElementById('phoneVoiceHelp');
   const phoneVoiceScript = document.getElementById('phoneVoiceScript');
   const productMonitor = document.getElementById('phoneProductMonitor');
@@ -105,8 +106,13 @@
       voiceFileUrl: '',
       voiceFilePath: '',
       voiceFileUpdatedAt: '',
+      profileId: '',
+      voiceCloneId: '',
+      voiceId: '',
       avatarId: '',
       requestId: '',
+      nativeAvatarJobId: '',
+      nativeAvatarStatusUrl: '',
       createdAvatar: null,
       returnTo: '',
       selectedProductId: '',
@@ -496,8 +502,13 @@
       supportState.avatarSetup.voiceFileUrl = String(parsed.voiceFileUrl || '').trim() || '';
       supportState.avatarSetup.voiceFilePath = String(parsed.voiceFilePath || '').trim() || '';
       supportState.avatarSetup.voiceFileUpdatedAt = String(parsed.voiceFileUpdatedAt || '').trim() || '';
+      supportState.avatarSetup.profileId = String(parsed.profileId || '').trim() || '';
+      supportState.avatarSetup.voiceCloneId = String(parsed.voiceCloneId || '').trim() || '';
+      supportState.avatarSetup.voiceId = String(parsed.voiceId || '').trim() || '';
       supportState.avatarSetup.avatarId = String(parsed.avatarId || '').trim() || '';
       supportState.avatarSetup.requestId = String(parsed.requestId || '').trim() || '';
+      supportState.avatarSetup.nativeAvatarJobId = String(parsed.nativeAvatarJobId || '').trim() || '';
+      supportState.avatarSetup.nativeAvatarStatusUrl = String(parsed.nativeAvatarStatusUrl || '').trim() || '';
       supportState.avatarSetup.createdAvatar = parsed.createdAvatar || null;
       supportState.avatarSetup.returnTo = String(parsed.returnTo || '').trim() || '';
       supportState.avatarSetup.selectedProductId = String(parsed.selectedProductId || '').trim() || '';
@@ -596,6 +607,19 @@
         parts.push(`Platform: ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`);
         if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
         avatarMonitor.textContent = parts.join(' · ');
+      }
+      if (avatarBindingBadge) {
+        const profileId = String(supportState.avatarSetup.profileId || supportState.affiliateCode || '').trim().toUpperCase();
+        const voiceId = String(
+          supportState.avatarSetup.voiceCloneId ||
+          supportState.avatarSetup.voiceId ||
+          supportState.avatarSetup.createdAvatar?.voiceCloneId ||
+          supportState.avatarSetup.createdAvatar?.voiceId ||
+          ''
+        ).trim();
+        avatarBindingBadge.textContent = profileId
+          ? `Profile ID: ${profileId} · Voice ID: ${voiceId || 'pending'}`
+          : 'Profile ID: pending · Voice ID: pending';
       }
       if (avatarCreatedCard && avatarCreatedTitle && avatarCreatedMeta && avatarReturnLink) {
         const created = supportState.avatarSetup.createdAvatar;
@@ -1471,6 +1495,7 @@
   async function uploadRecordedAvatarVoice(blob) {
     const file = new File([blob], `voice-sample-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
     const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice', {
+      profileId: supportState.affiliateCode,
       affiliateCode: supportState.affiliateCode,
       affiliateName: supportState.affiliateName
     });
@@ -1485,6 +1510,7 @@
   async function uploadAvatarPhoto() {
     const file = avatarPhotoInput?.files?.[0];
     const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-photo', 'photo', {
+      profileId: supportState.affiliateCode,
       affiliateCode: supportState.affiliateCode,
       affiliateName: supportState.affiliateName
     });
@@ -1507,6 +1533,7 @@
     const file = avatarVoiceInput?.files?.[0];
     if (file) {
       const payload = await uploadAvatarAsset(file, '/api/affiliate/avatar/upload-voice', 'voice', {
+        profileId: supportState.affiliateCode,
         affiliateCode: supportState.affiliateCode,
         affiliateName: supportState.affiliateName
       });
@@ -1627,6 +1654,7 @@
     const payload = await apiJson('/api/affiliate/avatar/request', {
       method: 'POST',
       body: JSON.stringify({
+        profileId: supportState.affiliateCode,
         affiliateId: supportState.affiliateCode,
         name: `${supportState.affiliateName} Avatar`,
         style: 'avatar',
@@ -1648,6 +1676,7 @@
     });
     supportState.avatarSetup.requestId = String(payload.requestId || '');
     supportState.avatarSetup.returnTo = String(payload.request?.returnTo || '/phone-app');
+    supportState.avatarSetup.profileId = supportState.affiliateCode;
     supportState.avatarSetup.productReferences = Array.isArray(supportState.avatarSetup.productReferences)
       ? supportState.avatarSetup.productReferences
       : [];
@@ -1729,6 +1758,8 @@
         }
         const profileVoiceUrl = String(profile.voiceFileUrl || '').trim();
         const profileVoiceUpdatedAt = String(profile.voiceFileUpdatedAt || profile.updatedAt || profile.createdAt || '').trim();
+        const profileVoiceCloneId = String(profile.voiceCloneId || '').trim();
+        const profileVoiceId = String(profile.voiceId || '').trim();
         const currentVoiceUrl = String(supportState.avatarSetup.voiceFileUrl || '').trim();
         const currentVoiceUpdatedAt = String(supportState.avatarSetup.voiceFileUpdatedAt || '').trim();
         if (profileVoiceUrl && (profileVoiceUrl !== currentVoiceUrl || profileVoiceUpdatedAt !== currentVoiceUpdatedAt)) {
@@ -1739,6 +1770,10 @@
         } else if (!supportState.avatarSetup.voiceFileUpdatedAt && profileVoiceUpdatedAt) {
           supportState.avatarSetup.voiceFileUpdatedAt = profileVoiceUpdatedAt;
         }
+        supportState.avatarSetup.profileId = normalizeAffiliateCode(profile.profileId || profile.affiliateCode || supportState.affiliateCode);
+        supportState.avatarSetup.voiceCloneId = profileVoiceCloneId || supportState.avatarSetup.voiceCloneId || '';
+        supportState.avatarSetup.voiceId = profileVoiceId || supportState.avatarSetup.voiceId || '';
+        persistAvatarSetup();
         if (affiliateProfileBanner) {
           affiliateProfileBanner.style.display = 'flex';
           if (affiliateProfileName) affiliateProfileName.textContent = profile.name || supportState.affiliateCode;
@@ -1775,19 +1810,70 @@
     return { requestId: '', source: 'none' };
   }
 
+  function normalizeNativeAvatarJobStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['queued', 'preprocessing', 'rendering', 'postprocessing', 'completed', 'failed', 'cancelled'].includes(normalized)) {
+      return normalized;
+    }
+    return '';
+  }
+
+  async function fetchNativeAvatarJob(jobId) {
+    const cleanJobId = String(jobId || '').trim();
+    if (!cleanJobId) return null;
+    const payload = await apiJson(`/api/native-avatar/jobs/${encodeURIComponent(cleanJobId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`);
+    return payload && payload.job ? payload.job : null;
+  }
+
+  async function waitForNativeAvatarJobTerminal(jobId, options = {}) {
+    const maxAttempts = Math.max(1, Number(options.maxAttempts || 30));
+    const delayMs = Math.max(500, Number(options.delayMs || 2500));
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const job = await fetchNativeAvatarJob(jobId);
+      const status = normalizeNativeAvatarJobStatus(job && job.status);
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        return { job, timedOut: false };
+      }
+      if (attempt < maxAttempts - 1) {
+        await sleep(delayMs);
+      }
+    }
+    return { job: await fetchNativeAvatarJob(jobId), timedOut: true };
+  }
+
   async function syncAvatarRequestStatus() {
     const lookup = getAvatarRequestLookup();
     const requestId = lookup.requestId;
     if (!requestId) return;
     const payload = await apiJson(`/api/affiliate/avatar/request/${encodeURIComponent(requestId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`);
-    const request = payload.request || null;
+    let request = payload.request || null;
     if (!request) return;
     if (!isOwnedByActiveAffiliate(request)) {
       throw new Error('Avatar request ownership mismatch. This request is not assigned to the active affiliate ID.');
     }
+    const nativeAvatarJobId = String(request.nativeAvatarJobId || supportState.avatarSetup.nativeAvatarJobId || '').trim();
+    if ((request.status === 'queued' || request.status === 'processing') && nativeAvatarJobId) {
+      supportState.avatarSetup.nativeAvatarJobId = nativeAvatarJobId;
+      supportState.avatarSetup.nativeAvatarStatusUrl = `/api/native-avatar/jobs/${encodeURIComponent(nativeAvatarJobId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`;
+      try {
+        const nativeJob = await fetchNativeAvatarJob(nativeAvatarJobId);
+        const nativeStatus = normalizeNativeAvatarJobStatus(nativeJob && nativeJob.status);
+        if (nativeStatus === 'completed' || nativeStatus === 'failed' || nativeStatus === 'cancelled') {
+          const refreshed = await apiJson(`/api/affiliate/avatar/request/${encodeURIComponent(requestId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`);
+          request = refreshed.request || request;
+        }
+      } catch (nativeError) {
+        console.warn('Native avatar status check failed:', nativeError.message);
+      }
+    }
     const resolvedRequestId = String(request.requestId || requestId);
     supportState.avatarSetup.requestId = resolvedRequestId;
+    supportState.avatarSetup.profileId = String(request.profileId || request.affiliateCode || supportState.affiliateCode || '').trim().toUpperCase();
     localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, resolvedRequestId);
+    supportState.avatarSetup.nativeAvatarJobId = String(request.nativeAvatarJobId || supportState.avatarSetup.nativeAvatarJobId || '').trim();
+    supportState.avatarSetup.nativeAvatarStatusUrl = supportState.avatarSetup.nativeAvatarJobId
+      ? `/api/native-avatar/jobs/${encodeURIComponent(supportState.avatarSetup.nativeAvatarJobId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`
+      : '';
     const shouldHydrateRequestContext = lookup.source === 'url' || request.status === 'queued' || request.status === 'processing';
     if (shouldHydrateRequestContext) {
       supportState.avatarSetup.returnTo = request.returnTo || supportState.avatarSetup.returnTo || '/phone-app';
@@ -1833,6 +1919,8 @@
         supportState.avatarSetup.avatarId = requestAvatarId || supportState.avatarSetup.avatarId || '';
         supportState.avatarSetup.photoUrl = String(request.avatar.photoUrl || supportState.avatarSetup.photoUrl || '');
       }
+      supportState.avatarSetup.voiceCloneId = String(request.avatar.voiceCloneId || request.voiceCloneId || supportState.avatarSetup.voiceCloneId || '').trim();
+      supportState.avatarSetup.voiceId = String(request.avatar.voiceId || request.voiceId || supportState.avatarSetup.voiceId || '').trim();
       const requestVoiceUrl = String(request.avatar.voiceFileUrl || '').trim();
       const requestVoicePath = String(request.avatar.voiceFilePath || requestVoiceUrl || '').trim();
       const requestVoiceUpdatedAt = String(request.avatar.voiceFileUpdatedAt || request.avatar.voiceUpdatedAt || '').trim();
@@ -1855,11 +1943,15 @@
       renderAvatarSetup();
       renderSelectedProductDetails();
       sessionInfo.textContent = `Avatar created through Affiliate Hub and returned to ${supportState.affiliateCode}.`;
+      await loadAvatarLibrary();
     } else if (request.status === 'queued' || request.status === 'processing') {
-      sessionInfo.textContent = 'Avatar request is queued in Affiliate Hub. Creating now...';
+      sessionInfo.textContent = supportState.avatarSetup.nativeAvatarJobId
+        ? 'Avatar request is processing in native async pipeline. We are tracking progress.'
+        : 'Avatar request is queued in Affiliate Hub. Creating now...';
     } else if (request.status === 'failed') {
       sessionInfo.textContent = `Avatar request failed: ${request.error || 'Unknown error'}`;
     }
+    persistAvatarSetup();
   }
 
   function renderChatFeed() {
@@ -2302,52 +2394,82 @@
             photoUrl: supportState.avatarSetup.photoUrl,
             voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
             voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
+            requestId: supportState.avatarSetup.requestId || null,
             attire: attire,
-            source: 'phone-app'
+            source: 'phone-app',
+            nativeAsync: true,
+            avatarProvider: 'auto'
           })
         });
 
         setControlState(createAvatarBtn, 'completed', 2000);
-        if (createAvatarStatus) {
-          createAvatarStatus.textContent = '✅ Avatar created! Rendering proof video…';
-          createAvatarStatus.className = 'create-avatar-status status-success';
-        }
         if (payload.requestId || payload.avatarId) {
           supportState.avatarSetup.requestId = String(payload.requestId || payload.avatarId);
           localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, supportState.avatarSetup.requestId);
         }
+        supportState.avatarSetup.nativeAvatarJobId = String(payload.nativeAvatarJobId || '').trim() || '';
+        supportState.avatarSetup.nativeAvatarStatusUrl = String(payload.statusUrl || '').trim() || '';
         if (payload.avatar) {
           supportState.avatarSetup.createdAvatar = payload.avatar;
         }
         persistAvatarSetup();
         renderAvatarSetup();
-        sessionInfo.textContent = 'Avatar created — waiting for proof video render…';
-        // Reload avatar library so the new avatar appears immediately
-        await loadAvatarLibrary();
-
-        // Poll for proof video completion and store URL
-        const proofVideoId = payload.avatar?.proofVideoId || null;
-        const requestId = payload.requestId || null;
-        if (proofVideoId && requestId) {
-          try {
-            if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 30-60 seconds)';
-            const proofResult = await waitForAvatarProof(proofVideoId);
-            const videoUrl = proofResult.videoUrl || proofResult.video_url || '';
-            const thumbnailUrl = proofResult.thumbnailUrl || payload.avatar?.photoUrl || '';
-            if (videoUrl) {
-              await apiJson('/api/affiliate/avatar/proof-complete', {
-                method: 'POST',
-                body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl, affiliateCode: supportState.affiliateCode })
-              });
-              if (createAvatarStatus) {
-                createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
-              }
-              sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
-              await loadAvatarLibrary();
-            }
-          } catch (proofErr) {
+        if (payload.async && payload.nativeAvatarJobId) {
+          if (createAvatarStatus) {
+            createAvatarStatus.textContent = '⏳ Avatar request accepted. Native async pipeline is creating your avatar now…';
+            createAvatarStatus.className = 'create-avatar-status';
+          }
+          sessionInfo.textContent = 'Avatar request submitted. Waiting for async completion…';
+          const terminal = await waitForNativeAvatarJobTerminal(payload.nativeAvatarJobId, { maxAttempts: 40, delayMs: 2500 });
+          const finalStatus = normalizeNativeAvatarJobStatus(terminal.job && terminal.job.status);
+          if (finalStatus === 'completed') {
+            await syncAvatarRequestStatus();
+            await loadAvatarLibrary();
             if (createAvatarStatus) {
-              createAvatarStatus.textContent = '✅ Avatar created! Proof video still rendering — tap "Generate proof" in library to check.';
+              createAvatarStatus.textContent = '✅ Avatar created and added to your Avatar Library.';
+              createAvatarStatus.className = 'create-avatar-status status-success';
+            }
+            sessionInfo.textContent = 'Avatar completed in async pipeline and hydrated into library.';
+          } else if (finalStatus === 'failed' || finalStatus === 'cancelled') {
+            const message = terminal.job && terminal.job.error ? terminal.job.error : `Native avatar job ${finalStatus}`;
+            throw new Error(message);
+          } else if (terminal.timedOut) {
+            if (createAvatarStatus) {
+              createAvatarStatus.textContent = '⏳ Avatar is still processing. Keep this page open and use Refresh to check status.';
+            }
+            sessionInfo.textContent = 'Avatar async processing is still running.';
+          }
+        } else {
+          if (createAvatarStatus) {
+            createAvatarStatus.textContent = '✅ Avatar created! Rendering proof video…';
+            createAvatarStatus.className = 'create-avatar-status status-success';
+          }
+          sessionInfo.textContent = 'Avatar created — waiting for proof video render…';
+          await loadAvatarLibrary();
+
+          const proofVideoId = payload.avatar?.proofVideoId || null;
+          const requestId = payload.requestId || null;
+          if (proofVideoId && requestId) {
+            try {
+              if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 30-60 seconds)';
+              const proofResult = await waitForAvatarProof(proofVideoId);
+              const videoUrl = proofResult.videoUrl || proofResult.video_url || '';
+              const thumbnailUrl = proofResult.thumbnailUrl || payload.avatar?.photoUrl || '';
+              if (videoUrl) {
+                await apiJson('/api/affiliate/avatar/proof-complete', {
+                  method: 'POST',
+                  body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl, affiliateCode: supportState.affiliateCode })
+                });
+                if (createAvatarStatus) {
+                  createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
+                }
+                sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
+                await loadAvatarLibrary();
+              }
+            } catch (proofErr) {
+              if (createAvatarStatus) {
+                createAvatarStatus.textContent = '✅ Avatar created! Proof video still rendering — tap "Generate proof" in library to check.';
+              }
             }
           }
         }
