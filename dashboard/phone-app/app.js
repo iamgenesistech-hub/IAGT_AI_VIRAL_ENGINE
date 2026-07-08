@@ -791,11 +791,12 @@
     }
     avatarLibraryPreview.classList.remove('hidden');
     avatarLibraryPreviewTitle.textContent = item.name || 'Affiliate avatar';
-    avatarLibraryPreviewMeta.textContent = statusText || (item.proofVideoUrl ? 'Proof ready to play.' : 'Generating proof video for this avatar.');
+    avatarLibraryPreviewMeta.textContent = statusText || (item.proofVideoUrl ? 'Proof ready to play.' : 'Rendering proof video for this avatar…');
     avatarLibraryPreviewPrompt.textContent = item.proofStatus === 'completed'
       ? "This is my avatar, and it's time to get this blessing flowing!"
-      : "Tap generate proof to create the 8-second proof clip.";
+      : "Proof video is being rendered with your voice and photo.";
 
+    // Always show the profile photo — it acts as poster for the video too
     const mediaUrl = item.proofThumbnailUrl || item.photoUrl || '';
     if (mediaUrl) {
       avatarLibraryPreviewImage.src = mediaUrl;
@@ -803,22 +804,22 @@
         avatarLibraryPreviewImage.onerror = null;
         avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'No photo');
       };
-      avatarLibraryPreviewImage.classList.remove('hidden');
     } else {
       avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'No photo');
-      avatarLibraryPreviewImage.classList.add('hidden');
     }
+    // Keep image visible as poster until video loads; hide it once video plays
+    avatarLibraryPreviewImage.classList.remove('hidden');
 
     if (item.proofVideoUrl) {
       avatarLibraryPreviewVideo.src = item.proofVideoUrl;
       avatarLibraryPreviewVideo.preload = 'metadata';
-      avatarLibraryPreviewVideo.poster = item.proofThumbnailUrl || item.photoUrl || mediaPlaceholder(item.name || 'Proof video');
+      avatarLibraryPreviewVideo.poster = mediaUrl || mediaPlaceholder(item.name || 'Proof video');
       avatarLibraryPreviewVideo.onerror = function () {
         avatarLibraryPreviewVideo.onerror = null;
         avatarLibraryPreviewVideo.removeAttribute('src');
         avatarLibraryPreviewVideo.classList.add('hidden');
-        avatarLibraryPreviewImage.src = mediaPlaceholder(item.name || 'Proof unavailable');
         avatarLibraryPreviewImage.classList.remove('hidden');
+        if (avatarLibraryPreviewMeta) avatarLibraryPreviewMeta.textContent = 'Video unavailable — tap Refresh to reload.';
       };
       avatarLibraryPreviewVideo.classList.remove('hidden');
     } else {
@@ -898,8 +899,10 @@
     }
   }
 
-  async function waitForAvatarProof(videoId) {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+  async function waitForAvatarProof(videoId, opts = {}) {
+    const maxAttempts = Math.max(1, Number(opts.maxAttempts || 72)); // 6 min at 5s
+    const delayMs = Math.max(1000, Number(opts.delayMs || 5000));
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const response = await fetch(`/api/affiliate/avatar/video-status/${encodeURIComponent(videoId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, {
         headers: { Accept: 'application/json' }
       });
@@ -910,7 +913,7 @@
       if (payload.status === 'completed' || payload.status === 'done' || payload.videoUrl || payload.video_url) {
         return payload;
       }
-      await sleep(3000);
+      if (attempt < maxAttempts - 1) await sleep(delayMs);
     }
     throw new Error('Proof video is still rendering. Please try again in a moment.');
   }
@@ -964,7 +967,7 @@
     if (!match) return;
     supportState.selectedAvatarLibraryId = match.id;
     renderAvatarLibrary();
-    renderAvatarLibraryPreview(match, match.proofVideoUrl ? 'Proof ready to play.' : 'Generating proof video when needed.');
+    renderAvatarLibraryPreview(match, match.proofVideoUrl ? 'Proof ready to play.' : 'Rendering proof video… (this may take 2-5 minutes)');
     if (!match.proofVideoUrl && match.requestId) {
       if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Generating proof for ${match.name}...`;
       if (avatarLibraryRefreshBtn) avatarLibraryRefreshBtn.disabled = true;
@@ -972,11 +975,11 @@
         const updated = await requestAvatarProof(match);
         supportState.avatarLibrary = items.map((item) => String(item.id) === String(updated.id) ? updated : item);
         renderAvatarLibrary();
-        renderAvatarLibraryPreview(updated, 'Proof ready to play.');
-        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof ready for ${updated.name}.`;
+        renderAvatarLibraryPreview(updated, updated.proofVideoUrl ? 'Proof ready to play.' : 'Proof video still rendering — try refreshing in a moment.');
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = updated.proofVideoUrl ? `Proof ready for ${updated.name}.` : `Proof video still rendering for ${updated.name}.`;
       } catch (error) {
-        renderAvatarLibraryPreview(match, `Proof generation failed: ${error.message}`);
-        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof generation failed: ${error.message}`;
+        renderAvatarLibraryPreview(match, `Proof video still rendering — tap Refresh to check again.`);
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof rendering: ${error.message}`;
       } finally {
         if (avatarLibraryRefreshBtn) avatarLibraryRefreshBtn.disabled = false;
       }
@@ -2432,16 +2435,42 @@
             createAvatarStatus.className = 'create-avatar-status';
           }
           sessionInfo.textContent = 'Avatar request submitted. Waiting for async completion…';
-          const terminal = await waitForNativeAvatarJobTerminal(payload.nativeAvatarJobId, { maxAttempts: 40, delayMs: 2500 });
+          const terminal = await waitForNativeAvatarJobTerminal(payload.nativeAvatarJobId, { maxAttempts: 60, delayMs: 3000 });
           const finalStatus = normalizeNativeAvatarJobStatus(terminal.job && terminal.job.status);
           if (finalStatus === 'completed') {
             await syncAvatarRequestStatus();
             await loadAvatarLibrary();
-            if (createAvatarStatus) {
-              createAvatarStatus.textContent = '✅ Avatar created and added to your Avatar Library.';
-              createAvatarStatus.className = 'create-avatar-status status-success';
-            }
             sessionInfo.textContent = 'Avatar completed in async pipeline and hydrated into library.';
+            // Auto-generate proof video for the newly created avatar
+            const newRequestId = supportState.avatarSetup.requestId;
+            const newAvatar = (supportState.avatarLibrary || []).find((item) => item.requestId === newRequestId)
+              || (supportState.avatarLibrary || [])[0];
+            if (newAvatar && !newAvatar.proofVideoUrl) {
+              if (createAvatarStatus) createAvatarStatus.textContent = '✅ Avatar created! Rendering proof video…';
+              try {
+                const updated = await requestAvatarProof(newAvatar);
+                supportState.avatarLibrary = (supportState.avatarLibrary || []).map((item) =>
+                  String(item.id) === String(updated.id) ? updated : item
+                );
+                renderAvatarLibrary();
+                renderAvatarLibraryPreview(updated, 'Proof ready to play.');
+                if (createAvatarStatus) {
+                  createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
+                  createAvatarStatus.className = 'create-avatar-status status-success';
+                }
+                sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
+              } catch (proofErr) {
+                if (createAvatarStatus) {
+                  createAvatarStatus.textContent = '✅ Avatar created! Tap your avatar in the Library to generate your proof video.';
+                  createAvatarStatus.className = 'create-avatar-status status-success';
+                }
+              }
+            } else {
+              if (createAvatarStatus) {
+                createAvatarStatus.textContent = '✅ Avatar created and added to your Avatar Library.';
+                createAvatarStatus.className = 'create-avatar-status status-success';
+              }
+            }
           } else if (finalStatus === 'failed' || finalStatus === 'cancelled') {
             const message = terminal.job && terminal.job.error ? terminal.job.error : `Native avatar job ${finalStatus}`;
             throw new Error(message);
@@ -2463,7 +2492,7 @@
           const requestId = payload.requestId || null;
           if (proofVideoId && requestId) {
             try {
-              if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 30-60 seconds)';
+              if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 2-5 minutes)';
               const proofResult = await waitForAvatarProof(proofVideoId);
               const videoUrl = proofResult.videoUrl || proofResult.video_url || '';
               const thumbnailUrl = proofResult.thumbnailUrl || payload.avatar?.photoUrl || '';
@@ -2472,15 +2501,42 @@
                   method: 'POST',
                   body: JSON.stringify({ requestId, videoId: proofVideoId, videoUrl, thumbnailUrl, affiliateCode: supportState.affiliateCode })
                 });
+                await loadAvatarLibrary();
+                const updatedAvatar = (supportState.avatarLibrary || []).find((item) => item.requestId === requestId)
+                  || (supportState.avatarLibrary || [])[0];
+                if (updatedAvatar) renderAvatarLibraryPreview(updatedAvatar, 'Proof ready to play.');
                 if (createAvatarStatus) {
                   createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
                 }
                 sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
-                await loadAvatarLibrary();
               }
             } catch (proofErr) {
               if (createAvatarStatus) {
-                createAvatarStatus.textContent = '✅ Avatar created! Proof video still rendering — tap "Generate proof" in library to check.';
+                createAvatarStatus.textContent = '✅ Avatar created! Proof video still rendering — tap your avatar in the Library to check.';
+              }
+            }
+          } else {
+            // No proofVideoId in create response — find the avatar in the library and auto-generate proof
+            const newRequestId = requestId || supportState.avatarSetup.requestId;
+            const newAvatar = (supportState.avatarLibrary || []).find((item) => item.requestId === newRequestId)
+              || (supportState.avatarLibrary || [])[0];
+            if (newAvatar && !newAvatar.proofVideoUrl) {
+              try {
+                if (createAvatarStatus) createAvatarStatus.textContent = '⏳ Proof video rendering… (this may take 2-5 minutes)';
+                const updated = await requestAvatarProof(newAvatar);
+                supportState.avatarLibrary = (supportState.avatarLibrary || []).map((item) =>
+                  String(item.id) === String(updated.id) ? updated : item
+                );
+                renderAvatarLibrary();
+                renderAvatarLibraryPreview(updated, 'Proof ready to play.');
+                if (createAvatarStatus) {
+                  createAvatarStatus.textContent = '✅ Avatar proof video ready! Check your Avatar Library below.';
+                }
+                sessionInfo.textContent = 'Proof video delivered to your Avatar Library.';
+              } catch (proofErr) {
+                if (createAvatarStatus) {
+                  createAvatarStatus.textContent = '✅ Avatar created! Tap your avatar in the Library to generate your proof video.';
+                }
               }
             }
           }
