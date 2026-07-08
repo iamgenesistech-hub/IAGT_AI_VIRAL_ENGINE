@@ -1110,6 +1110,26 @@ function humanizeAttireValue(value) {
   return String(value || '').trim().replace(/-/g, ' ');
 }
 
+/**
+ * Rewrites a direct GCS `affiliate-uploads/` URL to the server-proxied `/uploads/:filename`
+ * route that serves from local disk first, then falls back to GCS with auth.
+ * This is the fix for the "Voice file unavailable" error after Cloud Run container restarts.
+ * Existing stored profiles still have `storage.googleapis.com` URLs — this rewrites them on
+ * the way out so the browser always gets a URL that works without GCS public access.
+ */
+function rewriteAffiliateUploadUrl(url, req) {
+  if (!url) return url;
+  const match = String(url).match(/\/affiliate-uploads\/([^?#\s]+)/);
+  if (!match) return url;
+  const filename = decodeURIComponent(match[1]);
+  if (req) {
+    const protocol = String(req.headers['x-forwarded-proto'] || 'http');
+    const host = String(req.headers.host || 'localhost:4175');
+    return `${protocol}://${host}/uploads/${encodeURIComponent(filename)}`;
+  }
+  return `/uploads/${encodeURIComponent(filename)}`;
+}
+
 function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId, voiceId, avatarGender = '', voiceFileUpdatedAt = '') {
   const code = normalizeAffiliateCode(affiliateCode);
   if (!code) throw new Error('affiliateCode is required');
@@ -6421,12 +6441,15 @@ app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     await uploadToGcs(req.file.path, gcsPath, contentType);
-    const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
+    // Always use the server proxy URL as photoUrl — same reasoning as voice files:
+    // direct GCS URLs are private and fail in browser after container restart.
+    const gcsDeliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
     if (affiliateCode) {
-      upsertAffiliateProfile(affiliateCode, affiliateName || affiliateCode, deliveryUrl);
+      upsertAffiliateProfile(affiliateCode, affiliateName || affiliateCode, proxyUrl);
     }
-    // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
-    res.json({ success: true, photoUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, filename, size: req.file.size });
+    // photoUrl = server proxy (works locally + Cloud Run via GCS fallback with auth)
+    // deliveryUrl = raw GCS URL (kept for external API calls like HeyGen)
+    res.json({ success: true, photoUrl: proxyUrl, localUrl: proxyUrl, deliveryUrl: gcsDeliveryUrl, gcsUrl: gcsDeliveryUrl, filename, size: req.file.size });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -6484,22 +6507,26 @@ app.post('/api/affiliate/avatar/upload-voice', (req, res, next) => {
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'audio/webm';
     await uploadToGcs(finalLocalPath, gcsPath, contentType);
-    const deliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
+    // Always use the server proxy URL as voiceFileUrl — the /uploads/:filename route serves from
+    // local disk first, then falls back to GCS with auth. Direct GCS URLs are private by default
+    // and would fail with 403 in the browser after a container restart.
+    const gcsDeliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
     const voiceFileUpdatedAt = new Date().toISOString();
     if (affiliateCode) {
       upsertAffiliateProfile(
         affiliateCode,
         String(req.body && req.body.affiliateName || affiliateCode),
         '',
-        deliveryUrl,
+        proxyUrl,
         '',
         '',
         '',
         voiceFileUpdatedAt
       );
     }
-    // Return the CDN/public delivery URL when configured; keep local proxy for fallback.
-    res.json({ success: true, voiceFileUrl: deliveryUrl, localUrl: proxyUrl, deliveryUrl, voiceFilePath: proxyUrl, filename, size: req.file.size, voiceFileUpdatedAt, affiliateCode: affiliateCode || null });
+    // voiceFileUrl = server proxy (works locally + Cloud Run via GCS fallback with auth)
+    // gcsDeliveryUrl = raw GCS URL (kept for external API calls like HeyGen voice clone)
+    res.json({ success: true, voiceFileUrl: proxyUrl, localUrl: proxyUrl, deliveryUrl: gcsDeliveryUrl, gcsUrl: gcsDeliveryUrl, voiceFilePath: proxyUrl, filename, size: req.file.size, voiceFileUpdatedAt, affiliateCode: affiliateCode || null });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -6640,7 +6667,14 @@ app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
       }
     });
   }
-  res.json({ success: true, profile });
+  // Rewrite any old direct-GCS affiliate-upload URLs to the server proxy route.
+  // This silently migrates existing profiles without touching stored data.
+  const safeProfile = Object.assign({}, profile, {
+    voiceFileUrl: rewriteAffiliateUploadUrl(profile.voiceFileUrl, req),
+    pictureUrl: rewriteAffiliateUploadUrl(profile.pictureUrl, req),
+    profilePhotoUrl: rewriteAffiliateUploadUrl(profile.profilePhotoUrl || profile.pictureUrl, req),
+  });
+  res.json({ success: true, profile: safeProfile });
 });
 
 // POST /api/affiliate/profile — update affiliate profile (name + picture)
@@ -6896,7 +6930,9 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
     const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || requestRecord?.photoUrl || null);
     const storedProfile = getAffiliateProfile(requestedAffiliateCode);
-    const storedVoiceUrl = String(storedProfile?.voiceFileUrl || '').trim();
+    // Rewrite old direct-GCS affiliate-upload URLs to the server proxy route before passing
+    // to HeyGen — the proxy route is publicly accessible via Cloud Run + GCS auth fallback.
+    const storedVoiceUrl = rewriteAffiliateUploadUrl(String(storedProfile?.voiceFileUrl || '').trim(), req);
     const storedVoiceCloneId = String(storedProfile?.voiceCloneId || '').trim();
     const storedVoiceId = String(storedProfile?.voiceId || '').trim();
     const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || storedVoiceUrl || null;

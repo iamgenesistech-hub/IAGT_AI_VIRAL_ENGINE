@@ -574,6 +574,14 @@
           if (voiceVolumeRow) voiceVolumeRow.classList.remove('hidden');
           avatarVoicePreview.volume = (voiceVolumeSlider ? parseInt(voiceVolumeSlider.value, 10) : 80) / 100;
           avatarVoicePreview.onerror = function() {
+            // If a direct GCS URL failed (private bucket), derive and try the server proxy route.
+            const currentSrc = String(avatarVoicePreview.src || '');
+            const gcsMatch = currentSrc.match(/\/affiliate-uploads\/([^?#\s]+)/);
+            if (gcsMatch && !currentSrc.includes('/uploads/')) {
+              const filename = decodeURIComponent(gcsMatch[1]);
+              avatarVoicePreview.src = `/uploads/${encodeURIComponent(filename)}`;
+              return; // onerror will re-fire if the proxy also fails
+            }
             // If server URL fails, fall back to local blob if available
             if (avatarVoicePreview._localBlobUrl && avatarVoicePreview.src !== avatarVoicePreview._localBlobUrl) {
               avatarVoicePreview.src = avatarVoicePreview._localBlobUrl;
