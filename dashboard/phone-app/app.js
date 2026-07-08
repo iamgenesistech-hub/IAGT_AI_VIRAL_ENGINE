@@ -2637,17 +2637,26 @@
   if (avatarLibraryRefreshBtn) {
     avatarLibraryRefreshBtn.addEventListener('click', async () => {
       const selected = (Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : []).find((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''));
-      if (!selected) return;
+      if (!selected) {
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = 'Select an avatar first.';
+        return;
+      }
       avatarLibraryRefreshBtn.disabled = true;
+      avatarLibraryRefreshBtn.textContent = '⏳ Rendering…';
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Generating proof video for ${selected.name}… (2-5 minutes)`;
+      renderAvatarLibraryPreview(selected, 'Rendering proof video… please wait.');
       try {
         const updated = await requestAvatarProof(selected);
         supportState.avatarLibrary = supportState.avatarLibrary.map((item) => String(item.id) === String(updated.id) ? updated : item);
         renderAvatarLibrary();
-        renderAvatarLibraryPreview(updated, 'Proof ready to play.');
+        renderAvatarLibraryPreview(updated, updated.proofVideoUrl ? 'Proof ready to play.' : 'Proof video still rendering — try again shortly.');
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = updated.proofVideoUrl ? `✅ Proof ready for ${updated.name}.` : `Proof video still rendering for ${updated.name}.`;
       } catch (error) {
-        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Proof refresh failed: ${error.message}`;
+        if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `❌ Proof failed: ${error.message}`;
+        renderAvatarLibraryPreview(selected, `Proof failed: ${error.message}`);
       } finally {
         avatarLibraryRefreshBtn.disabled = false;
+        avatarLibraryRefreshBtn.textContent = selected.proofVideoUrl ? 'Refresh proof' : 'Generate proof';
       }
     });
   }
@@ -2655,7 +2664,7 @@
   async function deleteSelectedAvatar() {
     const selected = (Array.isArray(supportState.avatarLibrary) ? supportState.avatarLibrary : []).find((item) => String(item.id) === String(supportState.selectedAvatarLibraryId || ''));
     if (!selected) {
-      sessionInfo.textContent = 'No avatar selected to delete.';
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = 'No avatar selected to delete.';
       return;
     }
     const confirmed = confirm(`Delete avatar "${selected.name || 'Untitled'}"? This action cannot be undone.`);
@@ -2663,25 +2672,39 @@
 
     avatarLibraryDeleteBtn.disabled = true;
     setControlState(avatarLibraryDeleteBtn, 'running');
+    if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `Deleting "${selected.name || 'avatar'}"…`;
+
+    // Prefer requestId for delete — it is the canonical server key.
+    // Fall back to avatarId (item ID) if requestId is not available.
+    const deleteId = selected.requestId || selected.id;
+
     try {
-      const response = await fetch(`/api/affiliate/avatar/${encodeURIComponent(selected.id)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, {
+      const response = await fetch(`/api/affiliate/avatar/${encodeURIComponent(deleteId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, {
         method: 'DELETE',
         headers: { Accept: 'application/json' }
       });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
         throw new Error(payload.error || `Delete failed: ${response.status}`);
       }
-      // Remove from local list
-      supportState.avatarLibrary = supportState.avatarLibrary.filter((item) => String(item.id) !== String(selected.id));
-      supportState.selectedAvatarLibraryId = '';
+      // Immediately remove from local state and re-render
+      supportState.avatarLibrary = supportState.avatarLibrary.filter(
+        (item) => String(item.id) !== String(selected.id) && String(item.requestId) !== String(selected.requestId)
+      );
+      supportState.selectedAvatarLibraryId = supportState.avatarLibrary.length ? supportState.avatarLibrary[0].id : '';
       setControlState(avatarLibraryDeleteBtn, 'completed', 1300);
-      sessionInfo.textContent = `Avatar "${selected.name || 'Untitled'}" deleted permanently.`;
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `✅ Avatar "${selected.name || 'Untitled'}" deleted.`;
+      if (sessionInfo) sessionInfo.textContent = `Avatar "${selected.name || 'Untitled'}" deleted permanently.`;
       renderAvatarLibrary();
-      renderAvatarLibraryPreview(null);
+      if (supportState.avatarLibrary.length) {
+        renderAvatarLibraryPreview(supportState.avatarLibrary[0], null);
+      } else {
+        renderAvatarLibraryPreview(null);
+      }
     } catch (error) {
       setControlState(avatarLibraryDeleteBtn, 'off');
-      sessionInfo.textContent = `Avatar deletion failed: ${error.message}`;
+      if (avatarLibraryMonitor) avatarLibraryMonitor.textContent = `❌ Delete failed: ${error.message}`;
+      if (sessionInfo) sessionInfo.textContent = `Avatar deletion failed: ${error.message}`;
     } finally {
       avatarLibraryDeleteBtn.disabled = false;
     }

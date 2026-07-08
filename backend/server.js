@@ -6696,36 +6696,40 @@ app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
   try {
     const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
     const avatarId = String(req.params.avatarId || '').trim();
-    
+
     if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
     if (!avatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
-    
-    // Find the avatar request to verify ownership
-    const avatarRequest = findAvatarRequest(avatarId) || 
-                         (avatarRequests.find((req) => String(req.avatar?.id) === avatarId) ||
-                          avatarRequests.find((req) => String(req.avatar?.avatarId) === avatarId) ||
-                          avatarRequests.find((req) => String(req.avatar?.avatarItemId) === avatarId));
-    
-    if (!avatarRequest) {
+
+    // Load fresh from disk so we always work on the current state
+    const allRecords = getAvatarRequests();
+
+    // Find by requestId OR any avatar ID field — whichever matches
+    const matchIndex = allRecords.findIndex((r) =>
+      r.requestId === avatarId ||
+      String(r.avatar?.id || '') === avatarId ||
+      String(r.avatar?.avatarId || '') === avatarId ||
+      String(r.avatar?.avatarItemId || '') === avatarId
+    );
+
+    if (matchIndex < 0) {
       return res.status(404).json({ success: false, error: 'Avatar not found' });
     }
-    
+
+    const avatarRequest = allRecords[matchIndex];
+
     // AFFILIATE ISOLATION: verify the requesting affiliate owns this avatar
     const ownerCode = affiliateRecordCode(avatarRequest);
-    if (ownerCode !== affiliateCode) {
+    if (ownerCode && ownerCode !== affiliateCode) {
       return res.status(403).json({ success: false, error: 'You can only delete your own avatars' });
     }
-    
-    // Remove from avatar requests
-    const index = avatarRequests.findIndex((req) => String(req.avatar?.id) === avatarId || 
-                                                     String(req.avatar?.avatarId) === avatarId ||
-                                                     String(req.avatar?.avatarItemId) === avatarId);
-    if (index >= 0) {
-      avatarRequests.splice(index, 1);
-      saveAvatarRequests();
-    }
-    
-    // Clean up GCS files if persistence engine is available
+
+    // Remove from the fresh array and persist immediately
+    allRecords.splice(matchIndex, 1);
+    saveAvatarRequests(allRecords);
+    // Sync to GCS so it survives container restarts
+    persistenceEngine.gcsWrite('evics-data/avatar_requests.json', allRecords).catch(() => {});
+
+    // Best-effort GCS file cleanup
     if (avatarRequest.avatar?.photoUrl || avatarRequest.avatar?.voiceFileUrl) {
       try {
         if (persistenceEngine && persistenceEngine.deleteAvatarFiles) {
@@ -6735,7 +6739,8 @@ app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
         console.warn(`File cleanup warning for avatar ${avatarId}:`, err.message);
       }
     }
-    
+
+    console.log(`[Avatar Delete] Removed avatar ${avatarId} for affiliate ${affiliateCode}. Remaining: ${allRecords.length}`);
     res.json({ success: true, deleted: true, avatarId });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
