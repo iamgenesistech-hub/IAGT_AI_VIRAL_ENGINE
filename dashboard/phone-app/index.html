@@ -88,14 +88,14 @@
           </div>
           <div class="avatar-setup-grid">
             <div class="avatar-upload-card">
-              <h3>Profile Picture</h3>
+              <div class="step-label"><span class="step-num">1</span> Profile Picture</div>
               <p>Upload a clear front-facing photo.</p>
               <input id="phoneAvatarPhotoInput" type="file" accept="image/*" />
               <button type="button" id="phoneAvatarPhotoUpload" class="control-btn state-off">Upload picture</button>
               <img id="phoneAvatarPhotoPreview" class="avatar-photo-preview hidden" alt="Affiliate profile preview" />
             </div>
             <div class="avatar-upload-card">
-              <h3>Voice Sample</h3>
+              <div class="step-label"><span class="step-num">2</span> Voice Sample</div>
               <p>Upload a clean voice clip for cloning/reference.</p>
               <p id="phoneVoiceHelp" class="avatar-help">Allow microphone access to record directly, or upload a file below.</p>
               <div class="voice-script-card">
@@ -122,7 +122,7 @@
           <div class="panel attire-panel">
             <div class="panel-head">
               <div>
-                <h2>Avatar Attire Selection</h2>
+                <h2><span class="step-label-inline"><span class="step-num">3</span></span> Avatar Attire Selection</h2>
                 <p>Choose how your avatar will be dressed when presenting products.</p>
               </div>
             </div>
@@ -326,6 +326,8 @@
           </div>
 
           <div class="create-avatar-action" id="phoneCreateAvatarSection">
+            <div class="step-label" style="margin-bottom:6px"><span class="step-num">4</span> Verify Identity &amp; Create Avatar</div>
+            <div class="binding-badge" id="phoneAvatarBindingBadge">Profile ID: pending · Voice ID: pending</div>
             <button type="button" id="phoneCreateAvatarBtn" class="control-btn create-avatar-btn state-off">
               🚀 Create My Avatar
             </button>

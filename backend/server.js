@@ -1135,6 +1135,8 @@ function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voice
     profiles.unshift(updated);
   }
   saveAffiliateProfiles(profiles.slice(0, 500));
+  // Write-through backup to GCS so profiles survive Cloud Run redeploys
+  persistenceEngine.gcsWrite('evics-data/affiliate_profiles.json', profiles.slice(0, 500)).catch(() => {});
   return updated;
 }
 
@@ -9814,8 +9816,17 @@ app.listen(PORT, () => {
   // Start automation scheduler (viral scan, profit audit, library cleanup, exec report)
   startScheduler(`http://127.0.0.1:${PORT}`);
 
-  // Restore persisted state from GCS — avatar requests and video records survive redeploys
+  // Restore persisted state from GCS — avatar requests, profiles, and video records survive redeploys
   (async () => {
+    try {
+      const profileData = await persistenceEngine.gcsRead('evics-data/affiliate_profiles.json');
+      if (Array.isArray(profileData) && profileData.length) {
+        saveAffiliateProfiles(profileData);
+        console.log(`[Persist] ✅ Restored ${profileData.length} affiliate profile(s) from GCS.`);
+      }
+    } catch (e) {
+      console.warn('[Persist] Could not restore affiliate profiles from GCS:', e.message);
+    }
     try {
       const avatarData = await persistenceEngine.gcsRead('evics-data/avatar_requests.json');
       if (Array.isArray(avatarData) && avatarData.length) {
