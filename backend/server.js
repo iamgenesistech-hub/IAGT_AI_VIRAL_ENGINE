@@ -2349,6 +2349,8 @@ nativeAvatarWorkerRef = createNativeAvatarWorker({
         name: input.name,
         photoUrl: input.photoUrl,
         voiceFileUrl: input.voiceFileUrl,
+        voiceCloneId: input.voiceCloneId || '',
+        voiceId: input.voiceId || '',
         attire: input.attire || null,
       });
       const avatarItem = payload && payload.avatar_item ? payload.avatar_item : {};
@@ -6790,6 +6792,16 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
   }
   try {
     // Use talking_photo_id when available, otherwise fall back to avatar_id rendering.
+    // Voice priority: avatar's own clone → profile's stored clone → env default → never hardcoded
+    const profileVoiceCloneId = String(getAffiliateProfile(ownerCode)?.voiceCloneId || '').trim();
+    const resolvedVoiceCloneId = String(
+      resolvedRequest?.avatar?.voiceCloneId ||
+      resolvedRequest?.voiceCloneId ||
+      profileVoiceCloneId ||
+      process.env.HEYGEN_VOICE_ID || ''
+    ).trim();
+    console.log(`[Proof] Affiliate: ${ownerCode}, voiceCloneId from avatar: ${resolvedRequest?.avatar?.voiceCloneId || 'none'}, from profile: ${profileVoiceCloneId || 'none'}, resolved: ${resolvedVoiceCloneId || 'MISSING'}`);
+
     let render;
     if (storedTalkingPhotoId) {
       const v2Resp = await heygenApiJson('/v2/video/generate', {
@@ -6798,18 +6810,17 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
           voice: {
             type: 'text',
             input_text: resolvedScript,
-            voice_id: resolvedRequest?.avatar?.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b'
+            voice_id: resolvedVoiceCloneId
           }
         }],
         dimension: { width: 720, height: 1280 }
       });
       render = { video_id: v2Resp?.data?.video_id || null };
     } else {
-      const voiceId = resolvedRequest?.avatar?.voiceCloneId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
       render = await startHeyGenRender({
         script: resolvedScript,
         avatar_id: resolvedAvatarId,
-        voice_id: voiceId,
+        voice_id: resolvedVoiceCloneId,
         config: {
           aspect: '9:16',
           background: { type: 'color', color: '#0b1016' },
@@ -6927,27 +6938,33 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     if (requestRecord && affiliateRecordCode(requestRecord) && affiliateRecordCode(requestRecord) !== requestedAffiliateCode) {
       return res.status(403).json({ success: false, error: 'This avatar request belongs to a different affiliate account.' });
     }
-    const resolvedName = name || requestRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
-    const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || requestRecord?.photoUrl || null);
+    // If the client is reusing a requestId that already has a completed/failed avatar,
+    // generate a fresh one so the new photo/voice/attire create a brand-new avatar.
+    const effectiveRequestId = (requestRecord && (requestRecord.status === 'completed' || requestRecord.status === 'failed'))
+      ? makeAvatarRequestId()
+      : finalRequestId;
+    const effectiveRecord = effectiveRequestId === finalRequestId ? requestRecord : null;
+    const resolvedName = name || effectiveRecord?.name || `${affiliateId ? 'My' : 'EVICS'} Avatar`;
+    const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || effectiveRecord?.photoUrl || null);
     const storedProfile = getAffiliateProfile(requestedAffiliateCode);
     // Rewrite old direct-GCS affiliate-upload URLs to the server proxy route before passing
     // to HeyGen — the proxy route is publicly accessible via Cloud Run + GCS auth fallback.
     const storedVoiceUrl = rewriteAffiliateUploadUrl(String(storedProfile?.voiceFileUrl || '').trim(), req);
     const storedVoiceCloneId = String(storedProfile?.voiceCloneId || '').trim();
     const storedVoiceId = String(storedProfile?.voiceId || '').trim();
-    const resolvedVoiceUrl = voiceFileUrl || requestRecord?.voiceFileUrl || storedVoiceUrl || null;
-    const resolvedProductId = productId || requestRecord?.productId || null;
-    const resolvedProductHandle = productHandle || requestRecord?.productHandle || null;
-    const resolvedProductTitle = productTitle || requestRecord?.productTitle || null;
-    const resolvedProductPageUrl = productPageUrl || requestRecord?.productPageUrl || null;
-    const resolvedProductImageUrl = productImageUrl || requestRecord?.productImageUrl || null;
-    const resolvedPlatform = platform || requestRecord?.platform || null;
-    const resolvedPlatformLabel = platformLabel || requestRecord?.platformLabel || null;
-    const rawAttire = (attire && typeof attire === 'object') ? attire : (requestRecord?.attire || null);
+    const resolvedVoiceUrl = voiceFileUrl || effectiveRecord?.voiceFileUrl || storedVoiceUrl || null;
+    const resolvedProductId = productId || effectiveRecord?.productId || null;
+    const resolvedProductHandle = productHandle || effectiveRecord?.productHandle || null;
+    const resolvedProductTitle = productTitle || effectiveRecord?.productTitle || null;
+    const resolvedProductPageUrl = productPageUrl || effectiveRecord?.productPageUrl || null;
+    const resolvedProductImageUrl = productImageUrl || effectiveRecord?.productImageUrl || null;
+    const resolvedPlatform = platform || effectiveRecord?.platform || null;
+    const resolvedPlatformLabel = platformLabel || effectiveRecord?.platformLabel || null;
+    const rawAttire = (attire && typeof attire === 'object') ? attire : (effectiveRecord?.attire || null);
     const resolvedAttire = normalizeAvatarAttire(rawAttire, storedProfile?.avatarGender || storedProfile?.gender || '');
      
     // Log resolved inputs for debugging
-    console.log(`[Avatar Create] Affiliate: ${requestedAffiliateCode}, PhotoURL: ${resolvedPhotoUrl}, VoiceURL: ${resolvedVoiceUrl}`);
+    console.log(`[Avatar Create] Affiliate: ${requestedAffiliateCode}, EffectiveReqId: ${effectiveRequestId} (orig: ${finalRequestId}), PhotoURL: ${resolvedPhotoUrl}, VoiceURL: ${resolvedVoiceUrl}, VoiceCloneId: ${storedVoiceCloneId || 'none'}`);
     console.log(`[Avatar Create] Attire received from phone app:`, JSON.stringify(rawAttire || {}, null, 2));
     console.log(`[Avatar Create] Attire after normalization:`, JSON.stringify(resolvedAttire || {}, null, 2));
 
@@ -6981,52 +6998,54 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     if (nativeAsyncRequested && nativeAvatarRuntime && typeof nativeAvatarRuntime.submitJob === 'function') {
       const submission = await nativeAvatarRuntime.submitJob({
         affiliateCode: requestedAffiliateCode,
-        requestId: finalRequestId,
-        idempotencyKey: `avatar_create_${finalRequestId}`,
+        requestId: effectiveRequestId,
+        idempotencyKey: `avatar_create_${effectiveRequestId}`,
         provider: String(req.body?.avatarProvider || 'auto').trim().toLowerCase() || 'auto',
         name: resolvedName,
         photoUrl: resolvedPhotoUrl,
         voiceFileUrl: resolvedVoiceUrl,
+        voiceCloneId: storedVoiceCloneId || null,
+        voiceId: storedVoiceId || null,
         attire: resolvedAttire,
         requestedBy: source || 'affiliate-hub',
         source: source || 'affiliate-hub',
-      }, `legacy_avatar_create_${finalRequestId}`);
+      }, `legacy_avatar_create_${effectiveRequestId}`);
 
       upsertAvatarRequest({
-        ...(requestRecord || {}),
-        requestId: finalRequestId,
+        ...(effectiveRecord || {}),
+        requestId: effectiveRequestId,
         affiliateCode: requestedAffiliateCode,
         affiliateId: requestedAffiliateCode,
         name: resolvedName,
         photoUrl: resolvedPhotoUrl,
         voiceFileUrl: resolvedVoiceUrl,
-        voiceFilePath: voiceFilePath || requestRecord?.voiceFilePath || null,
-        voiceFileUpdatedAt: requestRecord?.voiceFileUpdatedAt || null,
-        productId: resolvedProductId || requestRecord?.productId || null,
-        productHandle: resolvedProductHandle || requestRecord?.productHandle || null,
-        productTitle: resolvedProductTitle || requestRecord?.productTitle || null,
-        productPageUrl: resolvedProductPageUrl || requestRecord?.productPageUrl || null,
-        productImageUrl: resolvedProductImageUrl || requestRecord?.productImageUrl || null,
-        platform: resolvedPlatform || requestRecord?.platform || null,
-        platformLabel: resolvedPlatformLabel || requestRecord?.platformLabel || null,
-        attire: resolvedAttire || requestRecord?.attire || null,
-        source: requestRecord?.source || source || 'affiliate-hub',
-        returnTo: normalizedReturnTo || requestRecord?.returnTo || null,
+        voiceFilePath: voiceFilePath || effectiveRecord?.voiceFilePath || null,
+        voiceFileUpdatedAt: effectiveRecord?.voiceFileUpdatedAt || null,
+        productId: resolvedProductId || effectiveRecord?.productId || null,
+        productHandle: resolvedProductHandle || effectiveRecord?.productHandle || null,
+        productTitle: resolvedProductTitle || effectiveRecord?.productTitle || null,
+        productPageUrl: resolvedProductPageUrl || effectiveRecord?.productPageUrl || null,
+        productImageUrl: resolvedProductImageUrl || effectiveRecord?.productImageUrl || null,
+        platform: resolvedPlatform || effectiveRecord?.platform || null,
+        platformLabel: resolvedPlatformLabel || effectiveRecord?.platformLabel || null,
+        attire: resolvedAttire || effectiveRecord?.attire || null,
+        source: effectiveRecord?.source || source || 'affiliate-hub',
+        returnTo: normalizedReturnTo || effectiveRecord?.returnTo || null,
         status: 'processing',
         processingMode: 'native_async',
         nativeAvatarJobId: submission.job.id,
         nativeAvatarProvider: submission.job.provider,
-        createdAt: requestRecord?.createdAt || new Date().toISOString(),
+        createdAt: effectiveRecord?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         completedAt: null,
-        avatar: requestRecord?.avatar || null,
+        avatar: null,
         error: null
       });
 
       return res.status(202).json({
         success: true,
         async: true,
-        requestId: finalRequestId,
+        requestId: effectiveRequestId,
         status: 'processing',
         nativeAvatarJobId: submission.job.id,
         provider: submission.job.provider,

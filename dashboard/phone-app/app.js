@@ -2399,6 +2399,11 @@
         createAvatarStatus.className = 'create-avatar-status';
       }
 
+      // Clear the old requestId so a fresh avatar is always created with the
+      // current photo, voice, and attire — never replaying an old completed job.
+      supportState.avatarSetup.requestId = '';
+      localStorage.removeItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`);
+
       try {
         const payload = await apiJson('/api/affiliate/avatar/create', {
           method: 'POST',
@@ -2409,7 +2414,7 @@
             photoUrl: supportState.avatarSetup.photoUrl,
             voiceFilePath: supportState.avatarSetup.voiceFilePath || null,
             voiceFileUrl: supportState.avatarSetup.voiceFileUrl || null,
-            requestId: supportState.avatarSetup.requestId || null,
+            requestId: null,
             attire: attire,
             source: 'phone-app',
             nativeAsync: true,
