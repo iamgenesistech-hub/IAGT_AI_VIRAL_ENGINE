@@ -68,6 +68,7 @@ const mountBillingRoutes = require('./billingRoutes');
 
 // Phase 2: Production Hardening — JWT auth, RBAC, health checks, cost optimization
 const phase2Integration = require('./phase2Integration');
+const cdnEngine = require('./cdnEngine');
 
 // HeyGen Cost Tracking Engine — track every API dollar spent before counting profit.
 const costTracker = require('./costTrackingEngine');
@@ -124,13 +125,19 @@ async function uploadToGcs(localPath, gcsPath, contentType) {
   const token = await getGcsAccessToken();
   if (!token) return null; // Not on Cloud Run or no access
   const fileBuffer = fs.readFileSync(localPath);
+  
+  // Include CDN cache headers for GCS objects
+  const cdnHeaders = cdnEngine.getGCSUploadHeaders(contentType);
+  
   const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o?uploadType=media&name=${encodeURIComponent(gcsPath)}`;
   const resp = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': contentType || 'application/octet-stream',
-      'Content-Length': String(fileBuffer.length)
+      'Content-Length': String(fileBuffer.length),
+      'Cache-Control': cdnHeaders['Cache-Control'],
+      'x-goog-meta-cache-control': cdnHeaders['Cache-Control']
     },
     body: fileBuffer
   });
@@ -140,7 +147,7 @@ async function uploadToGcs(localPath, gcsPath, contentType) {
     return null;
   }
   await resp.json().catch(() => ({}));
-  console.log(`[GCS] Uploaded: ${gcsPath} (${fileBuffer.length} bytes)`);
+  console.log(`[GCS] Uploaded: ${gcsPath} (${fileBuffer.length} bytes) with CDN cache headers`);
   return `gs://${GCS_BUCKET}/${gcsPath}`;
 }
 
@@ -209,6 +216,9 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
+
+// Apply CDN cache headers middleware
+app.use(cdnEngine.applyCDNHeaders);
 
 app.use(express.json());
 
@@ -2107,6 +2117,26 @@ app.get('/api/evidence/heygen', (_req, res) => {
 app.get('/api/health', async (req, res, next) => {
   req.url = '/status';
   app.handle(req, res, next);
+});
+
+// /api/cdn/health – CDN configuration and cache metrics
+app.get('/api/cdn/health', async (req, res) => {
+  const cdnStatus = await cdnEngine.verifyCDNSetup();
+  const metrics = cdnEngine.getCDNHealthMetrics({
+    timestamp: new Date().toISOString(),
+    requestCount: errorCount,
+    lastUpdated: new Date().toISOString()
+  });
+  res.json({
+    success: true,
+    cdn: cdnStatus,
+    metrics: metrics,
+    cacheHeaders: {
+      video: cdnEngine.CDN_CACHE_POLICIES['video/mp4'].description,
+      image: cdnEngine.CDN_CACHE_POLICIES['image/jpeg'].description,
+      metadata: cdnEngine.CDN_CACHE_POLICIES['application/json'].description
+    }
+  });
 });
 
 // Scheduler activity log

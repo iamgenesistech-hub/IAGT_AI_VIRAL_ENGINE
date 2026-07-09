@@ -9,7 +9,10 @@
     "check": "node --check backend/server.js && node --check backend/sharedEvicsEvieCore.js && node --check backend/evicsEvieRoutes.js && node --check backend/evicsEliteRoutes.js && node --check backend/sacredIntelligenceGovernance.js && node --check backend/governanceRoutes.js && node --check tests/evics-evie-validation.js && node --check tests/governance-validation.js",
     "test": "node tests/evics-evie-validation.js",
     "test:governance": "node tests/governance-validation.js",
-    "test:legacy-scraper": "node scrapers/viralScraper.js"
+    "test:legacy-scraper": "node scrapers/viralScraper.js",
+    "loadtest": "node tests/run-loadtests.js",
+    "loadtest:500": "node tests/loadtest-500.js",
+    "loadtest:1000": "node tests/loadtest-1000.js"
   },
   "dependencies": {
     "@google-cloud/firestore": "^8.6.0",
