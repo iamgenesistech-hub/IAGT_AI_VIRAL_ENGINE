@@ -1181,14 +1181,17 @@
       const pEmoji = platformEmoji[item.platform] || '🎬';
       const priceStr = item.productPrice ? `$${Number(item.productPrice).toFixed(2)}` : '';
       const scoreStr = item.qualityScore != null ? `${item.qualityScore}/100` : '';
-      return `<button type="button" class="video-library-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
-        ${thumb ? `<img class="vlc-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="vlc-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:32px">🎬</div>'}
-        ${item.status === 'completed' ? '<span class="vlc-play-overlay">▶</span>' : ''}
-        <strong>${escapeHtml(item.productTitle || 'Product Video')}${priceStr ? ' · ' + priceStr : ''}</strong>
-        <span class="vlc-platform">${pEmoji} ${escapeHtml(item.platform || 'tiktok')}</span>
-        ${scoreStr ? `<span class="vlc-score" title="AI Quality Score">${scoreStr}</span>` : ''}
-        <span class="vlc-status ${statusClass}">${statusLabel}</span>
-      </button>`;
+      return `<div class="video-library-card-wrap">
+        <button type="button" class="video-library-card${selected ? ' selected' : ''}" data-pvid="${escapeHtml(item.videoJobId)}">
+          ${thumb ? `<img class="vlc-thumb" src="${escapeHtml(thumb)}" alt="Video thumbnail" />` : '<div class="vlc-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:32px">🎬</div>'}
+          ${item.status === 'completed' ? '<span class="vlc-play-overlay">▶</span>' : ''}
+          <strong>${escapeHtml(item.productTitle || 'Product Video')}${priceStr ? ' · ' + priceStr : ''}</strong>
+          <span class="vlc-platform">${pEmoji} ${escapeHtml(item.platform || 'tiktok')}</span>
+          ${scoreStr ? `<span class="vlc-score" title="AI Quality Score">${scoreStr}</span>` : ''}
+          <span class="vlc-status ${statusClass}">${statusLabel}</span>
+        </button>
+        <button type="button" class="vlc-delete-btn" data-delete-pvid="${escapeHtml(item.videoJobId)}" title="Delete this video" aria-label="Delete video">🗑</button>
+      </div>`;
     }).join('');
 
     productVideoGrid.querySelectorAll('[data-pvid]').forEach((btn) => {
@@ -1203,12 +1206,64 @@
       });
     });
 
+    // Wire delete buttons on each card
+    productVideoGrid.querySelectorAll('[data-delete-pvid]').forEach((delBtn) => {
+      delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const pvid = delBtn.getAttribute('data-delete-pvid');
+        const item = items.find((v) => v.videoJobId === pvid);
+        const label = item ? (item.productTitle || 'this video') : 'this video';
+        if (!confirm(`Delete "${label}"?\n\nThis cannot be undone.`)) return;
+        delBtn.textContent = '⏳';
+        delBtn.disabled = true;
+        const ok = await deleteProductVideo(pvid);
+        if (ok) {
+          supportState.productVideos = supportState.productVideos.filter((v) => v.videoJobId !== pvid);
+          if (supportState.selectedProductVideoId === pvid) supportState.selectedProductVideoId = null;
+          renderProductVideoGallery();
+        } else {
+          delBtn.textContent = '🗑';
+          delBtn.disabled = false;
+        }
+      });
+    });
+
     const selected = items.find((v) => v.videoJobId === supportState.selectedProductVideoId) || items[0];
     if (selected && !supportState.selectedProductVideoId) supportState.selectedProductVideoId = selected.videoJobId;
     renderProductVideoPreview(selected || null);
   }
 
-  async function copyToClipboard(text) {
+  /**
+   * deleteProductVideo — calls DELETE /api/affiliate/product-video/:videoJobId
+   * Only the owning affiliate can delete their own video.
+   * Returns true on success, false on failure.
+   */
+  async function deleteProductVideo(videoJobId) {
+    const deleteStatus = document.getElementById('phoneProductVideoDeleteStatus');
+    try {
+      const resp = await fetch(
+        `/api/affiliate/product-video/${encodeURIComponent(videoJobId)}?affiliateCode=${encodeURIComponent(supportState.affiliateCode || '')}`,
+        { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
+      );
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok || payload.success === false) {
+        const msg = payload.error || `Delete failed (${resp.status})`;
+        if (deleteStatus) { deleteStatus.textContent = `❌ ${msg}`; setTimeout(() => { deleteStatus.textContent = ''; }, 5000); }
+        console.warn('[VideoDelete] failed:', msg);
+        return false;
+      }
+      if (deleteStatus) { deleteStatus.textContent = ''; }
+      console.log('[VideoDelete] deleted:', videoJobId);
+      return true;
+    } catch (err) {
+      const msg = `Delete error: ${err.message}`;
+      if (deleteStatus) { deleteStatus.textContent = `❌ ${msg}`; setTimeout(() => { deleteStatus.textContent = ''; }, 5000); }
+      console.error('[VideoDelete]', err);
+      return false;
+    }
+  }
+
+
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -1513,6 +1568,28 @@
             if (postStatus) postStatus.textContent = `Post failed: ${err.message}`;
           }
         });
+      });
+    }
+
+    // Wire the "Delete This Video" button in the player panel
+    const deleteBtn = document.getElementById('phoneProductVideoDeleteBtn');
+    if (deleteBtn && item && item.videoJobId) {
+      const newDeleteBtn = deleteBtn.cloneNode(true);
+      deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+      newDeleteBtn.addEventListener('click', async () => {
+        const label = item.productTitle || 'this video';
+        if (!confirm(`Delete "${label}"?\n\nThis cannot be undone.`)) return;
+        newDeleteBtn.textContent = '⏳ Deleting…';
+        newDeleteBtn.disabled = true;
+        const ok = await deleteProductVideo(item.videoJobId);
+        if (ok) {
+          supportState.productVideos = supportState.productVideos.filter((v) => v.videoJobId !== item.videoJobId);
+          supportState.selectedProductVideoId = null;
+          renderProductVideoGallery();
+        } else {
+          newDeleteBtn.textContent = '🗑 Delete This Video';
+          newDeleteBtn.disabled = false;
+        }
       });
     }
   }

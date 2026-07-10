@@ -416,10 +416,55 @@
     }
   }
 
+  const asyncErrorsEl = document.getElementById('adminAsyncErrors');
+
+  async function refreshAsyncErrors() {
+    try {
+      const data = await apiJson('/api/admin/async-job-errors?limit=25');
+      const errors = data.errors || [];
+      if (!asyncErrorsEl) return;
+      if (!errors.length) {
+        asyncErrorsEl.innerHTML = '<p class="monitor-info">No recent async job errors.</p>';
+        return;
+      }
+      asyncErrorsEl.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="color:#1ec8f2;text-align:left;border-bottom:1px solid #1c3044">
+              <th style="padding:6px 8px">Type</th>
+              <th style="padding:6px 8px">Affiliate</th>
+              <th style="padding:6px 8px">Request ID</th>
+              <th style="padding:6px 8px">Video Job ID</th>
+              <th style="padding:6px 8px">Status</th>
+              <th style="padding:6px 8px">Error</th>
+              <th style="padding:6px 8px">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${errors.map((item) => {
+              const err = String(item.error || '').trim();
+              return `<tr style="border-bottom:1px solid #0e2233">
+                <td style="padding:5px 8px">${item.jobType || '—'}</td>
+                <td style="padding:5px 8px;font-family:monospace">${item.affiliateCode || '—'}</td>
+                <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9" title="${item.requestId || ''}">${shortId(item.requestId)}</td>
+                <td style="padding:5px 8px;font-family:monospace;color:#8fb7c9" title="${item.videoJobId || ''}">${shortId(item.videoJobId)}</td>
+                <td style="padding:5px 8px">${statusBadge(item.status)}</td>
+                <td style="padding:5px 8px;color:#ff9999;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${err}">${err || '—'}</td>
+                <td style="padding:5px 8px;color:#6b7e8f">${item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    } catch (error) {
+      if (asyncErrorsEl) asyncErrorsEl.innerHTML = `<p class="monitor-info" style="color:#ff4d4d">Async error feed unavailable: ${error.message}</p>`;
+    }
+  }
+
   if (identityRefreshBtn) {
     identityRefreshBtn.addEventListener('click', () => {
       void refreshIdentityChains(identityRefreshBtn);
       void refreshRecentRequests();
+      void refreshAsyncErrors();
     });
   }
 
@@ -438,6 +483,7 @@
       void refreshGovernance(refreshBtn);
       void refreshIdentityChains(refreshBtn);
       void refreshRecentRequests();
+      void refreshAsyncErrors();
       setTimeout(() => refreshBtn.classList.remove('pressing'), 120);
     });
   }
@@ -447,8 +493,133 @@
   void refreshGovernance();
   void refreshIdentityChains();
   void refreshRecentRequests();
+  void refreshAsyncErrors();
   setInterval(() => { void refresh(); }, 30000);
   setInterval(() => { void refreshComms(); }, 8000);
   setInterval(() => { void refreshGovernance(); }, 30000);
-  setInterval(() => { void refreshIdentityChains(); void refreshRecentRequests(); }, 60000);
+  setInterval(() => { void refreshIdentityChains(); void refreshRecentRequests(); void refreshAsyncErrors(); }, 60000);
+
+  // ── Admin Video Management ────────────────────────────────────────────────
+  (function initVideoMgmt() {
+    const loadBtn    = document.getElementById('adminVideoMgmtLoad');
+    const codeInput  = document.getElementById('adminVideoMgmtAffiliate');
+    const jobIdInput = document.getElementById('adminVideoMgmtJobId');
+    const deleteDirectBtn = document.getElementById('adminVideoMgmtDeleteDirect');
+    const directStatus   = document.getElementById('adminVideoMgmtDirectStatus');
+    const listEl         = document.getElementById('adminVideoMgmtList');
+    const adminKeyInput  = document.getElementById('adminVideoMgmtKey');
+    if (!loadBtn || !listEl) return;
+
+    function getAdminKey() { return (adminKeyInput ? adminKeyInput.value.trim() : '') || ''; }
+
+    // Load videos for an affiliate (or all if blank)
+    loadBtn.addEventListener('click', async () => {
+      const code = (codeInput ? codeInput.value.trim() : '');
+      setControlState(loadBtn, 'running');
+      listEl.innerHTML = '<p class="monitor-info" style="font-size:12px">Loading…</p>';
+      try {
+        const url = `/api/affiliate/product-videos?affiliateCode=${encodeURIComponent(code)}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        const payload = await resp.json().catch(() => ({}));
+        const videos = Array.isArray(payload.videos) ? payload.videos : [];
+        if (!videos.length) {
+          listEl.innerHTML = '<p class="monitor-info" style="font-size:12px">No videos found.</p>';
+          setControlState(loadBtn, 'completed', 3000);
+          return;
+        }
+        setControlState(loadBtn, 'completed', 3000);
+        const rows = videos.map((v) => {
+          const pvid = String(v.videoJobId || '').replace(/"/g, '&quot;');
+          const affiliateCode = String(v.affiliateCode || code || '').replace(/"/g, '&quot;');
+          const title = String(v.productTitle || v.productId || 'Product Video').substring(0, 50);
+          const status = String(v.status || 'unknown');
+          const statusColor = status === 'completed' ? '#4caf50' : status === 'failed' ? '#e55' : '#d9bf7a';
+          return `<tr>
+            <td style="font-size:11px;padding:5px 8px">${affiliateCode}</td>
+            <td style="font-size:11px;padding:5px 8px">${title}</td>
+            <td style="font-size:11px;padding:5px 8px;color:${statusColor}">${status}</td>
+            <td style="font-size:11px;padding:5px 8px;font-family:monospace;color:var(--muted)">${pvid.substring(0, 24)}…</td>
+            <td style="padding:3px 8px">
+              <button type="button" class="control-btn state-off admin-vid-del"
+                style="font-size:10px;padding:3px 8px;border-color:#7c1c1c;color:#e55"
+                data-pvid="${pvid}" data-affiliate="${affiliateCode}">🗑</button>
+            </td>
+          </tr>`;
+        }).join('');
+        listEl.innerHTML = `<table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="font-size:10px;text-align:left;padding:4px 8px;color:var(--muted)">AFFILIATE</th>
+            <th style="font-size:10px;text-align:left;padding:4px 8px;color:var(--muted)">PRODUCT</th>
+            <th style="font-size:10px;text-align:left;padding:4px 8px;color:var(--muted)">STATUS</th>
+            <th style="font-size:10px;text-align:left;padding:4px 8px;color:var(--muted)">JOB ID</th>
+            <th style="font-size:10px;text-align:left;padding:4px 8px;color:var(--muted)">DEL</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+        // Wire delete buttons
+        listEl.querySelectorAll('.admin-vid-del').forEach((delBtn) => {
+          delBtn.addEventListener('click', async () => {
+            const pvid = delBtn.getAttribute('data-pvid');
+            if (!confirm(`Admin delete video:\n${pvid}\n\nThis is permanent.`)) return;
+            delBtn.textContent = '⏳';
+            delBtn.disabled = true;
+            const ok = await adminDeleteVideo(pvid);
+            if (ok) {
+              const row = delBtn.closest('tr');
+              if (row) row.remove();
+            } else {
+              delBtn.textContent = '🗑';
+              delBtn.disabled = false;
+            }
+          });
+        });
+      } catch (err) {
+        listEl.innerHTML = `<p class="monitor-info" style="font-size:12px;color:#e55">Error: ${err.message}</p>`;
+        setControlState(loadBtn, 'state-off');
+      }
+    });
+
+    // Direct delete by Job ID
+    if (deleteDirectBtn) {
+      deleteDirectBtn.addEventListener('click', async () => {
+        const pvid = jobIdInput ? jobIdInput.value.trim() : '';
+        if (!pvid) { if (directStatus) directStatus.textContent = '⚠️ Enter a Job ID first'; return; }
+        if (!confirm(`Admin delete video:\n${pvid}\n\nThis is permanent.`)) return;
+        setControlState(deleteDirectBtn, 'running');
+        if (directStatus) directStatus.textContent = 'Deleting…';
+        const ok = await adminDeleteVideo(pvid);
+        if (ok) {
+          setControlState(deleteDirectBtn, 'completed', 3000);
+          if (directStatus) { directStatus.textContent = '✅ Deleted'; setTimeout(() => { directStatus.textContent = ''; }, 4000); }
+          if (jobIdInput) jobIdInput.value = '';
+        } else {
+          setControlState(deleteDirectBtn, 'state-off');
+          if (directStatus) { directStatus.textContent = '❌ Failed — check key/ID'; setTimeout(() => { directStatus.textContent = ''; }, 5000); }
+        }
+      });
+    }
+
+    async function adminDeleteVideo(videoJobId) {
+      try {
+        const adminKey = getAdminKey();
+        const headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
+        if (adminKey) headers['x-admin-key'] = adminKey;
+        const resp = await fetch(`/api/admin/video/${encodeURIComponent(videoJobId)}`, {
+          method: 'DELETE',
+          headers
+        });
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok || payload.success === false) {
+          console.warn('[AdminVideoDelete] failed:', payload.error || resp.status);
+          return false;
+        }
+        console.log('[AdminVideoDelete] deleted:', videoJobId);
+        return true;
+      } catch (err) {
+        console.error('[AdminVideoDelete]', err);
+        return false;
+      }
+    }
+  })();
 })();

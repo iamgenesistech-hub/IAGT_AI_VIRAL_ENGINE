@@ -194,6 +194,52 @@
             <p class="monitor-info">Loading requests…</p>
           </div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Recent Async Job Errors</h2>
+              <p style="margin:0;font-size:12px;opacity:.7">Latest avatar + product video failures with affiliate trace IDs</p>
+            </div>
+          </div>
+          <div id="adminAsyncErrors" style="overflow-x:auto">
+            <p class="monitor-info">Loading async job errors…</p>
+          </div>
+        </div>
+
+        <!-- Admin Video Management — delete any affiliate video -->
+        <div class="panel" id="adminVideoMgmtPanel">
+          <div class="panel-head">
+            <div>
+              <h2>🎬 Video Management</h2>
+              <p style="margin:0;font-size:12px;opacity:.7">Admin-only: search and delete any affiliate product video. Deletions are permanent and GCS-cleaned.</p>
+            </div>
+            <div class="panel-actions">
+              <button type="button" id="adminVideoMgmtLoad" class="control-btn state-off" style="font-size:12px;padding:4px 12px">Load videos</button>
+            </div>
+          </div>
+          <div class="comms-console" style="gap:10px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <label for="adminVideoMgmtAffiliate" style="white-space:nowrap;font-size:12px;min-width:90px">Affiliate code</label>
+              <input type="text" id="adminVideoMgmtAffiliate" placeholder="e.g. ROLAND787 (blank = all)" style="flex:1" />
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label for="adminVideoMgmtJobId" style="white-space:nowrap;font-size:12px;min-width:90px">Job ID (optional)</label>
+              <input type="text" id="adminVideoMgmtJobId" placeholder="Delete a specific videoJobId directly" style="flex:1" />
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" id="adminVideoMgmtDeleteDirect" class="control-btn state-off" style="font-size:12px;padding:5px 12px;border-color:#7c1c1c;color:#e55">🗑 Delete by Job ID</button>
+              <span id="adminVideoMgmtDirectStatus" style="font-size:12px;align-self:center;color:var(--muted)"></span>
+            </div>
+          </div>
+          <div id="adminVideoMgmtList" style="margin-top:12px">
+            <p class="monitor-info" style="font-size:12px">Enter an affiliate code and click "Load videos" to see their renders.</p>
+          </div>
+          <div id="adminVideoMgmtAdminKey" style="margin-top:10px">
+            <label for="adminVideoMgmtKey" style="font-size:11px;opacity:.6">Admin Key (x-admin-key)</label>
+            <input type="password" id="adminVideoMgmtKey" placeholder="Required for admin delete operations" style="font-size:12px;padding:5px 8px;margin-top:4px" />
+          </div>
+        </div>
       </main>
     </div>
   </div>

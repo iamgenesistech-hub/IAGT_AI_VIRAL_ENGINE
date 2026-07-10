@@ -1211,6 +1211,57 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   letter-spacing: .3px;
 }
 
+/* Video card wrapper — contains the card button + the delete trash button */
+.video-library-card-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.video-library-card-wrap .video-library-card {
+  flex: 1;
+  width: 100%;
+}
+/* 🗑 Delete button — top-right corner of card */
+.vlc-delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(220,53,69,.6);
+  background: rgba(26,10,10,.85);
+  color: #e55;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .2s, background .15s;
+  z-index: 5;
+}
+.video-library-card-wrap:hover .vlc-delete-btn {
+  opacity: 1;
+}
+.vlc-delete-btn:hover {
+  background: rgba(220,53,69,.9);
+  color: #fff;
+}
+/* Delete action button in player info panel */
+.vlc-delete-action {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background .15s, border-color .15s;
+}
+.vlc-delete-action:hover {
+  background: rgba(220,53,69,.15) !important;
+  border-color: #dc3545 !important;
+  color: #ff6b6b !important;
+}
+
 /* Player Section */
 .video-library-player-section {
   margin-top: 16px;
