@@ -182,172 +182,121 @@ const CATEGORY_THEMES = {
   }
 };
 
-// ── Dynamic Random Background Engine ─────────────────────────────────────────
-// Every render gets a UNIQUE background. Unsplash source URLs return a different
-// random high-quality photo on each request for the given search terms.
-// Format: https://source.unsplash.com/1920x1080/?query1,query2
-// Adding a cache-buster (&sig=timestamp) guarantees uniqueness even if CDN caches.
-
-// Scene keywords per category — multiple variations for maximum diversity
+// ── Static Background Image Sets ─────────────────────────────────────────────
+// Curated direct images.unsplash.com CDN URLs per category.
+// source.unsplash.com was deprecated/shut down in 2024 and is no longer usable.
+// All URLs here are permanent direct CDN links that HeyGen can reliably download.
 const SCENE_QUERIES = {
+  health:    ['nature,morning,sunlight,wellness','zen,garden,peaceful,outdoor','yoga,outdoor,sunrise,park'],
+  supplements:['modern,kitchen,clean,bright','marble,countertop,minimalist,luxury','ocean,blue,luxury,clean'],
+  ocean:     ['ocean,blue,luxury,sunrise','beach,water,high-end,clean','coastal,blue,luxury,modern'],
+  fitness:   ['gym,fitness,dark,dramatic','beach,fitness,ocean,morning','athletic,training,intense,dark'],
+  beauty:    ['pink,marble,luxury,vanity','salon,elegant,mirror','bathroom,spa,luxury,clean'],
+  skincare:  ['spa,luxury,zen','bathroom,marble,minimalist','tropical,leaves,natural,fresh'],
+  food:      ['kitchen,modern,bright','farm,table,organic,rustic','restaurant,elegant,plating'],
+  tech:      ['office,modern,minimal','neon,city,night,futuristic','coworking,space,design'],
+  lifestyle: ['urban,fashion,city','cafe,morning,lifestyle','rooftop,bar,sunset,city'],
+  spiritual: ['temple,sunrise,golden','candles,meditation,warm','forest,light,mystical'],
+  finance:   ['office,skyline,glass','luxury,car,wealth','penthouse,city,night'],
+  education: ['library,books,warm','classroom,bright','bookshelf,reading,warm'],
+  default:   ['studio,professional,modern','office,minimalist,bright','luxury,interior,elegant']
+};
+
+// Curated static direct CDN image sets per category (multiple for variety, random selection).
+// These are permanent direct images.unsplash.com URLs — no redirect needed.
+const LIFESTYLE_IMAGE_SETS = {
   health: [
-    'nature,morning,sunlight,wellness',
-    'tropical,beach,sunrise,calm',
-    'mountain,meadow,fresh,green',
-    'zen,garden,peaceful,outdoor',
-    'lake,forest,serene,morning',
-    'yoga,outdoor,sunrise,park'
+    'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1920&q=80&fit=crop'
   ],
   supplements: [
-    'modern,kitchen,clean,bright',
-    'marble,countertop,minimalist,luxury',
-    'natural,wood,rustic,organic',
-    'bright,studio,white,clean',
-    'cafe,modern,warm,interior',
-    'farmhouse,kitchen,natural,light',
-    'ocean,blue water,luxury,clean',
-    'ocean,sunlight,white foam,premium'
+    'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1550572017-edd951b55104?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1920&q=80&fit=crop'
   ],
   ocean: [
-    'ocean,blue water,luxury,sunrise',
-    'ocean,white foam,premium,clean',
-    'ocean,glass water,calm,luxury',
-    'beach,blue water,high-end,clean',
-    'sea,reflection,soft light,premium',
-    'coastal,blue gradient,luxury,modern'
+    'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=1920&q=80&fit=crop'
   ],
   fitness: [
-    'outdoor,track,stadium,sunrise',
-    'rooftop,city,workout,urban',
-    'beach,fitness,ocean,morning',
-    'mountain,trail,running,scenic',
-    'park,exercise,trees,daylight',
-    'boxing,ring,industrial,dramatic'
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1920&q=80&fit=crop'
   ],
   beauty: [
-    'pink,marble,luxury,vanity',
-    'salon,modern,elegant,mirror',
-    'flowers,soft,pastel,feminine',
-    'bathroom,spa,luxury,clean',
-    'boutique,glamour,gold,interior',
-    'rose,garden,soft,light'
+    'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=1920&q=80&fit=crop'
   ],
   skincare: [
-    'spa,luxury,towels,zen',
-    'bathroom,marble,minimalist,clean',
-    'tropical,leaves,natural,fresh',
-    'water,droplets,clean,blue',
-    'bamboo,zen,stone,peaceful',
-    'cotton,white,soft,clean'
+    'https://images.unsplash.com/photo-1556228852-6d35a585d566?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=1920&q=80&fit=crop'
   ],
   food: [
-    'kitchen,chef,modern,bright',
-    'farm,table,organic,rustic',
-    'restaurant,elegant,food,plating',
-    'garden,herbs,fresh,outdoor',
-    'market,colorful,fresh,produce',
-    'picnic,outdoor,summer,natural'
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1920&q=80&fit=crop'
   ],
   tech: [
-    'office,modern,desk,minimal',
-    'neon,city,night,futuristic',
-    'startup,workspace,bright,clean',
-    'server,room,blue,technology',
-    'coworking,space,modern,design',
-    'digital,abstract,dark,sleek'
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=1920&q=80&fit=crop'
   ],
   lifestyle: [
-    'urban,fashion,street,city',
-    'cafe,cozy,morning,lifestyle',
-    'apartment,modern,stylish,interior',
-    'shopping,district,luxury,urban',
-    'rooftop,bar,sunset,city',
-    'beach,resort,luxury,tropical'
+    'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1540553016722-983e48a2cd10?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&q=80&fit=crop'
   ],
   spiritual: [
-    'temple,sunrise,peaceful,golden',
-    'candles,meditation,dark,warm',
-    'forest,light,rays,mystical',
-    'ocean,sunset,calm,spiritual',
-    'incense,zen,room,quiet',
-    'stars,night,sky,cosmic'
+    'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=1920&q=80&fit=crop'
   ],
   finance: [
-    'office,skyline,modern,glass',
-    'trading,floor,screens,professional',
-    'luxury,car,lifestyle,wealth',
-    'penthouse,city,view,night',
-    'gold,bars,vault,wealth',
-    'yacht,ocean,luxury,lifestyle'
+    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1920&q=80&fit=crop'
   ],
   education: [
-    'library,books,study,warm',
-    'classroom,modern,bright,learning',
-    'university,campus,outdoor,green',
-    'desk,study,lamp,cozy',
-    'bookshelf,home,reading,warm',
-    'lecture,hall,professional,clean'
+    'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1920&q=80&fit=crop'
   ],
   default: [
-    'studio,professional,modern,clean',
-    'office,minimalist,bright,white',
-    'urban,city,modern,background',
-    'luxury,interior,elegant,room',
-    'nature,outdoor,professional,light',
-    'abstract,gradient,dark,premium'
+    'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80&fit=crop',
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1920&q=80&fit=crop'
   ]
 };
 
 /**
  * Get a random unique background URL for a category.
- * Uses Unsplash source with random query variation + cache-buster = unique every time.
+ * Uses curated static images.unsplash.com CDN URLs (no redirect, HeyGen-safe).
  * @param {string} category
  * @returns {{ url: string, query: string, scene: string }}
  */
 function getRandomBackground(category = 'default') {
+  const images = LIFESTYLE_IMAGE_SETS[category] || LIFESTYLE_IMAGE_SETS.default;
   const queries = SCENE_QUERIES[category] || SCENE_QUERIES.default;
-  // Pick a random query from the category's options
-  const query = queries[Math.floor(Math.random() * queries.length)];
-  // Cache-buster ensures we never get the same cached image
-  const sig = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const url = `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}&sig=${sig}`;
+  const idx = Math.floor(Math.random() * images.length);
+  const url = images[idx];
+  const query = queries[idx % queries.length] || queries[0];
   return { url, query, scene: query.split(',')[0] };
 }
 
 /**
- * Resolve a source.unsplash.com redirect URL to the final direct image URL.
- * HeyGen requires direct image URLs (won't follow 302 redirects).
- * @param {string} sourceUrl — the source.unsplash.com URL
- * @returns {Promise<string>} — resolved direct image URL
+/**
+ * Resolve a background URL for HeyGen delivery.
+ * source.unsplash.com was shut down in 2024 — this function is now a passthrough
+ * that simply returns the URL as-is (all URLs in this module are already direct CDN links).
+ * @param {string} sourceUrl
+ * @returns {Promise<string>}
  */
 async function resolveBackgroundUrl(sourceUrl) {
-  if (!sourceUrl || !sourceUrl.includes('source.unsplash.com')) {
-    return sourceUrl; // Already a direct URL
-  }
-  try {
-    const https = require('https');
-    const http = require('http');
-    const resolved = await new Promise((resolve, reject) => {
-      const doRequest = (url, redirects = 0) => {
-        if (redirects > 5) return resolve(url); // Max redirects, use what we have
-        const mod = url.startsWith('https') ? https : http;
-        const req = mod.get(url, { timeout: 8000 }, (res) => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            doRequest(res.headers.location, redirects + 1);
-          } else {
-            resolve(url); // Final destination
-          }
-          res.resume(); // Consume response data to free memory
-        });
-        req.on('error', () => resolve(url));
-        req.on('timeout', () => { req.destroy(); resolve(url); });
-      };
-      doRequest(sourceUrl);
-    });
-    return resolved;
-  } catch {
-    return sourceUrl; // Fallback to unresolved URL
-  }
+  return sourceUrl || '';
 }
 
 /**
@@ -372,10 +321,10 @@ function getBackgroundOptions(product = {}) {
       category,
       scene: keywords[0],
       query,
-      // Preview URL (shows one random example of this scene type)
-      preview: `https://source.unsplash.com/400x300/?${encodeURIComponent(query)}&sig=${sig}`,
+      // Preview URL uses first static image from the set for this category
+      preview: (LIFESTYLE_IMAGE_SETS[category] || LIFESTYLE_IMAGE_SETS.default)[i % (LIFESTYLE_IMAGE_SETS[category] || LIFESTYLE_IMAGE_SETS.default).length],
       // Actual render URL will be generated fresh at render time (unique every render)
-      note: 'Each render produces a unique image from this scene type'
+      note: 'Each render picks a unique image from the curated set for this scene type'
     };
   });
 }

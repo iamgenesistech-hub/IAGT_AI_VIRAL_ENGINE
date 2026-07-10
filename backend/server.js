@@ -6464,21 +6464,14 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   // If user provided a specific backgroundUrl, use it directly
   let bgConfig, heygenBg;
   if (backgroundUrl) {
-    const rawUrl = backgroundQuery
-      ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      : backgroundUrl;
-    const resolvedUrl = await resolveBackgroundUrl(rawUrl);
-    heygenBg = { type: 'image', url: resolvedUrl };
-    bgConfig = { type: 'image', url: resolvedUrl, mode: 'user-selected', category: 'custom', scene: scene || null, query: backgroundQuery || null };
+    // Use backgroundUrl as-is (already a direct URL from user or prior resolution)
+    heygenBg = { type: 'image', url: backgroundUrl };
+    bgConfig = { type: 'image', url: backgroundUrl, mode: 'user-selected', category: 'custom', scene: scene || null, query: backgroundQuery || null };
   } else {
     // Use 'lifestyle' mode (real scene photos) when no product image available
     const productObj = product || { title: productTitle, imageUrl: productImageUrl };
     const bgMode = processedImageUrl ? 'product' : (backgroundMode === 'color' ? 'color' : 'lifestyle');
     bgConfig   = selectBackground(productObj, processedImageUrl || productImageUrl, bgMode);
-    // Resolve redirect URLs to direct image URLs (HeyGen won't follow redirects)
-    if (bgConfig.url && bgConfig.url.includes('source.unsplash.com')) {
-      bgConfig.url = await resolveBackgroundUrl(bgConfig.url);
-    }
     heygenBg   = toHeyGenBackground(bgConfig);
   }
 
@@ -6598,9 +6591,11 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   let bgScene = scene || 'random';
 
   if (backgroundQuery) {
-    const sig = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    bgUrl = `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${sig}`;
-    bgScene = scene || 'custom';
+    // backgroundQuery is a hint — find the closest static image for that category
+    const { detectCategory: dc, getRandomBackground: getRandBg } = require('../utils/videoBackgroundSelector');
+    const bg = getRandBg(scene || dc({ title: backgroundQuery }) || 'default');
+    bgUrl = bg.url;
+    bgScene = scene || bg.scene || 'custom';
   } else if (!bgUrl) {
     const category = scene || detectCategory(meta) || 'default';
     const randomBg = getRandomBackground(category);
@@ -7946,23 +7941,16 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     if (cinematicRequested) {
       const productObj = { title: resolvedProductTitle, imageUrl: resolvedProductImage, product_type: productHandle || '' };
       if (backgroundUrl) {
-        const rawBgUrl = backgroundQuery
-          ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          : backgroundUrl;
-        const directBgUrl = await resolveBackgroundUrl(rawBgUrl);
         resolvedBackground = {
           type: 'image',
           mode: 'user-selected',
           category: 'custom',
-          url: directBgUrl,
+          url: backgroundUrl,
           query: backgroundQuery || null
         };
       } else {
         const mode = processedProductImageUrl ? 'product' : (String(backgroundMode || '').toLowerCase() === 'color' ? 'color' : 'lifestyle');
         resolvedBackground = selectBackground(productObj, processedProductImageUrl || resolvedProductImage, mode);
-        if (resolvedBackground && resolvedBackground.url && resolvedBackground.url.includes('source.unsplash.com')) {
-          resolvedBackground.url = await resolveBackgroundUrl(resolvedBackground.url);
-        }
       }
       heygenBackground = toHeyGenBackground(resolvedBackground);
     }
