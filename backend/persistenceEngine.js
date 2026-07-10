@@ -335,9 +335,42 @@ async function archiveHeyGenVideo(affiliateCode, jobId, sourceUrl) {
   return gcsDownloadUrl(sourceUrl, `evics-videos/${owner}/${id}.mp4`, 'video/mp4');
 }
 
+/**
+ * Delete a GCS object by path.
+ * Used to permanently remove archived video files when an affiliate deletes a render.
+ * Returns true on success, false if not found or on any error.
+ */
+async function gcsDelete(gcsPath) {
+  const token = await _getToken();
+  if (!token) return false;
+  try {
+    const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(GCS_BUCKET)}/o/${encodeURIComponent(gcsPath)}`;
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (resp.status === 404) {
+      console.warn(`[Persist] GCS delete: object not found (${gcsPath}) — skipping.`);
+      return false;
+    }
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      console.warn(`[Persist] GCS delete failed ${gcsPath} (${resp.status}): ${err.substring(0, 120)}`);
+      return false;
+    }
+    console.log(`[Persist] GCS deleted: ${gcsPath}`);
+    return true;
+  } catch (e) {
+    console.warn(`[Persist] GCS delete error ${gcsPath}: ${e.message}`);
+    return false;
+  }
+}
+
 module.exports = {
   gcsRead,
   gcsWrite,
+  gcsDelete,
   gcsDownloadUrl,
   createVideoJob,
   getVideoJob,

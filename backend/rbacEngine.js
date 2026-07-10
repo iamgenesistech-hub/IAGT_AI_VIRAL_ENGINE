@@ -41,6 +41,7 @@ const PERMISSIONS = {
   'video:generate': [ROLES.AFFILIATE, ROLES.ADMIN],
   'video:read': [ROLES.AFFILIATE, ROLES.ADMIN],
   'video:list': [ROLES.AFFILIATE, ROLES.ADMIN],
+  'video:delete': [ROLES.AFFILIATE, ROLES.ADMIN],
   'video:publish': [ROLES.AFFILIATE, ROLES.ADMIN],
 
   // Billing & payments

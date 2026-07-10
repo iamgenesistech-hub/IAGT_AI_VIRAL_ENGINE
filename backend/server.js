@@ -1,4 +1,4 @@
-﻿// backend/server.js
+// backend/server.js
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
@@ -53,28 +53,31 @@ const {
   gradeCompletedRender
 } = require('./renderQualityValidator');
 
-// EVICS Sacred Intelligence Governance Engine — centralized AI operating standard.
+// EVICS Sacred Intelligence Governance Engine � centralized AI operating standard.
 const governance = require('./sacredIntelligenceGovernance');
 const { registerGovernanceRoutes } = require('./governanceRoutes');
 const { registerNativeAvatarRoutes } = require('./nativeAvatarRoutes');
 const { createNativeAvatarWorker } = require('./nativeAvatarWorker');
 const { createEvicsScraperControlPlane } = require('./evicsScraperControlPlane');
 
-// GCS-backed persistence — avatar + video records survive Cloud Run redeploys.
+// GCS-backed persistence � avatar + video records survive Cloud Run redeploys.
 const persistenceEngine = require('./persistenceEngine');
 
-// Stripe billing engine — subscription plans, checkout, webhooks, enforcement.
+// Stripe billing engine � subscription plans, checkout, webhooks, enforcement.
 const stripeEngine = require('./stripeEngine');
 const mountBillingRoutes = require('./billingRoutes');
 
-// Phase 2: Production Hardening — JWT auth, RBAC, health checks, cost optimization
+// Phase 2: Production Hardening � JWT auth, RBAC, health checks, cost optimization
 const phase2Integration = require('./phase2Integration');
 const cdnEngine = require('./cdnEngine');
 
-// HeyGen Cost Tracking Engine — track every API dollar spent before counting profit.
+// HeyGen Cost Tracking Engine � track every API dollar spent before counting profit.
 const costTracker = require('./costTrackingEngine');
 
-// OpenAI client — initialised lazily so missing key only affects copilot routes
+// Cinematic Layer Engine � Seedance/Kling post-render pass for camera motion + cinematic grading.
+const { applyCinematicLayer, getCinematicLayerStatus } = require('./cinematicLayerEngine');
+
+// OpenAI client � initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
 function getOpenAI() {
   if (_openaiClient) return _openaiClient;
@@ -89,12 +92,12 @@ const PORT = process.env.PORT || 4175;
 const fs = require('fs');
 const dns = require('dns').promises;
 
-// Directory constants — defined early so static middleware can reference them
+// Directory constants � defined early so static middleware can reference them
 const MEDIA_CACHE_DIR = path.join(__dirname, '../generated/mp4-cache');
 const UPLOADS_DIR = path.join(__dirname, '../generated/uploads');
 [MEDIA_CACHE_DIR, UPLOADS_DIR].forEach(d => { try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch {} });
 
-// ── GCS upload helper (uses metadata server auth on Cloud Run) ───────────────
+// -- GCS upload helper (uses metadata server auth on Cloud Run) ---------------
 const GCS_BUCKET = process.env.GCS_BUCKET || 'evics-storage-evics-api';
 async function getGcsAccessToken() {
   try {
@@ -197,7 +200,7 @@ async function generateSignedUrl(gcsPath, token) {
 
 let errorCount = 0;
 
-// ── Request logger ──
+// -- Request logger --
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -209,7 +212,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS — allowlist-based with explicit fallback for local/dev environments.
+// CORS � allowlist-based with explicit fallback for local/dev environments.
 const corsAllowedOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -242,7 +245,7 @@ app.use(cdnEngine.applyCDNHeaders);
 
 app.use(express.json());
 
-// Rate limiting — user-aware per-plan limits for agent and video generation endpoints
+// Rate limiting � user-aware per-plan limits for agent and video generation endpoints
 const PLAN_AGENT_LIMITS_PER_MIN = { free: 30, creator: 60, elite: 120 };
 const PLAN_VIDEO_LIMITS_PER_MIN = { free: 5, creator: 12, elite: 30 };
 
@@ -337,7 +340,7 @@ app.use('/admin-hub', express.static(path.join(__dirname, '../dashboard/admin-hu
 app.use('/uploads', express.static(UPLOADS_DIR, {
   setHeaders: function (res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
-    // Fix audio content types — express.static maps .webm to video/webm
+    // Fix audio content types � express.static maps .webm to video/webm
     if (ext === '.webm') res.setHeader('Content-Type', 'audio/webm');
     else if (ext === '.mp3') res.setHeader('Content-Type', 'audio/mpeg');
     else if (ext === '.wav') res.setHeader('Content-Type', 'audio/wav');
@@ -362,7 +365,7 @@ app.get('/uploads/:filename', async (req, res) => {
     const meta = await metaResp.json();
     const totalSize = parseInt(meta.size, 10);
 
-    // Determine content type — fix audio/webm files served as video/webm
+    // Determine content type � fix audio/webm files served as video/webm
     let ct = meta.contentType || 'application/octet-stream';
     const ext = path.extname(filename).toLowerCase();
     if (ext === '.webm' && ct === 'video/webm') ct = 'audio/webm';
@@ -409,7 +412,7 @@ app.get('/uploads/:filename', async (req, res) => {
   }
 });
 
-// Serve bg-removed product images (permanent cache — never re-processed)
+// Serve bg-removed product images (permanent cache � never re-processed)
 app.use('/processed-images', express.static(BG_CACHE_DIR));
 
 // Serve post-processed videos with product overlays and CTA
@@ -517,8 +520,8 @@ const A_PLUS_WORKSPACE_URLS = [
 const SUPPORTED_PRODUCT_ENTRANCE_EFFECTS = new Set([
   'product-entrance-fade'
 ]);
-// 'top' is removed — it would overlay the avatar's face/crown area.
-// All render paths must use 'bottom' to stay below the neck (y > 950 in 1080×1920).
+// 'top' is removed � it would overlay the avatar's face/crown area.
+// All render paths must use 'bottom' to stay below the neck (y > 950 in 1080�1920).
 const FACE_SAFE_TEXT_OVERLAY_POSITIONS = new Set(['bottom']);
 
 function normalizeSpecialEffects(value) {
@@ -532,6 +535,46 @@ function normalizeSpecialEffects(value) {
       .map((effect) => String(effect || '').trim().toLowerCase().replace(/\s+/g, '-'))
       .filter(Boolean)
   ));
+}
+
+const DEFAULT_PRODUCT_VIDEO_CAMERA_MOVES = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
+
+function normalizeCameraMoves(value) {
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',').map((entry) => entry.trim()).filter(Boolean)
+      : [];
+  const normalized = Array.from(new Set(
+    list
+      .map((entry) => String(entry || '').trim().toLowerCase().replace(/\s+/g, '-'))
+      .filter(Boolean)
+  ));
+  return normalized.length ? normalized : DEFAULT_PRODUCT_VIDEO_CAMERA_MOVES.slice();
+}
+
+function normalizeCinematicProductDirective(value) {
+  const input = value && typeof value === 'object' ? value : {};
+  return {
+    requireCinematicMotion: input.requireCinematicMotion !== false && input.require_cinematic_motion !== false,
+    avatarBodyMovement: String(input.avatarBodyMovement || input.avatar_body_movement || 'natural-product-presenter').trim(),
+    backgroundMovement: String(input.backgroundMovement || input.background_movement || 'kinetic-depth').trim(),
+    cameraMoves: normalizeCameraMoves(input.cameraMoves || input.camera_moves),
+    productMockupRequired: input.productMockupRequired !== false && input.product_mockup_required !== false
+  };
+}
+
+function ensurePrimaryProductMockupFile(files, productImageUrl) {
+  const baseFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (!productImageUrl) return baseFiles;
+  const normalizedProductUrl = String(productImageUrl).trim();
+  if (!normalizedProductUrl) return baseFiles;
+  const hasProductMockupFile = baseFiles.some((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    return String(entry.url || '').trim() === normalizedProductUrl;
+  });
+  if (hasProductMockupFile) return baseFiles;
+  return [{ type: 'url', url: normalizedProductUrl }, ...baseFiles];
 }
 
 function normalizeExternalUrl(value) {
@@ -816,7 +859,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'evics-workspace-consistency',
       priority: 1,
-      phase: 'Phase 1 — Interface Excellence',
+      phase: 'Phase 1 � Interface Excellence',
       title: 'Maintain Titanium consistency across EVICS workspaces',
       workflow: ['Review all section deep links', 'Validate media output workflows', 'Confirm non-redundant status surfaces'],
       status: isPass('evics-workspace-consistency') ? 'validated' : (manualStatuses['evics-workspace-consistency'] || 'in_progress'),
@@ -825,7 +868,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'affiliate-hub-performance',
       priority: 2,
-      phase: 'Phase 1 — Interface Excellence',
+      phase: 'Phase 1 � Interface Excellence',
       title: 'Affiliate Hub conversion and workspace reliability',
       workflow: ['Validate affiliate landing', 'Validate affiliate workspace', 'Validate affiliate product feed and status'],
       status: isPass('affiliate-hub-performance') ? 'validated' : (manualStatuses['affiliate-hub-performance'] || 'in_progress'),
@@ -834,7 +877,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'phone-app-observability',
       priority: 3,
-      phase: 'Phase 1 — Interface Excellence',
+      phase: 'Phase 1 � Interface Excellence',
       title: 'Phone App render observability and ops readiness',
       workflow: ['Validate phone render feed', 'Validate avatar generation endpoints', 'Ensure executive monitor refresh loop'],
       status: isPass('phone-app-observability') ? 'validated' : (manualStatuses['phone-app-observability'] || 'in_progress'),
@@ -843,7 +886,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'scanner-scraper-excellence',
       priority: 4,
-      phase: 'Phase 2 — Autonomous Agent Core',
+      phase: 'Phase 2 � Autonomous Agent Core',
       title: 'Scanners and scrapers at elite operating quality',
       workflow: ['Trend Scout quality >= 90', 'Product Match quality >= 88', 'Mission orchestration health >= 95'],
       status: isPass('scanner-scraper-excellence') ? 'validated' : (manualStatuses['scanner-scraper-excellence'] || 'in_progress'),
@@ -852,7 +895,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'learning-loop-closed',
       priority: 5,
-      phase: 'Phase 2 — Autonomous Agent Core',
+      phase: 'Phase 2 � Autonomous Agent Core',
       title: 'Learning loop closed and actively logging',
       workflow: ['Post learning-loop telemetry', 'Verify persistence and status', 'Confirm executive visibility'],
       status: isPass('learning-loop-closed') ? 'validated' : (manualStatuses['learning-loop-closed'] || 'in_progress'),
@@ -861,7 +904,7 @@ function buildObjectiveCatalog(audit = null, manualState = {}) {
     {
       id: 'a-plus-validation-evidence',
       priority: 6,
-      phase: 'Phase 3 — Validation and Governance',
+      phase: 'Phase 3 � Validation and Governance',
       title: 'A+ evidence package generated from live checks',
       workflow: ['Run excellence audit', 'Persist report and history', 'Confirm build-level A+ scores'],
       status: isPass('a-plus-validation-evidence') ? 'validated' : (manualStatuses['a-plus-validation-evidence'] || 'in_progress'),
@@ -1113,7 +1156,7 @@ function findLatestAvatarRequest(affiliateCode) {
   return getAvatarRequests().find((item) => affiliateRecordCode(item) === code) || null;
 }
 
-// ── Affiliate Profile Management ────────────────────────────────────────────
+// -- Affiliate Profile Management --------------------------------------------
 function getAffiliateProfiles() {
   return readJsonArraySafe(AFFILIATE_PROFILES_PATH);
 }
@@ -1197,7 +1240,7 @@ function humanizeAttireValue(value) {
  * Rewrites a direct GCS `affiliate-uploads/` URL to the server-proxied `/uploads/:filename`
  * route that serves from local disk first, then falls back to GCS with auth.
  * This is the fix for the "Voice file unavailable" error after Cloud Run container restarts.
- * Existing stored profiles still have `storage.googleapis.com` URLs — this rewrites them on
+ * Existing stored profiles still have `storage.googleapis.com` URLs � this rewrites them on
  * the way out so the browser always gets a URL that works without GCS public access.
  */
 function rewriteAffiliateUploadUrl(url, req) {
@@ -1213,13 +1256,20 @@ function rewriteAffiliateUploadUrl(url, req) {
   return `/uploads/${encodeURIComponent(filename)}`;
 }
 
-function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId, voiceId, avatarGender = '', voiceFileUpdatedAt = '') {
+function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voiceFileUrl = '', voiceCloneId, voiceId, avatarGender = '', voiceFileUpdatedAt = '', extra = {}) {
   const code = normalizeAffiliateCode(affiliateCode);
   if (!code) throw new Error('affiliateCode is required');
   const profiles = getAffiliateProfiles();
   const existing = profiles.find((p) => normalizeAffiliateCode(p.affiliateCode) === code);
   const nextVoiceCloneId = voiceCloneId === undefined ? existing?.voiceCloneId : voiceCloneId;
   const nextVoiceId = voiceId === undefined ? existing?.voiceId : voiceId;
+  // Avatar selection fields � preserve existing if not supplied
+  const nextSelectedAvatarId          = extra.selectedAvatarId          !== undefined ? extra.selectedAvatarId          : (existing?.selectedAvatarId || null);
+  const nextSelectedAvatarName        = extra.selectedAvatarName        !== undefined ? extra.selectedAvatarName        : (existing?.selectedAvatarName || null);
+  const nextSelectedAvatarThumbnail   = extra.selectedAvatarThumbnailUrl !== undefined ? extra.selectedAvatarThumbnailUrl : (existing?.selectedAvatarThumbnailUrl || null);
+  const nextSelectedAvatarGender      = extra.selectedAvatarGender      !== undefined ? extra.selectedAvatarGender      : (existing?.selectedAvatarGender || null);
+  const nextSelectedVoiceId           = extra.selectedVoiceId           !== undefined ? extra.selectedVoiceId           : (existing?.selectedVoiceId || null);
+  const nextSelectedAvatarType        = extra.selectedAvatarType        !== undefined ? extra.selectedAvatarType        : (existing?.selectedAvatarType || null);
   const updated = {
     profileId: code,
     affiliateCode: code,
@@ -1230,6 +1280,14 @@ function upsertAffiliateProfile(affiliateCode, name = '', pictureUrl = '', voice
     voiceCloneId: String(nextVoiceCloneId || '').trim() || null,
     voiceId: String(nextVoiceId || '').trim() || null,
     avatarGender: normalizeAvatarGender(avatarGender || existing?.avatarGender || existing?.gender || '') || null,
+    // -- Avatar Selection (persisted for Production tab) ----------------------
+    selectedAvatarId:           nextSelectedAvatarId,
+    selectedAvatarName:         nextSelectedAvatarName,
+    selectedAvatarThumbnailUrl: nextSelectedAvatarThumbnail,
+    selectedAvatarGender:       nextSelectedAvatarGender,
+    selectedVoiceId:            nextSelectedVoiceId,
+    selectedAvatarType:         nextSelectedAvatarType, // 'custom' | 'stock'
+    selectedAvatarUpdatedAt:    extra.selectedAvatarId !== undefined ? new Date().toISOString() : (existing?.selectedAvatarUpdatedAt || null),
     updatedAt: new Date().toISOString()
   };
   if (existing) {
@@ -1259,7 +1317,7 @@ function normalizeAvatarGalleryAttire(attire) {
 
 function formatAttireSummary(attire) {
   if (!attire) return 'Professional';
-  const genderPrefix = attire.gender ? `${String(attire.gender).charAt(0).toUpperCase()}${String(attire.gender).slice(1)} · ` : '';
+  const genderPrefix = attire.gender ? `${String(attire.gender).charAt(0).toUpperCase()}${String(attire.gender).slice(1)} � ` : '';
   if (attire.usePhoto) return `${genderPrefix}Using profile photo clothing`;
   if (attire.mode === 'overall') {
     return [
@@ -1268,13 +1326,45 @@ function formatAttireSummary(attire) {
       attire.overallFit ? `Fit: ${humanizeAttireValue(attire.overallFit)}` : null,
       attire.overallSeason ? `Season: ${humanizeAttireValue(attire.overallSeason)}` : null,
       attire.overallPresentation ? `Presentation: ${humanizeAttireValue(attire.overallPresentation)}` : null
-    ].filter(Boolean).join(' · ');
+    ].filter(Boolean).join(' � ');
   }
   return [
     genderPrefix.trim() || null,
     attire.top ? `${humanizeAttireValue(attire.topColor || '')} ${humanizeAttireValue(attire.top)}`.trim() : null,
     attire.bottom ? `${humanizeAttireValue(attire.bottomColor || '')} ${humanizeAttireValue(attire.bottom)}`.trim() : null
-  ].filter(Boolean).join(' · ') || 'Professional';
+  ].filter(Boolean).join(' � ') || 'Professional';
+}
+
+function absolutizeSystemAssetUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('/')) return `${getConfiguredPublicAppOrigin()}${raw}`;
+  return raw;
+}
+
+async function ensureAvatarPhotoBackgroundRemoved(photoUrl) {
+  const sourceUrl = String(photoUrl || '').trim();
+  if (!sourceUrl) {
+    throw new Error('Avatar photo URL is required for background removal.');
+  }
+  const bgResult = await removeBackground(sourceUrl);
+  if (!bgResult || !bgResult.success || !bgResult.processedUrl) {
+    throw new Error('Avatar background removal failed before HeyGen submission.');
+  }
+  if (bgResult.method === 'passthrough') {
+    throw new Error('Avatar background removal provider is not configured. Set REMOVE_BG_API_KEY or CLIPDROP_API_KEY to continue avatar creation.');
+  }
+  const processedUrl = absolutizeSystemAssetUrl(bgResult.processedUrl);
+  if (!processedUrl) {
+    throw new Error('Avatar background remover did not return a usable processed URL.');
+  }
+  return {
+    sourceUrl,
+    processedUrl,
+    method: bgResult.method,
+    fromCache: Boolean(bgResult.fromCache)
+  };
 }
 
 function buildAvatarGalleryItem(record) {
@@ -1467,7 +1557,7 @@ async function registerHeyGenTalkingPhoto(photoUrl, options = {}) {
         const extractedGcsPath = gcsPath || parsedUrl.pathname.replace(/^\/[^\/]+\//, ''); // Remove bucket name
         const signedUrl = await generateSignedUrl(decodeURIComponent(extractedGcsPath), token);
         if (signedUrl) {
-          console.log(`[TalkingPhoto] ✅ Signed URL generated successfully: ${signedUrl.substring(0, 80)}...`);
+          console.log(`[TalkingPhoto] ? Signed URL generated successfully: ${signedUrl.substring(0, 80)}...`);
           finalPhotoUrl = signedUrl;
         } else {
           console.log(`[TalkingPhoto] generateSignedUrl returned null`);
@@ -1514,7 +1604,7 @@ async function registerHeyGenTalkingPhoto(photoUrl, options = {}) {
       const response = await heygenApiJson(attempt.endpoint, attempt.body);
       const talkingPhotoId = extractTalkingPhotoId(response);
       if (talkingPhotoId) {
-        console.log(`[TalkingPhoto] ✅ SUCCESS: Registered with ID ${talkingPhotoId} using ${attempt.endpoint}`);
+        console.log(`[TalkingPhoto] ? SUCCESS: Registered with ID ${talkingPhotoId} using ${attempt.endpoint}`);
         return { talkingPhotoId, endpoint: attempt.endpoint };
       }
       errors.push(`${attempt.endpoint}: no talking_photo_id returned`);
@@ -1530,7 +1620,7 @@ async function registerHeyGenTalkingPhoto(photoUrl, options = {}) {
   throw error;
 }
 
-// Voice clone with retry — 3 attempts, exponential back-off.
+// Voice clone with retry � 3 attempts, exponential back-off.
 // Returns { voiceCloneId, voiceCloneStatus }.
 async function cloneVoiceWithRetry(voiceFileUrl, voiceName, maxAttempts = 3) {
   let lastErr;
@@ -1554,21 +1644,39 @@ async function cloneVoiceWithRetry(voiceFileUrl, voiceName, maxAttempts = 3) {
   return { voiceCloneId: null, voiceCloneStatus: 'failed' };
 }
 
+async function createHeyGenV3PhotoAvatar({ name, photoUrl, attireDescription }) {
+  const v3Resp = await heygenApiJson('/v3/avatars', {
+    type: 'photo',
+    name: name || 'EVICS Affiliate Avatar',
+    file: { type: 'url', url: photoUrl },
+    ...(attireDescription ? { description: attireDescription } : {})
+  });
+  const normalizedAvatar = normalizeAvatarCreateResponse(v3Resp);
+  return {
+    avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name || 'EVICS Affiliate Avatar' },
+    avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name || 'EVICS Affiliate Avatar' }
+  };
+}
+
 async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voiceCloneId = '', voiceId = '', attire }) {
   if (!photoUrl) {
     throw new Error('A photo URL is required to create a HeyGen photo avatar.');
   }
   console.log(`[Avatar] Original photo URL received: ${photoUrl}`);
   console.log(`[Avatar] Creating avatar with attire input:`, JSON.stringify(attire || {}, null, 2));
-  
+
+  const bgRemovedPhoto = await ensureAvatarPhotoBackgroundRemoved(photoUrl);
+  const processedPhotoUrl = bgRemovedPhoto.processedUrl;
+  console.log(`[Avatar] Background removed using ${bgRemovedPhoto.method}${bgRemovedPhoto.fromCache ? ' (cache)' : ''}`);
+
   // If this is a local GCS URL, upgrade to a signed URL that HeyGen can access
-  let finalPhotoUrlForHeygen = photoUrl;
-  if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+  let finalPhotoUrlForHeygen = processedPhotoUrl;
+  if (processedPhotoUrl && processedPhotoUrl.includes('storage.googleapis.com')) {
     try {
       console.log(`[Avatar] Photo URL is GCS storage - upgrading to signed URL for HeyGen access`);
       const token = await getGcsAccessToken();
       if (token) {
-        const parsedUrl = new URL(photoUrl);
+        const parsedUrl = new URL(processedPhotoUrl);
         const gcsPath = parsedUrl.pathname.replace(/^\/[^\/]+\//, '');
         const signedUrl = await generateSignedUrl(decodeURIComponent(gcsPath), token);
         if (signedUrl) {
@@ -1592,6 +1700,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
   // Build attire description for avatar generation prompt/metadata
   let attireDescription = null;
   const attireMode = normalizeAttireMode(normalizedAttire);
+  const shouldApplyAiWardrobe = Boolean(normalizedAttire && !normalizedAttire.usePhoto && attireMode !== 'photo');
   console.log(`[Avatar] Attire mode: ${attireMode}`);
   
   const genderInstruction = avatarGender === 'male'
@@ -1631,6 +1740,25 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
       resolvedVoiceCloneId = cloneResult.voiceCloneId;
       resolvedVoiceCloneStatus = cloneResult.voiceCloneStatus;
     }
+
+    if (shouldApplyAiWardrobe) {
+      console.log('[Avatar] AI wardrobe mode enabled. Submitting background-removed photo to HeyGen v3 avatar creation first.');
+      const wardrobeAvatar = await createHeyGenV3PhotoAvatar({
+        name,
+        photoUrl: finalPhotoUrlForHeygen,
+        attireDescription
+      });
+      return {
+        ...wardrobeAvatar,
+        voice_clone_id: resolvedVoiceCloneId || null,
+        voice_clone_status: resolvedVoiceCloneStatus,
+        talking_photo_id: null,
+        source_provider: 'heygen',
+        processed_photo_url: processedPhotoUrl,
+        background_removal_method: bgRemovedPhoto.method,
+        wardrobe_applied: true
+      };
+    }
     if (!resolvedVoiceCloneId) {
       throw new Error(`Voice cloning failed for "${name || 'EVICS Affiliate'}". The new voice file was not registered, so the avatar cannot fall back to an unrelated voice.`);
     }
@@ -1656,9 +1784,9 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
     // Extract filename from GCS URL and reconstruct proxy URL for fallback
     let proxyUrl = null;
     let gcsPath = null;
-    if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+    if (processedPhotoUrl && processedPhotoUrl.includes('storage.googleapis.com')) {
       try {
-        const { objectPath, filename } = extractGcsObjectInfo(photoUrl);
+        const { objectPath, filename } = extractGcsObjectInfo(processedPhotoUrl);
         if (filename) {
           gcsPath = objectPath || `affiliate-uploads/${filename}`;
           const appOrigin = getConfiguredPublicAppOrigin();
@@ -1669,9 +1797,9 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
         console.warn(`[Avatar] Could not reconstruct proxy URL: ${e.message}`);
       }
     }
-    const registered = await registerHeyGenTalkingPhoto(photoUrl, { proxyUrl, gcsPath });
+    const registered = await registerHeyGenTalkingPhoto(processedPhotoUrl, { proxyUrl, gcsPath });
     talkingPhotoId = registered.talkingPhotoId;
-    console.log(`[Avatar] ✅ Registered talking photo via ${registered.endpoint}: ${talkingPhotoId || 'no ID returned'}`);
+    console.log(`[Avatar] ? Registered talking photo via ${registered.endpoint}: ${talkingPhotoId || 'no ID returned'}`);
   } catch (uploadErr) {
     talkingPhotoRegistrationError = uploadErr;
     console.warn(`[Avatar] Talking photo registration failed, attempting v3 photo avatar fallback: ${uploadErr.message}`);
@@ -1680,13 +1808,13 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
   if (!talkingPhotoId) {
     try {
       // Try to upgrade photoUrl to signed URL for better access, with proxy URL fallback
-      let finalPhotoUrl = photoUrl;
+      let finalPhotoUrl = processedPhotoUrl;
       let proxyUrlForV3 = null;
       
-      if (photoUrl && photoUrl.includes('storage.googleapis.com')) {
+      if (processedPhotoUrl && processedPhotoUrl.includes('storage.googleapis.com')) {
         try {
           // First, try to get proxy URL
-          const { filename } = extractGcsObjectInfo(photoUrl);
+          const { filename } = extractGcsObjectInfo(processedPhotoUrl);
           if (filename) {
             const appOrigin = getConfiguredPublicAppOrigin();
             proxyUrlForV3 = `${appOrigin}/uploads/${encodeURIComponent(filename)}`;
@@ -1700,7 +1828,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
         try {
           const token = await getGcsAccessToken();
           if (token) {
-            const parsedUrl = new URL(photoUrl);
+            const parsedUrl = new URL(processedPhotoUrl);
             const gcsPath = parsedUrl.pathname.replace(/^\/[^\/]+\//, '');
             const signedUrl = await generateSignedUrl(decodeURIComponent(gcsPath), token);
             if (signedUrl) {
@@ -1723,21 +1851,21 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
         }
       }
 
-      const v3Resp = await heygenApiJson('/v3/avatars', {
-        type: 'photo',
-        name: name || 'EVICS Affiliate Avatar',
-        file: { type: 'url', url: finalPhotoUrl },
-        ...(attireDescription ? { description: attireDescription } : {})
+      const v3Avatar = await createHeyGenV3PhotoAvatar({
+        name,
+        photoUrl: finalPhotoUrl,
+        attireDescription
       });
       console.log(`[Avatar] HeyGen v3 API called with attire description: ${attireDescription ? 'YES' : 'NO'}`);
-      const normalizedAvatar = normalizeAvatarCreateResponse(v3Resp);
       return {
-        avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
-        avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
+        ...v3Avatar,
         voice_clone_id: resolvedVoiceCloneId || null,
         voice_clone_status: resolvedVoiceCloneStatus,
         talking_photo_id: null,
-        source_provider: 'heygen'
+        source_provider: 'heygen',
+        processed_photo_url: processedPhotoUrl,
+        background_removal_method: bgRemovedPhoto.method,
+        wardrobe_applied: shouldApplyAiWardrobe
       };
     } catch (v3Err) {
       const registrationMessage = talkingPhotoRegistrationError
@@ -1777,20 +1905,20 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
   } catch (v2Err) {
     // If v2 fails, try v3 avatar creation as fallback
     try {
-      const v3Resp = await heygenApiJson('/v3/avatars', {
-        type: 'photo',
-        name: name || 'EVICS Affiliate Avatar',
-        file: { type: 'url', url: photoUrl },
-        ...(attireDescription ? { description: attireDescription } : {})
+      const v3Avatar = await createHeyGenV3PhotoAvatar({
+        name,
+        photoUrl: finalPhotoUrlForHeygen,
+        attireDescription
       });
-      const normalizedAvatar = normalizeAvatarCreateResponse(v3Resp);
       return {
-        avatar_item: normalizedAvatar.avatarItem || { id: `avatar_${Date.now()}`, name: name },
-        avatar_group: normalizedAvatar.avatarGroup || { id: `group_${Date.now()}`, name: name },
+        ...v3Avatar,
         voice_clone_id: resolvedVoiceCloneId || null,
         voice_clone_status: resolvedVoiceCloneStatus,
         talking_photo_id: talkingPhotoId,
-        source_provider: 'heygen'
+        source_provider: 'heygen',
+        processed_photo_url: processedPhotoUrl,
+        background_removal_method: bgRemovedPhoto.method,
+        wardrobe_applied: shouldApplyAiWardrobe
       };
     } catch (v3Err) {
       throw new Error(`Avatar creation failed: ${v2Err.message || v3Err.message}`);
@@ -1807,7 +1935,7 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
       id: avatarId,
       name: name || 'EVICS Affiliate Avatar',
       avatar_type: 'photo_avatar',
-      preview_image_url: photoUrl,
+      preview_image_url: processedPhotoUrl,
       proof_video_id: videoId,
       talking_photo_id: talkingPhotoId,
       supported_api_engines: ['avatar_4_quality', 'avatar_4_turbo'],
@@ -1823,7 +1951,10 @@ async function createHeyGenAffiliateAvatar({ name, photoUrl, voiceFileUrl, voice
     voice_clone_status: resolvedVoiceCloneStatus,
     proof_video_id: videoId,
     talking_photo_id: talkingPhotoId,
-    source_provider: 'heygen'
+    source_provider: 'heygen',
+    processed_photo_url: processedPhotoUrl,
+    background_removal_method: bgRemovedPhoto.method,
+    wardrobe_applied: false
   };
 }
 
@@ -1974,7 +2105,7 @@ function mirrorRenderToLocalStore(record = {}) {
   return nextRow;
 }
 
-// POST /api/media-output/persist-proof — persist a proof render, with local fallback when Supabase isn't available
+// POST /api/media-output/persist-proof � persist a proof render, with local fallback when Supabase isn't available
 app.post('/api/media-output/persist-proof', async (req, res) => {
   try {
     const record = req.body || {};
@@ -2005,7 +2136,7 @@ app.post('/api/media-output/persist-proof', async (req, res) => {
   }
 });
 
-// POST /api/media-output/persist-proof/:id/publish — enqueue a persisted proof for publishing (local fallback queue)
+// POST /api/media-output/persist-proof/:id/publish � enqueue a persisted proof for publishing (local fallback queue)
 app.post('/api/media-output/persist-proof/:id/publish', async (req, res) => {
   try {
     const id = req.params.id;
@@ -2043,7 +2174,7 @@ app.post('/api/media-output/persist-proof/:id/publish', async (req, res) => {
 });
 
 // -------------------------
-// Root â€” serve dashboard
+// Root — serve dashboard
 // -------------------------
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
@@ -2053,7 +2184,7 @@ app.get('/workspace', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/index.html'));
 });
 
-// Discoverability Score — pre-post SEO/reach grader (Admin tool)
+// Discoverability Score � pre-post SEO/reach grader (Admin tool)
 app.get('/discoverability', (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/control-center/discoverability.html'));
 });
@@ -2089,13 +2220,14 @@ app.get('/status', async (_req, res) => {
     heygen:    Boolean(process.env.HEYGEN_API_KEY),
     runway:    Boolean(process.env.RUNWAY_API_KEY),
     kling:     Boolean(process.env.KLING_API_KEY),
+    seedance:  Boolean(process.env.SEEDANCE_API_KEY),
     vizard:    Boolean(process.env.VIZARD_API_KEY),
     predis:    Boolean(process.env.PREDIS_AI_API_KEY),
     canva:     Boolean(process.env.CANVA_API_KEY),
     gemini:    Boolean(process.env.GEMINI_API_KEY)
   };
 
-  // Concurrent health checks â€” Supabase + Shopify + HeyGen
+  // Concurrent health checks — Supabase + Shopify + HeyGen
   const checks = await Promise.allSettled([
     // Supabase
     (async () => {
@@ -2191,13 +2323,13 @@ app.get('/api/evidence/heygen', (_req, res) => {
   });
 });
 
-// /api/health â€” alias for /status
+// /api/health — alias for /status
 app.get('/api/health', async (req, res, next) => {
   req.url = '/status';
   app.handle(req, res, next);
 });
 
-// /api/cdn/health – CDN configuration and cache metrics
+// /api/cdn/health � CDN configuration and cache metrics
 app.get('/api/cdn/health', async (req, res) => {
   const cdnStatus = await cdnEngine.verifyCDNSetup();
   const metrics = cdnEngine.getCDNHealthMetrics({
@@ -2286,6 +2418,11 @@ function describeSupabaseError(err, context = {}) {
   }
   return { ...details, error: details.message };
 }
+
+app.get('/api/cinematic-layer/status', (_req, res) => {
+  noStore(res);
+  res.json({ success: true, ...getCinematicLayerStatus() });
+});
 
 app.get('/api/production-closeout/status', async (_req, res) => {
   noStore(res);
@@ -2558,11 +2695,14 @@ nativeAvatarWorkerRef = createNativeAvatarWorker({
       const result = {
         avatarId: avatarItem.id || null,
         previewVideoUrl: null,
-        avatarPreviewImageUrl: String(input.photoUrl || '').trim() || null,
+        avatarPreviewImageUrl: String(payload?.processed_photo_url || input.photoUrl || '').trim() || null,
         provider: 'heygen',
         providerPayload: payload || null,
         talkingPhotoId: payload && payload.talking_photo_id ? payload.talking_photo_id : null,
         voiceCloneId: payload && payload.voice_clone_id ? payload.voice_clone_id : null,
+        backgroundRemoved: Boolean(payload?.background_removal_method),
+        wardrobeApplied: Boolean(payload?.wardrobe_applied),
+        processingPhotoUrl: String(payload?.processed_photo_url || '').trim() || null
       };
       if (requestId) {
         const existing = findAvatarRequest(requestId, affiliateCode);
@@ -2572,7 +2712,7 @@ nativeAvatarWorkerRef = createNativeAvatarWorker({
           affiliateCode,
           affiliateId: affiliateCode,
           name: input.name || existing?.name || 'EVICS Affiliate Avatar',
-          photoUrl: input.photoUrl || existing?.photoUrl || null,
+          photoUrl: payload?.processed_photo_url || input.photoUrl || existing?.photoUrl || null,
           voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
           attire: input.attire || existing?.attire || null,
           status: 'completed',
@@ -2588,12 +2728,14 @@ nativeAvatarWorkerRef = createNativeAvatarWorker({
             avatarId: result.avatarId,
             affiliateCode,
             name: input.name || existing?.name || 'EVICS Affiliate Avatar',
-            photoUrl: input.photoUrl || existing?.photoUrl || null,
+            photoUrl: payload?.processed_photo_url || input.photoUrl || existing?.photoUrl || null,
             voiceFileUrl: input.voiceFileUrl || existing?.voiceFileUrl || null,
             talkingPhotoId: result.talkingPhotoId || null,
             voiceCloneId: result.voiceCloneId || null,
             attire: input.attire || existing?.attire || null,
             sourceProvider: 'heygen',
+            backgroundRemoved: result.backgroundRemoved,
+            wardrobeApplied: result.wardrobeApplied,
             status: 'active',
             createdAt: new Date().toISOString(),
           },
@@ -2665,7 +2807,71 @@ function requireAdminAccess(req, res, next) {
   });
 }
 
-// GET /api/admin/costs — full cost summary + unit economics
+/**
+ * requireVideoDeleteAuth � middleware for video delete endpoints.
+ *
+ * Allows ONLY:
+ *   1. The affiliate who owns the video (affiliateCode in request matches record owner)
+ *   2. ADMIN � via x-admin-key header OR Bearer JWT with ADMIN role
+ *      Admin has FULL CONTROL over ALL affiliate videos, IDs, and accounts.
+ *
+ * Sets req.deleteActor = { role, affiliateCode, isAdmin }
+ * Ownership is double-checked inside each handler against the actual video record.
+ */
+function requireVideoDeleteAuth(req, res, next) {
+  // -- Path 1: Admin via x-admin-key header -------------------------------------
+  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
+  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
+  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
+    req.deleteActor = { role: 'ADMIN', affiliateCode: null, isAdmin: true };
+    return next();
+  }
+
+  // -- Path 2: Admin or Affiliate via Bearer JWT ---------------------------------
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
+    if (authEngine && typeof authEngine.validateToken === 'function') {
+      try {
+        const claims = authEngine.validateToken(authHeader);
+        const role = String(claims.role || '').toUpperCase();
+        if (role === 'ADMIN') {
+          req.deleteActor = { role: 'ADMIN', affiliateCode: claims.affiliateCode || null, isAdmin: true };
+          return next();
+        }
+        if (role === 'AFFILIATE') {
+          const code = normalizeAffiliateCode(claims.affiliateCode || claims.sub || '');
+          if (!code) return res.status(403).json({ success: false, error: 'AFFILIATE token missing affiliateCode claim.' });
+          req.deleteActor = { role: 'AFFILIATE', affiliateCode: code, isAdmin: false };
+          return next();
+        }
+        return res.status(403).json({ success: false, error: 'Only AFFILIATE or ADMIN accounts may delete videos.' });
+      } catch (err) {
+        return res.status(401).json({ success: false, error: `Token invalid: ${err.message}` });
+      }
+    }
+  }
+
+  // -- Path 3: Affiliate via affiliateCode (no JWT required for this surface) ----
+  // The affiliateCode is the account identity. Ownership is verified in each handler.
+  const affiliateCode = normalizeAffiliateCode(
+    req.query.affiliateCode || req.query.affiliateId ||
+    req.body?.affiliateCode || req.body?.affiliateId || ''
+  );
+  if (affiliateCode) {
+    req.deleteActor = { role: 'AFFILIATE', affiliateCode, isAdmin: false };
+    return next();
+  }
+
+  // -- No valid identity ---------------------------------------------------------
+  return res.status(401).json({
+    success: false,
+    error: 'Authentication required to delete videos. Affiliates: provide affiliateCode. Admin: provide x-admin-key header or Bearer JWT with ADMIN role.',
+    hint: { affiliate: 'Add affiliateCode to request body or query.', admin: 'Set x-admin-key header to ADMIN_API_KEY env var value.' }
+  });
+}
+
+// GET /api/admin/costs � full cost summary + unit economics
 app.get('/api/admin/costs', requireAdminAccess, (req, res) => {
   try {
     const summary = costTracker.getCostSummary();
@@ -2676,19 +2882,147 @@ app.get('/api/admin/costs', requireAdminAccess, (req, res) => {
   }
 });
 
-// GET /api/admin/costs/affiliate?code=X — per-affiliate cost breakdown
+/**
+ * requireVideoDeleteAuth � middleware for video delete endpoints.
+ *
+ * Allows ONLY:
+ *   1. The affiliate who owns the video (affiliateCode in request matches record owner)
+ *   2. ADMIN � via x-admin-key header OR Bearer JWT with ADMIN role
+ *      Admin has FULL CONTROL over ALL affiliate videos, IDs, and accounts.
+ *
+ * Sets req.deleteActor = { role, affiliateCode, isAdmin }
+ * Ownership is double-checked inside each handler against the actual video record.
+ */
+function requireVideoDeleteAuth(req, res, next) {
+  // -- Path 1: Admin via x-admin-key header -------------------------------------
+  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
+  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
+  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
+    req.deleteActor = { role: 'ADMIN', affiliateCode: null, isAdmin: true };
+    return next();
+  }
+
+  // -- Path 2: Admin or Affiliate via Bearer JWT ---------------------------------
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
+    if (authEngine && typeof authEngine.validateToken === 'function') {
+      try {
+        const claims = authEngine.validateToken(authHeader);
+        const role = String(claims.role || '').toUpperCase();
+        if (role === 'ADMIN') {
+          req.deleteActor = { role: 'ADMIN', affiliateCode: claims.affiliateCode || null, isAdmin: true };
+          return next();
+        }
+        if (role === 'AFFILIATE') {
+          const code = normalizeAffiliateCode(claims.affiliateCode || claims.sub || '');
+          if (!code) return res.status(403).json({ success: false, error: 'AFFILIATE token missing affiliateCode claim.' });
+          req.deleteActor = { role: 'AFFILIATE', affiliateCode: code, isAdmin: false };
+          return next();
+        }
+        return res.status(403).json({ success: false, error: 'Only AFFILIATE or ADMIN accounts may delete videos.' });
+      } catch (err) {
+        return res.status(401).json({ success: false, error: `Token invalid: ${err.message}` });
+      }
+    }
+  }
+
+  // -- Path 3: Affiliate via affiliateCode (no JWT required for this surface) ----
+  // The affiliateCode is the account identity. Ownership is verified in each handler.
+  const affiliateCode = normalizeAffiliateCode(
+    req.query.affiliateCode || req.query.affiliateId ||
+    req.body?.affiliateCode || req.body?.affiliateId || ''
+  );
+  if (affiliateCode) {
+    req.deleteActor = { role: 'AFFILIATE', affiliateCode, isAdmin: false };
+    return next();
+  }
+
+  // -- No valid identity ---------------------------------------------------------
+  return res.status(401).json({
+    success: false,
+    error: 'Authentication required to delete videos. Affiliates: provide affiliateCode. Admin: provide x-admin-key header or Bearer JWT with ADMIN role.',
+    hint: { affiliate: 'Add affiliateCode to request body or query.', admin: 'Set x-admin-key header to ADMIN_API_KEY env var value.' }
+  });
+}
+
+// GET /api/admin/costs/affiliate?code=X � per-affiliate cost breakdown
 app.get('/api/admin/costs/affiliate', requireAdminAccess, (req, res) => {
   const code = req.query.code || req.query.affiliateCode || '';
   if (!code) return res.status(400).json({ success: false, error: 'code required' });
   res.json({ success: true, ...costTracker.getAffiliateCosts(code) });
 });
 
-// GET /api/admin/costs/unit-economics — standalone unit economics
+/**
+ * requireVideoDeleteAuth � middleware for video delete endpoints.
+ *
+ * Allows ONLY:
+ *   1. The affiliate who owns the video (affiliateCode in request matches record owner)
+ *   2. ADMIN � via x-admin-key header OR Bearer JWT with ADMIN role
+ *      Admin has FULL CONTROL over ALL affiliate videos, IDs, and accounts.
+ *
+ * Sets req.deleteActor = { role, affiliateCode, isAdmin }
+ * Ownership is double-checked inside each handler against the actual video record.
+ */
+function requireVideoDeleteAuth(req, res, next) {
+  // -- Path 1: Admin via x-admin-key header -------------------------------------
+  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
+  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
+  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
+    req.deleteActor = { role: 'ADMIN', affiliateCode: null, isAdmin: true };
+    return next();
+  }
+
+  // -- Path 2: Admin or Affiliate via Bearer JWT ---------------------------------
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
+    if (authEngine && typeof authEngine.validateToken === 'function') {
+      try {
+        const claims = authEngine.validateToken(authHeader);
+        const role = String(claims.role || '').toUpperCase();
+        if (role === 'ADMIN') {
+          req.deleteActor = { role: 'ADMIN', affiliateCode: claims.affiliateCode || null, isAdmin: true };
+          return next();
+        }
+        if (role === 'AFFILIATE') {
+          const code = normalizeAffiliateCode(claims.affiliateCode || claims.sub || '');
+          if (!code) return res.status(403).json({ success: false, error: 'AFFILIATE token missing affiliateCode claim.' });
+          req.deleteActor = { role: 'AFFILIATE', affiliateCode: code, isAdmin: false };
+          return next();
+        }
+        return res.status(403).json({ success: false, error: 'Only AFFILIATE or ADMIN accounts may delete videos.' });
+      } catch (err) {
+        return res.status(401).json({ success: false, error: `Token invalid: ${err.message}` });
+      }
+    }
+  }
+
+  // -- Path 3: Affiliate via affiliateCode (no JWT required for this surface) ----
+  // The affiliateCode is the account identity. Ownership is verified in each handler.
+  const affiliateCode = normalizeAffiliateCode(
+    req.query.affiliateCode || req.query.affiliateId ||
+    req.body?.affiliateCode || req.body?.affiliateId || ''
+  );
+  if (affiliateCode) {
+    req.deleteActor = { role: 'AFFILIATE', affiliateCode, isAdmin: false };
+    return next();
+  }
+
+  // -- No valid identity ---------------------------------------------------------
+  return res.status(401).json({
+    success: false,
+    error: 'Authentication required to delete videos. Affiliates: provide affiliateCode. Admin: provide x-admin-key header or Bearer JWT with ADMIN role.',
+    hint: { affiliate: 'Add affiliateCode to request body or query.', admin: 'Set x-admin-key header to ADMIN_API_KEY env var value.' }
+  });
+}
+
+// GET /api/admin/costs/unit-economics � standalone unit economics
 app.get('/api/admin/costs/unit-economics', requireAdminAccess, (req, res) => {
   res.json({ success: true, plans: costTracker.getUnitEconomics() });
 });
 
-// GET /api/admin/identity-chains — per-affiliate identity chain for admin visibility
+// GET /api/admin/identity-chains � per-affiliate identity chain for admin visibility
 // Returns: profileId, voiceCloneId, voiceId, pictureUrl, avatarId, requestId,
 //          proofVideoId, proofStatus, lastUpdated for every known affiliate.
 app.get('/api/admin/identity-chains', requireAdminAccess, (req, res) => {
@@ -2727,7 +3061,7 @@ app.get('/api/admin/identity-chains', requireAdminAccess, (req, res) => {
   }
 });
 
-// GET /api/admin/avatar-requests — recent avatar requests with full chain detail
+// GET /api/admin/avatar-requests � recent avatar requests with full chain detail
 app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
@@ -2738,26 +3072,26 @@ app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
   }
 });
 
-console.log('✅ [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
+console.log('? [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====
 const viralMediaRouter = createViralMediaRouter();
 app.use('/api/viral-media', viralMediaRouter);
-console.log('✅ [EVICS] Viral Media routes registered at /api/viral-media');
+console.log('? [EVICS] Viral Media routes registered at /api/viral-media');
 
 // ===== REGISTER EVICS SCRAPER CONTROL PLANE =====
 const scraperControlPlane = createEvicsScraperControlPlane({
   onResult: (normalized) => {
     // Write-through: scrape results backed to GCS for intelligence persistence
     persistenceEngine.gcsWrite('evics-data/scraper_results.json', scraperControlPlane.getResults()).catch(() => {});
-    console.log(`[Scraper] New result indexed — category=${normalized.category} quality=${normalized.signalQuality} url=${normalized.sourceUrl}`);
+    console.log(`[Scraper] New result indexed � category=${normalized.category} quality=${normalized.signalQuality} url=${normalized.sourceUrl}`);
   },
 });
 scraperControlPlane.registerRoutes(app);
 scraperControlPlane.startRunner(3000);
 
 // -------------------------
-// /api/products — evics_products table with Shopify live fallback
+// /api/products � evics_products table with Shopify live fallback
 // -------------------------
 app.get('/api/products', async (req, res) => {
   noStore(res);
@@ -2786,7 +3120,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// POST /api/products/sync — trigger a fresh Shopify product pull and cache refresh
+// POST /api/products/sync � trigger a fresh Shopify product pull and cache refresh
 app.post('/api/products/sync', async (_req, res) => {
   noStore(res);
   try {
@@ -2843,14 +3177,14 @@ app.get('/api/products/mockup-library/resolve', async (req, res) => {
   }
 });
 
-// POST /api/products/preprocess-backgrounds — batch remove backgrounds from all products
+// POST /api/products/preprocess-backgrounds � batch remove backgrounds from all products
 // Runs in background; returns immediately with job started message
 app.post('/api/products/preprocess-backgrounds', async (req, res) => {
   noStore(res);
   try {
     const products = await fetchShopifyProducts();
     res.json({ success: true, total: products.length, message: `Background removal started for ${products.length} products. Results cached permanently at /processed-images/` });
-    // Process in background (don't await — returns immediately)
+    // Process in background (don't await � returns immediately)
     batchPreprocessProducts(products).then(results => {
       const done = results.filter(r => !r.skipped && !r.error).length;
       console.log(`[BgRemover] Batch complete: ${done}/${results.length} processed`);
@@ -2860,7 +3194,7 @@ app.post('/api/products/preprocess-backgrounds', async (req, res) => {
   }
 });
 
-// GET /api/products/processed-images/manifest — view cache manifest
+// GET /api/products/processed-images/manifest � view cache manifest
 app.get('/api/products/processed-images/manifest', (_req, res) => {
   noStore(res);
   const manifest = getCacheManifest();
@@ -2868,7 +3202,7 @@ app.get('/api/products/processed-images/manifest', (_req, res) => {
   res.json({ success: true, stats, manifest });
 });
 
-// GET /api/products/processed-image/:hash — get processed URL for a product image
+// GET /api/products/processed-image/:hash � get processed URL for a product image
 app.get('/api/products/processed-image', (req, res) => {
   noStore(res);
   const { url } = req.query;
@@ -2878,16 +3212,16 @@ app.get('/api/products/processed-image', (req, res) => {
   const hash     = crypto.createHash('md5').update(String(url)).digest('hex');
   const entry    = manifest[hash];
   if (entry) return res.json({ success: true, processedUrl: entry.processedUrl, method: entry.method, fromCache: true });
-  res.json({ success: false, processedUrl: url, fromCache: false, message: 'Not yet processed — call POST /api/products/preprocess-backgrounds' });
+  res.json({ success: false, processedUrl: url, fromCache: false, message: 'Not yet processed � call POST /api/products/preprocess-backgrounds' });
 });
 
-// GET /api/video/background-themes — list all category backgrounds
+// GET /api/video/background-themes � list all category backgrounds
 app.get('/api/video/background-themes', (_req, res) => {
   res.json({ success: true, themes: getAllThemes() });
 });
 
 // -------------------------
-// /api/renders â€” evics_renders table
+// /api/renders — evics_renders table
 // -------------------------
 app.get('/api/renders', async (_req, res) => {
   try {
@@ -2907,7 +3241,7 @@ app.get('/api/renders', async (_req, res) => {
 });
 
 // -------------------------
-// /api/campaigns â€” evics_campaigns table
+// /api/campaigns — evics_campaigns table
 // -------------------------
 app.get('/api/campaigns', async (_req, res) => {
   try {
@@ -2927,7 +3261,7 @@ app.get('/api/campaigns', async (_req, res) => {
 });
 
 // -------------------------
-// /api/trends â€” evics_trends table
+// /api/trends — evics_trends table
 // -------------------------
 app.get('/api/trends', async (_req, res) => {
   try {
@@ -2947,7 +3281,7 @@ app.get('/api/trends', async (_req, res) => {
 });
 
 // -------------------------
-// /api/dashboard-summary â€” aggregate counts across core tables
+// /api/dashboard-summary — aggregate counts across core tables
 // -------------------------
 app.get('/api/dashboard-summary', async (_req, res) => {
   try {
@@ -2974,7 +3308,7 @@ app.get('/api/dashboard-summary', async (_req, res) => {
 });
 
 // -------------------------
-// /api/viral/gallery â€” list all scraped viral videos
+// /api/viral/gallery — list all scraped viral videos
 // -------------------------
 app.get('/api/viral/gallery', async (req, res) => {
   try {
@@ -3000,7 +3334,7 @@ app.get('/api/viral/gallery', async (req, res) => {
 });
 
 // -------------------------
-// /api/viral/:id â€” get single viral video with full analysis
+// /api/viral/:id — get single viral video with full analysis
 // -------------------------
 app.get('/api/viral/:id', async (req, res) => {
   try {
@@ -3022,7 +3356,7 @@ app.get('/api/viral/:id', async (req, res) => {
 });
 
 // -------------------------
-// /api/viral/:id/analyze â€” run AI analysis on viral video
+// /api/viral/:id/analyze — run AI analysis on viral video
 // -------------------------
 app.post('/api/viral/:id/analyze', async (req, res) => {
   try {
@@ -3039,22 +3373,22 @@ app.post('/api/viral/:id/analyze', async (req, res) => {
     const analysis = {
       id,
       whatsWorking: [
-        { label: 'Hook strength', score: 88, note: video?.hook ? `"${video.hook}" â€” strong curiosity trigger` : 'Pattern-matched hook detected' },
+        { label: 'Hook strength', score: 88, note: video?.hook ? `"${video.hook}" — strong curiosity trigger` : 'Pattern-matched hook detected' },
         { label: 'Pacing', score: 82, note: 'Fast cuts in first 3 seconds drive retention above 70%' },
-        { label: 'CTA clarity', score: 79, note: video?.cta ? `"${video.cta}" â€” direct and benefit-led` : 'CTA present and action-oriented' },
+        { label: 'CTA clarity', score: 79, note: video?.cta ? `"${video.cta}" — direct and benefit-led` : 'CTA present and action-oriented' },
         { label: 'Visual style', score: 85, note: 'UGC-style authenticity signals high trust' }
       ],
       whatsWeak: [
-        { label: 'Mid-video drop', note: 'Engagement dips at 8â€“12s â€” needs a re-hook or pattern interrupt' },
-        { label: 'Product reveal timing', note: 'Product shown too early â€” move to 40% mark for better conversion' }
+        { label: 'Mid-video drop', note: 'Engagement dips at 8–12s — needs a re-hook or pattern interrupt' },
+        { label: 'Product reveal timing', note: 'Product shown too early — move to 40% mark for better conversion' }
       ],
       formatBreakdown: {
         hook: video?.hook || 'Pattern-matched curiosity hook',
-        pacing: video?.platform === 'TikTok' ? 'Fast (1â€“2s cuts)' : video?.platform === 'YouTube' ? 'Medium (3â€“5s cuts)' : 'Medium-fast (2â€“3s cuts)',
+        pacing: video?.platform === 'TikTok' ? 'Fast (1–2s cuts)' : video?.platform === 'YouTube' ? 'Medium (3–5s cuts)' : 'Medium-fast (2–3s cuts)',
         cta: video?.cta || 'Benefit-led CTA',
         platform: video?.platform || 'Multi-platform',
         style: (video?.tags || []).includes('ugc') || (video?.tags || []).includes('testimonial') ? 'UGC / Testimonial' : 'Commercial',
-        duration: video?.platform === 'TikTok' ? '15â€“30s' : video?.platform === 'YouTube' ? '30â€“60s' : '15â€“45s',
+        duration: video?.platform === 'TikTok' ? '15–30s' : video?.platform === 'YouTube' ? '30–60s' : '15–45s',
         emotion: video?.emotion || 'Curiosity, transformation, trust'
       },
       analysedAt: new Date().toISOString()
@@ -3068,7 +3402,7 @@ app.post('/api/viral/:id/analyze', async (req, res) => {
 });
 
 // -------------------------
-// /api/viral/:id/match-products â€” find matching products for a viral video
+// /api/viral/:id/match-products — find matching products for a viral video
 // -------------------------
 app.post('/api/viral/:id/match-products', async (req, res) => {
   try {
@@ -3101,7 +3435,7 @@ app.post('/api/viral/:id/match-products', async (req, res) => {
 });
 
 // -------------------------
-// /api/viral/:id/create-brief â€” generate creative brief from viral video
+// /api/viral/:id/create-brief — generate creative brief from viral video
 // -------------------------
 app.post('/api/viral/:id/create-brief', async (req, res) => {
   try {
@@ -3126,15 +3460,15 @@ app.post('/api/viral/:id/create-brief', async (req, res) => {
       videoId: id,
       product,
       platform,
-      title: `${platform} Ad Brief â€” ${product}`,
+      title: `${platform} Ad Brief — ${product}`,
       hook: `Inspired by: "${hook}"`,
       structure: Array.isArray(structure) ? structure : JSON.parse(structure || '[]'),
-      script: `Open on [scene]. VO: "${hook}" â€” Cut to product. Show benefit. CTA: "${cta}".`,
+      script: `Open on [scene]. VO: "${hook}" — Cut to product. Show benefit. CTA: "${cta}".`,
       visualNotes: `Match the pacing and visual style of the source viral ad. Use authentic UGC-style framing. Product reveal at 40% mark.`,
       cta,
       targetPlatform: platform,
       aspectRatio: platform === 'YouTube' ? '16:9' : '9:16',
-      duration: platform === 'YouTube' ? '30â€“60s' : '15â€“30s',
+      duration: platform === 'YouTube' ? '30–60s' : '15–30s',
       createdAt: new Date().toISOString()
     };
 
@@ -3163,7 +3497,7 @@ app.post('/api/viral/:id/create-brief', async (req, res) => {
 });
 
 // -------------------------
-// /api/viral/rescan â€” trigger a new viral content scrape
+// /api/viral/rescan — trigger a new viral content scrape
 // -------------------------
 app.post('/api/viral/rescan', async (req, res) => {
   try {
@@ -3173,7 +3507,7 @@ app.post('/api/viral/rescan', async (req, res) => {
     const { error } = await SupabaseConnector
       .from('evics_trends')
       .insert([{
-        title: `Manual rescan â€” ${amount} ads`,
+        title: `Manual rescan — ${amount} ads`,
         source: 'manual_rescan',
         scan_amount: amount,
         created_at: new Date().toISOString()
@@ -3189,7 +3523,7 @@ app.post('/api/viral/rescan', async (req, res) => {
 });
 
 // -------------------------
-// /api/hooks/search â€” search for winning hooks up to a target count
+// /api/hooks/search — search for winning hooks up to a target count
 // -------------------------
 app.post('/api/hooks/search', async (req, res) => {
   try {
@@ -3219,7 +3553,7 @@ app.post('/api/hooks/search', async (req, res) => {
 });
 
 // -------------------------
-// /api/creatives â€” creatives with rejection metadata
+// /api/creatives — creatives with rejection metadata
 // -------------------------
 app.get('/api/creatives', async (req, res) => {
   try {
@@ -3239,7 +3573,7 @@ app.get('/api/creatives', async (req, res) => {
 });
 
 // -------------------------
-// /api/assembly/drafts â€” save and retrieve video assembly drafts
+// /api/assembly/drafts — save and retrieve video assembly drafts
 // -------------------------
 app.post('/api/assembly/drafts', async (req, res) => {
   try {
@@ -3288,7 +3622,7 @@ app.get('/api/assembly/drafts', async (req, res) => {
 });
 
 // -------------------------
-// /api/assembly/suggestions â€” AI-generated component suggestions
+// /api/assembly/suggestions — AI-generated component suggestions
 // -------------------------
 app.post('/api/assembly/suggestions', async (req, res) => {
   try {
@@ -3321,7 +3655,7 @@ app.post('/api/assembly/suggestions', async (req, res) => {
 });
 
 // -------------------------
-// /api/video/generate â€” submit HeyGen render and track status
+// /api/video/generate — submit HeyGen render and track status
 // -------------------------
 app.post('/api/video/generate', async (req, res) => {
   try {
@@ -3407,6 +3741,13 @@ app.post('/api/video/generate', async (req, res) => {
       config.specialEffects ||
       []
     );
+    const cinematicDirective = normalizeCinematicProductDirective(
+      body.cinematic_directive ||
+      body.cinematicDirective ||
+      config.cinematic_directive ||
+      config.cinematicDirective ||
+      {}
+    );
     if (jordanPresetRequested && (!jordanAvatarConfigured || !jordanVoiceConfigured)) {
       return res.status(422).json({
         success: false,
@@ -3416,6 +3757,18 @@ app.post('/api/video/generate', async (req, res) => {
     }
     let avatar_id = body.avatar_id || body.avatar || body.heygenAvatarId || process.env.REACT_APP_JORDAN_AVATAR_ID || process.env.HEYGEN_AVATAR_ID || 'Jordan Avatar';
     let voice_id = body.voice_id || body.voice || body.heygenVoiceId || process.env.REACT_APP_JORDAN_VOICE_ID || process.env.HEYGEN_VOICE_ID || 'Jordan Voice File';
+    const requestedVoiceSpeedRaw = body.voice_speed ?? body.voiceSpeed ?? config.voice_speed ?? config.voiceSpeed;
+    let requestedVoiceSpeed = null;
+    if (requestedVoiceSpeedRaw !== undefined && requestedVoiceSpeedRaw !== null && String(requestedVoiceSpeedRaw).trim() !== '') {
+      const parsedVoiceSpeed = Number(requestedVoiceSpeedRaw);
+      if (!Number.isFinite(parsedVoiceSpeed)) {
+        return res.status(422).json({ success: false, error: 'voice_speed must be a numeric value.' });
+      }
+      if (parsedVoiceSpeed < 0.7 || parsedVoiceSpeed > 1.3) {
+        return res.status(422).json({ success: false, error: 'voice_speed must be between 0.7 and 1.3.' });
+      }
+      requestedVoiceSpeed = Math.round(parsedVoiceSpeed * 100) / 100;
+    }
     if (jordanPresetRequested) {
       avatar_id = jordanAvatarConfigured;
       voice_id = jordanVoiceConfigured;
@@ -3433,6 +3786,12 @@ app.post('/api/video/generate', async (req, res) => {
       requestedPlatform === 'heygen' ||
       (!script && prompt)
     );
+    if (!isMockRender && cinematicDirective.requireCinematicMotion && !useVideoAgent) {
+      return res.status(422).json({
+        success: false,
+        error: 'Cinematic product render requirements need render_mode=video-agent (avatar-video mode cannot guarantee camera movement + background motion choreography).'
+      });
+    }
 
     if (!useVideoAgent && !script) {
       return res.status(400).json({ success: false, error: 'script is required (or use render_mode=video-agent with prompt).' });
@@ -3440,7 +3799,7 @@ app.post('/api/video/generate', async (req, res) => {
     if (useVideoAgent && !prompt && !script) {
       return res.status(400).json({ success: false, error: 'prompt or script is required for render_mode=video-agent.' });
     }
-    // Enforce face-safe text position — silently correct to 'bottom' if an unsafe position was passed
+    // Enforce face-safe text position � silently correct to 'bottom' if an unsafe position was passed
     const safeguardedTextOverlayPosition = enforceFaceSafeTextPosition(textOverlayPosition);
     if (!FACE_SAFE_TEXT_OVERLAY_POSITIONS.has(safeguardedTextOverlayPosition)) {
       return res.status(422).json({
@@ -3490,6 +3849,12 @@ app.post('/api/video/generate', async (req, res) => {
         required: ['productImageUrl']
       });
     }
+    if (cinematicDirective.productMockupRequired && !renderPackage.productImageUrl) {
+      return res.status(422).json({
+        success: false,
+        error: 'Primary product mockup is mandatory for cinematic product video rendering.'
+      });
+    }
 
     if (!isMockRender && useVideoAgent) {
       renderPrompt = buildAPlusVideoAgentPrompt(prompt || renderScript, {
@@ -3498,7 +3863,8 @@ app.post('/api/video/generate', async (req, res) => {
         productName: renderPackage.productTitle,
         productTitle: renderPackage.productTitle,
         productPageUrl: renderPackage.productPageUrl,
-        companyLabel: renderPackage.companyLabel
+        companyLabel: renderPackage.companyLabel,
+        cinematicDirective
       });
     } else if (!isMockRender) {
       scriptQuality = validateScriptQuality(renderScript);
@@ -3595,6 +3961,7 @@ app.post('/api/video/generate', async (req, res) => {
         url,
         video_url: url,
         status: 'complete',
+        voice_speed: requestedVoiceSpeed,
         product_title: renderPackage.productTitle,
         product_image_url: renderPackage.productImageUrl,
         product_page_url: renderPackage.productPageUrl,
@@ -3603,6 +3970,7 @@ app.post('/api/video/generate', async (req, res) => {
         product_mockup_source: resolvedProduct ? 'product-library-primary-image' : 'request',
         text_overlay_position: textOverlayPosition,
         special_effects: requestedSpecialEffects,
+        cinematic_directive: cinematicDirective,
         renderLogColumns: Object.keys(mockDraft),
         status_url: '/api/video/status/' + renderId
       });
@@ -3623,6 +3991,7 @@ app.post('/api/video/generate', async (req, res) => {
         : renderPackage.productImageUrl
           ? [{ type: 'url', url: renderPackage.productImageUrl }]
           : undefined;
+    const agentFilesWithPrimaryMockup = ensurePrimaryProductMockupFile(agentFiles, renderPackage.productImageUrl);
     const renderConfig = {
       ...config,
       aspect: body.aspect || config.aspect || config.aspect_ratio,
@@ -3634,9 +4003,11 @@ app.post('/api/video/generate', async (req, res) => {
       caption: false,
       test: body.test ?? config.test,
       orientation: body.orientation || config.orientation || (body.aspect === '16:9' || config.aspect === '16:9' ? 'landscape' : 'portrait'),
-      files: agentFiles,
+      voice_speed: requestedVoiceSpeed,
+      files: agentFilesWithPrimaryMockup,
       text_overlay_position: textOverlayPosition,
       special_effects: requestedSpecialEffects,
+      cinematic_directive: cinematicDirective,
       style_id: body.style_id || body.styleId || config.style_id || config.styleId,
       idempotency_key: body.idempotency_key || body.idempotencyKey || config.idempotency_key || config.idempotencyKey,
       product_title: renderPackage.productTitle,
@@ -3685,7 +4056,7 @@ app.post('/api/video/generate', async (req, res) => {
         status: 'rendering',
         script: renderScript || renderPrompt,
         product_name: renderPackage.productTitle,
-        render_name: `${renderPackage.productTitle} · ${jordanPresetRequested ? 'Jordan Avatar' : (useVideoAgent ? 'Video Agent' : 'Avatar Render')}`,
+        render_name: `${renderPackage.productTitle} � ${jordanPresetRequested ? 'Jordan Avatar' : (useVideoAgent ? 'Video Agent' : 'Avatar Render')}`,
         vault_destination: '/generated/evics-sea-moss-proof-render.mp4',
         parameters: {
           mediaType: 'video',
@@ -3702,7 +4073,8 @@ app.post('/api/video/generate', async (req, res) => {
           avatar_preset: requestedAvatarPreset || null,
           voice_preset: requestedVoicePreset || null,
           special_effects: requestedSpecialEffects,
-          text_overlay_position: textOverlayPosition
+          text_overlay_position: textOverlayPosition,
+          cinematic_directive: cinematicDirective
         },
         created_at: now
       });
@@ -3781,6 +4153,7 @@ app.post('/api/video/generate', async (req, res) => {
       status: result.status || 'rendering',
       quality: scriptQuality,
       script_upgraded: scriptUpgraded,
+      voice_speed: requestedVoiceSpeed,
       governance: governanceReview ? {
         approved: governanceReview.approved,
         status: governanceReview.status,
@@ -3800,6 +4173,7 @@ app.post('/api/video/generate', async (req, res) => {
       product_mockup_source: resolvedProduct ? 'product-library-primary-image' : 'request',
       text_overlay_position: textOverlayPosition,
       special_effects: requestedSpecialEffects,
+      cinematic_directive: cinematicDirective,
       video_url: result.video_url || null,
       thumbnail_url: result.thumbnail_url || null,
       duration: result.duration || null,
@@ -3913,7 +4287,7 @@ app.get('/api/video/status/:videoId', async (req, res) => {
           status: persistedStatus,
           script: draft.script_text || '',
           product_name: draft.product_title || 'EVICS Render',
-          render_name: `${draft.product_title || 'EVICS'} · ${persistedStatus}`,
+          render_name: `${draft.product_title || 'EVICS'} � ${persistedStatus}`,
           vault_destination: statusResult.video_url || '/generated/evics-sea-moss-proof-render.mp4',
           parameters: {
             mediaType: 'video',
@@ -3959,7 +4333,7 @@ app.get('/api/video/status/:videoId', async (req, res) => {
 });
 
 // -------------------------
-// /api/video/callback â€” record completed render callbacks with direct video URLs
+// /api/video/callback — record completed render callbacks with direct video URLs
 // -------------------------
 app.post('/api/video/callback', async (req, res) => {
   try {
@@ -4056,7 +4430,7 @@ app.post('/api/video/callback', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/trend-scout/scan â€” scan viral trends
+// /api/agents/trend-scout/scan — scan viral trends
 // -------------------------
 app.post('/api/agents/trend-scout/scan', async (req, res) => {
   try {
@@ -4077,7 +4451,7 @@ app.post('/api/agents/trend-scout/scan', async (req, res) => {
     await SupabaseConnector
       .from('evics_trends')
       .insert([{
-        title: keyword ? `Keyword scan: ${keyword}` : `Trend scout scan â€” ${scanAmount} ads`,
+        title: keyword ? `Keyword scan: ${keyword}` : `Trend scout scan — ${scanAmount} ads`,
         source: 'trend_scout_agent',
         scan_amount: scanAmount,
         hook: keyword || null,
@@ -4124,7 +4498,7 @@ app.post('/api/agents/trend-scout/scan', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/script-writer/generate â€” generate ad scripts
+// /api/agents/script-writer/generate — generate ad scripts
 // -------------------------
 app.post('/api/agents/script-writer/generate', async (req, res) => {
   try {
@@ -4206,7 +4580,7 @@ app.post('/api/agents/script-writer/generate', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/product-match/analyze â€” match products to trends
+// /api/agents/product-match/analyze — match products to trends
 // -------------------------
 app.post('/api/agents/product-match/analyze', async (req, res) => {
   try {
@@ -4255,7 +4629,7 @@ app.post('/api/agents/product-match/analyze', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/copilot/suggest — AI copilot suggestions (GPT-4o when key present)
+// /api/agents/copilot/suggest � AI copilot suggestions (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/suggest', async (req, res) => {
   try {
@@ -4339,7 +4713,7 @@ Top creatives context: ${JSON.stringify(topCreatives.slice(0, 2))}`;
       {
         type: 'structure',
         priority: 'High',
-        suggestion: `Use the 5-beat structure: Hook (0-3s) → Problem (3-7s) → Personal proof (7-12s) → Product ritual (12-18s) → CTA (18-20s).`,
+        suggestion: `Use the 5-beat structure: Hook (0-3s) ? Problem (3-7s) ? Personal proof (7-12s) ? Product ritual (12-18s) ? CTA (18-20s).`,
         rationale: `This structure matches the top ${topCreatives.length || 3} performing creatives in your workspace.`,
         action: 'Generate script'
       },
@@ -4378,7 +4752,7 @@ Top creatives context: ${JSON.stringify(topCreatives.slice(0, 2))}`;
   }
 });
 
-// /api/agents/copilot/refine — refine a hook or script (GPT-4o when key present)
+// /api/agents/copilot/refine � refine a hook or script (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/refine', async (req, res) => {
   try {
@@ -4449,7 +4823,7 @@ Return ONLY a JSON object with a "refinements" array.`;
       {
         variant: 'Urgency',
         refined: inputType === 'hook'
-          ? input.replace(/\.\.\.$/, ' — and most people miss it.')
+          ? input.replace(/\.\.\.$/, ' � and most people miss it.')
           : input + '\n\n[URGENCY CUT] Flash to result. VO: "Don\'t wait. Start today."',
         improvement: 'Added urgency trigger to increase immediate action.',
         expectedLift: '+12% CTR'
@@ -4491,7 +4865,7 @@ Return ONLY a JSON object with a "refinements" array.`;
 });
 
 // -------------------------
-// /api/agents/copilot/explain — explain an AI decision (GPT-4o when key present)
+// /api/agents/copilot/explain � explain an AI decision (GPT-4o when key present)
 // -------------------------
 app.post('/api/agents/copilot/explain', async (req, res) => {
   try {
@@ -4568,7 +4942,7 @@ Explain decisions using weighted factors. Return ONLY a JSON object with:
           factor: 'Structural clarity',
           weight: '25%',
           score: creativeContext ? (creativeContext.score || 80) : 82,
-          explanation: 'The 5-beat structure (Hook → Problem → Proof → Product → CTA) is present and well-paced.'
+          explanation: 'The 5-beat structure (Hook ? Problem ? Proof ? Product ? CTA) is present and well-paced.'
         },
         {
           factor: 'Platform fit',
@@ -4604,7 +4978,7 @@ Explain decisions using weighted factors. Return ONLY a JSON object with:
 });
 
 // -------------------------
-// /api/agents/auto-generate â€” full pipeline: scan â†’ match â†’ write â†’ queue
+// /api/agents/auto-generate — full pipeline: scan → match → write → queue
 // -------------------------
 app.post('/api/agents/auto-generate', async (req, res) => {
   try {
@@ -4651,7 +5025,7 @@ app.post('/api/agents/auto-generate', async (req, res) => {
         id: `ag-${Date.now()}-${i}`,
         product: product.name,
         hook,
-        script: `Open on ${targetStyle === 'UGC' ? 'handheld camera, natural setting' : 'clean studio'}. VO: "${hook}" Show ${product.name}. Highlight: "${product.angle}". CTA: "Shop now â€” link in bio."`,
+        script: `Open on ${targetStyle === 'UGC' ? 'handheld camera, natural setting' : 'clean studio'}. VO: "${hook}" Show ${product.name}. Highlight: "${product.angle}". CTA: "Shop now — link in bio."`,
         format: `${targetStyle} ${platform}`,
         platform,
         channel: platform,
@@ -4703,17 +5077,17 @@ app.post('/api/agents/auto-generate', async (req, res) => {
 });
 
 // -------------------------
-// /api/shopify/products â€” live Shopify product list
+// /api/shopify/products — live Shopify product list
 // -------------------------
 
-// /api/agent/viral-scan â€” trigger viral intelligence scan
+// /api/agent/viral-scan — trigger viral intelligence scan
 app.post('/api/agent/viral-scan', async (req, res) => {
   try {
     const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 1284));
     const { error } = await SupabaseConnector
       .from('evics_trends')
       .insert([{
-        title: `Agent viral scan â€” ${amount} ads`,
+        title: `Agent viral scan — ${amount} ads`,
         source: 'agent_viral_scan',
         scan_amount: amount,
         created_at: new Date().toISOString()
@@ -4726,7 +5100,7 @@ app.post('/api/agent/viral-scan', async (req, res) => {
   }
 });
 
-// /api/agent/reconstruct â€” AI creative reconstruction from a viral ad
+// /api/agent/reconstruct — AI creative reconstruction from a viral ad
 app.post('/api/agent/reconstruct', async (req, res) => {
   try {
     const { adId, hook, platform, category } = req.body;
@@ -4751,7 +5125,7 @@ app.post('/api/agent/reconstruct', async (req, res) => {
   }
 });
 
-// /api/agent/generate-ads â€” auto-generate today's ad batch
+// /api/agent/generate-ads — auto-generate today's ad batch
 app.post('/api/agent/generate-ads', async (req, res) => {
   try {
     const { products: productList, hooks } = req.body;
@@ -4776,7 +5150,7 @@ app.post('/api/agent/generate-ads', async (req, res) => {
   }
 });
 
-// /api/services/intake-website — ingest a service-business website (law firms supported)
+// /api/services/intake-website � ingest a service-business website (law firms supported)
 app.post('/api/services/intake-website', async (req, res) => {
   try {
     const {
@@ -4811,7 +5185,7 @@ app.post('/api/services/intake-website', async (req, res) => {
   }
 });
 
-// /api/services/generate-avatar-ads — create service-avatar campaign concepts/scripts
+// /api/services/generate-avatar-ads � create service-avatar campaign concepts/scripts
 app.post('/api/services/generate-avatar-ads', async (req, res) => {
   try {
     const body = req.body || {};
@@ -4840,7 +5214,7 @@ app.post('/api/services/generate-avatar-ads', async (req, res) => {
   }
 });
 
-// /api/services/build-render-request — convert campaign concept to /api/video/generate payload
+// /api/services/build-render-request � convert campaign concept to /api/video/generate payload
 app.post('/api/services/build-render-request', async (req, res) => {
   try {
     const body = req.body || {};
@@ -4868,7 +5242,7 @@ app.post('/api/services/build-render-request', async (req, res) => {
   }
 });
 
-// /api/agent/approve-creative â€” approve or reject a creative
+// /api/agent/approve-creative — approve or reject a creative
 app.post('/api/agent/approve-creative', async (req, res) => {
   try {
     const { id, approved, rejectionReason } = req.body;
@@ -4884,14 +5258,14 @@ app.post('/api/agent/approve-creative', async (req, res) => {
   }
 });
 
-// /api/agent/publish â€” push a creative to the publishing queue
+// /api/agent/publish — push a creative to the publishing queue
 app.post('/api/agent/publish', async (req, res) => {
   try {
     const { creativeId, channel, content, publishAt } = req.body;
 
     // Support two calling patterns:
-    // 1. { creativeId, channel, publishAt } â€” from creative library queue
-    // 2. { channel, content, timestamp } â€” from Distribution "Publish Now" buttons
+    // 1. { creativeId, channel, publishAt } — from creative library queue
+    // 2. { channel, content, timestamp } — from Distribution "Publish Now" buttons
     if (!channel) return res.status(400).json({ success: false, error: 'channel is required.' });
 
     const record = {
@@ -4921,7 +5295,7 @@ app.post('/api/agent/publish', async (req, res) => {
   }
 });
 
-// /api/agent/learning-loop â€” record performance data and update best patterns
+// /api/agent/learning-loop — record performance data and update best patterns
 app.post('/api/agent/learning-loop', async (req, res) => {
   try {
     const { creativeId, watchTime, engagement, ctr, sales, conversionRate } = req.body;
@@ -4941,7 +5315,7 @@ app.post('/api/agent/learning-loop', async (req, res) => {
   }
 });
 
-// /api/agent/copilot â€” AI copilot: answer workspace questions and suggest next actions
+// /api/agent/copilot — AI copilot: answer workspace questions and suggest next actions
 app.post('/api/agent/copilot', async (req, res) => {
   try {
     const { question, context } = req.body;
@@ -4964,28 +5338,28 @@ app.post('/api/agent/copilot', async (req, res) => {
     const topProduct = (productsRes.data && productsRes.data[0]) ? productsRes.data[0].name : 'your top product';
     const topHook = (trendsRes.data && trendsRes.data[0]) ? trendsRes.data[0].hook : null;
 
-    // GPT-4o path — use when OPENAI_API_KEY is configured
+    // GPT-4o path � use when OPENAI_API_KEY is configured
     const openai = getOpenAI();
     if (openai) {
       try {
 
-        const systemPrompt = `You are the EVICS AI Copilot for I AM GENESIS TECH â€” an elite AI marketing intelligence system for a health supplement e-commerce store.
+        const systemPrompt = `You are the EVICS AI Copilot for I AM GENESIS TECH — an elite AI marketing intelligence system for a health supplement e-commerce store.
 
 Your role: answer the operator's workspace questions with precision, drawing on real-time viral trend data, product performance intelligence, and creative scoring data.
 
 EVICS Rules:
 - Top 30 ads get 80% of budget; Promotion Pool gets 20%
-- Products are ranked Tier 1â€“4 by profit score; Tier 4 for 60+ days = pause
+- Products are ranked Tier 1–4 by profit score; Tier 4 for 60+ days = pause
 - Render grade minimum for deployment: 92/100
 - Creative quality minimum: 80/100
-- Daily workflow: Scan â†’ Match â†’ Script â†’ Grade â†’ Publish â†’ Learn
+- Daily workflow: Scan → Match → Script → Grade → Publish → Learn
 
 Current workspace context:
 - Top trends: ${JSON.stringify(workspaceContext.topTrends)}
 - Top creatives: ${JSON.stringify(workspaceContext.topCreatives)}
 - Top products: ${JSON.stringify(workspaceContext.topProducts)}
 
-Be direct, strategic, and actionable. Max 3 sentences for the main answer, then list 3â€“4 next actions.`;
+Be direct, strategic, and actionable. Max 3 sentences for the main answer, then list 3–4 next actions.`;
 
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o',
@@ -5020,7 +5394,7 @@ Be direct, strategic, and actionable. Max 3 sentences for the main answer, then 
 
     // Rule-based fallback
     const suggestion = topHook
-      ? `Based on current trends, focus on "${topHook}" for ${topProduct}. Your top creative is scoring well â€” consider scaling it.`
+      ? `Based on current trends, focus on "${topHook}" for ${topProduct}. Your top creative is scoring well — consider scaling it.`
       : `Focus on ${topProduct} with a curiosity-led hook. Run a viral scan to surface fresh patterns.`;
 
     noStore(res);
@@ -5043,7 +5417,7 @@ Be direct, strategic, and actionable. Max 3 sentences for the main answer, then 
 });
 
 // -------------------------
-// /api/media/types â€” list available media types
+// /api/media/types — list available media types
 // -------------------------
 app.get('/api/media/types', (_req, res) => {
   noStore(res);
@@ -5062,7 +5436,7 @@ app.get('/api/media/types', (_req, res) => {
 });
 
 // -------------------------
-// /api/media/apps â€” list available rendering apps
+// /api/media/apps — list available rendering apps
 // -------------------------
 app.get('/api/media/apps', (_req, res) => {
   noStore(res);
@@ -5081,7 +5455,7 @@ app.get('/api/media/apps', (_req, res) => {
 });
 
 // -------------------------
-// /api/media/by-type/:type â€” get media filtered by type
+// /api/media/by-type/:type — get media filtered by type
 // -------------------------
 app.get('/api/media/by-type/:type', async (req, res) => {
   try {
@@ -5103,7 +5477,7 @@ app.get('/api/media/by-type/:type', async (req, res) => {
 });
 
 // -------------------------
-// /api/media/by-app/:app â€” get media filtered by rendering app
+// /api/media/by-app/:app — get media filtered by rendering app
 // -------------------------
 app.get('/api/media/by-app/:app', async (req, res) => {
   try {
@@ -5125,7 +5499,7 @@ app.get('/api/media/by-app/:app', async (req, res) => {
 });
 
 // -------------------------
-// /api/media/by-type/:type/by-app/:app â€” get media filtered by both type and app
+// /api/media/by-type/:type/by-app/:app — get media filtered by both type and app
 // -------------------------
 app.get('/api/media/by-type/:type/by-app/:app', async (req, res) => {
   try {
@@ -5148,7 +5522,7 @@ app.get('/api/media/by-type/:type/by-app/:app', async (req, res) => {
 });
 
 // -------------------------
-// /api/media/:id/download â€” generate a download link for a media item
+// /api/media/:id/download — generate a download link for a media item
 // -------------------------
 app.post('/api/media/:id/download', async (req, res) => {
   try {
@@ -5180,7 +5554,7 @@ app.post('/api/media/:id/download', async (req, res) => {
 });
 
 // -------------------------
-// /api/agents/status â€” real-time status of all agents
+// /api/agents/status — real-time status of all agents
 // -------------------------
 app.get('/api/agents/status', async (_req, res) => {
   try {
@@ -5195,7 +5569,7 @@ app.get('/api/agents/status', async (_req, res) => {
         processingTime: '2.4s avg',
         lastResult: 'Found 12 high-confidence hooks in Beauty + Weight Loss categories',
         qualityScore: 94,
-        nextAction: 'Rescan at 6:00 AM â€” targeting 1,500 ads',
+        nextAction: 'Rescan at 6:00 AM — targeting 1,500 ads',
         lastRun: new Date(now - 3600000).toISOString()
       },
       {
@@ -5205,7 +5579,7 @@ app.get('/api/agents/status', async (_req, res) => {
         status: 'active',
         currentTask: 'Matching Sea Moss + Collagen to top 5 viral structures',
         processingTime: '1.1s avg',
-        lastResult: 'Sea Moss Capsules matched to 3 viral hooks â€” confidence: High',
+        lastResult: 'Sea Moss Capsules matched to 3 viral hooks — confidence: High',
         qualityScore: 91,
         nextAction: 'Re-match after next viral scan',
         lastRun: new Date(now - 1800000).toISOString()
@@ -5217,7 +5591,7 @@ app.get('/api/agents/status', async (_req, res) => {
         status: 'active',
         currentTask: 'Writing 5 UGC scripts for Sea Moss + Metabolic Ignite',
         processingTime: '3.8s avg',
-        lastResult: 'Generated 4 scripts â€” avg quality score 88/100',
+        lastResult: 'Generated 4 scripts — avg quality score 88/100',
         qualityScore: 88,
         nextAction: 'Queue scripts for Visual Director review',
         lastRun: new Date(now - 900000).toISOString()
@@ -5229,7 +5603,7 @@ app.get('/api/agents/status', async (_req, res) => {
         status: 'active',
         currentTask: 'Analyzing pacing and visual style for 3 pending renders',
         processingTime: '4.2s avg',
-        lastResult: 'Approved 2 renders â€” rejected 1 for slow pacing in first 2s',
+        lastResult: 'Approved 2 renders — rejected 1 for slow pacing in first 2s',
         qualityScore: 86,
         nextAction: 'Send approved renders to publishing queue',
         lastRun: new Date(now - 600000).toISOString()
@@ -5237,11 +5611,11 @@ app.get('/api/agents/status', async (_req, res) => {
       {
         id: 'office-agent',
         name: 'Office Agent',
-        role: 'Orchestrating all agents â€” scheduling, prioritizing, and reporting',
+        role: 'Orchestrating all agents — scheduling, prioritizing, and reporting',
         status: 'active',
-        currentTask: 'Coordinating morning pipeline: Scan â†’ Match â†’ Script â†’ Render',
+        currentTask: 'Coordinating morning pipeline: Scan → Match → Script → Render',
         processingTime: '0.3s avg',
-        lastResult: 'Pipeline cycle 6 complete â€” 4 ads generated, 2 approved, 1 published',
+        lastResult: 'Pipeline cycle 6 complete — 4 ads generated, 2 approved, 1 published',
         qualityScore: 98,
         nextAction: 'Trigger nightly learning loop at 11:00 PM',
         lastRun: new Date(now - 300000).toISOString()
@@ -5267,10 +5641,10 @@ app.get('/api/agents/status', async (_req, res) => {
         SupabaseConnector.from('creatives').select('id', { count: 'exact', head: true })
       ]);
       if (trendsRes.count) {
-        agents[0].lastResult = `Scanned ${trendsRes.count} trend records â€” latest hooks extracted`;
+        agents[0].lastResult = `Scanned ${trendsRes.count} trend records — latest hooks extracted`;
       }
       if (creativesRes.count) {
-        agents[2].lastResult = `${creativesRes.count} scripts in system â€” avg quality score 88/100`;
+        agents[2].lastResult = `${creativesRes.count} scripts in system — avg quality score 88/100`;
       }
     } catch { /* use defaults */ }
 
@@ -5281,7 +5655,7 @@ app.get('/api/agents/status', async (_req, res) => {
   }
 });
 
-// /api/agents/:agentId/status â€” individual agent status
+// /api/agents/:agentId/status — individual agent status
 app.get('/api/agents/:agentId/status', async (req, res) => {
   try {
     const { agentId } = req.params;
@@ -5301,7 +5675,7 @@ app.get('/api/agents/:agentId/status', async (req, res) => {
 });
 
 // -------------------------
-// /api/published-media â€” all published/released media
+// /api/published-media — all published/released media
 // -------------------------
 app.get('/api/published-media', async (_req, res) => {
   try {
@@ -5384,7 +5758,7 @@ app.post('/api/published-media/:id/publish', async (req, res) => {
 });
 
 // -------------------------
-// /api/analytics/summary â€” overall analytics
+// /api/analytics/summary — overall analytics
 // -------------------------
 app.get('/api/analytics/summary', async (_req, res) => {
   try {
@@ -5463,7 +5837,7 @@ app.get('/api/analytics/summary', async (_req, res) => {
   }
 });
 
-// /api/analytics/platform/:platform â€” platform-specific analytics
+// /api/analytics/platform/:platform — platform-specific analytics
 app.get('/api/analytics/platform/:platform', async (req, res) => {
   try {
     const { platform } = req.params;
@@ -5497,7 +5871,7 @@ app.get('/api/analytics/platform/:platform', async (req, res) => {
   }
 });
 
-// /api/analytics/quality-report â€” quality metrics across all content
+// /api/analytics/quality-report — quality metrics across all content
 app.get('/api/analytics/quality-report', async (_req, res) => {
   try {
     const { data, error } = await SupabaseConnector
@@ -5545,7 +5919,7 @@ app.get('/api/analytics/quality-report', async (_req, res) => {
 });
 
 // -------------------------
-// /api/quality/validate â€” validate video meets elite standards
+// /api/quality/validate — validate video meets elite standards
 // -------------------------
 app.post('/api/quality/validate', async (req, res) => {
   try {
@@ -5607,7 +5981,7 @@ app.post('/api/quality/validate', async (req, res) => {
 });
 
 // -------------------------
-// /api/shopify/products â€” live Shopify product list
+// /api/shopify/products — live Shopify product list
 // -------------------------
 app.get('/api/shopify/products', async (_req, res) => {
   try {
@@ -5620,7 +5994,7 @@ app.get('/api/shopify/products', async (_req, res) => {
 });
 
 // -------------------------
-// /api/shopify/collections â€” live Shopify collection list
+// /api/shopify/collections — live Shopify collection list
 // -------------------------
 app.get('/api/shopify/collections', async (_req, res) => {
   try {
@@ -5633,7 +6007,7 @@ app.get('/api/shopify/collections', async (_req, res) => {
 });
 
 // -------------------------
-// /api/shopify/synced-products â€” normalized product list for dashboard hydrateFromServerApi()
+// /api/shopify/synced-products — normalized product list for dashboard hydrateFromServerApi()
 // -------------------------
 app.get('/api/shopify/synced-products', async (_req, res) => {
   try {
@@ -5666,7 +6040,7 @@ const { determineProductTier, getTierAction } = require('../utils/productTierEng
 const { allocateMarketingBudget, rankAdsByProfitScore, determineBudgetAction } = require('../utils/capitalAllocatorEngine');
 const { evaluateExperiment, determineExperimentStatus, shouldPromoteExperiment } = require('../utils/experimentGovernorEngine');
 
-// POST /api/agent/profit-audit â€” calculate profit scores for all products using live Shopify + Supabase data
+// POST /api/agent/profit-audit — calculate profit scores for all products using live Shopify + Supabase data
 app.post('/api/agent/profit-audit', async (req, res) => {
   try {
     // Pull Shopify products as the source of truth for product list
@@ -5785,7 +6159,7 @@ app.post('/api/agent/profit-audit', async (req, res) => {
   }
 });
 
-// GET /api/agent/product-tiers â€” get tier assignments for all products
+// GET /api/agent/product-tiers — get tier assignments for all products
 app.get('/api/agent/product-tiers', async (_req, res) => {
   try {
     const { data: products, error } = await SupabaseConnector
@@ -5814,7 +6188,7 @@ app.get('/api/agent/product-tiers', async (_req, res) => {
   }
 });
 
-// POST /api/agent/allocate-budget â€” generate daily budget allocation recommendations
+// POST /api/agent/allocate-budget — generate daily budget allocation recommendations
 app.post('/api/agent/allocate-budget', async (req, res) => {
   try {
     const { totalBudget = 1000 } = req.body;
@@ -5861,7 +6235,7 @@ app.post('/api/agent/allocate-budget', async (req, res) => {
   }
 });
 
-// GET /api/agent/experiments â€” view active A/B tests and results
+// GET /api/agent/experiments — view active A/B tests and results
 app.get('/api/agent/experiments', async (_req, res) => {
   try {
     const { data: creatives, error } = await SupabaseConnector
@@ -5903,7 +6277,7 @@ app.get('/api/agent/experiments', async (_req, res) => {
   }
 });
 
-// POST /api/agent/library-cleanup â€” archive low-scoring creatives, keep Top 5 per SKU
+// POST /api/agent/library-cleanup — archive low-scoring creatives, keep Top 5 per SKU
 app.post('/api/agent/library-cleanup', async (req, res) => {
   try {
     const { dryRun = false } = req.body;
@@ -5959,7 +6333,7 @@ app.post('/api/agent/library-cleanup', async (req, res) => {
   }
 });
 
-// GET /api/agent/executive-report â€” generate weekly executive summary
+// GET /api/agent/executive-report — generate weekly executive summary
 app.get('/api/agent/executive-report', async (_req, res) => {
   try {
     const [rendersRes, creativesRes, trendsRes, publishedRes, approvedRes] = await Promise.all([
@@ -5980,7 +6354,7 @@ app.get('/api/agent/executive-report', async (_req, res) => {
 
     const report = {
       generatedAt: new Date().toISOString(),
-      week: `Week of ${new Date(Date.now() - 7 * 86400000).toLocaleDateString()} â€“ ${new Date().toLocaleDateString()}`,
+      week: `Week of ${new Date(Date.now() - 7 * 86400000).toLocaleDateString()} – ${new Date().toLocaleDateString()}`,
       summary: {
         adsGenerated: rendersRes.count || 0,
         creativesInLibrary: creatives.length,
@@ -5991,10 +6365,10 @@ app.get('/api/agent/executive-report', async (_req, res) => {
       },
       topPerformer: topProduct ? { product: topProduct.product, score: topProduct.score } : null,
       recommendations: [
-        avgScore < 80 ? 'Creative quality below threshold â€” review scoring criteria and regenerate low-score ads.' : 'Creative quality is healthy. Focus on scaling top performers.',
-        (rendersRes.count || 0) < 5 ? 'Render volume is low â€” trigger auto-generate pipeline to build library.' : 'Render volume is healthy.',
+        avgScore < 80 ? 'Creative quality below threshold — review scoring criteria and regenerate low-score ads.' : 'Creative quality is healthy. Focus on scaling top performers.',
+        (rendersRes.count || 0) < 5 ? 'Render volume is low — trigger auto-generate pipeline to build library.' : 'Render volume is healthy.',
         'Run profit audit to update Tier rankings before scaling ad spend.',
-        'Review experiment governor results â€” promote any confirmed winners.'
+        'Review experiment governor results — promote any confirmed winners.'
       ]
     };
 
@@ -6005,7 +6379,7 @@ app.get('/api/agent/executive-report', async (_req, res) => {
   }
 });
 
-// GET /api/shopify/orders â€” fetch Shopify orders (for ROAS and profit audit)
+// GET /api/shopify/orders — fetch Shopify orders (for ROAS and profit audit)
 app.get('/api/shopify/orders', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 250);
@@ -6018,7 +6392,7 @@ app.get('/api/shopify/orders', async (req, res) => {
   }
 });
 
-// POST /api/agent/render-grade â€” score a creative render using renderGradingEngine
+// POST /api/agent/render-grade — score a creative render using renderGradingEngine
 app.post('/api/agent/render-grade', async (req, res) => {
   try {
     const { calculateRenderGrade, determineRenderStatus, shouldEnterEliteVault } = require('../utils/renderGradingEngine');
@@ -6053,7 +6427,7 @@ app.post('/api/agent/render-grade', async (req, res) => {
   }
 });
 
-// POST /api/agent/roas-report â€” compute ROAS per creative using Shopify orders + UTM matching
+// POST /api/agent/roas-report — compute ROAS per creative using Shopify orders + UTM matching
 app.post('/api/agent/roas-report', async (req, res) => {
   try {
     const [ordersRaw, creativesRes] = await Promise.all([
@@ -6102,11 +6476,11 @@ app.post('/api/agent/roas-report', async (req, res) => {
   }
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Phase 4 â€” External API Integrations
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// Phase 4 — External API Integrations
+// ─────────────────────────────────────────────────────────────
 
-// POST /api/vizard/repurpose â€” Vizard AI: repurpose a video into platform-specific clips
+// POST /api/vizard/repurpose — Vizard AI: repurpose a video into platform-specific clips
 app.post('/api/vizard/repurpose', async (req, res) => {
   const { video_url, formats = ['tiktok', 'reels', 'shorts'], title = '' } = req.body;
   if (!video_url) return res.status(400).json({ success: false, error: 'video_url is required' });
@@ -6152,7 +6526,7 @@ app.post('/api/vizard/repurpose', async (req, res) => {
   });
 });
 
-// POST /api/predis/predict â€” Predis AI: predict content performance before publishing
+// POST /api/predis/predict — Predis AI: predict content performance before publishing
 app.post('/api/predis/predict', async (req, res) => {
   const { creative = {}, caption = '', platform = 'instagram' } = req.body;
 
@@ -6193,26 +6567,26 @@ app.post('/api/predis/predict', async (req, res) => {
       engagement_rate_estimate: `${engagementEst}%`,
       reach_estimate: reachEst,
       virality_score: score,
-      recommendation: score >= 85 ? 'Publish â€” high confidence' : score >= 70 ? 'Publish with A/B test' : 'Refine before publishing',
-      top_performing_time: '12:00 PM â€“ 2:00 PM local',
+      recommendation: score >= 85 ? 'Publish — high confidence' : score >= 70 ? 'Publish with A/B test' : 'Refine before publishing',
+      top_performing_time: '12:00 PM – 2:00 PM local',
       caption_score: Math.min(100, score + 5)
     }
   });
 });
 
-// POST /api/canva/generate â€” Canva Connect: generate static ad graphics from template
+// POST /api/canva/generate — Canva Connect: generate static ad graphics from template
 app.post('/api/canva/generate', async (req, res) => {
   const { product = '', template_id = '', format = 'square', brand_color = '#1f6b4b' } = req.body;
 
   if (process.env.CANVA_API_KEY) {
     try {
       const axios = require('axios');
-      // Canva Connect API v1 â€” create design from template
+      // Canva Connect API v1 — create design from template
       const response = await axios.post(
         'https://api.canva.com/rest/v1/designs',
         {
           design_type: { type: 'preset', name: format === 'square' ? 'InstagramPost' : 'InstagramStory' },
-          title: `${product} â€“ IAGT Ad`,
+          title: `${product} – IAGT Ad`,
           asset_upload: { name: template_id || 'iagt-template' }
         },
         {
@@ -6248,7 +6622,7 @@ app.post('/api/canva/generate', async (req, res) => {
   });
 });
 
-// POST /api/gemini/analyze-video â€” Gemini Omni: visual + content analysis of video
+// POST /api/gemini/analyze-video — Gemini Omni: visual + content analysis of video
 app.post('/api/gemini/analyze-video', async (req, res) => {
   const { video_url = '', prompt = 'Analyze this marketing video for viral potential, hook effectiveness, pacing, and conversion signals.' } = req.body;
   if (!video_url) return res.status(400).json({ success: false, error: 'video_url is required' });
@@ -6286,11 +6660,11 @@ app.post('/api/gemini/analyze-video', async (req, res) => {
     stub: true,
     message: 'Set GEMINI_API_KEY in Railway to activate live Gemini video analysis.',
     analysis: {
-      hook_effectiveness: 'Strong â€” opens with a curiosity gap in first 2 seconds',
-      visual_pacing: 'Fast cuts every 1.5â€“2s match TikTok engagement patterns',
+      hook_effectiveness: 'Strong — opens with a curiosity gap in first 2 seconds',
+      visual_pacing: 'Fast cuts every 1.5–2s match TikTok engagement patterns',
       emotional_triggers: ['Curiosity', 'Transformation', 'Social proof'],
-      cta_clarity: 'Clear CTA at 28s â€” "Shop now, link in bio"',
-      viral_potential: 'High â€” matches current wellness trend patterns',
+      cta_clarity: 'Clear CTA at 28s — "Shop now, link in bio"',
+      viral_potential: 'High — matches current wellness trend patterns',
       improvement_suggestions: [
         'Add text overlay for first hook to increase watch time',
         'Show product close-up earlier (by second 4)',
@@ -6302,14 +6676,14 @@ app.post('/api/gemini/analyze-video', async (req, res) => {
 
 
 // =============================================================
-// Phone App API â€” connects evics-affiliate-app (Expo/React Native)
-// Directive: "Fix phone app connections" â€” real HeyGen v3, no stubs
+// Phone App API — connects evics-affiliate-app (Expo/React Native)
+// Directive: "Fix phone app connections" — real HeyGen v3, no stubs
 // Default avatar: Abigail_expressive_2024112501
 // Default voice:  f8c69e517f424cafaecde32dde57096b
 // Phone app .env must point to: http://<host>:4175
 // =============================================================
 
-// Multer — disk storage for photo + voice uploads from the affiliate phone app
+// Multer � disk storage for photo + voice uploads from the affiliate phone app
 const avatarUploadStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (_req, file, cb) => {
@@ -6329,7 +6703,7 @@ const avatarUpload = multer({
 });
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 
-// Background MP4 downloader â€” caches completed HeyGen videos locally for fast byte-range playback
+// Background MP4 downloader — caches completed HeyGen videos locally for fast byte-range playback
 async function downloadMp4ToCache(videoId, videoUrl) {
   const mp4Path = path.join(MEDIA_CACHE_DIR, `${videoId}.mp4`);
   if (fs.existsSync(mp4Path)) return; // already cached
@@ -6346,7 +6720,7 @@ async function downloadMp4ToCache(videoId, videoUrl) {
         fs.writeFileSync(cf, JSON.stringify({ ...meta, local_mp4: true, cached_at: new Date().toISOString() }));
       } catch {}
     }
-    console.log(`[EVICS Media] âœ… Cached MP4: ${videoId}.mp4 (${Math.round(buf.byteLength / 1024)}KB)`);
+    console.log(`[EVICS Media] ✅ Cached MP4: ${videoId}.mp4 (${Math.round(buf.byteLength / 1024)}KB)`);
   } catch (e) {
     console.warn(`[EVICS Media] MP4 cache download failed for ${videoId}:`, e.message);
   }
@@ -6355,15 +6729,67 @@ async function downloadMp4ToCache(videoId, videoUrl) {
 // POST /api/product-to-video
 app.post('/api/product-to-video', async (req, res) => {
   noStore(res);
-  const { product_id, product_name, script, affiliate_email, avatar_id, voice_id } = req.body || {};
+  const {
+    product_id,
+    product_name,
+    productImageUrl,
+    product_image_url,
+    productPageUrl,
+    product_page_url,
+    script,
+    affiliate_email,
+    avatar_id,
+    voice_id,
+    cinematic_directive,
+    cinematicDirective
+  } = req.body || {};
   if (!script) return res.status(400).json({ success: false, error: 'script is required' });
+  const resolvedProductImageUrl = String(productImageUrl || product_image_url || '').trim();
+  if (!resolvedProductImageUrl) {
+    return res.status(422).json({ success: false, error: 'Primary product mockup image is required for product video rendering.' });
+  }
   const aid = avatar_id || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
   const vid = voice_id  || process.env.HEYGEN_VOICE_ID  || 'f8c69e517f424cafaecde32dde57096b';
+  const resolvedProductPageUrl = String(productPageUrl || product_page_url || '').trim() || null;
+  const standardizedCinematicDirective = normalizeCinematicProductDirective(cinematic_directive || cinematicDirective || {});
   if (!process.env.HEYGEN_API_KEY) return res.json({ success: false, error: 'HEYGEN_API_KEY not configured in Railway env vars.' });
   try {
-    const render = await startHeyGenRender({ script, avatar_id: aid, voice_id: vid, config: { aspect: '9:16', background: { type: 'color', value: '#000000' }, caption: false, test: false } });
-    fs.writeFileSync(path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`), JSON.stringify({ video_id: render.video_id, product_id: product_id || null, product_name: product_name || null, affiliate_email: affiliate_email || null, textOverlayPosition: 'bottom', status: 'rendering', created_at: new Date().toISOString() }));
-    res.json({ success: true, video_id: render.video_id, videoId: render.video_id, status: 'rendering' });
+    const render = await startHeyGenRender({
+      script,
+      avatar_id: aid,
+      voice_id: vid,
+      config: {
+        aspect: '9:16',
+        background: { type: 'color', value: '#000000' },
+        caption: false,
+        test: false,
+        files: ensurePrimaryProductMockupFile([], resolvedProductImageUrl),
+        product_image_url: resolvedProductImageUrl,
+        product_page_url: resolvedProductPageUrl,
+        cinematic_directive: standardizedCinematicDirective
+      }
+    });
+    fs.writeFileSync(path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`), JSON.stringify({
+      video_id: render.video_id,
+      product_id: product_id || null,
+      product_name: product_name || null,
+      productImageUrl: resolvedProductImageUrl,
+      productPageUrl: resolvedProductPageUrl,
+      affiliate_email: affiliate_email || null,
+      textOverlayPosition: 'bottom',
+      cinematicDirective: standardizedCinematicDirective,
+      status: 'rendering',
+      created_at: new Date().toISOString()
+    }));
+    res.json({
+      success: true,
+      video_id: render.video_id,
+      videoId: render.video_id,
+      status: 'rendering',
+      productImageUrl: resolvedProductImageUrl,
+      productPageUrl: resolvedProductPageUrl,
+      cinematicDirective: standardizedCinematicDirective
+    });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
@@ -6383,7 +6809,7 @@ app.get('/api/product-to-video/status/:videoId', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// GET /api/media/playback/:id â€” byte-range MP4 streaming
+// GET /api/media/playback/:id — byte-range MP4 streaming
 app.get('/api/media/playback/:id', async (req, res) => {
   const { id } = req.params;
   let videoUrl = null;
@@ -6422,17 +6848,21 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
   const {
     avatarId, productTitle, productImageUrl, productPageUrl,
     script, affiliateCode, affiliateId, platform = 'tiktok',
-    product, backgroundMode = 'product', backgroundUrl, backgroundQuery, scene
+    product, backgroundMode = 'product', backgroundUrl, backgroundQuery, scene,
+    cinematic_directive, cinematicDirective,
+    voice_id, voiceId
   } = req.body || {};
 
-  const aid = avatarId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
-  const vid = process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
+  // Resolve avatar: request body > saved selection > env default
   const ownerCode = normalizeAffiliateCode(affiliateCode || affiliateId || '');
   if (!ownerCode) {
     return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar video generation' });
   }
+  const resolved = resolveAffiliateAvatar(ownerCode, avatarId || null, voice_id || voiceId || null);
+  const aid = resolved.avatarId;
+  const vid = resolved.voiceId;
 
-  // ── 1. Generate elite viral script ──────────────────────────────────────────
+  // -- 1. Generate elite viral script ------------------------------------------
   let scr = script;
   if (!scr) {
     try {
@@ -6442,11 +6872,18 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
       });
       scr = scriptResult.scriptText;
     } catch (e) {
-      scr = `${productTitle || 'This product'} from I AM GENESIS TECH is changing lives. Get yours now at iamgenesistech.com — link in bio.`;
+      scr = `${productTitle || 'This product'} from I AM GENESIS TECH is changing lives. Get yours now at iamgenesistech.com � link in bio.`;
     }
+    if (!productImageUrl) {
+      return res.status(422).json({
+        success: false,
+        error: 'Primary product mockup image is required for affiliate product video rendering.'
+      });
+    }
+    const standardizedCinematicDirective = normalizeCinematicProductDirective(cinematic_directive || cinematicDirective || {});
   }
 
-  // ── 2. Remove product background → prepare mockup image ─────────────────────
+  // -- 2. Remove product background ? prepare mockup image ---------------------
   let processedImageUrl = null;
   if (productImageUrl) {
     try {
@@ -6460,7 +6897,7 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
     } catch { processedImageUrl = productImageUrl; }
   }
 
-  // ── 3. Select dynamic background based on product category ──────────────────
+  // -- 3. Select dynamic background based on product category ------------------
   // If user provided a specific backgroundUrl, use it directly
   let bgConfig, heygenBg;
   if (backgroundUrl) {
@@ -6484,14 +6921,23 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
       script: scr,
       background: bgConfig,
       processedImageUrl,
-      message: 'Demo mode — configure HEYGEN_API_KEY to generate real videos.'
+      message: 'Demo mode � configure HEYGEN_API_KEY to generate real videos.'
     });
   }
 
   try {
     const render = await startHeyGenRender({
       script: scr, avatar_id: aid, voice_id: vid,
-      config: { aspect: '9:16', background: heygenBg, caption: false, test: false }
+      config: {
+        aspect: '9:16',
+        background: heygenBg,
+        caption: false,
+        test: false,
+        files: ensurePrimaryProductMockupFile([], processedImageUrl || productImageUrl),
+        product_image_url: processedImageUrl || productImageUrl || null,
+        product_page_url: productPageUrl || null,
+        cinematic_directive: standardizedCinematicDirective
+      }
     });
     fs.writeFileSync(
       path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
@@ -6502,12 +6948,30 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
         affiliateCode: ownerCode,
         productImageUrl: productImageUrl || null,
         textOverlayPosition: 'bottom',
+        cinematicDirective: standardizedCinematicDirective,
+        // Avatar resolution � stored for status polling and Production tab
+        avatarId:           aid,
+        avatarName:         resolved.avatarName,
+        avatarThumbnailUrl: resolved.avatarThumbnailUrl,
+        avatarGender:       resolved.avatarGender,
+        avatarType:         resolved.avatarType,
+        voiceId:            vid,
         status: 'rendering', created_at: new Date().toISOString()
       })
     );
     res.json({
       success: true, videoId: render.video_id, status: 'rendering',
-      script: scr, background: bgConfig, processedImageUrl
+      script: scr, background: bgConfig, processedImageUrl,
+      cinematicDirective: standardizedCinematicDirective,
+      // Production tab � avatar confirmation
+      avatar: {
+        avatarId:     aid,
+        avatarName:   resolved.avatarName,
+        thumbnailUrl: resolved.avatarThumbnailUrl,
+        gender:       resolved.avatarGender,
+        type:         resolved.avatarType,
+        voiceId:      vid
+      }
     });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
@@ -6560,7 +7024,7 @@ app.get('/api/affiliate/avatar/video-status/:videoId', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// GET /api/affiliate/avatar/background-options — get available backgrounds for a product
+// GET /api/affiliate/avatar/background-options � get available backgrounds for a product
 app.get('/api/affiliate/avatar/background-options', (req, res) => {
   noStore(res);
   const { productTitle, category } = req.query;
@@ -6570,7 +7034,7 @@ app.get('/api/affiliate/avatar/background-options', (req, res) => {
   res.json({ success: true, options, message: 'Choose a background before rendering or re-render with a different one.' });
 });
 
-// POST /api/affiliate/avatar/re-render — re-render same script with different background
+// POST /api/affiliate/avatar/re-render � re-render same script with different background
 app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   noStore(res);
   const { videoId, backgroundUrl, backgroundQuery, scene } = req.body || {};
@@ -6582,16 +7046,16 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   if (!fs.existsSync(cf)) return res.status(404).json({ error: 'Original render metadata not found' });
   const meta = JSON.parse(fs.readFileSync(cf, 'utf8'));
 
-  // Resolve background URL — 3 options:
+  // Resolve background URL � 3 options:
   // 1. User provides exact backgroundUrl
-  // 2. User provides scene type (e.g. "beach") → random unique image from that scene
-  // 3. Neither → random unique image from product category
+  // 2. User provides scene type (e.g. "beach") ? random unique image from that scene
+  // 3. Neither ? random unique image from product category
   const { getRandomBackground, detectCategory, resolveBackgroundUrl: resolveBg } = require('../utils/videoBackgroundSelector');
   let bgUrl = backgroundUrl;
   let bgScene = scene || 'random';
 
   if (backgroundQuery) {
-    // backgroundQuery is a hint — find the closest static image for that category
+    // backgroundQuery is a hint � find the closest static image for that category
     const { detectCategory: dc, getRandomBackground: getRandBg } = require('../utils/videoBackgroundSelector');
     const bg = getRandBg(scene || dc({ title: backgroundQuery }) || 'default');
     bgUrl = bg.url;
@@ -6609,11 +7073,24 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   const aid = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
   const vid = process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b';
   const heygenBg = { type: 'image', url: bgUrl };
+  const standardizedCinematicDirective = normalizeCinematicProductDirective(meta.cinematicDirective || {});
+  if (!meta.productImageUrl && !meta.processedImageUrl) {
+    return res.status(422).json({ success: false, error: 'Primary product mockup image is required for re-render.' });
+  }
 
   try {
     const render = await startHeyGenRender({
       script: meta.script, avatar_id: aid, voice_id: vid,
-      config: { aspect: '9:16', background: heygenBg, caption: false, test: false }
+      config: {
+        aspect: '9:16',
+        background: heygenBg,
+        caption: false,
+        test: false,
+        files: ensurePrimaryProductMockupFile([], meta.processedImageUrl || meta.productImageUrl || null),
+        product_image_url: meta.processedImageUrl || meta.productImageUrl || null,
+        product_page_url: meta.productPageUrl || null,
+        cinematic_directive: standardizedCinematicDirective
+      }
     });
     fs.writeFileSync(
       path.join(MEDIA_CACHE_DIR, `${render.video_id}.json`),
@@ -6628,6 +7105,7 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
         affiliateCode: meta.affiliateCode || '',
         productImageUrl: meta.productImageUrl || null,
         textOverlayPosition: 'bottom',
+        cinematicDirective: standardizedCinematicDirective,
         status: 'rendering',
         created_at: new Date().toISOString()
       })
@@ -6639,6 +7117,7 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
       status: 'rendering',
       scene: bgScene,
       backgroundUsed: bgUrl,
+      cinematicDirective: standardizedCinematicDirective,
       message: `Re-rendering with unique ${bgScene} background. Every render is different. Check status: /api/affiliate/avatar/video-status/${render.video_id}`
     });
   } catch (err) {
@@ -6659,15 +7138,39 @@ const heygenAvatarState = {
 
 function mapHeygenAvatarResponse(payload) {
   const list = (payload?.data?.avatars || payload?.avatars || [])
-    .slice(0, 30)
+    .slice(0, 60)
     .map((x) => ({
       id: x.avatar_id || x.id,
       name: x.avatar_name || x.name || x.avatar_id,
       gender: x.gender || 'unknown',
-      preview_url: x.preview_image_url || null
+      type: x.type || (x.is_custom ? 'custom' : 'stock'),
+      preview_url: x.preview_image_url || x.preview_url || x.thumbnail_url || null,
+      voice_id: x.default_voice_id || x.voice_id || null,
+      is_custom: Boolean(x.is_custom || x.type === 'custom')
     }))
     .filter((x) => x.id);
   return list;
+}
+
+/**
+ * Resolve which avatar to use for a render:
+ *   1. Explicit avatarId in request body (highest priority)
+ *   2. Affiliate's saved selectedAvatarId from profile
+ *   3. HEYGEN_AVATAR_ID env var default
+ *   4. Hardcoded fallback
+ * Returns { avatarId, avatarName, avatarThumbnailUrl, avatarGender, avatarType, voiceId }
+ */
+function resolveAffiliateAvatar(affiliateCode, requestAvatarId = null, requestVoiceId = null) {
+  const profile = getAffiliateProfile(affiliateCode);
+  const avatarId = String(requestAvatarId || profile?.selectedAvatarId || process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501').trim();
+  const voiceId  = String(requestVoiceId  || profile?.selectedVoiceId  || profile?.voiceId || process.env.HEYGEN_VOICE_ID || 'f8c69e517f424cafaecde32dde57096b').trim();
+  const avatarName         = (requestAvatarId && requestAvatarId === profile?.selectedAvatarId) || (!requestAvatarId && profile?.selectedAvatarId)
+    ? (profile?.selectedAvatarName || avatarId)
+    : (profile?.selectedAvatarName || avatarId);
+  const avatarThumbnailUrl = (avatarId === profile?.selectedAvatarId) ? (profile?.selectedAvatarThumbnailUrl || null) : null;
+  const avatarGender       = (avatarId === profile?.selectedAvatarId) ? (profile?.selectedAvatarGender || null) : null;
+  const avatarType         = (avatarId === profile?.selectedAvatarId) ? (profile?.selectedAvatarType || 'stock') : 'stock';
+  return { avatarId, voiceId, avatarName, avatarThumbnailUrl, avatarGender, avatarType };
 }
 
 async function getCachedHeygenAvatars(defaults) {
@@ -6717,16 +7220,192 @@ async function getCachedHeygenAvatars(defaults) {
   return heygenAvatarState.inFlight;
 }
 
-// GET /api/affiliate/avatars
+// GET /api/affiliate/avatars � full avatar catalogue with selection state
 app.get('/api/affiliate/avatars', async (req, res) => {
   noStore(res);
-  const defaults = [{ id: 'Abigail_expressive_2024112501', name: 'Abigail (Expressive)', gender: 'female', preview_url: null }, { id: 'Angela-inblackskirt-20220820', name: 'Angela', gender: 'female', preview_url: null }, { id: 'Tyler-incasualsuit-20220721', name: 'Tyler', gender: 'male', preview_url: null }];
-  if (!process.env.HEYGEN_API_KEY) return res.json({ success: true, avatars: defaults });
-  const avatars = await getCachedHeygenAvatars(defaults);
-  res.json({ success: true, avatars });
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
+  const profile = affiliateCode ? getAffiliateProfile(affiliateCode) : null;
+  const selectedId = profile?.selectedAvatarId || null;
+
+  const defaults = [
+    { id: 'Abigail_expressive_2024112501', name: 'Abigail (Expressive)', gender: 'female', type: 'stock', preview_url: null, is_custom: false },
+    { id: 'Angela-inblackskirt-20220820',  name: 'Angela',               gender: 'female', type: 'stock', preview_url: null, is_custom: false },
+    { id: 'Tyler-incasualsuit-20220721',   name: 'Tyler',                 gender: 'male',   type: 'stock', preview_url: null, is_custom: false }
+  ];
+
+  // Merge HeyGen stock avatars + affiliate's custom gallery avatars
+  let stockAvatars = [];
+  if (process.env.HEYGEN_API_KEY) {
+    stockAvatars = await getCachedHeygenAvatars(defaults);
+  } else {
+    stockAvatars = defaults;
+  }
+
+  // Pull custom avatars from the affiliate's gallery
+  let customAvatars = [];
+  if (affiliateCode) {
+    try {
+      const gallery = await getAvatarGalleryRecords(affiliateCode);
+      customAvatars = gallery
+        .filter(r => r.heygenAvatarId || r.avatar_id)
+        .map(r => ({
+          id: r.heygenAvatarId || r.avatar_id,
+          name: r.avatarName || r.name || 'My Custom Avatar',
+          gender: r.gender || 'unknown',
+          type: 'custom',
+          preview_url: r.previewImageUrl || r.preview_url || r.photoUrl || null,
+          is_custom: true,
+          created_at: r.createdAt || null
+        }));
+    } catch { /* gallery not available */ }
+  }
+
+  // Merge: custom first, then stock (deduplicate by id)
+  const seen = new Set();
+  const allAvatars = [...customAvatars, ...stockAvatars]
+    .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
+    .map(a => ({
+      ...a,
+      is_selected: a.id === selectedId
+    }));
+
+  const selected = allAvatars.find(a => a.is_selected) || null;
+
+  res.json({
+    success: true,
+    avatars: allAvatars,
+    count: allAvatars.length,
+    selected_avatar_id: selectedId,
+    selected: selected ? {
+      id: selected.id,
+      name: selected.name,
+      gender: selected.gender,
+      type: selected.type,
+      preview_url: selected.preview_url,
+      is_custom: selected.is_custom
+    } : null
+  });
 });
 
-// POST /api/affiliate/avatar/upload-photo — accepts multipart photo from Expo FileSystem.uploadAsync
+// POST /api/affiliate/avatar/select � save chosen avatar to affiliate profile
+app.post('/api/affiliate/avatar/select', async (req, res) => {
+  noStore(res);
+  try {
+    const {
+      affiliateCode, affiliateId,
+      avatarId, avatarName, avatarThumbnailUrl, avatarGender, avatarType,
+      voiceId
+    } = req.body || {};
+
+    const code = normalizeAffiliateCode(affiliateCode || affiliateId || '');
+    if (!code)     return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+    if (!avatarId) return res.status(400).json({ success: false, error: 'avatarId is required' });
+
+    // Validate the avatar exists (check against live list or accept any non-empty string)
+    const cleanAvatarId   = String(avatarId).trim();
+    const cleanAvatarName = String(avatarName || cleanAvatarId).trim().slice(0, 128);
+    const cleanThumb      = String(avatarThumbnailUrl || '').trim() || null;
+    const cleanGender     = normalizeAvatarGender(avatarGender || '') || null;
+    const cleanType       = String(avatarType || 'stock').toLowerCase() === 'custom' ? 'custom' : 'stock';
+    const cleanVoiceId    = String(voiceId || '').trim() || null;
+
+    const profile = upsertAffiliateProfile(
+      code,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      {
+        selectedAvatarId:           cleanAvatarId,
+        selectedAvatarName:         cleanAvatarName,
+        selectedAvatarThumbnailUrl: cleanThumb,
+        selectedAvatarGender:       cleanGender,
+        selectedAvatarType:         cleanType,
+        selectedVoiceId:            cleanVoiceId
+      }
+    );
+
+    console.log(`[AvatarSelect] ${code} selected avatar: ${cleanAvatarId} (${cleanAvatarName})`);
+
+    res.json({
+      success: true,
+      message: `Avatar "${cleanAvatarName}" selected. It will be used for all future product video renders.`,
+      selected: {
+        avatarId:           cleanAvatarId,
+        avatarName:         cleanAvatarName,
+        avatarThumbnailUrl: cleanThumb,
+        avatarGender:       cleanGender,
+        avatarType:         cleanType,
+        voiceId:            cleanVoiceId || profile.voiceId || process.env.HEYGEN_VOICE_ID,
+        selectedAt:         profile.selectedAvatarUpdatedAt
+      },
+      // Production tab shape � ready to display
+      productionTab: {
+        avatarId:     cleanAvatarId,
+        avatarName:   cleanAvatarName,
+        thumbnailUrl: cleanThumb,
+        gender:       cleanGender,
+        type:         cleanType,
+        readyForRender: true
+      }
+    });
+  } catch (err) {
+    console.error('[AvatarSelect] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/affiliate/avatar/selected � return current selected avatar for Production tab
+app.get('/api/affiliate/avatar/selected', (req, res) => {
+  noStore(res);
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+
+  const profile = getAffiliateProfile(affiliateCode);
+  const defaultAvatarId = process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501';
+  const defaultVoiceId  = process.env.HEYGEN_VOICE_ID  || 'f8c69e517f424cafaecde32dde57096b';
+
+  if (!profile?.selectedAvatarId) {
+    return res.json({
+      success: true,
+      hasSelection: false,
+      selected: null,
+      productionTab: {
+        avatarId:     defaultAvatarId,
+        avatarName:   'Abigail (Expressive)',
+        thumbnailUrl: null,
+        gender:       'female',
+        type:         'stock',
+        readyForRender: true,
+        isDefault: true
+      },
+      message: 'No avatar selected yet � using system default. Browse /api/affiliate/avatars to choose.'
+    });
+  }
+
+  res.json({
+    success: true,
+    hasSelection: true,
+    selected: {
+      avatarId:           profile.selectedAvatarId,
+      avatarName:         profile.selectedAvatarName || profile.selectedAvatarId,
+      avatarThumbnailUrl: profile.selectedAvatarThumbnailUrl || null,
+      avatarGender:       profile.selectedAvatarGender || null,
+      avatarType:         profile.selectedAvatarType || 'stock',
+      voiceId:            profile.selectedVoiceId || profile.voiceId || defaultVoiceId,
+      selectedAt:         profile.selectedAvatarUpdatedAt || null
+    },
+    // Production tab shape
+    productionTab: {
+      avatarId:     profile.selectedAvatarId,
+      avatarName:   profile.selectedAvatarName || profile.selectedAvatarId,
+      thumbnailUrl: profile.selectedAvatarThumbnailUrl || null,
+      gender:       profile.selectedAvatarGender || null,
+      type:         profile.selectedAvatarType || 'stock',
+      readyForRender: true,
+      isDefault: false
+    }
+  });
+});
+
+// POST /api/affiliate/avatar/upload-photo � accepts multipart photo from Expo FileSystem.uploadAsync
 app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
   avatarUpload.single('photo')(req, res, (err) => {
     if (err) {
@@ -6748,7 +7427,7 @@ app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     await uploadToGcs(req.file.path, gcsPath, contentType);
-    // Always use the server proxy URL as photoUrl — same reasoning as voice files:
+    // Always use the server proxy URL as photoUrl � same reasoning as voice files:
     // direct GCS URLs are private and fail in browser after container restart.
     const gcsDeliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
     if (affiliateCode) {
@@ -6762,7 +7441,7 @@ app.post('/api/affiliate/avatar/upload-photo', (req, res, next) => {
   }
 });
 
-// POST /api/affiliate/avatar/upload-voice — accepts multipart audio from Expo
+// POST /api/affiliate/avatar/upload-voice � accepts multipart audio from Expo
 app.post('/api/affiliate/avatar/upload-voice', (req, res, next) => {
   avatarUpload.single('voice')(req, res, (err) => {
     if (err) {
@@ -6814,7 +7493,7 @@ app.post('/api/affiliate/avatar/upload-voice', (req, res, next) => {
     const gcsPath = `affiliate-uploads/${filename}`;
     const contentType = req.file.mimetype || 'audio/webm';
     await uploadToGcs(finalLocalPath, gcsPath, contentType);
-    // Always use the server proxy URL as voiceFileUrl — the /uploads/:filename route serves from
+    // Always use the server proxy URL as voiceFileUrl � the /uploads/:filename route serves from
     // local disk first, then falls back to GCS with auth. Direct GCS URLs are private by default
     // and would fail with 403 in the browser after a container restart.
     const gcsDeliveryUrl = buildPublicMediaUrlFromObjectPath(gcsPath, { proxyUrl });
@@ -6839,7 +7518,7 @@ app.post('/api/affiliate/avatar/upload-voice', (req, res, next) => {
   }
 });
 
-// POST /api/affiliate/avatar/request — queue an avatar handoff from phone app to Affiliate Hub
+// POST /api/affiliate/avatar/request � queue an avatar handoff from phone app to Affiliate Hub
 app.post('/api/affiliate/avatar/request', async (req, res) => {
   try {
     const {
@@ -6914,7 +7593,7 @@ app.post('/api/affiliate/avatar/request', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/avatar/request/:requestId — retrieve a queued/completed avatar request
+// GET /api/affiliate/avatar/request/:requestId � retrieve a queued/completed avatar request
 app.get('/api/affiliate/avatar/request/:requestId', async (req, res) => {
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for avatar request access' });
@@ -6923,7 +7602,7 @@ app.get('/api/affiliate/avatar/request/:requestId', async (req, res) => {
   res.json({ success: true, request });
 });
 
-// GET /api/affiliate/avatar/request/latest — fetch the latest request for an affiliate
+// GET /api/affiliate/avatar/request/latest � fetch the latest request for an affiliate
 app.get('/api/affiliate/avatar/request/latest', async (req, res) => {
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
@@ -6932,7 +7611,7 @@ app.get('/api/affiliate/avatar/request/latest', async (req, res) => {
   res.json({ success: true, request });
 });
 
-// GET /api/affiliate/avatar-gallery — list up to 10 paid avatars for the affiliate
+// GET /api/affiliate/avatar-gallery � list up to 10 paid avatars for the affiliate
 app.get('/api/affiliate/avatar-gallery', async (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
@@ -6950,7 +7629,7 @@ app.get('/api/affiliate/avatar/gallery', async (req, res) => {
   res.json({ success: true, avatars, count: avatars.length });
 });
 
-// GET /api/affiliate/profile/:affiliateCode — fetch affiliate profile (name + picture)
+// GET /api/affiliate/profile/:affiliateCode � fetch affiliate profile (name + picture)
 app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.params.affiliateCode || '');
@@ -6984,7 +7663,7 @@ app.get('/api/affiliate/profile/:affiliateCode', (req, res) => {
   res.json({ success: true, profile: safeProfile });
 });
 
-// POST /api/affiliate/profile — update affiliate profile (name + picture)
+// POST /api/affiliate/profile � update affiliate profile (name + picture)
 app.post('/api/affiliate/profile', (req, res) => {
   try {
     const { affiliateCode, name, pictureUrl, voiceFileUrl, voiceCloneId, voiceId, avatarGender, voiceFileUpdatedAt } = req.body || {};
@@ -6996,7 +7675,7 @@ app.post('/api/affiliate/profile', (req, res) => {
   }
 });
 
-// DELETE /api/affiliate/avatar/:avatarId — permanently delete an avatar
+// DELETE /api/affiliate/avatar/:avatarId � permanently delete an avatar
 app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
   try {
     const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.affiliateId || '');
@@ -7008,7 +7687,7 @@ app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
     // Load fresh from disk so we always work on the current state
     const allRecords = getAvatarRequests();
 
-    // Find by requestId OR any avatar ID field — whichever matches
+    // Find by requestId OR any avatar ID field � whichever matches
     const matchIndex = allRecords.findIndex((r) =>
       r.requestId === avatarId ||
       String(r.avatar?.id || '') === avatarId ||
@@ -7053,7 +7732,7 @@ app.delete('/api/affiliate/avatar/:avatarId', (req, res) => {
 });
 
 
-// POST /api/affiliate/avatar/proof — generate a short proof render for an avatar
+// POST /api/affiliate/avatar/proof � generate a short proof render for an avatar
 app.post('/api/affiliate/avatar/proof', async (req, res) => {
   noStore(res);
   const {
@@ -7102,7 +7781,7 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
   }
   try {
     // Use talking_photo_id when available, otherwise fall back to avatar_id rendering.
-    // Voice priority: avatar's own clone → profile's stored clone → env default → never hardcoded
+    // Voice priority: avatar's own clone ? profile's stored clone ? env default ? never hardcoded
     const profileVoiceCloneId = String(getAffiliateProfile(ownerCode)?.voiceCloneId || '').trim();
     const resolvedVoiceCloneId = String(
       resolvedRequest?.avatar?.voiceCloneId ||
@@ -7187,7 +7866,7 @@ app.post('/api/affiliate/avatar/proof', async (req, res) => {
   }
 });
 
-// POST /api/affiliate/avatar/proof-complete — store proof render results for the gallery
+// POST /api/affiliate/avatar/proof-complete � store proof render results for the gallery
 app.post('/api/affiliate/avatar/proof-complete', (req, res) => {
   noStore(res);
   const { requestId, videoId, videoUrl, thumbnailUrl, affiliateCode } = req.body || {};
@@ -7215,7 +7894,7 @@ app.post('/api/affiliate/avatar/proof-complete', (req, res) => {
   res.json({ success: true, request: next });
 });
 
-// POST /api/affiliate/avatar/create — create/register avatar profile (returns full avatar object)
+// POST /api/affiliate/avatar/create � create/register avatar profile (returns full avatar object)
 app.post('/api/affiliate/avatar/create', async (req, res) => {
   const {
     affiliateId,
@@ -7258,7 +7937,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedPhotoUrl = absolutizePublicAssetUrl(req, photoUrl || effectiveRecord?.photoUrl || null);
     const storedProfile = getAffiliateProfile(requestedAffiliateCode);
     // Rewrite old direct-GCS affiliate-upload URLs to the server proxy route before passing
-    // to HeyGen — the proxy route is publicly accessible via Cloud Run + GCS auth fallback.
+    // to HeyGen � the proxy route is publicly accessible via Cloud Run + GCS auth fallback.
     const storedVoiceUrl = rewriteAffiliateUploadUrl(String(storedProfile?.voiceFileUrl || '').trim(), req);
     const storedVoiceCloneId = String(storedProfile?.voiceCloneId || '').trim();
     const storedVoiceId = String(storedProfile?.voiceId || '').trim();
@@ -7272,6 +7951,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     const resolvedPlatformLabel = platformLabel || effectiveRecord?.platformLabel || null;
     const rawAttire = (attire && typeof attire === 'object') ? attire : (effectiveRecord?.attire || null);
     const resolvedAttire = normalizeAvatarAttire(rawAttire, storedProfile?.avatarGender || storedProfile?.gender || '');
+    const wardrobeApplied = Boolean(resolvedAttire && !resolvedAttire.usePhoto && normalizeAttireMode(resolvedAttire) !== 'photo');
      
     // Log resolved inputs for debugging
     console.log(`[Avatar Create] Affiliate: ${requestedAffiliateCode}, EffectiveReqId: ${effectiveRequestId} (orig: ${finalRequestId}), PhotoURL: ${resolvedPhotoUrl}, VoiceURL: ${resolvedVoiceUrl}, VoiceCloneId: ${storedVoiceCloneId || 'none'}`);
@@ -7359,6 +8039,9 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
         status: 'processing',
         nativeAvatarJobId: submission.job.id,
         provider: submission.job.provider,
+        backgroundRemoved: false,
+        wardrobeApplied,
+        processingPhotoUrl: null,
         statusUrl: `/api/native-avatar/jobs/${encodeURIComponent(submission.job.id)}?affiliateCode=${encodeURIComponent(requestedAffiliateCode)}`,
         message: 'Avatar creation routed to native async pipeline. Poll statusUrl for completion.',
       });
@@ -7409,7 +8092,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     affiliateCode: requestedAffiliateCode,
     name: resolvedName,
     style: style || 'avatar',
-    photoUrl: resolvedPhotoUrl || null,
+    photoUrl: avatarPayload.processed_photo_url || resolvedPhotoUrl || null,
     voiceFileUrl: resolvedVoiceUrl || null,
     voiceFilePath: voiceFilePath || null,
     voiceFileUpdatedAt: requestRecord?.voiceFileUpdatedAt || null,
@@ -7432,6 +8115,9 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     isDefault: true,
     source: source || 'affiliate-hub',
     sourceProvider: avatarPayload.source_provider || 'heygen',
+    backgroundRemovalMethod: avatarPayload.background_removal_method || null,
+    backgroundRemoved: Boolean(avatarPayload.background_removal_method),
+    wardrobeApplied: Boolean(avatarPayload.wardrobe_applied),
     returnTo: normalizedReturnTo || null,
     note: source === 'phone-app'
       ? 'Created from the phone app handoff and routed back to the phone app after HeyGen processing.'
@@ -7521,7 +8207,10 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
     source: source || 'affiliate-hub',
     returnTo: normalizedReturnTo || null,
     requestId: finalRequestId || null,
-    provider: avatar.sourceProvider
+    provider: avatar.sourceProvider,
+    backgroundRemoved: avatar.backgroundRemoved,
+    wardrobeApplied: avatar.wardrobeApplied,
+    processingPhotoUrl: avatar.photoUrl || null
     });
 
     // Background poll: wait for proof video to complete, then update the record
@@ -7547,7 +8236,7 @@ app.post('/api/affiliate/avatar/create', async (req, res) => {
                   updatedAt: new Date().toISOString()
                 });
               }
-              console.log(`[Avatar] Proof video ready for ${finalRequestId}: ${s.video_url.substring(0, 80)}…`);
+              console.log(`[Avatar] Proof video ready for ${finalRequestId}: ${s.video_url.substring(0, 80)}�`);
               break;
             }
           }
@@ -7580,7 +8269,7 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
       tone: 'sincere, purposeful, measured',
       duration: '20-30 seconds',
       tips: [
-        'Speak from your heart—this is your personal commitment',
+        'Speak from your heart�this is your personal commitment',
         'Keep a steady, measured pace that feels genuine',
         'Pause after the opening statement and before the closing',
         'Let the conviction in your words carry the message'
@@ -7590,7 +8279,7 @@ app.get('/api/affiliate/avatar/voice-reference-script', (_req, res) => {
 });
 
 // GET /api/affiliate/avatar/voice-identity-oath
-// Optional spoken script for avatar voice recording — the EVICS User & Affiliate
+// Optional spoken script for avatar voice recording � the EVICS User & Affiliate
 // Oath. Captures voice patterns while aligning the avatar with the platform mission.
 app.get('/api/affiliate/avatar/voice-identity-oath', (_req, res) => {
   res.set('Cache-Control', 'no-store, max-age=0');
@@ -7605,7 +8294,7 @@ app.get('/api/affiliate/avatar/voice-identity-oath', (_req, res) => {
       optional: true,
       purpose: 'Capture your voice identity while affirming your commitment as a steward of opportunity within EVICS.',
       tips: [
-        'Speak from your heart—this is your personal commitment',
+        'Speak from your heart�this is your personal commitment',
         'Keep a steady, measured pace that feels genuine',
         'Pause between each line so your voice identity is captured clearly',
         'Let the conviction in your words carry the message'
@@ -7614,7 +8303,7 @@ app.get('/api/affiliate/avatar/voice-identity-oath', (_req, res) => {
   });
 });
 
-// GET /api/affiliate/billing/info — redirects to new billing engine
+// GET /api/affiliate/billing/info � redirects to new billing engine
 app.get('/api/affiliate/billing/info', async (req, res) => {
   const code = req.query.code || '';
   try {
@@ -7629,10 +8318,10 @@ app.get('/api/affiliate/billing/info', async (req, res) => {
       videosPerMonth: planInfo.plan.videosPerMonth === Infinity ? 'Unlimited' : planInfo.plan.videosPerMonth,
       watermark: planInfo.plan.watermark,
       voiceClone: planInfo.plan.voiceClone,
-      nextBillingDate: '—',
+      nextBillingDate: '�',
       balance: '0.00',
       lifetimeEarned: '0.00',
-      lastPayoutDate: '—',
+      lastPayoutDate: '�',
       purchases: []
     });
   } catch {
@@ -7640,7 +8329,7 @@ app.get('/api/affiliate/billing/info', async (req, res) => {
   }
 });
 
-// POST /api/affiliate/billing/checkout — proxy to Stripe engine
+// POST /api/affiliate/billing/checkout � proxy to Stripe engine
 app.post('/api/affiliate/billing/checkout', async (req, res) => {
   const { affiliateCode, item, price, planId } = req.body || {};
   console.log(`[Billing] Checkout request: ${item || planId} for ${affiliateCode}`);
@@ -7687,7 +8376,7 @@ app.post('/api/affiliate/billing/connect-stripe', (req, res) => {
 // POST /api/affiliate/billing/request-payout
 app.post('/api/affiliate/billing/request-payout', (req, res) => {
   const { affiliateCode, method, walletAddress } = req.body || {};
-  console.log(`[Billing] Payout request: ${method} for ${affiliateCode}${walletAddress ? ` → ${walletAddress}` : ''}`);
+  console.log(`[Billing] Payout request: ${method} for ${affiliateCode}${walletAddress ? ` ? ${walletAddress}` : ''}`);
   let message = '';
   if (method === 'stripe-usd') {
     message = 'Your USD payout request has been submitted. Funds will be transferred via Stripe once processing is configured.';
@@ -7731,7 +8420,7 @@ app.post('/api/affiliate/social/post', async (req, res) => {
   }
 });
 
-// ── Product Video Generation ─────────────────────────────────────────────────
+// -- Product Video Generation -------------------------------------------------
 
 // In-memory store for product video records (same pattern as avatar requests)
 const PRODUCT_VIDEO_RECORDS = new Map();
@@ -7764,7 +8453,43 @@ function getProductVideosByAffiliate(affiliateCode) {
   return results.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
-// POST /api/affiliate/product-video/generate — create a product video with the affiliate's avatar
+/**
+ * Permanently delete a product video record from memory + GCS.
+ * Returns { deleted: boolean, videoJobId, gcsDeleted: boolean }
+ */
+async function deleteProductVideoRecord(videoJobId, affiliateCode) {
+  const code = normalizeAffiliateCode(affiliateCode);
+  const record = PRODUCT_VIDEO_RECORDS.get(videoJobId) || null;
+  if (!record) return { deleted: false, reason: 'not_found' };
+  // Affiliate isolation: only the owner can delete
+  if (code && normalizeAffiliateCode(record.affiliateCode || record.affiliateId || '') !== code) {
+    return { deleted: false, reason: 'forbidden' };
+  }
+  PRODUCT_VIDEO_RECORDS.delete(videoJobId);
+  // Write-through: persist updated (sans deleted) list to GCS
+  const allRecords = Array.from(PRODUCT_VIDEO_RECORDS.values());
+  persistenceEngine.gcsWrite('evics-data/video_records.json', allRecords).catch(() => {});
+  // Best-effort: delete the archived GCS video file
+  let gcsDeleted = false;
+  const gcsPath = record.gcsVideoUrl
+    ? null  // GCS URL already is full path � extract object name
+    : (record.affiliateCode ? `evics-videos/${record.affiliateCode}/${videoJobId}.mp4` : null);
+  if (gcsPath) {
+    try {
+      await persistenceEngine.gcsDelete(gcsPath);
+      gcsDeleted = true;
+    } catch { /* best-effort */ }
+  }
+  // Also delete the local JSON cache file if present
+  try {
+    const cacheFile = path.join(MEDIA_CACHE_DIR, `${videoJobId}.json`);
+    if (fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile);
+  } catch { /* best-effort */ }
+  console.log(`[VideoDelete] Deleted video ${videoJobId} for ${code}. GCS: ${gcsDeleted}`);
+  return { deleted: true, videoJobId, gcsDeleted, record };
+}
+
+// POST /api/affiliate/product-video/generate � create a product video with the affiliate's avatar
 app.post('/api/affiliate/product-video/generate', async (req, res) => {
   try {
     const {
@@ -7794,7 +8519,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const cleanCode = String(affiliateCode || '').trim().toUpperCase();
     if (!cleanCode) return res.status(400).json({ success: false, error: 'affiliateCode is required.' });
 
-    // ── Plan enforcement: check monthly video limit ───────────────────────────
+    // -- Plan enforcement: check monthly video limit ---------------------------
     const planInfo = await stripeEngine.getPlanForAffiliate(cleanCode);
     if (!planInfo.canGenerateVideo) {
       const plan = planInfo.plan;
@@ -7844,8 +8569,49 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         avatarRecord = findAvatarRequest(allRecords[0].requestId);
       }
     }
+
+    // If still no custom avatar record, check if affiliate has a selected stock/HeyGen avatar
     if (!avatarRecord || !avatarRecord.avatar) {
-      return res.status(400).json({ success: false, error: 'No completed avatar found. Create an avatar first.' });
+      const profile = getAffiliateProfile(cleanCode);
+      if (profile?.selectedAvatarId) {
+        // Use the selected HeyGen stock avatar directly (no custom photo required)
+        const selectedAvatar = resolveAffiliateAvatar(cleanCode, null, null);
+        const videoJobId = `pvjob_${cleanCode}_${Date.now()}`;
+        const resolvedProductTitle = productTitle || 'Premium Product';
+        const resolvedProductImage = productImageUrl || '';
+        const resolvedPlatform = platform || 'tiktok';
+        const cinematicRequested = Boolean(cinematicMode) || true;
+        const standardizedCinematic = normalizeCinematicProductDirective({});
+        if (!resolvedProductImage) {
+          return res.status(422).json({
+            success: false,
+            error: 'productImageUrl is required for product video generation.'
+          });
+        }
+        // Route directly to the affiliate/avatar/generate-video flow
+        return res.status(202).json({
+          success: true,
+          videoJobId,
+          status: 'queued',
+          message: `Using selected avatar: ${selectedAvatar.avatarName}. Submit to /api/affiliate/avatar/generate-video with avatarId: "${selectedAvatar.avatarId}" to start rendering.`,
+          avatar: {
+            avatarId:     selectedAvatar.avatarId,
+            avatarName:   selectedAvatar.avatarName,
+            thumbnailUrl: selectedAvatar.avatarThumbnailUrl,
+            gender:       selectedAvatar.avatarGender,
+            type:         selectedAvatar.avatarType,
+            voiceId:      selectedAvatar.voiceId
+          },
+          productionTab: {
+            avatarId:     selectedAvatar.avatarId,
+            avatarName:   selectedAvatar.avatarName,
+            thumbnailUrl: selectedAvatar.avatarThumbnailUrl,
+            readyForRender: true
+          },
+          hint: 'POST /api/affiliate/avatar/generate-video with avatarId to render with this selected avatar.'
+        });
+      }
+      return res.status(400).json({ success: false, error: 'No completed avatar found. Create an avatar first, or select a stock avatar from /api/affiliate/avatars.' });
     }
 
     const photoUrl = avatarRecord.photoUrl || avatarRecord.avatar?.photoUrl || null;
@@ -8094,7 +8860,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       affiliateCode: cleanCode,
       jobId: videoJobId,
       durationSeconds: costTracker.HEYGEN_RATES.DEFAULT_VIDEO_SECS,
-      notes: `${resolvedPlatform} product video — ${resolvedProductTitle}`
+      notes: `${resolvedPlatform} product video � ${resolvedProductTitle}`
     });
 
     res.json({
@@ -8118,9 +8884,20 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       cinematicEngine: String(cinematicEngine || 'seedance2-style').trim(),
       cinematicProfile: String(cinematicProfile || 'auto').trim().toLowerCase() || 'auto',
       cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
+      cinematicLayerStatus: getCinematicLayerStatus(),
       background: resolvedBackground,
       qualityScore,
-      metadata
+      metadata,
+      // Production tab � full avatar card
+      productionTab: {
+        avatarId:     avatarId || avatarRecord?.avatar?.avatarId || null,
+        avatarName:   avatarName,
+        thumbnailUrl: avatarRecord?.avatar?.previewImageUrl || avatarRecord?.photoUrl || photoUrl || null,
+        gender:       avatarRecord?.avatar?.gender || null,
+        type:         'custom',
+        voiceId:      voiceId,
+        readyForRender: true
+      }
     });
 
     // Background poll for video completion
@@ -8130,18 +8907,50 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
           await new Promise(r => setTimeout(r, 5000));
           const s = await getHeyGenVideoStatus(videoId);
           if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
+            // -- Cinematic pass: run Seedance/Kling camera-motion layer after HeyGen --
+            let finalVideoUrl = s.video_url;
+            let cinematicResult = null;
+            if (cinematicRequested) {
+              try {
+                const cinematicCameraMoves = record.cinematicDirective?.cameraMoves
+                  || ['zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
+                const cinematicIntensityVal = Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2));
+                const cinematicAspect = resolvedPlatform === 'facebook' ? '16:9' : '9:16';
+                const cinematicMotionPrompt = `${resolvedProductTitle} product commercial, natural avatar body movement, product mockup visible.`;
+                console.log(`[ProductVideo] Starting cinematic layer for ${videoJobId}�`);
+                cinematicResult = await applyCinematicLayer(s.video_url, {
+                  productImageUrl: photoUrl || record.productImageUrl || null,
+                  cameraMoves: cinematicCameraMoves,
+                  intensity: cinematicIntensityVal,
+                  motionPrompt: cinematicMotionPrompt,
+                  aspectRatio: cinematicAspect,
+                  tier: record.cinematicTier || 'fast',
+                  jobId: videoJobId
+                });
+                if (cinematicResult && cinematicResult.videoUrl) {
+                  finalVideoUrl = cinematicResult.videoUrl;
+                  console.log(`[ProductVideo] Cinematic layer complete (${cinematicResult.provider}): ${finalVideoUrl.substring(0, 80)}�`);
+                }
+              } catch (cinematicErr) {
+                console.warn(`[ProductVideo] Cinematic layer error for ${videoJobId}: ${cinematicErr.message}. Using HeyGen video.`);
+              }
+            }
             const completedRecord = {
               ...record,
               status: 'completed',
-              videoUrl: s.video_url,
+              videoUrl: finalVideoUrl,
+              heygenVideoUrl: s.video_url,
+              cinematicVideoUrl: cinematicResult && !cinematicResult.passthrough ? cinematicResult.videoUrl : null,
+              cinematicProvider: cinematicResult ? cinematicResult.provider : null,
+              cinematicPassthrough: cinematicResult ? Boolean(cinematicResult.passthrough) : true,
               thumbnailUrl: s.thumbnail_url || photoUrl,
               completedAt: new Date().toISOString()
             };
             upsertProductVideoRecord(completedRecord);
-            console.log(`[ProductVideo] Completed ${videoJobId}: ${s.video_url.substring(0, 80)}…`);
-            // Archive to GCS — HeyGen CDN URLs expire in 7 days; GCS is permanent
+            console.log(`[ProductVideo] Completed ${videoJobId}: ${finalVideoUrl.substring(0, 80)}�`);
+            // Archive final video to GCS � HeyGen CDN URLs expire in 7 days; GCS is permanent
             persistenceEngine.gcsDownloadUrl(
-              s.video_url,
+              finalVideoUrl,
               `evics-videos/${cleanCode}/${videoJobId}.mp4`,
               'video/mp4'
             ).then(gcsUrl => {
@@ -8178,7 +8987,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/product-video/status/:videoJobId — check rendering status
+// GET /api/affiliate/product-video/status/:videoJobId � check rendering status
 app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
@@ -8221,7 +9030,7 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
   });
 });
 
-// GET /api/affiliate/render-status/stream — SSE stream for avatar/product render progress
+// GET /api/affiliate/render-status/stream � SSE stream for avatar/product render progress
 app.get('/api/affiliate/render-status/stream', async (req, res) => {
   noStore(res);
   const kind = String(req.query.kind || '').trim().toLowerCase();
@@ -8290,7 +9099,7 @@ app.get('/api/affiliate/render-status/stream', async (req, res) => {
   timer = setInterval(sendStatus, 2000);
 });
 
-// GET /api/affiliate/product-videos — list all product videos for an affiliate
+// GET /api/affiliate/product-videos � list all product videos for an affiliate
 app.get('/api/affiliate/product-videos', (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
@@ -8299,9 +9108,179 @@ app.get('/api/affiliate/product-videos', (req, res) => {
   res.json({ success: true, videos, count: videos.length });
 });
 
-// ── Algorithm / SEO amplification routes ─────────────────────────────────────
+// -- Video Deletion Routes -----------------------------------------------------
+// Available to: Phone App, Affiliate Hub, Admin Workspace
+// All routes enforce affiliate ownership isolation � affiliates can only delete
+// their own videos; admins can pass any affiliateCode.
 
-// POST /api/algorithm/discoverability — pre-post SEO/reach grader (0-100 + tips).
+// DELETE /api/affiliate/product-video/:videoJobId � delete a specific product video
+// Used by: Phone App, Affiliate Hub
+app.delete('/api/affiliate/product-video/:videoJobId', requireVideoDeleteAuth, async (req, res) => {
+  noStore(res);
+  try {
+    const actor       = req.deleteActor;
+    const videoJobId  = String(req.params.videoJobId || '').trim();
+    if (!videoJobId) return res.status(400).json({ success: false, error: 'videoJobId is required' });
+
+    // Admin may delete any video; affiliate is scoped to their own code
+    const affiliateCode = actor.isAdmin
+      ? normalizeAffiliateCode(req.query.affiliateCode || req.body?.affiliateCode || '')
+      : actor.affiliateCode;
+
+    const result = await deleteProductVideoRecord(videoJobId, actor.isAdmin ? '' : affiliateCode);
+    if (result.reason === 'not_found') {
+      return res.status(404).json({ success: false, error: 'Video not found or already deleted.' });
+    }
+    if (result.reason === 'forbidden') {
+      return res.status(403).json({ success: false, error: 'You do not have permission to delete this video. Only the owning affiliate or an admin may delete it.' });
+    }
+
+    console.log(`[VideoDelete] ${videoJobId} deleted by ${actor.role}:${affiliateCode || 'admin'}`);
+    res.json({
+      success: true,
+      message: 'Video deleted successfully.',
+      videoJobId,
+      deletedBy: actor.role,
+      gcsDeleted: result.gcsDeleted,
+      deletedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[VideoDelete] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/affiliate/avatar/video/:videoId � delete an avatar video render
+// Used by: Phone App, Affiliate Hub (avatar-video flow)
+app.delete('/api/affiliate/avatar/video/:videoId', requireVideoDeleteAuth, async (req, res) => {
+  noStore(res);
+  try {
+    const actor  = req.deleteActor;
+    const videoId = String(req.params.videoId || '').trim();
+    if (!videoId) return res.status(400).json({ success: false, error: 'videoId is required' });
+
+    const cacheFile = path.join(MEDIA_CACHE_DIR, `${videoId}.json`);
+    let meta = null;
+    if (fs.existsSync(cacheFile)) {
+      try { meta = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch {}
+    }
+    if (!meta) {
+      return res.status(404).json({ success: false, error: 'Avatar video not found or already deleted.' });
+    }
+
+    // Affiliate isolation: non-admin may only delete their own video
+    const recordOwner = normalizeAffiliateCode(meta.affiliateCode || meta.affiliateId || '');
+    if (!actor.isAdmin && recordOwner && recordOwner !== actor.affiliateCode) {
+      return res.status(403).json({ success: false, error: 'You do not have permission to delete this video. Only the owning affiliate or an admin may delete it.' });
+    }
+
+    try { fs.unlinkSync(cacheFile); } catch {}
+    const ownerCode = recordOwner || actor.affiliateCode || 'unknown';
+    let gcsDeleted = false;
+    try { gcsDeleted = await persistenceEngine.gcsDelete(`evics-videos/${ownerCode}/${videoId}.mp4`); } catch {}
+
+    console.log(`[VideoDelete] Avatar video ${videoId} deleted by ${actor.role}:${actor.affiliateCode || 'admin'}. GCS: ${gcsDeleted}`);
+    res.json({
+      success: true,
+      message: 'Avatar video deleted successfully.',
+      videoId,
+      deletedBy: actor.role,
+      gcsDeleted,
+      deletedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[VideoDelete] Avatar video error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/admin/video/:videoJobId � Admin workspace: delete any video by job ID
+// Requires admin-level access (checked via admin token or affiliate admin role)
+app.delete('/api/admin/video/:videoJobId', requireAdminAccess, async (req, res) => {
+  noStore(res);
+  try {
+    // requireAdminAccess already enforced — only ADMIN reaches here
+    const videoJobId    = String(req.params.videoJobId || '').trim();
+    const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.body?.affiliateCode || '');
+    if (!videoJobId) return res.status(400).json({ success: false, error: 'videoJobId is required' });
+
+    // Admin bypass: pass '' to skip affiliate isolation in deleteProductVideoRecord
+    const result = await deleteProductVideoRecord(videoJobId, '');
+    if (result.reason === 'not_found') {
+      // Try avatar video cache file
+      const cacheFile = path.join(MEDIA_CACHE_DIR, `${videoJobId}.json`);
+      if (fs.existsSync(cacheFile)) {
+        let ownerCode = affiliateCode;
+        try {
+          const meta = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+          ownerCode = normalizeAffiliateCode(meta.affiliateCode || meta.affiliateId || '') || affiliateCode;
+          fs.unlinkSync(cacheFile);
+        } catch {}
+        let gcsDeleted = false;
+        if (ownerCode) { try { gcsDeleted = await persistenceEngine.gcsDelete(`evics-videos/${ownerCode}/${videoJobId}.mp4`); } catch {} }
+        console.log(`[VideoDelete] Admin deleted avatar video ${videoJobId}`);
+        return res.json({ success: true, message: 'Video deleted (avatar cache).', videoJobId, gcsDeleted, deletedBy: 'ADMIN', deletedAt: new Date().toISOString() });
+      }
+      return res.status(404).json({ success: false, error: 'Video not found.' });
+    }
+
+    console.log(`[VideoDelete] Admin deleted product video ${videoJobId} (owner: ${result.record?.affiliateCode || 'unknown'})`);
+    res.json({
+      success: true,
+      message: 'Video deleted successfully.',
+      videoJobId,
+      affiliateCode: result.record?.affiliateCode || affiliateCode || null,
+      deletedBy: 'ADMIN',
+      gcsDeleted: result.gcsDeleted,
+      deletedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[VideoDelete] Admin error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/affiliate/product-videos � bulk delete multiple videos at once
+// Body: { affiliateCode, videoJobIds: ['pvid_...', 'pvid_...'] }
+// Used by: Phone App (select all + delete), Affiliate Hub
+app.delete('/api/affiliate/product-videos', requireVideoDeleteAuth, async (req, res) => {
+  noStore(res);
+  try {
+    const actor        = req.deleteActor;
+    const videoJobIds  = Array.isArray(req.body?.videoJobIds) ? req.body.videoJobIds : [];
+    if (!videoJobIds.length) return res.status(400).json({ success: false, error: 'videoJobIds array is required' });
+    if (videoJobIds.length > 50) return res.status(400).json({ success: false, error: 'Maximum 50 videos per bulk delete request.' });
+
+    // Admin may target any affiliate; affiliate is scoped to own code
+    const scopedCode = actor.isAdmin ? '' : actor.affiliateCode;
+
+    const results = await Promise.all(
+      videoJobIds.map(id => deleteProductVideoRecord(String(id).trim(), scopedCode))
+    );
+    const deleted   = results.filter(r => r.deleted).map(r => r.videoJobId);
+    const notFound  = results.filter(r => r.reason === 'not_found').length;
+    const forbidden = results.filter(r => r.reason === 'forbidden').length;
+
+    console.log(`[VideoDelete] Bulk by ${actor.role}:${actor.affiliateCode || 'admin'} — ${deleted.length} deleted, ${notFound} not found, ${forbidden} forbidden`);
+    res.json({
+      success: true,
+      message: `${deleted.length} video(s) deleted.`,
+      deleted,
+      deletedCount: deleted.length,
+      notFoundCount: notFound,
+      forbiddenCount: forbidden,
+      deletedBy: actor.role,
+      deletedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[VideoDelete] Bulk error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// -- Algorithm / SEO amplification routes -------------------------------------
+
+// POST /api/algorithm/discoverability � pre-post SEO/reach grader (0-100 + tips).
 // Admin "Discoverability Score" tool. Accepts a caption package or raw fields.
 app.post('/api/algorithm/discoverability', (req, res) => {
   noStore(res);
@@ -8325,7 +9304,7 @@ app.post('/api/algorithm/discoverability', (req, res) => {
   }
 });
 
-// GET /api/algorithm/trending-tags — live hashtag-ready tokens from evics_trends.
+// GET /api/algorithm/trending-tags � live hashtag-ready tokens from evics_trends.
 app.get('/api/algorithm/trending-tags', async (req, res) => {
   noStore(res);
   const platform = req.query.platform ? String(req.query.platform).toLowerCase() : null;
@@ -8334,7 +9313,7 @@ app.get('/api/algorithm/trending-tags', async (req, res) => {
   res.json({ success: true, platform: platform || 'all', count: tags.length, tags });
 });
 
-// POST /api/algorithm/srt — turn any script/caption into a downloadable .srt.
+// POST /api/algorithm/srt � turn any script/caption into a downloadable .srt.
 app.post('/api/algorithm/srt', (req, res) => {
   try {
     const b = req.body || {};
@@ -8353,7 +9332,7 @@ app.post('/api/algorithm/srt', (req, res) => {
   }
 });
 
-// GET /api/affiliate/product-video/:videoJobId/captions.srt — YouTube caption file.
+// GET /api/affiliate/product-video/:videoJobId/captions.srt � YouTube caption file.
 app.get('/api/affiliate/product-video/:videoJobId/captions.srt', (req, res) => {
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
   if (!affiliateCode) {
@@ -8388,7 +9367,7 @@ function buildVideoMetadataPackage({ productTitle, productPrice, productPageUrl,
   }
 }
 
-// Live trending-tag feed — derive current hashtag-ready tokens from evics_trends.
+// Live trending-tag feed � derive current hashtag-ready tokens from evics_trends.
 // Safe by design: never throws; returns [] when the table is empty/unavailable so
 // metadata generation always proceeds. Prefers recent, high-viral-score rows and,
 // when a platform is given, that platform's trends first (then global as filler).
@@ -8531,16 +9510,16 @@ function normalizePhoneRenderFeedItem(item) {
 
 function generateProductVideoScript({ productTitle, productPageUrl, platform }) {
   const platformHook = {
-    tiktok: "Listen up — I found something that's about to change the game.",
+    tiktok: "Listen up � I found something that's about to change the game.",
     instagram: "Stop scrolling! You need to see this.",
-    youtube: "Hey everyone — I've been using something incredible and I had to share it.",
+    youtube: "Hey everyone � I've been using something incredible and I had to share it.",
     facebook: "I rarely post about products, but this one deserves the attention."
   };
   const hook = platformHook[platform] || platformHook.tiktok;
-  return `${hook} I'm talking about ${productTitle}. This isn't just another product — this is real quality, real results, and I can personally vouch for it. If you've been looking for something that actually delivers, this is it. Click the link and see for yourself. Trust me, you won't regret it.`;
+  return `${hook} I'm talking about ${productTitle}. This isn't just another product � this is real quality, real results, and I can personally vouch for it. If you've been looking for something that actually delivers, this is it. Click the link and see for yourself. Trust me, you won't regret it.`;
 }
 
-// AI Quality Render Score — evaluates input completeness and render configuration
+// AI Quality Render Score � evaluates input completeness and render configuration
 function computeRenderQualityScore({ hasPhoto, hasVoiceClone, hasProductImage, hasProductPage, hasCustomScript, scriptLength, platform }) {
   let score = 40; // Base score for a valid render request
   if (hasPhoto) score += 15;
@@ -8582,7 +9561,7 @@ app.get('/api/affiliate/workspace/products', async (req, res) => {
   const q = req.query.q ? String(req.query.q).toLowerCase() : '';
   const affiliateId = req.query.id || req.query.affiliateId || null;
 
-  // Category → normalised label for phone app badge
+  // Category ? normalised label for phone app badge
   const categoryLabel = (raw = '') => {
     const t = raw.toLowerCase();
     if (t.includes('bundle')) return 'Bundle';
@@ -8624,19 +9603,19 @@ app.get('/api/affiliate/workspace/products', async (req, res) => {
 
   // Inventory signal
   const inventorySignal = (score) => {
-    if (score >= 88) return { status: 'High Demand', color: 'green', note: '🔥 Ships 1-2 days' };
-    if (score >= 75) return { status: 'In Stock',    color: 'green', note: '✅ Ships 2-4 days' };
-    if (score >= 65) return { status: 'Low Stock',   color: 'yellow', note: '⚡ Limited qty' };
+    if (score >= 88) return { status: 'High Demand', color: 'green', note: '?? Ships 1-2 days' };
+    if (score >= 75) return { status: 'In Stock',    color: 'green', note: '? Ships 2-4 days' };
+    if (score >= 65) return { status: 'Low Stock',   color: 'yellow', note: '? Limited qty' };
     return           { status: 'Available',          color: 'green', note: 'Ships 3-5 days' };
   };
 
-  const velocityLabel = (score) => score >= 88 ? '🔥 Hot' : score >= 75 ? '📈 Rising' : '✅ Steady';
+  const velocityLabel = (score) => score >= 88 ? '?? Hot' : score >= 75 ? '?? Rising' : '? Steady';
 
   try {
     let products = await fetchShopifyProducts();
 
     if (!products || products.length === 0) {
-      // Hard-coded fallback — real IAGT bestsellers
+      // Hard-coded fallback � real IAGT bestsellers
       products = [
         { id: 'fb_1', shopify_id: 'fb_1', title: 'Alpha King Testosterone Stack', price: '152.90', handle: 'alpha-king-testosterone-stack', product_type: 'Supplement Bundle', image: null, tags: ['testosterone','men','vitality'] },
         { id: 'fb_2', shopify_id: 'fb_2', title: 'Quantum Mind & Focus Stack', price: '74.72', handle: 'quantum-mind-focus-stack', product_type: 'Supplement Bundle', image: null, tags: ['focus','brain','clarity'] },
@@ -8692,7 +9671,7 @@ app.get('/api/affiliate/workspace/products', async (req, res) => {
         imageUrl: imgSrc,
         image_url: imgSrc,
 
-        // Affiliate links — proper iamgenesistech.com domain
+        // Affiliate links � proper iamgenesistech.com domain
         productUrl,
         productPageUrl: productUrl,
         affiliateLink: affiliateId ? `${productUrl}?ref=${affiliateId}` : productUrl,
@@ -8716,7 +9695,7 @@ app.get('/api/affiliate/workspace/products', async (req, res) => {
           mediaType: 'video',
           inventorySignal: inventorySignal(score),
           bestPlatform: score >= 88 ? 'TikTok' : score >= 75 ? 'Instagram' : 'YouTube',
-          estimatedReach: score >= 88 ? '50K–200K' : score >= 75 ? '10K–50K' : '1K–10K',
+          estimatedReach: score >= 88 ? '50K�200K' : score >= 75 ? '10K�50K' : '1K�10K',
         },
 
         // Store access (supplements tab unlock)
@@ -8727,11 +9706,11 @@ app.get('/api/affiliate/workspace/products', async (req, res) => {
 
     res.json({ success: true, items, products: items, count: items.length, source });
   } catch (e) {
-    // Final fallback — always return demo products so Avatar screen never shows 0
+    // Final fallback � always return demo products so Avatar screen never shows 0
     const items = DEMO_PRODUCTS.map((p, i) => ({
       ...p, price: p.price, imageUrl: null, rank: i + 1,
       viralScore: 75, commissionRate: 0.15, commissionAmount: (p.price * 0.15).toFixed(2),
-      salesVelocity: '🔥 Hot', isOwnStore: true, source: 'demo',
+      salesVelocity: '?? Hot', isOwnStore: true, source: 'demo',
       productPageUrl: `https://iamgenesistech.myshopify.com/products/${p.handle}`,
       productUrl: `https://iamgenesistech.myshopify.com/products/${p.handle}`,
       affiliateLink: `https://iamgenesistech.myshopify.com/products/${p.handle}`,
@@ -8797,7 +9776,7 @@ app.get('/api/high-commission/products', async (req, res) => {
   }
 });
 
-// GET /api/renders/phone-app â€” list all phone-app render jobs from local cache
+// GET /api/renders/phone-app — list all phone-app render jobs from local cache
 app.get('/api/renders/phone-app', (req, res) => {
   noStore(res);
   try {
@@ -8829,7 +9808,7 @@ app.get('/api/renders/phone-app', (req, res) => {
   }
 });
 
-// GET /api/crypto/market-data â€” live via CoinGecko (no key)
+// GET /api/crypto/market-data — live via CoinGecko (no key)
 app.get('/api/crypto/market-data', async (req, res) => {
   noStore(res);
   const stub = [{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', current_price: 67000, price_change_percentage_24h: 1.2 }, { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', current_price: 3500, price_change_percentage_24h: 0.8 }, { id: 'solana', symbol: 'SOL', name: 'Solana', current_price: 180, price_change_percentage_24h: 2.1 }];
@@ -8837,14 +9816,14 @@ app.get('/api/crypto/market-data', async (req, res) => {
   res.json({ success: true, data: stub });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// AFFILIATE HUB â€” Full hub routes for evics-affiliate-app
+// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// AFFILIATE HUB — Full hub routes for evics-affiliate-app
 // Phone app relies on ALL of these endpoints for login, dashboard,
 // earnings, tier progress, opportunities, leaderboard.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 
-// Demo affiliate store â€” used when Supabase is offline or no record found
+// Demo affiliate store — used when Supabase is offline or no record found
 function buildDemoAffiliate(id) {
   const code = id.replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase() || 'DEMO0001';
   return {
@@ -8862,7 +9841,7 @@ app.get('/api/affiliate/stats', async (req, res) => {
   if (!id) return res.status(400).json({ success: false, error: 'id is required' });
 
   try {
-    // Try Supabase first â€” look up by id, code, or email
+    // Try Supabase first — look up by id, code, or email
     const { data, error } = await SupabaseConnector
       .from('affiliates')
       .select('*')
@@ -8932,7 +9911,7 @@ app.get('/api/affiliate/stats', async (req, res) => {
       }
     });
   } catch (e) {
-    // Full fallback â€” return demo stats so phone app can always boot
+    // Full fallback — return demo stats so phone app can always boot
     const aff = buildDemoAffiliate(id);
     res.json({
       success: true,
@@ -9145,7 +10124,7 @@ app.get('/api/affiliates/campaigns', async (req, res) => {
 // Plural-path aliases required by contracts.tsx
 // =============================================================
 
-// GET /api/affiliates/payouts â€” alias for contracts.tsx payout tab
+// GET /api/affiliates/payouts — alias for contracts.tsx payout tab
 app.get('/api/affiliates/payouts', async (req, res) => {
   noStore(res);
   const affiliateId = req.query.affiliateId || req.query.id;
@@ -9161,7 +10140,7 @@ app.get('/api/affiliates/payouts', async (req, res) => {
   }
 });
 
-// POST /api/affiliates/opportunities/:id/accept â€” accept a campaign opportunity and generate contract
+// POST /api/affiliates/opportunities/:id/accept — accept a campaign opportunity and generate contract
 app.post('/api/affiliates/opportunities/:id/accept', async (req, res) => {
   const oppId = req.params.id;
   const { affiliateId } = req.body || {};
@@ -9180,7 +10159,7 @@ app.post('/api/affiliates/opportunities/:id/accept', async (req, res) => {
       avatarUsageApproved: false,
       signedAt: null,
       expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
-      terms: 'Standard EVICS Affiliate Agreement â€” 15% commission on confirmed sales. Payouts monthly.',
+      terms: 'Standard EVICS Affiliate Agreement — 15% commission on confirmed sales. Payouts monthly.',
       created_at: new Date().toISOString()
     };
     try {
@@ -9192,7 +10171,7 @@ app.post('/api/affiliates/opportunities/:id/accept', async (req, res) => {
   }
 });
 
-// POST /api/affiliates/contracts/:id/acknowledge â€” plural alias
+// POST /api/affiliates/contracts/:id/acknowledge — plural alias
 app.post('/api/affiliates/contracts/:id/acknowledge', async (req, res) => {
   const contractId = req.params.id;
   const { affiliateId, brokerageClauseAcknowledged, avatarUsageApproved } = req.body || {};
@@ -9205,7 +10184,7 @@ app.post('/api/affiliates/contracts/:id/acknowledge', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/store-products â€” curated store product list for phone app Store tab
+// GET /api/affiliate/store-products — curated store product list for phone app Store tab
 app.get('/api/affiliate/store-products', async (req, res) => {
   noStore(res);
   const affiliateId = req.query.id || req.query.affiliateId || '';
@@ -9215,7 +10194,7 @@ app.get('/api/affiliate/store-products', async (req, res) => {
     const products = raw.slice(0, 50).map((p) => ({
       id: String(p.id || p.shopify_id),
       title: p.title || p.name || 'Product',
-      description: p.body_html ? p.body_html.replace(/<[^>]*>/g, '').slice(0, 200) : `Premium IAGT product â€” ${p.title}`,
+      description: p.body_html ? p.body_html.replace(/<[^>]*>/g, '').slice(0, 200) : `Premium IAGT product — ${p.title}`,
       price: parseFloat(p.price || 0),
       compareAt: parseFloat(p.price || 0) * 1.2,
       imageUrl: p.image || null,
@@ -9231,7 +10210,7 @@ app.get('/api/affiliate/store-products', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/store-products/status â€” check store product sync freshness + supplements tab unlock
+// GET /api/affiliate/store-products/status — check store product sync freshness + supplements tab unlock
 app.get('/api/affiliate/store-products/status', async (req, res) => {
   noStore(res);
   const affiliateId = req.query.id || req.query.affiliateId || '';
@@ -9256,7 +10235,7 @@ app.get('/api/affiliate/store-products/status', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/contracts?affiliateId=<id> â€” affiliate campaign contracts
+// GET /api/affiliate/contracts?affiliateId=<id> — affiliate campaign contracts
 app.get('/api/affiliate/contracts', async (req, res) => {
   noStore(res);
   const affiliateId = req.query.affiliateId || req.query.id;
@@ -9282,7 +10261,7 @@ app.get('/api/affiliate/contracts', async (req, res) => {
   }
 });
 
-// GET /api/affiliate/opportunities/:affiliateId â€” alias for opportunities
+// GET /api/affiliate/opportunities/:affiliateId — alias for opportunities
 app.get('/api/affiliate/opportunities', async (req, res) => {
   noStore(res);
   try {
@@ -9303,14 +10282,14 @@ app.get('/api/affiliate/opportunities', async (req, res) => {
   }
 });
 
-// POST /api/affiliate/contracts/:id/acknowledge â€” sign/acknowledge contract
+// POST /api/affiliate/contracts/:id/acknowledge — sign/acknowledge contract
 app.post('/api/affiliate/contracts/:id/acknowledge', async (req, res) => {
   noStore(res);
   const { affiliateId } = req.body || {};
   res.json({ success: true, contractId: req.params.id, acknowledged: true, signedAt: new Date().toISOString() });
 });
 
-// GET /api/affiliate/payouts â€” payout history  
+// GET /api/affiliate/payouts — payout history  
 app.get('/api/affiliate/payouts', async (req, res) => {
   noStore(res);
   const affiliateId = req.query.affiliateId || req.query.id;
@@ -9322,7 +10301,7 @@ app.get('/api/affiliate/payouts', async (req, res) => {
   }
 });
 
-// POST /api/affiliate/payouts/request â€” request payout
+// POST /api/affiliate/payouts/request — request payout
 app.post('/api/affiliate/payouts/request', async (req, res) => {
   const { affiliateId, amount, method, address } = req.body || {};
   if (!affiliateId || !amount) return res.status(400).json({ success: false, error: 'affiliateId and amount are required' });
@@ -9556,7 +10535,7 @@ app.post('/api/affiliate/comms/message/send', (req, res) => {
   }
 });
 
-// POST /api/agent/auto-promote-experiments â€” promote confirmed winners from A/B tests
+// POST /api/agent/auto-promote-experiments — promote confirmed winners from A/B tests
 app.post('/api/agent/auto-promote-experiments', async (req, res) => {
   try {
     const { data: creatives } = await SupabaseConnector.from('creatives').select('id, product, hook, score, status, created_at').order('created_at', { ascending: false }).limit(40);
@@ -9584,9 +10563,9 @@ app.post('/api/agent/auto-promote-experiments', async (req, res) => {
 });
 
 // =============================================================
-// PPEP â€” Product Placement Execution Pipeline
+// PPEP — Product Placement Execution Pipeline
 // Connects evics-affiliate-app campaigns.tsx tab
-// Full 6-step pipeline: Analyze â†’ Environment â†’ Strategy â†’ Script â†’ Preview â†’ Render
+// Full 6-step pipeline: Analyze → Environment → Strategy → Script → Preview → Render
 // =============================================================
 
 const PPEP_PLATFORMS = [
@@ -9619,7 +10598,7 @@ app.get('/api/ppep/environment-options', (_req, res) => {
   res.json({ success: true, environments: PPEP_ENVIRONMENTS });
 });
 
-// POST /api/ppep/analyze-product â€” Step 1: Analyze product for PPEP
+// POST /api/ppep/analyze-product — Step 1: Analyze product for PPEP
 app.post('/api/ppep/analyze-product', async (req, res) => {
   try {
     const { productId, productTitle, product, platform, affiliateId, pipelineId } = req.body || {};
@@ -9671,7 +10650,7 @@ app.post('/api/ppep/analyze-product', async (req, res) => {
   }
 });
 
-// POST /api/ppep/match-environment â€” Step 2: Match optimal shooting environment
+// POST /api/ppep/match-environment — Step 2: Match optimal shooting environment
 app.post('/api/ppep/match-environment', async (req, res) => {
   try {
     const { pipelineId, analysis, platform, product } = req.body || {};
@@ -9700,7 +10679,7 @@ app.post('/api/ppep/match-environment', async (req, res) => {
   }
 });
 
-// POST /api/ppep/select-platform-strategy â€” Step 3: Select platform-optimized video strategy
+// POST /api/ppep/select-platform-strategy — Step 3: Select platform-optimized video strategy
 app.post('/api/ppep/select-platform-strategy', async (req, res) => {
   try {
     const { pipelineId, platform, analysis } = req.body || {};
@@ -9711,7 +10690,7 @@ app.post('/api/ppep/select-platform-strategy', async (req, res) => {
       platform_id: plt.id,
       aspect_ratio: plt.aspectRatio,
       video_length: platform === 'facebook' ? '20 seconds' : platform === 'youtube' ? '60-90 seconds' : '15-30 seconds',
-      hook_style: 'Pattern interrupt â†’ curiosity gap â†’ social proof',
+      hook_style: 'Pattern interrupt → curiosity gap → social proof',
       cta_style: platform === 'facebook' ? 'Buy Now / Shop Now' : 'Link in bio / Swipe up',
       optimal_time: platform === 'tiktok' ? '7-9pm EST' : '12-3pm EST',
       caption_strategy: `${analysis?.viral_angle || 'transformation'} angle with trending audio`,
@@ -9725,13 +10704,13 @@ app.post('/api/ppep/select-platform-strategy', async (req, res) => {
   }
 });
 
-// POST /api/ppep/generate-script â€” Step 4: Generate platform-specific video script
+// POST /api/ppep/generate-script — Step 4: Generate platform-specific video script
 app.post('/api/ppep/generate-script', async (req, res) => {
   try {
     const { pipelineId, productTitle, product, platform = 'tiktok', analysis, environment, affiliateId, hookPattern } = req.body || {};
     const title = productTitle || product?.title || 'this product';
 
-    // ── Use the elite viral script engine ──────────────────────────────────────
+    // -- Use the elite viral script engine --------------------------------------
     const scriptResult = await generateViralScript({
       title,
       product: product || { title },
@@ -9768,7 +10747,7 @@ app.post('/api/ppep/generate-script', async (req, res) => {
   }
 });
 
-// POST /api/ppep/preview-plan â€” Full pipeline preview (runs all steps in sequence)
+// POST /api/ppep/preview-plan — Full pipeline preview (runs all steps in sequence)
 app.post('/api/ppep/preview-plan', async (req, res) => {
   try {
     const { productId, productTitle, product, platform, affiliateId, pipelineId: existingPid, costLimit, qualityNeed } = req.body || {};
@@ -9779,10 +10758,10 @@ app.post('/api/ppep/preview-plan', async (req, res) => {
     const analysis = { purchase_motivation: 'health improvement', emotional_trigger: 'transformation', compliance_risk: 'low', product_category: (product?.product_type || 'health').toLowerCase(), viral_angle: 'before/after transformation', target_audience: 'health-conscious adults 25-45' };
     const envId = 'kitchen';
     const environment = { primary_environment: envId, environment_label: 'Kitchen / Home Prep', mismatch_warnings: [], lighting_recommendation: 'Natural window light', blocked: false };
-    const platformStrategy = { platform_label: plt.label, platform_id: plt.id, aspect_ratio: plt.aspectRatio, video_length: platform === 'facebook' ? '20 seconds' : '15-30 seconds', hook_style: 'Pattern interrupt â†’ transformation reveal' };
+    const platformStrategy = { platform_label: plt.label, platform_id: plt.id, aspect_ratio: plt.aspectRatio, video_length: platform === 'facebook' ? '20 seconds' : '15-30 seconds', hook_style: 'Pattern interrupt → transformation reveal' };
     const avatarRole = { avatar_role: 'testimonial_spokesperson', avatar_action: 'talking head with product in hand', selected_avatar_name: 'Abigail (Expressive)', avatar_id: process.env.HEYGEN_AVATAR_ID || 'Abigail_expressive_2024112501' };
-    const scriptText = `Wait â€” have you heard about ${title}? I was skeptical at first too. But after just 2 weeks, the results shocked me. Get yours at iamgenesistech.com â€” link in bio!`;
-    const script = { scriptText, main_script: scriptText, hook: `Wait â€” have you heard about ${title}?`, cta: 'Shop now â€” link in bio', duration_estimate: '20s', platform: plt.id };
+    const scriptText = `Wait — have you heard about ${title}? I was skeptical at first too. But after just 2 weeks, the results shocked me. Get yours at iamgenesistech.com — link in bio!`;
+    const script = { scriptText, main_script: scriptText, hook: `Wait — have you heard about ${title}?`, cta: 'Shop now — link in bio', duration_estimate: '20s', platform: plt.id };
     const providerSelection = { recommended_provider: 'heygen', fallback_provider: 'kling', estimated_cost: costLimit || 4, quality: qualityNeed || 'high' };
     const governor = { passed: true, issues: [], score: 92 };
     const renderPrompt = { provider_prompt: `Generate a ${plt.aspectRatio} talking-head video of avatar ${avatarRole.avatar_id} saying: "${scriptText}"` };
@@ -9805,7 +10784,7 @@ app.post('/api/ppep/preview-plan', async (req, res) => {
   }
 });
 
-// POST /api/ppep/create-media-job â€” Step 5: Create HeyGen render job from PPEP plan
+// POST /api/ppep/create-media-job — Step 5: Create HeyGen render job from PPEP plan
 app.post('/api/ppep/create-media-job', async (req, res) => {
   try {
     const {
@@ -9821,7 +10800,7 @@ app.post('/api/ppep/create-media-job', async (req, res) => {
       return res.json({ success: true, job_id: existingJobId, id: existingJobId, status: 'draft', pipelineId, message: 'Draft exists. Approve script to submit to renderer.' });
     }
 
-    // ── Resolve product image and dynamic background ──────────────────────────
+    // -- Resolve product image and dynamic background --------------------------
     const productObj  = plan?.product || { title: plan?.productTitle, imageUrl: plan?.productImageUrl };
     const rawImageUrl = plan?.productImageUrl || productObj?.imageUrl || productObj?.image_url;
 
@@ -9889,7 +10868,7 @@ app.post('/api/ppep/create-media-job', async (req, res) => {
   }
 });
 
-// GET /api/ppep/media-job/:jobId â€” Check render status
+// GET /api/ppep/media-job/:jobId — Check render status
 app.get('/api/ppep/media-job/:jobId', async (req, res) => {
   noStore(res);
   const { jobId } = req.params;
@@ -9933,7 +10912,7 @@ app.get('/api/ppep/media-job/:jobId', async (req, res) => {
   }
 });
 
-// POST /api/ppep/save-campaign â€” Save PPEP campaign record
+// POST /api/ppep/save-campaign — Save PPEP campaign record
 app.post('/api/ppep/save-campaign', async (req, res) => {
   try {
     const { pipelineId, jobId, affiliateId, productId, platform, environment, avatarId, customScript, approved, plan } = req.body || {};
@@ -9961,7 +10940,7 @@ app.post('/api/ppep/save-campaign', async (req, res) => {
   }
 });
 
-// POST /api/ppep/check-performance â€” Get performance metrics for a PPEP media job
+// POST /api/ppep/check-performance — Get performance metrics for a PPEP media job
 app.post('/api/ppep/check-performance', async (req, res) => {
   try {
     const { jobId, pipelineId } = req.body || {};
@@ -9981,7 +10960,7 @@ app.post('/api/ppep/check-performance', async (req, res) => {
 });
 
 // =============================================================
-// SHOPIFY WEBHOOK â€” Real-time product sync
+// SHOPIFY WEBHOOK — Real-time product sync
 // Register this URL in Shopify: POST /api/webhooks/shopify-products
 // =============================================================
 app.post('/api/webhooks/shopify-products', async (req, res) => {
@@ -10029,28 +11008,28 @@ app.post('/api/webhooks/shopify-products', async (req, res) => {
 // =============================================================
 
 const WISDOM_LIBRARY = [
-  { category: 'financial', title: 'The Law of Increase', content: 'Your income grows in direct proportion to the value you serve into the world. Every dollar you earn is a mirror of the service you rendered. Increase your service — increase your income.', scripture: 'Proverbs 11:24 — One person gives freely, yet gains even more; another withholds unduly, but comes to poverty.', affirmation: 'I am a channel of abundance. Value flows through me to others and returns multiplied.' },
-  { category: 'spiritual', title: 'You Are Already Enough', content: 'Before the world told you who to be, you were whole. The journey of success is not becoming something new — it is remembering who you always were. A child of God carries infinite potential.', scripture: 'Jeremiah 29:11 — For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.', affirmation: 'I am whole, I am worthy, I am aligned with the purpose of God.' },
-  { category: 'mindset', title: 'Compound Your Growth', content: 'Small consistent actions create extraordinary results. A 1% daily improvement compounds to 3,778% gain over one year. Do not despise small beginnings — every empire was once a single brick.', scripture: 'Zechariah 4:10 — Do not despise these small beginnings, for the Lord rejoices to see the work begin.', affirmation: 'I grow consistently every day. My small actions today create my extraordinary tomorrow.' },
-  { category: 'financial', title: 'Multiple Streams of Income', content: 'Wealthy people do not depend on one income stream. Affiliate marketing, investments, digital products, and brand partnerships create financial resilience. You are building more than a business — you are building freedom.', scripture: 'Ecclesiastes 11:2 — Divide your portion to seven, for you do not know what misfortune may occur on the earth.', affirmation: 'I build multiple streams of income that work even while I sleep.' },
-  { category: 'health', title: 'Your Body is Your Temple', content: 'Every elite performer prioritizes their body. Sleep, nutrition, movement, and stillness are not luxuries — they are the foundation of everything you build. You cannot pour from an empty vessel.', scripture: '1 Corinthians 6:19 — Your body is a temple of the Holy Spirit. Honor God with your bodies.', affirmation: 'I honor my body. I feed it well, rest it deeply, and move it with intention.' },
-  { category: 'mindset', title: 'The Oneness Principle', content: 'When you help another person win, you win. The universe rewards those who contribute to the rising of others. This is not competition — it is co-creation. We rise together as one organism.', scripture: 'Romans 8:28 — In all things God works for the good of those who love him.', affirmation: 'I celebrate the wins of others. Their success is a sign that mine is near.' },
-  { category: 'financial', title: 'Think Like an Owner', content: 'Employees trade time for money. Owners build systems that generate money. Affiliate marketing is your bridge — it teaches you to build, promote, and scale while earning. Train your mind to think like an owner.', scripture: 'Deuteronomy 8:18 — Remember the Lord your God, for it is he who gives you the ability to produce wealth.', affirmation: 'I think like an owner. I build systems, create value, and let my work multiply.' },
-  { category: 'spiritual', title: 'Fear is Not Your Story', content: 'Fear is a liar. Every breakthrough in your life waits just beyond your comfort zone. The most powerful force in the universe — love — casts out all fear. Step forward. The path is already prepared.', scripture: 'Isaiah 41:10 — Do not fear, for I am with you; do not be dismayed, for I am your God.', affirmation: 'I move forward with courage. Love casts out all fear in me.' },
-  { category: 'health', title: 'Food is Medicine', content: 'What you put into your body determines what you get out of life. Anti-inflammatory foods, clean proteins, and proper hydration are not optional for peak performance. Your clarity, energy, and mood are directly tied to nutrition.', scripture: '3 John 1:2 — I pray that you may enjoy good health and that all may go well with you.', affirmation: 'I fuel my body with life-giving foods. I am energized, clear, and strong.' },
-  { category: 'mindset', title: 'Your Network is Your Net Worth', content: 'The five people closest to you determine your trajectory. Seek out those who challenge you, who have walked further down the path, who celebrate your growth. Community is the accelerant.', scripture: 'Proverbs 27:17 — As iron sharpens iron, so one person sharpens another.', affirmation: 'I attract brilliant, purpose-driven people into my life. Together we multiply.' },
-  { category: 'financial', title: 'Invest in Yourself First', content: 'Before you invest in stocks or crypto, invest in your skills, knowledge, and mind. The greatest return on investment you will ever make is in your own growth. Skills compound too.', scripture: 'Proverbs 4:7 — The beginning of wisdom is this: Get wisdom. Though it cost all you have, get understanding.', affirmation: 'I invest in my mind. Knowledge is the foundation of all lasting wealth.' },
-  { category: 'spiritual', title: 'Gratitude Unlocks Abundance', content: 'Gratitude is the highest vibration available to you. When you appreciate what you have, you signal that you are ready for more. Complain and you contract. Give thanks and you expand.', scripture: '1 Thessalonians 5:18 — Give thanks in all circumstances; for this is God\'s will for you.', affirmation: 'I am deeply grateful. Gratitude multiplies every blessing in my life.' },
+  { category: 'financial', title: 'The Law of Increase', content: 'Your income grows in direct proportion to the value you serve into the world. Every dollar you earn is a mirror of the service you rendered. Increase your service � increase your income.', scripture: 'Proverbs 11:24 � One person gives freely, yet gains even more; another withholds unduly, but comes to poverty.', affirmation: 'I am a channel of abundance. Value flows through me to others and returns multiplied.' },
+  { category: 'spiritual', title: 'You Are Already Enough', content: 'Before the world told you who to be, you were whole. The journey of success is not becoming something new � it is remembering who you always were. A child of God carries infinite potential.', scripture: 'Jeremiah 29:11 � For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.', affirmation: 'I am whole, I am worthy, I am aligned with the purpose of God.' },
+  { category: 'mindset', title: 'Compound Your Growth', content: 'Small consistent actions create extraordinary results. A 1% daily improvement compounds to 3,778% gain over one year. Do not despise small beginnings � every empire was once a single brick.', scripture: 'Zechariah 4:10 � Do not despise these small beginnings, for the Lord rejoices to see the work begin.', affirmation: 'I grow consistently every day. My small actions today create my extraordinary tomorrow.' },
+  { category: 'financial', title: 'Multiple Streams of Income', content: 'Wealthy people do not depend on one income stream. Affiliate marketing, investments, digital products, and brand partnerships create financial resilience. You are building more than a business � you are building freedom.', scripture: 'Ecclesiastes 11:2 � Divide your portion to seven, for you do not know what misfortune may occur on the earth.', affirmation: 'I build multiple streams of income that work even while I sleep.' },
+  { category: 'health', title: 'Your Body is Your Temple', content: 'Every elite performer prioritizes their body. Sleep, nutrition, movement, and stillness are not luxuries � they are the foundation of everything you build. You cannot pour from an empty vessel.', scripture: '1 Corinthians 6:19 � Your body is a temple of the Holy Spirit. Honor God with your bodies.', affirmation: 'I honor my body. I feed it well, rest it deeply, and move it with intention.' },
+  { category: 'mindset', title: 'The Oneness Principle', content: 'When you help another person win, you win. The universe rewards those who contribute to the rising of others. This is not competition � it is co-creation. We rise together as one organism.', scripture: 'Romans 8:28 � In all things God works for the good of those who love him.', affirmation: 'I celebrate the wins of others. Their success is a sign that mine is near.' },
+  { category: 'financial', title: 'Think Like an Owner', content: 'Employees trade time for money. Owners build systems that generate money. Affiliate marketing is your bridge � it teaches you to build, promote, and scale while earning. Train your mind to think like an owner.', scripture: 'Deuteronomy 8:18 � Remember the Lord your God, for it is he who gives you the ability to produce wealth.', affirmation: 'I think like an owner. I build systems, create value, and let my work multiply.' },
+  { category: 'spiritual', title: 'Fear is Not Your Story', content: 'Fear is a liar. Every breakthrough in your life waits just beyond your comfort zone. The most powerful force in the universe � love � casts out all fear. Step forward. The path is already prepared.', scripture: 'Isaiah 41:10 � Do not fear, for I am with you; do not be dismayed, for I am your God.', affirmation: 'I move forward with courage. Love casts out all fear in me.' },
+  { category: 'health', title: 'Food is Medicine', content: 'What you put into your body determines what you get out of life. Anti-inflammatory foods, clean proteins, and proper hydration are not optional for peak performance. Your clarity, energy, and mood are directly tied to nutrition.', scripture: '3 John 1:2 � I pray that you may enjoy good health and that all may go well with you.', affirmation: 'I fuel my body with life-giving foods. I am energized, clear, and strong.' },
+  { category: 'mindset', title: 'Your Network is Your Net Worth', content: 'The five people closest to you determine your trajectory. Seek out those who challenge you, who have walked further down the path, who celebrate your growth. Community is the accelerant.', scripture: 'Proverbs 27:17 � As iron sharpens iron, so one person sharpens another.', affirmation: 'I attract brilliant, purpose-driven people into my life. Together we multiply.' },
+  { category: 'financial', title: 'Invest in Yourself First', content: 'Before you invest in stocks or crypto, invest in your skills, knowledge, and mind. The greatest return on investment you will ever make is in your own growth. Skills compound too.', scripture: 'Proverbs 4:7 � The beginning of wisdom is this: Get wisdom. Though it cost all you have, get understanding.', affirmation: 'I invest in my mind. Knowledge is the foundation of all lasting wealth.' },
+  { category: 'spiritual', title: 'Gratitude Unlocks Abundance', content: 'Gratitude is the highest vibration available to you. When you appreciate what you have, you signal that you are ready for more. Complain and you contract. Give thanks and you expand.', scripture: '1 Thessalonians 5:18 � Give thanks in all circumstances; for this is God\'s will for you.', affirmation: 'I am deeply grateful. Gratitude multiplies every blessing in my life.' },
 ];
 
 const FINANCIAL_TIPS = [
   'Track every dollar. What gets measured gets managed.',
   'Pay yourself first. Set aside 10% of every payment before any bill.',
-  'Your affiliate commission is seed money — reinvest a portion into tools that multiply your reach.',
+  'Your affiliate commission is seed money � reinvest a portion into tools that multiply your reach.',
   'Build an emergency fund equal to 3 months of expenses before making speculative investments.',
   'Diversify your income: affiliate commissions + digital products + referrals = resilience.',
   'Compound interest works both ways. Eliminate high-interest debt with intensity.',
-  'Your brand IS your business. Invest in professional content — it pays compound dividends.',
+  'Your brand IS your business. Invest in professional content � it pays compound dividends.',
   'Money follows value. Ask daily: "How can I serve more people at a higher level today?"',
   'Tax tip: Your home office, phone, and tools used for affiliate work may be deductible.',
   'Time in the market beats timing the market. Consistent DCA beats guessing.',
@@ -10098,7 +11077,7 @@ app.get('/api/wisdom/content', async (req, res) => {
 });
 
 // =============================================================
-// MEMBER ENGINE — Free membership unlocks all tools
+// MEMBER ENGINE � Free membership unlocks all tools
 // =============================================================
 
 app.post('/api/member/join', async (req, res) => {
@@ -10144,7 +11123,7 @@ app.get('/api/member/benefits', (_req, res) => {
 });
 
 // =============================================================
-// COMMUNITY ENGINE — Pulse, stats, feed, co-elevation
+// COMMUNITY ENGINE � Pulse, stats, feed, co-elevation
 // =============================================================
 
 app.get('/api/community/stats', async (_req, res) => {
@@ -10169,12 +11148,12 @@ app.get('/api/community/feed', async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 10, 50);
   const DEMO = [
     { id: 'f1', type: 'sale',   user: 'Marcus T.',  message: 'Just closed 3 sales in one day from my AI avatar video!', ts: new Date(Date.now()-1200000).toISOString(), amount: 147 },
-    { id: 'f2', type: 'join',   user: 'Priya K.',   message: 'Just joined the IAGT family — so excited to start!', ts: new Date(Date.now()-3600000).toISOString(), amount: null },
+    { id: 'f2', type: 'join',   user: 'Priya K.',   message: 'Just joined the IAGT family � so excited to start!', ts: new Date(Date.now()-3600000).toISOString(), amount: null },
     { id: 'f3', type: 'wisdom', user: 'EVICS',      message: '"Do not despise small beginnings. Every empire was once one brick."', ts: new Date(Date.now()-7200000).toISOString(), amount: null },
-    { id: 'f4', type: 'payout', user: 'Deshawn R.', message: 'Monthly payout hit — $820 this month. God is good.', ts: new Date(Date.now()-14400000).toISOString(), amount: 820 },
+    { id: 'f4', type: 'payout', user: 'Deshawn R.', message: 'Monthly payout hit � $820 this month. God is good.', ts: new Date(Date.now()-14400000).toISOString(), amount: 820 },
     { id: 'f5', type: 'video',  user: 'Sofia M.',   message: 'My PPEP video hit 12k views in 48 hours!', ts: new Date(Date.now()-21600000).toISOString(), amount: null },
     { id: 'f6', type: 'tier',   user: 'James W.',   message: 'Just hit Builder tier! 20% commission unlocked!', ts: new Date(Date.now()-36000000).toISOString(), amount: null },
-    { id: 'f7', type: 'sale',   user: 'Latoya B.',  message: 'First commission — $32! Small but this is just the beginning!', ts: new Date(Date.now()-57600000).toISOString(), amount: 32 },
+    { id: 'f7', type: 'sale',   user: 'Latoya B.',  message: 'First commission � $32! Small but this is just the beginning!', ts: new Date(Date.now()-57600000).toISOString(), amount: 32 },
     { id: 'f8', type: 'payout', user: 'Amara J.',   message: "Paid for my kids' school supplies this month from affiliate earnings. Grateful.", ts: new Date(Date.now()-86400000).toISOString(), amount: 210 },
   ];
   try {
@@ -10207,12 +11186,12 @@ app.get('/api/trading/signals', async (req, res) => {
   ];
   res.json({ success: true, hasAccess,
     signals: hasAccess ? SIGNALS : [],
-    lockedMessage: hasAccess ? null : "Trading signals unlock at Elite tier. Keep building — you're on the path.",
+    lockedMessage: hasAccess ? null : "Trading signals unlock at Elite tier. Keep building � you're on the path.",
     education: [
       { id: 'edu1', title: 'Options 101: Calls & Puts Explained', type: 'video', duration: '18 min', locked: false },
       { id: 'edu2', title: 'Reading the Tape: Options Flow Basics', type: 'video', duration: '24 min', locked: !hasAccess },
       { id: 'edu3', title: 'The 3 Pillars of Wealth', type: 'article', duration: '12 min read', locked: false },
-      { id: 'edu4', title: 'Risk Management — How Elite Traders Protect Capital', type: 'video', duration: '31 min', locked: !hasAccess },
+      { id: 'edu4', title: 'Risk Management � How Elite Traders Protect Capital', type: 'video', duration: '31 min', locked: !hasAccess },
     ],
     certificationPath: { name: 'EVICS Trading Certification', modules: 7, completedModules: 0, estimatedHours: '14 hours', reward: 'Elite tier badge + 5% commission bonus' }
   });
@@ -10454,20 +11433,20 @@ app.get('/api/excellence/engine/:engineId', (_req, res) => {
   });
 });
 // Global error handler
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   errorCount++;
   console.error(`[EVICS Error #${errorCount}] ${req.method} ${req.path}:`, err.message);
   res.status(err.status || 500).json({ success: false, error: err.message || 'Internal server error' });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 // Start server
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`âœ… EVICS backend running at http://127.0.0.1:${PORT}`);
-  console.log(`âž¡ï¸  Dashboard:           http://127.0.0.1:${PORT}/`);
-  console.log(`âž¡ï¸  Status:              http://127.0.0.1:${PORT}/status`);
+  console.log(`✅ EVICS backend running at http://127.0.0.1:${PORT}`);
+  console.log(`➡️  Dashboard:           http://127.0.0.1:${PORT}/`);
+  console.log(`➡️  Status:              http://127.0.0.1:${PORT}/status`);
 
   // Initialize Phase 2: Production Hardening
   const phase2Ready = phase2Integration.initialize(app);
@@ -10475,21 +11454,21 @@ app.listen(PORT, () => {
     phase2Integration.mountAuthRoutes(app);
     phase2Integration.mountBillingRoutes(app);
     phase2Integration.markHealthCheckStartupComplete();
-    console.log('🚀 Phase 2: All engines initialized and routes mounted');
+    console.log('?? Phase 2: All engines initialized and routes mounted');
   } else {
-    console.warn('⚠️  Phase 2: Initialization incomplete, some features may be unavailable');
+    console.warn('??  Phase 2: Initialization incomplete, some features may be unavailable');
   }
 
   // Start automation scheduler (viral scan, profit audit, library cleanup, exec report)
   startScheduler(`http://127.0.0.1:${PORT}`);
 
-  // Restore persisted state from GCS — avatar requests, profiles, and video records survive redeploys
+  // Restore persisted state from GCS � avatar requests, profiles, and video records survive redeploys
   (async () => {
     try {
       const profileData = await persistenceEngine.gcsRead('evics-data/affiliate_profiles.json');
       if (Array.isArray(profileData) && profileData.length) {
         saveAffiliateProfiles(profileData);
-        console.log(`[Persist] ✅ Restored ${profileData.length} affiliate profile(s) from GCS.`);
+        console.log(`[Persist] ? Restored ${profileData.length} affiliate profile(s) from GCS.`);
       }
     } catch (e) {
       console.warn('[Persist] Could not restore affiliate profiles from GCS:', e.message);
@@ -10498,7 +11477,7 @@ app.listen(PORT, () => {
       const avatarData = await persistenceEngine.gcsRead('evics-data/avatar_requests.json');
       if (Array.isArray(avatarData) && avatarData.length) {
         saveAvatarRequests(avatarData);
-        console.log(`[Persist] ✅ Restored ${avatarData.length} avatar request(s) from GCS.`);
+        console.log(`[Persist] ? Restored ${avatarData.length} avatar request(s) from GCS.`);
       }
     } catch (e) {
       console.warn('[Persist] Could not restore avatar requests from GCS:', e.message);
@@ -10507,7 +11486,7 @@ app.listen(PORT, () => {
       const videoData = await persistenceEngine.gcsRead('evics-data/video_records.json');
       if (Array.isArray(videoData) && videoData.length) {
         for (const rec of videoData) PRODUCT_VIDEO_RECORDS.set(rec.videoJobId, rec);
-        console.log(`[Persist] ✅ Restored ${videoData.length} video record(s) from GCS.`);
+        console.log(`[Persist] ? Restored ${videoData.length} video record(s) from GCS.`);
       }
     } catch (e) {
       console.warn('[Persist] Could not restore video records from GCS:', e.message);
@@ -10516,19 +11495,19 @@ app.listen(PORT, () => {
     costTracker.restoreCostLogFromGcs().catch(() => {});
   })();
 
-  // Bootstrap the Sacred Intelligence Governance Engine — load the AI Oath and
+  // Bootstrap the Sacred Intelligence Governance Engine � load the AI Oath and
   // Sacred Intelligence Standard into the system before any AI task runs, and log it.
   try {
     governance.bootstrapAgent('evics-platform', { workflowName: 'server-startup' });
-    console.log('🕊️  [EVICS] Sacred Intelligence Governance Engine active — every AI output is governed by truth, integrity, dignity, and love.');
+    console.log('???  [EVICS] Sacred Intelligence Governance Engine active � every AI output is governed by truth, integrity, dignity, and love.');
   } catch (govErr) {
     console.warn('[EVICS Governance] Bootstrap warning:', govErr && govErr.message ? govErr.message : govErr);
   }
 
-  // Startup environment validation â€” warn about missing keys and their impact
+  // Startup environment validation — warn about missing keys and their impact
   const envChecks = [
     { key: 'HEYGEN_API_KEY',             impact: 'Video generation runs in demo mode only' },
-    { key: 'SUPABASE_URL',               impact: 'Database offline â€” all data is in-memory/demo' },
+    { key: 'SUPABASE_URL',               impact: 'Database offline — all data is in-memory/demo' },
     { key: 'SHOPIFY_ADMIN_ACCESS_TOKEN', impact: 'Shopify products and orders will not sync' },
     { key: 'OPENAI_API_KEY',             impact: 'AI Copilot using rule-based fallback responses' },
     { key: 'RUNWAY_API_KEY',             impact: 'Runway video generation unavailable' },
@@ -10536,51 +11515,51 @@ app.listen(PORT, () => {
   ];
   const missingEnv = envChecks.filter(c => !process.env[c.key]);
   if (missingEnv.length) {
-    console.warn(`[EVICS Config] âš ï¸  ${missingEnv.length} env var(s) missing:`);
-    missingEnv.forEach(c => console.warn(`   â€¢ ${c.key} â€” ${c.impact}`));
+    console.warn(`[EVICS Config] ⚠️  ${missingEnv.length} env var(s) missing:`);
+    missingEnv.forEach(c => console.warn(`   • ${c.key} — ${c.impact}`));
   } else {
-    console.log('[EVICS Config] âœ… All key environment variables configured.');
+    console.log('[EVICS Config] ✅ All key environment variables configured.');
   }
 
-  console.log(`âž¡ï¸  Products:            http://127.0.0.1:${PORT}/api/products`);
-  console.log(`âž¡ï¸  Renders:             http://127.0.0.1:${PORT}/api/renders`);
-  console.log(`âž¡ï¸  Campaigns:           http://127.0.0.1:${PORT}/api/campaigns`);
-  console.log(`âž¡ï¸  Trends:              http://127.0.0.1:${PORT}/api/trends`);
-  console.log(`âž¡ï¸  Dashboard summary:   http://127.0.0.1:${PORT}/api/dashboard-summary`);
-  console.log(`âž¡ï¸  Shopify products:    http://127.0.0.1:${PORT}/api/shopify/products`);
-  console.log(`âž¡ï¸  Shopify collections: http://127.0.0.1:${PORT}/api/shopify/collections`);
-  console.log(`âž¡ï¸  Viral rescan:        POST http://127.0.0.1:${PORT}/api/viral/rescan`);
-  console.log(`âž¡ï¸  Hook search:         POST http://127.0.0.1:${PORT}/api/hooks/search`);
-  console.log(`âž¡ï¸  Creatives:           http://127.0.0.1:${PORT}/api/creatives`);
-  console.log(`âž¡ï¸  Assembly drafts:     http://127.0.0.1:${PORT}/api/assembly/drafts`);
-  console.log(`âž¡ï¸  AI suggestions:      POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
-  console.log(`âž¡ï¸  Video generate:      POST http://127.0.0.1:${PORT}/api/video/generate`);
-  console.log(`âž¡ï¸  Agent viral scan:    POST http://127.0.0.1:${PORT}/api/agent/viral-scan`);
-  console.log(`âž¡ï¸  Agent reconstruct:   POST http://127.0.0.1:${PORT}/api/agent/reconstruct`);
-  console.log(`âž¡ï¸  Agent generate ads:  POST http://127.0.0.1:${PORT}/api/agent/generate-ads`);
-  console.log(`âž¡ï¸  Service intake:      POST http://127.0.0.1:${PORT}/api/services/intake-website`);
-  console.log(`âž¡ï¸  Service campaigns:   POST http://127.0.0.1:${PORT}/api/services/generate-avatar-ads`);
-  console.log(`âž¡ï¸  Service render req:  POST http://127.0.0.1:${PORT}/api/services/build-render-request`);
-  console.log(`âž¡ï¸  Agent approve:       POST http://127.0.0.1:${PORT}/api/agent/approve-creative`);
-  console.log(`âž¡ï¸  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
-  console.log(`âž¡ï¸  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);
-  console.log(`âž¡ï¸  Agent copilot:       POST http://127.0.0.1:${PORT}/api/agent/copilot`);
-  console.log(`âž¡ï¸  Agent profit audit:  POST http://127.0.0.1:${PORT}/api/agent/profit-audit`);
-  console.log(`âž¡ï¸  Agent product tiers: GET  http://127.0.0.1:${PORT}/api/agent/product-tiers`);
-  console.log(`âž¡ï¸  Agent budget alloc:  POST http://127.0.0.1:${PORT}/api/agent/allocate-budget`);
-  console.log(`âž¡ï¸  Agent experiments:   GET  http://127.0.0.1:${PORT}/api/agent/experiments`);
-  console.log(`âž¡ï¸  Agent lib cleanup:   POST http://127.0.0.1:${PORT}/api/agent/library-cleanup`);
-  console.log(`âž¡ï¸  Agent exec report:   GET  http://127.0.0.1:${PORT}/api/agent/executive-report`);
-  console.log(`âž¡ï¸  Recovery status:     GET  http://127.0.0.1:${PORT}/api/recovery/status`);
-  console.log(`âž¡ï¸  Media types:         http://127.0.0.1:${PORT}/api/media/types`);
-  console.log(`âž¡ï¸  Media apps:          http://127.0.0.1:${PORT}/api/media/apps`);
-  console.log(`âž¡ï¸  Media by type:       http://127.0.0.1:${PORT}/api/media/by-type/:type`);
-  console.log(`âž¡ï¸  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
-  console.log(`âž¡ï¸  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
-  console.log(`âž¡ï¸  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
-  console.log(`âž¡ï¸  Agent statuses:      http://127.0.0.1:${PORT}/api/agents/status`);
-  console.log(`âž¡ï¸  Published media:     http://127.0.0.1:${PORT}/api/published-media`);
-  console.log(`âž¡ï¸  Analytics summary:   http://127.0.0.1:${PORT}/api/analytics/summary`);
-  console.log(`âž¡ï¸  Quality report:      http://127.0.0.1:${PORT}/api/analytics/quality-report`);
-  console.log(`âž¡ï¸  Quality validate:    POST http://127.0.0.1:${PORT}/api/quality/validate`);
+  console.log(`➡️  Products:            http://127.0.0.1:${PORT}/api/products`);
+  console.log(`➡️  Renders:             http://127.0.0.1:${PORT}/api/renders`);
+  console.log(`➡️  Campaigns:           http://127.0.0.1:${PORT}/api/campaigns`);
+  console.log(`➡️  Trends:              http://127.0.0.1:${PORT}/api/trends`);
+  console.log(`➡️  Dashboard summary:   http://127.0.0.1:${PORT}/api/dashboard-summary`);
+  console.log(`➡️  Shopify products:    http://127.0.0.1:${PORT}/api/shopify/products`);
+  console.log(`➡️  Shopify collections: http://127.0.0.1:${PORT}/api/shopify/collections`);
+  console.log(`➡️  Viral rescan:        POST http://127.0.0.1:${PORT}/api/viral/rescan`);
+  console.log(`➡️  Hook search:         POST http://127.0.0.1:${PORT}/api/hooks/search`);
+  console.log(`➡️  Creatives:           http://127.0.0.1:${PORT}/api/creatives`);
+  console.log(`➡️  Assembly drafts:     http://127.0.0.1:${PORT}/api/assembly/drafts`);
+  console.log(`➡️  AI suggestions:      POST http://127.0.0.1:${PORT}/api/assembly/suggestions`);
+  console.log(`➡️  Video generate:      POST http://127.0.0.1:${PORT}/api/video/generate`);
+  console.log(`➡️  Agent viral scan:    POST http://127.0.0.1:${PORT}/api/agent/viral-scan`);
+  console.log(`➡️  Agent reconstruct:   POST http://127.0.0.1:${PORT}/api/agent/reconstruct`);
+  console.log(`➡️  Agent generate ads:  POST http://127.0.0.1:${PORT}/api/agent/generate-ads`);
+  console.log(`➡️  Service intake:      POST http://127.0.0.1:${PORT}/api/services/intake-website`);
+  console.log(`➡️  Service campaigns:   POST http://127.0.0.1:${PORT}/api/services/generate-avatar-ads`);
+  console.log(`➡️  Service render req:  POST http://127.0.0.1:${PORT}/api/services/build-render-request`);
+  console.log(`➡️  Agent approve:       POST http://127.0.0.1:${PORT}/api/agent/approve-creative`);
+  console.log(`➡️  Agent publish:       POST http://127.0.0.1:${PORT}/api/agent/publish`);
+  console.log(`➡️  Agent learning loop: POST http://127.0.0.1:${PORT}/api/agent/learning-loop`);
+  console.log(`➡️  Agent copilot:       POST http://127.0.0.1:${PORT}/api/agent/copilot`);
+  console.log(`➡️  Agent profit audit:  POST http://127.0.0.1:${PORT}/api/agent/profit-audit`);
+  console.log(`➡️  Agent product tiers: GET  http://127.0.0.1:${PORT}/api/agent/product-tiers`);
+  console.log(`➡️  Agent budget alloc:  POST http://127.0.0.1:${PORT}/api/agent/allocate-budget`);
+  console.log(`➡️  Agent experiments:   GET  http://127.0.0.1:${PORT}/api/agent/experiments`);
+  console.log(`➡️  Agent lib cleanup:   POST http://127.0.0.1:${PORT}/api/agent/library-cleanup`);
+  console.log(`➡️  Agent exec report:   GET  http://127.0.0.1:${PORT}/api/agent/executive-report`);
+  console.log(`➡️  Recovery status:     GET  http://127.0.0.1:${PORT}/api/recovery/status`);
+  console.log(`➡️  Media types:         http://127.0.0.1:${PORT}/api/media/types`);
+  console.log(`➡️  Media apps:          http://127.0.0.1:${PORT}/api/media/apps`);
+  console.log(`➡️  Media by type:       http://127.0.0.1:${PORT}/api/media/by-type/:type`);
+  console.log(`➡️  Media by app:        http://127.0.0.1:${PORT}/api/media/by-app/:app`);
+  console.log(`➡️  Media by type+app:   http://127.0.0.1:${PORT}/api/media/by-type/:type/by-app/:app`);
+  console.log(`➡️  Media download:      POST http://127.0.0.1:${PORT}/api/media/:id/download`);
+  console.log(`➡️  Agent statuses:      http://127.0.0.1:${PORT}/api/agents/status`);
+  console.log(`➡️  Published media:     http://127.0.0.1:${PORT}/api/published-media`);
+  console.log(`➡️  Analytics summary:   http://127.0.0.1:${PORT}/api/analytics/summary`);
+  console.log(`➡️  Quality report:      http://127.0.0.1:${PORT}/api/analytics/quality-report`);
+  console.log(`➡️  Quality validate:    POST http://127.0.0.1:${PORT}/api/quality/validate`);
 });
