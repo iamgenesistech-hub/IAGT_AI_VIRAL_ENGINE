@@ -8475,16 +8475,21 @@ function normalizePhoneRenderFeedItem(item) {
     || ''
   ).trim();
   const heygenVideoId = String(item.heygenVideoId || item.video_id || item.videoId || '').trim() || null;
-  const videoUrl = String(
+  const firstPlayableUrl = [
+    item.videoUrl,
+    item.video_url,
+    item.outputMediaUrl,
+    item.output_media_url,
+    item.playbackUrl,
+    item.asset && item.asset.playbackUrl,
+    item.asset && item.asset.downloadUrl,
+    item.asset && item.asset.shareUrl,
     item.gcsVideoUrl
-    || item.videoUrl
-    || item.video_url
-    || item.outputMediaUrl
-    || item.output_media_url
-    || item.playbackUrl
-    || (item.asset && (item.asset.playbackUrl || item.asset.downloadUrl || item.asset.shareUrl))
-    || ''
-  ).trim() || null;
+  ].find((value) => {
+    const raw = String(value || '').trim();
+    return raw.startsWith('/') || /^https?:\/\//i.test(raw);
+  });
+  const videoUrl = String(firstPlayableUrl || '').trim() || null;
   const thumbnailUrl = String(
     item.thumbnailUrl
     || item.thumbnail_url
@@ -8509,10 +8514,10 @@ function normalizePhoneRenderFeedItem(item) {
     video_url: videoUrl,
     outputMediaUrl: videoUrl || item.outputMediaUrl || item.output_media_url || null,
     output_media_url: videoUrl || item.output_media_url || item.outputMediaUrl || null,
-    playbackUrl: videoUrl || (renderId ? `/api/media/playback/${encodeURIComponent(heygenVideoId || renderId)}` : null),
+    playbackUrl: videoUrl || (renderId ? `/api/media/playback/${encodeURIComponent(renderId)}` : null),
     asset: videoUrl
       ? { playbackUrl: videoUrl, downloadUrl: videoUrl, shareUrl: videoUrl }
-      : (renderId ? { playbackUrl: `/api/media/playback/${encodeURIComponent(heygenVideoId || renderId)}` } : null),
+      : (renderId ? { playbackUrl: `/api/media/playback/${encodeURIComponent(renderId)}` } : null),
     thumbnailUrl,
     thumbnail_url: thumbnailUrl,
     media_type: item.media_type || item.mediaType || 'video',
