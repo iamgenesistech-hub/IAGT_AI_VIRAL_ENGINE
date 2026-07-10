@@ -1131,13 +1131,20 @@
             const directVideoUrl = [
               item.videoUrl,
               item.video_url,
+              item.gcsVideoUrl,
+              item.heygenVideoUrl,
               item.outputMediaUrl,
               item.output_media_url,
               item.mediaUrl,
               item.media_url,
+              item.storageUrl,
+              item.storage_url,
               item.playbackUrl,
               item.previewUrl,
-              item.preview_url
+              item.preview_url,
+              item.asset && item.asset.playbackUrl,
+              item.asset && item.asset.downloadUrl,
+              item.asset && item.asset.shareUrl
             ].find((value) => isSafeMediaUrl(value));
             const resolvedThumb = item.thumbnailUrl || item.thumbnail_url || item.posterUrl || item.poster_url || '';
             return {
@@ -1516,7 +1523,17 @@
       try {
         const response = await fetch(`/api/affiliate/product-video/status/${encodeURIComponent(videoJobId)}?affiliateCode=${encodeURIComponent(activeAffiliateCode())}`, { headers: { Accept: 'application/json' } });
         const payload = await response.json().catch(() => ({}));
-        if (payload.status === 'completed' && payload.videoUrl) return payload;
+        const hasPlayableVideo = Boolean(
+          payload.videoUrl
+          || payload.video_url
+          || payload.gcsVideoUrl
+          || payload.heygenVideoUrl
+          || payload.playbackUrl
+          || payload.outputMediaUrl
+          || payload.output_media_url
+          || (payload.asset && (payload.asset.playbackUrl || payload.asset.downloadUrl || payload.asset.shareUrl))
+        );
+        if (payload.status === 'completed' && hasPlayableVideo) return payload;
         if (payload.status === 'failed') throw new Error(payload.error || 'Rendering failed');
       } catch (err) {
         if (err.message.includes('failed')) throw err;
@@ -2686,9 +2703,6 @@
             requestId: null,
             attire: attire,
             source: 'phone-app',
-            nativeAsync: true,
-            avatarProvider: 'auto'
-            ,
             qualityMode: supportState.avatarSetup.qualityMode || 'elite'
           })
         });

@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env'), override: true })
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 const multer = require('multer');
 const SupabaseConnector = require('../utils/SupabaseConnector');
 const { fetchShopifyProducts, fetchShopifyCollections, fetchShopifyOrders } = require('../utils/shopifyLiveConnector');
@@ -86,6 +87,7 @@ function getOpenAI() {
 const app = express();
 const PORT = process.env.PORT || 4175;
 const fs = require('fs');
+const dns = require('dns').promises;
 
 // Directory constants — defined early so static middleware can reference them
 const MEDIA_CACHE_DIR = path.join(__dirname, '../generated/mp4-cache');
@@ -207,12 +209,30 @@ app.use((req, res, next) => {
   next();
 });
 
-// â”€â”€ CORS â€” allow Expo phone app, dashboard, and external clients â”€â”€
+// CORS — allowlist-based with explicit fallback for local/dev environments.
+const corsAllowedOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowAllCorsOrigins = process.env.CORS_ALLOW_ALL === 'true' || corsAllowedOrigins.length === 0;
+const corsAllowedSet = new Set(corsAllowedOrigins);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const isAllowed = !origin || allowAllCorsOrigins || corsAllowedSet.has(origin);
+  if (!isAllowed) {
+    return res.status(403).json({ success: false, error: 'Origin is not allowed by CORS policy.' });
+  }
+
+  if (origin && !allowAllCorsOrigins) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Api-Key, Accept');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Api-Key, X-Admin-Key, Accept');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset');
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
@@ -222,24 +242,77 @@ app.use(cdnEngine.applyCDNHeaders);
 
 app.use(express.json());
 
-// Rate limiting â€” protect agent and video generation endpoints
+// Rate limiting — user-aware per-plan limits for agent and video generation endpoints
+const PLAN_AGENT_LIMITS_PER_MIN = { free: 30, creator: 60, elite: 120 };
+const PLAN_VIDEO_LIMITS_PER_MIN = { free: 5, creator: 12, elite: 30 };
+
+function normalizePlanId(rawPlan) {
+  const plan = String(rawPlan || '').trim().toLowerCase();
+  return plan === 'creator' || plan === 'elite' ? plan : 'free';
+}
+
+function resolveAffiliateCodeFromRequest(req) {
+  const raw = (req.body && (req.body.affiliateCode || req.body.affiliateId))
+    || req.query.affiliateCode
+    || req.query.affiliateId
+    || req.headers['x-affiliate-code']
+    || req.headers['x-affiliate-id']
+    || '';
+  return normalizeAffiliateCode(raw);
+}
+
+async function resolveRateLimitIdentity(req, _res, next) {
+  const affiliateCode = resolveAffiliateCodeFromRequest(req);
+  if (affiliateCode) {
+    try {
+      const planInfo = await stripeEngine.getPlanForAffiliate(affiliateCode);
+      req.evicsRateLimitPlan = normalizePlanId(planInfo && (planInfo.planId || (planInfo.plan && planInfo.plan.id)));
+      req.evicsRateLimitKey = `affiliate:${affiliateCode}`;
+      return next();
+    } catch (err) {
+      console.warn('[rate-limit] Plan lookup failed; falling back to free tier:', err.message);
+      req.evicsRateLimitPlan = 'free';
+      req.evicsRateLimitKey = `affiliate:${affiliateCode}`;
+      return next();
+    }
+  }
+
+  req.evicsRateLimitPlan = normalizePlanId(req.headers['x-plan']);
+  req.evicsRateLimitKey = `ip:${ipKeyGenerator(req.ip || req.connection && req.connection.remoteAddress || 'unknown')}`;
+  next();
+}
+
 const agentLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30,
+  max: (req) => PLAN_AGENT_LIMITS_PER_MIN[req.evicsRateLimitPlan || 'free'] || PLAN_AGENT_LIMITS_PER_MIN.free,
+  keyGenerator: (req) => `${req.evicsRateLimitPlan || 'free'}:${req.evicsRateLimitKey || `ip:${ipKeyGenerator(req.ip || '')}`}`,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many requests. Please retry after 60 seconds.', retryAfter: 60 }
+  message: (req) => ({
+    success: false,
+    error: 'Too many requests. Please retry after 60 seconds.',
+    retryAfter: 60,
+    plan: req.evicsRateLimitPlan || 'free'
+  })
 });
+
 const videoLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: (req) => PLAN_VIDEO_LIMITS_PER_MIN[req.evicsRateLimitPlan || 'free'] || PLAN_VIDEO_LIMITS_PER_MIN.free,
+  keyGenerator: (req) => `${req.evicsRateLimitPlan || 'free'}:${req.evicsRateLimitKey || `ip:${ipKeyGenerator(req.ip || '')}`}`,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Video generation rate limit reached. Please retry after 60 seconds.', retryAfter: 60 }
+  message: (req) => ({
+    success: false,
+    error: 'Video generation rate limit reached. Please retry after 60 seconds.',
+    retryAfter: 60,
+    plan: req.evicsRateLimitPlan || 'free'
+  })
 });
-app.use('/api/agent', agentLimiter);
-app.use('/api/agents', agentLimiter);
-app.use('/api/video/generate', videoLimiter);
+
+app.use('/api/agent', resolveRateLimitIdentity, agentLimiter);
+app.use('/api/agents', resolveRateLimitIdentity, agentLimiter);
+app.use('/api/video/generate', resolveRateLimitIdentity, videoLimiter);
 
 // Serve static files from dashboard/control-center
 app.use(express.static(path.join(__dirname, '../dashboard/control-center')));
@@ -1312,7 +1385,12 @@ async function getAvatarGalleryRecords(affiliateCode) {
 
 function normalizeAvatarCreateResponse(payload) {
   const data = payload && payload.data ? payload.data : payload || {};
-  const avatarItem = data.avatar_item || data.avatarItem || data.avatar || data.avatar_item_id || null;
+  const rawAvatarItem = data.avatar_item || data.avatarItem || data.avatar || data.avatar_item_id || null;
+  const avatarItem = (rawAvatarItem && typeof rawAvatarItem === 'object')
+    ? rawAvatarItem
+    : (typeof rawAvatarItem === 'string' && rawAvatarItem.trim()
+      ? { id: rawAvatarItem.trim() }
+      : null);
   const avatarGroup = data.avatar_group || data.avatarGroup || data.group || null;
   return {
     avatarItem,
@@ -2146,8 +2224,73 @@ app.get('/api/scheduler/log', (_req, res) => {
 
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
+function parseSupabaseUrlHost() {
+  const raw = process.env.SUPABASE_URL ? String(process.env.SUPABASE_URL).trim() : '';
+  if (!raw) return { url: null, host: null, valid: false, error: 'SUPABASE_URL not configured.' };
+  try {
+    const parsed = new URL(raw);
+    return { url: raw, host: parsed.host, valid: true, error: null };
+  } catch (err) {
+    return { url: raw, host: null, valid: false, error: `SUPABASE_URL is invalid: ${err.message}` };
+  }
+}
+
+async function probeHostResolution(host) {
+  if (!host) return { ok: false, host: null, error: 'No host to resolve.' };
+  try {
+    const result = await dns.lookup(host);
+    return {
+      ok: true,
+      host,
+      address: result.address || null,
+      family: result.family || null,
+      error: null
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      host,
+      address: null,
+      family: null,
+      code: err.code || null,
+      error: err.message || String(err)
+    };
+  }
+}
+
+function describeSupabaseError(err, context = {}) {
+  const message = err && err.message ? err.message : String(err);
+  const cause = err && err.cause ? err.cause : null;
+  const details = {
+    message,
+    code: (cause && cause.code) || err.code || null,
+    errno: (cause && cause.errno) || err.errno || null,
+    syscall: (cause && cause.syscall) || err.syscall || null,
+    address: (cause && cause.address) || err.address || null,
+    host: context.host || null
+  };
+
+  if (details.code === 'ENOTFOUND') {
+    return {
+      ...details,
+      message: `Supabase host could not be resolved (DNS ENOTFOUND) for ${details.host || 'configured host'}.`,
+      error: `Supabase host could not be resolved (DNS ENOTFOUND) for ${details.host || 'configured host'}.`
+    };
+  }
+  if (message === 'fetch failed' && details.host) {
+    return {
+      ...details,
+      message: `Supabase request failed before response (network/TLS/connectivity issue) for host ${details.host}.`,
+      error: `Supabase request failed before response (network/TLS/connectivity issue) for host ${details.host}.`
+    };
+  }
+  return { ...details, error: details.message };
+}
+
 app.get('/api/production-closeout/status', async (_req, res) => {
   noStore(res);
+  const supabaseUrlInfo = parseSupabaseUrlHost();
+  const supabaseDns = await probeHostResolution(supabaseUrlInfo.host);
   const liveProofState = await findLatestLiveHeyGenProof();
   const liveProof = liveProofState.proof;
   const heygenAuth = getHeyGenAuthProfile();
@@ -2163,9 +2306,14 @@ app.get('/api/production-closeout/status', async (_req, res) => {
     },
     supabase: {
       configured: Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.evics_supabase_key)),
-      urlHost: process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).host : null,
+      url: supabaseUrlInfo.url,
+      urlHost: supabaseUrlInfo.host,
+      urlValid: supabaseUrlInfo.valid,
+      urlError: supabaseUrlInfo.error,
+      dns: supabaseDns,
       renderTable: null,
-      sharedTables: []
+      sharedTables: [],
+      blocker: null
     },
     heygen: {
       configured: heygenAuth.mode !== 'not_configured',
@@ -2181,16 +2329,37 @@ app.get('/api/production-closeout/status', async (_req, res) => {
     }
   };
 
+  const supabasePreflightBlocked = checks.supabase.configured && (!checks.supabase.urlValid || !checks.supabase.dns.ok);
+  if (supabasePreflightBlocked) {
+    checks.supabase.blocker = checks.supabase.urlValid
+      ? `Supabase host resolution failed (${checks.supabase.dns.code || 'UNKNOWN'}).`
+      : checks.supabase.urlError;
+    checks.supabase.renderTable = {
+      ok: false,
+      ...describeSupabaseError(new Error('fetch failed'), { host: checks.supabase.urlHost || null }),
+      note: 'Skipped live table probe because Supabase preflight failed.'
+    };
+    for (const table of ['evics_evie_entities', 'evics_evie_rankings', 'evics_evie_prompt_versions', 'evics_evie_scripts', 'evics_evie_render_jobs', 'evics_evie_evidence_records']) {
+      checks.supabase.sharedTables.push({
+        table,
+        ok: false,
+        error: checks.supabase.blocker,
+        note: 'Skipped live table probe because Supabase preflight failed.'
+      });
+    }
+    return res.json({ success: true, checks, timestamp: new Date().toISOString() });
+  }
+
   try {
     const { data, error } = await SupabaseConnector
       .from('evics_renders')
       .select('*')
       .limit(1);
     checks.supabase.renderTable = error
-      ? { ok: false, error: error.message }
+      ? { ok: false, ...describeSupabaseError(error, { host: checks.supabase.urlHost || null }) }
       : { ok: true, sampleColumns: data && data[0] ? Object.keys(data[0]) : [] };
   } catch (error) {
-    checks.supabase.renderTable = { ok: false, error: error.message };
+    checks.supabase.renderTable = { ok: false, ...describeSupabaseError(error, { host: checks.supabase.urlHost || null }) };
   }
 
   for (const table of ['evics_evie_entities', 'evics_evie_rankings', 'evics_evie_prompt_versions', 'evics_evie_scripts', 'evics_evie_render_jobs', 'evics_evie_evidence_records']) {
@@ -2198,9 +2367,11 @@ app.get('/api/production-closeout/status', async (_req, res) => {
       const { error } = await SupabaseConnector
         .from(table)
         .select('id', { count: 'exact', head: true });
-      checks.supabase.sharedTables.push({ table, ok: !error, error: error ? error.message : null });
+      checks.supabase.sharedTables.push(error
+        ? { table, ok: false, ...describeSupabaseError(error, { host: checks.supabase.urlHost || null }) }
+        : { table, ok: true, error: null });
     } catch (error) {
-      checks.supabase.sharedTables.push({ table, ok: false, error: error.message });
+      checks.supabase.sharedTables.push({ table, ok: false, ...describeSupabaseError(error, { host: checks.supabase.urlHost || null }) });
     }
   }
 
@@ -2463,8 +2634,39 @@ mountBillingRoutes(app);
 
 // ===== HEYGEN COST TRACKING ADMIN ROUTES =====
 
+function requireAdminAccess(req, res, next) {
+  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
+  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
+  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
+    if (!authEngine || typeof authEngine.validateToken !== 'function') {
+      return res.status(503).json({ success: false, error: 'Auth engine unavailable for admin authorization.' });
+    }
+    try {
+      const claims = authEngine.validateToken(authHeader);
+      if (String(claims.role || '').toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ success: false, error: 'Admin role required.' });
+      }
+      req.user = claims;
+      return next();
+    } catch (err) {
+      return res.status(401).json({ success: false, error: err.message });
+    }
+  }
+
+  res.status(401).json({
+    success: false,
+    error: 'Admin authorization required. Provide a valid Bearer token with ADMIN role or x-admin-key.'
+  });
+}
+
 // GET /api/admin/costs — full cost summary + unit economics
-app.get('/api/admin/costs', (req, res) => {
+app.get('/api/admin/costs', requireAdminAccess, (req, res) => {
   try {
     const summary = costTracker.getCostSummary();
     const unitEconomics = costTracker.getUnitEconomics();
@@ -2475,21 +2677,21 @@ app.get('/api/admin/costs', (req, res) => {
 });
 
 // GET /api/admin/costs/affiliate?code=X — per-affiliate cost breakdown
-app.get('/api/admin/costs/affiliate', (req, res) => {
+app.get('/api/admin/costs/affiliate', requireAdminAccess, (req, res) => {
   const code = req.query.code || req.query.affiliateCode || '';
   if (!code) return res.status(400).json({ success: false, error: 'code required' });
   res.json({ success: true, ...costTracker.getAffiliateCosts(code) });
 });
 
 // GET /api/admin/costs/unit-economics — standalone unit economics
-app.get('/api/admin/costs/unit-economics', (req, res) => {
+app.get('/api/admin/costs/unit-economics', requireAdminAccess, (req, res) => {
   res.json({ success: true, plans: costTracker.getUnitEconomics() });
 });
 
 // GET /api/admin/identity-chains — per-affiliate identity chain for admin visibility
 // Returns: profileId, voiceCloneId, voiceId, pictureUrl, avatarId, requestId,
 //          proofVideoId, proofStatus, lastUpdated for every known affiliate.
-app.get('/api/admin/identity-chains', (req, res) => {
+app.get('/api/admin/identity-chains', requireAdminAccess, (req, res) => {
   try {
     const profiles = getAffiliateProfiles();
     const requests = getAvatarRequests();
@@ -2526,7 +2728,7 @@ app.get('/api/admin/identity-chains', (req, res) => {
 });
 
 // GET /api/admin/avatar-requests — recent avatar requests with full chain detail
-app.get('/api/admin/avatar-requests', (req, res) => {
+app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
     const requests = getAvatarRequests().slice(0, limit);
@@ -6188,6 +6390,17 @@ app.get('/api/media/playback/:id', async (req, res) => {
   const cf = path.join(MEDIA_CACHE_DIR, `${id}.json`);
   if (fs.existsSync(cf)) { try { videoUrl = JSON.parse(fs.readFileSync(cf, 'utf8')).video_url; } catch {} }
   if (!videoUrl) { try { const { data } = await SupabaseConnector.from('evics_renders').select('video_url').eq('render_id', id).limit(1); if (data && data[0]) videoUrl = data[0].video_url; } catch {} }
+  if (!videoUrl) {
+    try {
+      const { data } = await SupabaseConnector
+        .from('ppep_media_jobs')
+        .select('output_media_url, outputMediaUrl, status')
+        .or(`job_id.eq.${id},id.eq.${id}`)
+        .limit(1);
+      const job = (data && data[0]) || null;
+      videoUrl = job && (job.output_media_url || job.outputMediaUrl || null);
+    } catch {}
+  }
   if (!videoUrl) return res.status(404).json({ error: 'Media not found' });
   const mp4 = path.join(MEDIA_CACHE_DIR, `${id}.mp4`);
   if (fs.existsSync(mp4)) {
@@ -6438,17 +6651,84 @@ app.post('/api/affiliate/avatar/re-render', async (req, res) => {
   }
 });
 
+const HEYGEN_AVATAR_CACHE_TTL_MS = parseInt(process.env.HEYGEN_AVATAR_CACHE_TTL_MS || `${60 * 1000}`, 10);
+const HEYGEN_AVATAR_CIRCUIT_THRESHOLD = parseInt(process.env.HEYGEN_AVATAR_CIRCUIT_THRESHOLD || '3', 10);
+const HEYGEN_AVATAR_CIRCUIT_COOLDOWN_MS = parseInt(process.env.HEYGEN_AVATAR_CIRCUIT_COOLDOWN_MS || `${30 * 1000}`, 10);
+const heygenAvatarState = {
+  avatars: null,
+  expiresAt: 0,
+  inFlight: null,
+  consecutiveFailures: 0,
+  circuitOpenUntil: 0
+};
+
+function mapHeygenAvatarResponse(payload) {
+  const list = (payload?.data?.avatars || payload?.avatars || [])
+    .slice(0, 30)
+    .map((x) => ({
+      id: x.avatar_id || x.id,
+      name: x.avatar_name || x.name || x.avatar_id,
+      gender: x.gender || 'unknown',
+      preview_url: x.preview_image_url || null
+    }))
+    .filter((x) => x.id);
+  return list;
+}
+
+async function getCachedHeygenAvatars(defaults) {
+  const now = Date.now();
+  if (heygenAvatarState.avatars && now < heygenAvatarState.expiresAt) {
+    return heygenAvatarState.avatars;
+  }
+  if (now < heygenAvatarState.circuitOpenUntil) {
+    return heygenAvatarState.avatars || defaults;
+  }
+  if (heygenAvatarState.inFlight) {
+    return heygenAvatarState.inFlight;
+  }
+
+  heygenAvatarState.inFlight = (async () => {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const r = await fetch('https://api.heygen.com/v3/avatars', {
+        signal: ctrl.signal,
+        headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, Accept: 'application/json' }
+      });
+      if (!r.ok) {
+        throw new Error(`HeyGen avatars request failed (${r.status})`);
+      }
+      const payload = await r.json();
+      const mapped = mapHeygenAvatarResponse(payload);
+      const avatars = mapped.length ? mapped : defaults;
+      heygenAvatarState.avatars = avatars;
+      heygenAvatarState.expiresAt = Date.now() + HEYGEN_AVATAR_CACHE_TTL_MS;
+      heygenAvatarState.consecutiveFailures = 0;
+      heygenAvatarState.circuitOpenUntil = 0;
+      return avatars;
+    } catch (err) {
+      heygenAvatarState.consecutiveFailures += 1;
+      if (heygenAvatarState.consecutiveFailures >= HEYGEN_AVATAR_CIRCUIT_THRESHOLD) {
+        heygenAvatarState.circuitOpenUntil = Date.now() + HEYGEN_AVATAR_CIRCUIT_COOLDOWN_MS;
+      }
+      console.warn('[heygen.avatars] Falling back to cached/default avatars:', err.message);
+      return heygenAvatarState.avatars || defaults;
+    } finally {
+      clearTimeout(timeout);
+      heygenAvatarState.inFlight = null;
+    }
+  })();
+
+  return heygenAvatarState.inFlight;
+}
+
 // GET /api/affiliate/avatars
 app.get('/api/affiliate/avatars', async (req, res) => {
   noStore(res);
   const defaults = [{ id: 'Abigail_expressive_2024112501', name: 'Abigail (Expressive)', gender: 'female', preview_url: null }, { id: 'Angela-inblackskirt-20220820', name: 'Angela', gender: 'female', preview_url: null }, { id: 'Tyler-incasualsuit-20220721', name: 'Tyler', gender: 'male', preview_url: null }];
   if (!process.env.HEYGEN_API_KEY) return res.json({ success: true, avatars: defaults });
-  try {
-    const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 6000);
-    const r = await fetch('https://api.heygen.com/v3/avatars', { signal: ctrl.signal, headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, Accept: 'application/json' } });
-    if (r.ok) { const d = await r.json(); const a = (d?.data?.avatars || d?.avatars || []).slice(0, 30).map((x) => ({ id: x.avatar_id || x.id, name: x.avatar_name || x.name || x.avatar_id, gender: x.gender || 'unknown', preview_url: x.preview_image_url || null })); return res.json({ success: true, avatars: a.length ? a : defaults }); }
-  } catch {}
-  res.json({ success: true, avatars: defaults });
+  const avatars = await getCachedHeygenAvatars(defaults);
+  res.json({ success: true, avatars });
 });
 
 // POST /api/affiliate/avatar/upload-photo — accepts multipart photo from Expo FileSystem.uploadAsync
@@ -7495,6 +7775,9 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const {
       affiliateCode,
       avatarRequestId,
+      avatarId: requestedAvatarId,
+      avatarAttire,
+      avatarAttireLabel,
       productId,
       productHandle,
       productTitle,
@@ -7502,7 +7785,15 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       productPageUrl,
       productPrice,
       platform,
-      customScript
+      customScript,
+      qualityMode,
+      cinematicMode,
+      cinematicEngine,
+      cinematicProfile,
+      cinematicIntensity,
+      backgroundMode,
+      backgroundUrl,
+      backgroundQuery
     } = req.body || {};
 
     const cleanCode = String(affiliateCode || '').trim().toUpperCase();
@@ -7533,6 +7824,24 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
       }
     }
+    if (!avatarRecord && requestedAvatarId) {
+      const galleryRecords = await getAvatarGalleryRecords(cleanCode);
+      const selected = galleryRecords.find((entry) => (
+        String(entry.requestId || '') === String(requestedAvatarId || '')
+        || String(entry.id || '') === String(requestedAvatarId || '')
+        || String(entry.avatarId || '') === String(requestedAvatarId || '')
+        || String(entry.heygenAvatarId || '') === String(requestedAvatarId || '')
+      ));
+      if (selected && selected.requestId) {
+        avatarRecord = findAvatarRequest(selected.requestId);
+      }
+      if (!avatarRecord) {
+        return res.status(400).json({
+          success: false,
+          error: 'The selected avatar could not be resolved. Re-select a completed avatar and try again.'
+        });
+      }
+    }
     if (!avatarRecord) {
       // Fall back to latest completed avatar for this affiliate ONLY
       const allRecords = await getAvatarGalleryRecords(cleanCode);
@@ -7552,9 +7861,30 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     // Resolve avatar metadata
     const avatarName = avatarRecord.name || avatarRecord.avatar?.name || 'Affiliate Avatar';
     const avatarId = avatarRecord.avatar?.avatarId || avatarRecord.avatar?.id || null;
-    // Prefer talking_photo_id; if unavailable, use avatar_id as render identity.
     const talkingPhotoId = avatarRecord.avatar?.talkingPhotoId || avatarRecord.talkingPhotoId || null;
-    if (!talkingPhotoId && !avatarId) {
+    const avatarIdLooksSynthetic = Boolean(
+      avatarId && (
+        /^avatar_\d+_/i.test(String(avatarId))
+        || /^avreq_/i.test(String(avatarId))
+        || /^req_/i.test(String(avatarId))
+        || /^nav_/i.test(String(avatarId))
+        || /^evics_native_/i.test(String(avatarId))
+      )
+    );
+    const avatarIdForRender = avatarIdLooksSynthetic ? null : avatarId;
+    const resolvedAttire = normalizeAvatarAttire(
+      avatarRecord.avatar?.attire
+      || avatarRecord.attire
+      || (avatarAttire && typeof avatarAttire === 'object' ? avatarAttire : null)
+    );
+    const resolvedAttireLabel = String(
+      avatarAttireLabel
+      || avatarRecord.avatar?.attireLabel
+      || avatarRecord.attireLabel
+      || formatAttireSummary(resolvedAttire)
+      || 'Professional'
+    ).trim();
+    if (!talkingPhotoId && !avatarIdForRender) {
       return res.status(400).json({
         success: false,
         error: 'Avatar does not have a usable render identity. Re-create your avatar from your uploaded profile photo before generating product videos.'
@@ -7567,54 +7897,137 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const resolvedProductPage = productPageUrl || avatarRecord.productPageUrl || '';
     const resolvedProductPrice = productPrice || null;
     const resolvedPlatform = platform || avatarRecord.platform || 'tiktok';
+    const renderQualityMode = String(qualityMode || avatarRecord.avatar?.renderQualityMode || 'elite').trim().toLowerCase() || 'elite';
+    const cinematicRequested = Boolean(cinematicMode) || renderQualityMode === 'elite';
 
-    // Generate a compelling product script
-    const script = customScript || generateProductVideoScript({
-      productTitle: resolvedProductTitle,
-      productPageUrl: resolvedProductPage,
-      platform: resolvedPlatform
-    });
+    // Generate a compelling product script.
+    let script = String(customScript || '').trim();
+    if (!script) {
+      if (cinematicRequested) {
+        try {
+          const scriptResult = await generateViralScript({
+            title: resolvedProductTitle,
+            product: {
+              title: resolvedProductTitle,
+              imageUrl: resolvedProductImage,
+              product_type: productHandle || ''
+            },
+            platform: resolvedPlatform,
+            affiliateCode: cleanCode
+          });
+          script = String(scriptResult?.scriptText || '').trim();
+        } catch (_) {}
+      }
+      if (!script) {
+        script = generateProductVideoScript({
+          productTitle: resolvedProductTitle,
+          productPageUrl: resolvedProductPage,
+          platform: resolvedPlatform
+        });
+      }
+    }
+
+    let processedProductImageUrl = null;
+    if (resolvedProductImage) {
+      try {
+        const bgResult = await removeBackground(resolvedProductImage);
+        processedProductImageUrl = bgResult.processedUrl || resolvedProductImage;
+        if (processedProductImageUrl && processedProductImageUrl.startsWith('/processed-images/')) {
+          const host = process.env.EVICS_HOST || process.env.HOST || `https://evics-api-480958062306.us-central1.run.app`;
+          processedProductImageUrl = `${host}${processedProductImageUrl}`;
+        }
+      } catch {
+        processedProductImageUrl = resolvedProductImage;
+      }
+    }
+
+    let resolvedBackground = null;
+    let heygenBackground = { type: 'color', value: '#0b1016' };
+    if (cinematicRequested) {
+      const productObj = { title: resolvedProductTitle, imageUrl: resolvedProductImage, product_type: productHandle || '' };
+      if (backgroundUrl) {
+        const rawBgUrl = backgroundQuery
+          ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(backgroundQuery)}&sig=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          : backgroundUrl;
+        const directBgUrl = await resolveBackgroundUrl(rawBgUrl);
+        resolvedBackground = {
+          type: 'image',
+          mode: 'user-selected',
+          category: 'custom',
+          url: directBgUrl,
+          query: backgroundQuery || null
+        };
+      } else {
+        const mode = processedProductImageUrl ? 'product' : (String(backgroundMode || '').toLowerCase() === 'color' ? 'color' : 'lifestyle');
+        resolvedBackground = selectBackground(productObj, processedProductImageUrl || resolvedProductImage, mode);
+        if (resolvedBackground && resolvedBackground.url && resolvedBackground.url.includes('source.unsplash.com')) {
+          resolvedBackground.url = await resolveBackgroundUrl(resolvedBackground.url);
+        }
+      }
+      heygenBackground = toHeyGenBackground(resolvedBackground);
+    }
 
     // Use the affiliate's voice clone if available, otherwise fall back to default
     const defaultVoice = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
     const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
     let voiceId = cloneVoice || defaultVoice;
 
-    // Build the HeyGen request payload using the affiliate's render identity.
-    const buildPayload = (vid) => {
-      const characterPayload = talkingPhotoId
-        ? { type: 'talking_photo', talking_photo_id: talkingPhotoId }
-        : { type: 'avatar', avatar_id: avatarId, avatar_style: 'normal' };
-      return {
-        video_inputs: [{
-          character: characterPayload,
-          voice: {
-            type: 'text',
-            input_text: script,
-            voice_id: vid
+    // Render with avatar_id when possible so selected avatar styling/attire is preserved.
+    // Fall back to talking_photo for older records missing avatar IDs.
+    const attemptAvatarRender = async (vid) => startHeyGenRender({
+      script,
+      avatar_id: avatarIdForRender,
+      voice_id: vid,
+      config: {
+        aspect: resolvedPlatform === 'facebook' ? '16:9' : '9:16',
+        background: heygenBackground,
+        caption: true,
+        test: false
+      }
+    });
+    const attemptTalkingPhotoRender = async (vid) => heygenApiJson('/v2/video/generate', {
+      video_inputs: [{
+        character: { type: 'talking_photo', talking_photo_id: talkingPhotoId },
+        voice: { type: 'text', input_text: script, voice_id: vid }
+      }],
+      dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 },
+      caption: true
+    });
+
+    const isRecoverableAvatarRenderError = (err) => /avatar|character|not\s*found|invalid|does not exist|failed to resolve/i.test(String(err && err.message || ''));
+    const renderWithVoice = async (vid) => {
+      if (avatarIdForRender) {
+        try {
+          return await attemptAvatarRender(vid);
+        } catch (avatarErr) {
+          if (talkingPhotoId && isRecoverableAvatarRenderError(avatarErr)) {
+            console.warn(`[ProductVideo] Avatar render failed for avatarId=${avatarIdForRender}; falling back to talking_photo_id=${talkingPhotoId}.`);
+            return attemptTalkingPhotoRender(vid);
           }
-        }],
-        dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 },
-        caption: true
-      };
+          throw avatarErr;
+        }
+      }
+      if (talkingPhotoId) {
+        return attemptTalkingPhotoRender(vid);
+      }
+      throw new Error('No usable avatar render identity is available.');
     };
 
-    // Render via HeyGen v2/video/generate — try clone voice, fall back to default
     let videoResult = null;
     try {
-      videoResult = await heygenApiJson('/v2/video/generate', buildPayload(voiceId));
+      videoResult = await renderWithVoice(voiceId);
     } catch (voiceErr) {
       // If voice clone is invalid, retry with default voice
       if (cloneVoice && voiceId !== defaultVoice && /voice.*not found|invalid.*voice/i.test(voiceErr.message)) {
         console.log(`[ProductVideo] Voice clone ${voiceId} invalid, falling back to default voice.`);
         voiceId = defaultVoice;
-        videoResult = await heygenApiJson('/v2/video/generate', buildPayload(voiceId));
+        videoResult = await renderWithVoice(voiceId);
       } else {
         throw voiceErr;
       }
     }
 
-    const videoId = videoResult?.data?.video_id || null;
+    const videoId = videoResult?.video_id || videoResult?.data?.video_id || null;
     if (!videoId) {
       return res.status(500).json({ success: false, error: 'HeyGen did not return a video ID.' });
     }
@@ -7654,6 +8067,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       avatarRequestId: avatarRequestId || avatarRecord.requestId || null,
       avatarName,
       avatarId,
+      avatarAttire: resolvedAttire,
+      avatarAttireLabel: resolvedAttireLabel,
       photoUrl,
       voiceId,
       voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
@@ -7665,6 +8080,13 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       productPageUrl: resolvedProductPage,
       platform: resolvedPlatform,
       script,
+      renderQualityMode,
+      cinematicMode: cinematicRequested ? 'elite' : 'standard',
+      cinematicEngine: String(cinematicEngine || 'seedance2-style').trim(),
+      cinematicProfile: String(cinematicProfile || 'auto').trim().toLowerCase() || 'auto',
+      cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
+      background: resolvedBackground,
+      processedProductImageUrl: processedProductImageUrl || null,
       qualityScore,
       metadata,
       status: 'rendering',
@@ -7696,11 +8118,19 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       avatarName,
       avatarId,
       avatarPhotoUrl: photoUrl,
+      avatarAttire: resolvedAttire,
+      avatarAttireLabel: resolvedAttireLabel,
       voiceId,
       voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
       productTitle: resolvedProductTitle,
       productPrice: resolvedProductPrice,
       platform: resolvedPlatform,
+      renderQualityMode,
+      cinematicMode: cinematicRequested ? 'elite' : 'standard',
+      cinematicEngine: String(cinematicEngine || 'seedance2-style').trim(),
+      cinematicProfile: String(cinematicProfile || 'auto').trim().toLowerCase() || 'auto',
+      cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
+      background: resolvedBackground,
       qualityScore,
       metadata
     });
@@ -7801,6 +8231,75 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
     success: true,
     ...ensureVideoMetadata(record)
   });
+});
+
+// GET /api/affiliate/render-status/stream — SSE stream for avatar/product render progress
+app.get('/api/affiliate/render-status/stream', async (req, res) => {
+  noStore(res);
+  const kind = String(req.query.kind || '').trim().toLowerCase();
+  const id = String(req.query.id || req.query.videoJobId || req.query.videoId || '').trim();
+  const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
+  if (!id) return res.status(400).json({ success: false, error: 'id is required' });
+  if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required' });
+  if (kind !== 'avatar' && kind !== 'product') {
+    return res.status(400).json({ success: false, error: 'kind must be "avatar" or "product"' });
+  }
+
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers.host || `localhost:${PORT}`;
+  const statusPath = kind === 'avatar'
+    ? `/api/affiliate/avatar/video-status/${encodeURIComponent(id)}?affiliateCode=${encodeURIComponent(affiliateCode)}`
+    : `/api/affiliate/product-video/status/${encodeURIComponent(id)}?affiliateCode=${encodeURIComponent(affiliateCode)}`;
+  const statusUrl = `${protocol}://${host}${statusPath}`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
+
+  let closed = false;
+  let timer = null;
+
+  const sendStatus = async () => {
+    if (closed) return;
+    try {
+      const statusRes = await fetch(statusUrl, { headers: { Accept: 'application/json' } });
+      const payload = await statusRes.json().catch(() => ({ success: false, error: 'Invalid JSON status payload' }));
+      const eventPayload = {
+        kind,
+        id,
+        affiliateCode,
+        httpStatus: statusRes.status,
+        timestamp: new Date().toISOString(),
+        ...payload
+      };
+      res.write(`event: status\n`);
+      res.write(`data: ${JSON.stringify(eventPayload)}\n\n`);
+
+      const terminal = payload && (payload.status === 'completed' || payload.status === 'failed');
+      if (terminal || statusRes.status >= 400) {
+        res.write(`event: end\n`);
+        res.write(`data: ${JSON.stringify({ kind, id, done: true, timestamp: new Date().toISOString() })}\n\n`);
+        if (timer) clearInterval(timer);
+        res.end();
+      }
+    } catch (err) {
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ success: false, error: err.message, timestamp: new Date().toISOString() })}\n\n`);
+      if (timer) clearInterval(timer);
+      res.end();
+    }
+  };
+
+  req.on('close', () => {
+    closed = true;
+    if (timer) clearInterval(timer);
+  });
+
+  await sendStatus();
+  timer = setInterval(sendStatus, 2000);
 });
 
 // GET /api/affiliate/product-videos — list all product videos for an affiliate
@@ -7972,6 +8471,69 @@ function ensureVideoMetadata(record) {
     upsertProductVideoRecord(record);
   }
   return record;
+}
+
+function normalizePhoneRenderFeedItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const affiliateCode = normalizeAffiliateCode(item.affiliateCode || item.affiliateId || item.affiliate_id || '');
+  const renderId = String(
+    item.id
+    || item.videoJobId
+    || item.video_id
+    || item.videoId
+    || item.job_id
+    || item.jobId
+    || item.heygenVideoId
+    || ''
+  ).trim();
+  const heygenVideoId = String(item.heygenVideoId || item.video_id || item.videoId || '').trim() || null;
+  const videoUrl = String(
+    item.gcsVideoUrl
+    || item.videoUrl
+    || item.video_url
+    || item.outputMediaUrl
+    || item.output_media_url
+    || item.playbackUrl
+    || (item.asset && (item.asset.playbackUrl || item.asset.downloadUrl || item.asset.shareUrl))
+    || ''
+  ).trim() || null;
+  const thumbnailUrl = String(
+    item.thumbnailUrl
+    || item.thumbnail_url
+    || item.posterUrl
+    || item.poster_url
+    || item.photoUrl
+    || ''
+  ).trim() || null;
+  let background = item.background || null;
+  if (typeof background === 'string') {
+    try { background = JSON.parse(background); } catch { background = null; }
+  }
+  return {
+    ...item,
+    id: renderId || null,
+    affiliateCode,
+    video_id: heygenVideoId || renderId || null,
+    videoId: heygenVideoId || renderId || null,
+    job_id: item.job_id || item.jobId || renderId || null,
+    jobId: item.jobId || item.job_id || renderId || null,
+    videoUrl,
+    video_url: videoUrl,
+    outputMediaUrl: videoUrl || item.outputMediaUrl || item.output_media_url || null,
+    output_media_url: videoUrl || item.output_media_url || item.outputMediaUrl || null,
+    playbackUrl: videoUrl || (renderId ? `/api/media/playback/${encodeURIComponent(heygenVideoId || renderId)}` : null),
+    asset: videoUrl
+      ? { playbackUrl: videoUrl, downloadUrl: videoUrl, shareUrl: videoUrl }
+      : (renderId ? { playbackUrl: `/api/media/playback/${encodeURIComponent(heygenVideoId || renderId)}` } : null),
+    thumbnailUrl,
+    thumbnail_url: thumbnailUrl,
+    media_type: item.media_type || item.mediaType || 'video',
+    type: item.type || item.media_type || 'video',
+    background,
+    created_at: item.created_at || item.createdAt || null,
+    createdAt: item.createdAt || item.created_at || null,
+    title: item.title || item.productTitle || item.product_name || item.product || item.name || renderId || 'Untitled'
+  };
 }
 
 function generateProductVideoScript({ productTitle, productPageUrl, platform }) {
@@ -8252,12 +8814,22 @@ app.get('/api/renders/phone-app', (req, res) => {
       return res.json({ success: true, count: 0, renders: [] });
     }
     const files = fs.readdirSync(MEDIA_CACHE_DIR).filter(f => f.endsWith('.json'));
-    const renders = files.map(f => {
-      try { return JSON.parse(fs.readFileSync(path.join(MEDIA_CACHE_DIR, f), 'utf8')); } catch { return null; }
-    })
-      .filter(Boolean)
-      .filter((item) => !affiliateCode || normalizeAffiliateCode(item.affiliateCode || item.affiliateId || '') === affiliateCode)
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    const cachedRenders = files.map((f) => {
+      try { return normalizePhoneRenderFeedItem(JSON.parse(fs.readFileSync(path.join(MEDIA_CACHE_DIR, f), 'utf8'))); } catch { return null; }
+    }).filter(Boolean);
+    const productVideoRenders = Array.from(PRODUCT_VIDEO_RECORDS.values())
+      .map((record) => normalizePhoneRenderFeedItem(record))
+      .filter(Boolean);
+    const mergedById = new Map();
+    for (const item of cachedRenders.concat(productVideoRenders)) {
+      const key = String(item.id || item.video_id || item.job_id || '').trim();
+      if (!key) continue;
+      const existing = mergedById.get(key);
+      mergedById.set(key, existing ? { ...existing, ...item } : item);
+    }
+    const renders = Array.from(mergedById.values())
+      .filter((item) => !affiliateCode || normalizeAffiliateCode(item.affiliateCode || item.affiliateId || item.affiliate_id || '') === affiliateCode)
+      .sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
     res.json({ success: true, count: renders.length, renders: renders.slice(0, 50) });
   } catch {
     res.json({ success: true, count: 0, renders: [] });
