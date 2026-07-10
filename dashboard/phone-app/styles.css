@@ -656,7 +656,7 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
 /* ── Product selection ─────────────────────────────────────────────────────── */
 .product-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(200px, 260px));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -1458,3 +1458,42 @@ h2 { font-size: 16px; font-weight: 700; color: var(--text); }
   border: 1px solid rgba(255,255,255,.08);
 }
 .caption-srt-btn:hover { opacity: .92; transform: translateY(-1px); }
+
+/* ── Phone App Two-Tab Navigation ── */
+.phone-tab-bar {
+  display: flex;
+  gap: 0;
+  background: #0f1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0 0 24px 0;
+}
+.phone-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255,255,255,0.45);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  text-align: center;
+  font-family: inherit;
+}
+.phone-tab:hover {
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.04);
+}
+.phone-tab.phone-tab-active {
+  color: #fff;
+  border-bottom-color: #7c3aed;
+  background: rgba(124,58,237,0.12);
+}
+#phoneStudioSection,
+#phoneProductionSection {
+  display: block;
+}

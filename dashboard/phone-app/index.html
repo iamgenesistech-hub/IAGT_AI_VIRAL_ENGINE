@@ -76,6 +76,13 @@
           </div>
         </div>
 
+        <!-- ── Phone App Two-Tab Navigation ── -->
+        <div class="phone-tab-bar">
+          <button type="button" class="phone-tab phone-tab-active" id="phoneTabStudio" data-tab="studio">🧬 Avatar Studio</button>
+          <button type="button" class="phone-tab" id="phoneTabProduction" data-tab="production">🎬 Production Board</button>
+        </div>
+
+        <div id="phoneStudioSection">
         <div class="panel">
           <div class="panel-head">
             <div>
@@ -327,7 +334,7 @@
 
           <div class="create-avatar-action" id="phoneCreateAvatarSection">
             <div class="step-label" style="margin-bottom:6px"><span class="step-num">4</span> Verify Identity &amp; Create Avatar</div>
-            <div class="binding-badge" id="phoneAvatarBindingBadge">Profile ID: pending · Voice ID: pending</div>
+            <div class="binding-badge" id="phoneAvatarBindingBadge">Profile ID: pending · Voice ID: pending · Render: Elite A+</div>
             <button type="button" id="phoneCreateAvatarBtn" class="control-btn create-avatar-btn state-off">
               🚀 Create My Avatar
             </button>
@@ -374,7 +381,9 @@
             </div>
           </div>
         </div>
+        </div><!-- /phoneStudioSection -->
 
+        <div id="phoneProductionSection">
         <div class="panel">
           <div class="panel-head">
             <div>
@@ -392,6 +401,17 @@
               <option value="instagram">Instagram Reels 9:16</option>
               <option value="youtube">YouTube Shorts 9:16</option>
               <option value="facebook">Facebook Feed 16:9</option>
+            </select>
+            <select id="phoneCinematicProfileSelect">
+              <option value="auto" selected>Cinematic: Auto (Smart Match)</option>
+              <option value="conversion">Cinematic: Conversion Driver</option>
+              <option value="story">Cinematic: Story Authority</option>
+              <option value="showcase">Cinematic: Premium Showcase</option>
+            </select>
+            <select id="phoneCinematicIntensitySelect">
+              <option value="1">Intensity: Level 1 (Clean)</option>
+              <option value="2" selected>Intensity: Level 2 (Balanced)</option>
+              <option value="3">Intensity: Level 3 (High Impact)</option>
             </select>
           </div>
           <div id="phoneProductList" class="product-grid">
@@ -668,6 +688,7 @@
             </div>
           </div>
         </div>
+        </div><!-- /phoneProductionSection -->
 
         <div class="panel">
           <div class="chat-head">

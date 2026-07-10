@@ -40,6 +40,8 @@
   const productMonitor = document.getElementById('phoneProductMonitor');
   const productSearchInput = document.getElementById('phoneProductSearch');
   const platformSelect = document.getElementById('phonePlatformSelect');
+  const cinematicProfileSelect = document.getElementById('phoneCinematicProfileSelect');
+  const cinematicIntensitySelect = document.getElementById('phoneCinematicIntensitySelect');
   const productList = document.getElementById('phoneProductList');
   const productDetails = document.getElementById('phoneProductDetails');
   const productImage = document.getElementById('phoneProductImage');
@@ -85,6 +87,29 @@
   const productVideoScript = document.getElementById('phoneProductVideoScript');
   const productVideoRefreshBtn = document.getElementById('phoneProductVideoRefresh');
   const modalState = { open: false, item: null };
+
+  // ── Two-Tab Navigation ──────────────────────────────────────────────
+  const studioSection = document.getElementById('phoneStudioSection');
+  const productionSection = document.getElementById('phoneProductionSection');
+  const tabStudioBtn = document.getElementById('phoneTabStudio');
+  const tabProductionBtn = document.getElementById('phoneTabProduction');
+
+  function switchPhoneTab(tab) {
+    const toStudio = tab === 'studio';
+    if (studioSection) studioSection.style.display = toStudio ? '' : 'none';
+    if (productionSection) productionSection.style.display = toStudio ? 'none' : '';
+    if (tabStudioBtn) tabStudioBtn.classList.toggle('phone-tab-active', toStudio);
+    if (tabProductionBtn) tabProductionBtn.classList.toggle('phone-tab-active', !toStudio);
+    try { localStorage.setItem('phoneActiveTab', tab); } catch (_) {}
+  }
+
+  if (tabStudioBtn) tabStudioBtn.addEventListener('click', () => switchPhoneTab('studio'));
+  if (tabProductionBtn) tabProductionBtn.addEventListener('click', () => switchPhoneTab('production'));
+
+  // Restore last active tab (default: studio)
+  const savedPhoneTab = (function () { try { return localStorage.getItem('phoneActiveTab'); } catch (_) { return null; } })();
+  switchPhoneTab(savedPhoneTab === 'production' ? 'production' : 'studio');
+  // ────────────────────────────────────────────────────────────────────
   const CONTROL_STANDBY_MS = 60000;
   const controlTimers = new Map();
   const voiceRecordState = {
@@ -109,6 +134,9 @@
       profileId: '',
       voiceCloneId: '',
       voiceId: '',
+      qualityMode: 'elite',
+      cinematicProfile: 'auto',
+      cinematicIntensity: 2,
       avatarId: '',
       requestId: '',
       nativeAvatarJobId: '',
@@ -215,14 +243,96 @@
     return String(item.media_type || item.mediaType || item.type || item.assetType || 'video').toLowerCase();
   }
 
+  function renderTitleOf(item) {
+    return String(
+      item.scriptTitle
+      || item.productTitle
+      || item.product_name
+      || item.product
+      || item.title
+      || item.name
+      || item.id
+      || item.video_id
+      || item.videoId
+      || item.job_id
+      || item.jobId
+      || 'Untitled'
+    ).trim();
+  }
+
+  function renderPlatformOf(item) {
+    return String(
+      item.platform
+      || item.channel
+      || item.primaryPlatform
+      || (item.metadata && item.metadata.primaryPlatform)
+      || 'unknown'
+    ).trim().toLowerCase();
+  }
+
+  function mediaIdentityOf(item) {
+    return String(
+      item.video_id
+      || item.videoId
+      || item.heygenVideoId
+      || item.videoJobId
+      || item.job_id
+      || item.jobId
+      || item.id
+      || ''
+    ).trim();
+  }
+
+  function isSafeMediaUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    if (raw.startsWith('/')) return true;
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
   function mediaUrlOf(item) {
-    return item.video_url || item.videoUrl || item.playbackUrl || item.previewUrl || item.preview_url || item.storage_url || item.storageUrl || null;
+    const candidates = [
+      item.video_url,
+      item.videoUrl,
+      item.output_media_url,
+      item.outputMediaUrl,
+      item.output_url,
+      item.outputUrl,
+      item.media_url,
+      item.mediaUrl,
+      item.gcsVideoUrl,
+      item.heygenVideoUrl,
+      item.playbackUrl,
+      item.previewUrl,
+      item.preview_url,
+      item.storage_url,
+      item.storageUrl,
+      item.sourceUrl,
+      item.url,
+      item.asset && item.asset.playbackUrl,
+      item.asset && item.asset.downloadUrl,
+      item.asset && item.asset.shareUrl
+    ];
+    for (const candidate of candidates) {
+      if (isSafeMediaUrl(candidate)) return String(candidate).trim();
+    }
+    const mediaId = mediaIdentityOf(item);
+    if (mediaId) {
+      // Fallback playback resolver for cache-backed jobs that only expose IDs.
+      return `/api/media/playback/${encodeURIComponent(mediaId)}`;
+    }
+    return null;
   }
 
   function mediaSurface(item) {
     const type = mediaTypeOf(item);
     const source = mediaUrlOf(item);
-    const title = item.productTitle || item.product || item.scriptTitle || item.id || 'Media item';
+    const title = renderTitleOf(item) || 'Media item';
     if (source) {
       if (type === 'video' || type === 'ugc') {
         return `<video src="${source}" controls playsinline class="review-video"></video>`;
@@ -236,9 +346,13 @@
       return `<img src="${source}" alt="${title}" class="review-image" />`;
     }
 
+    const status = String(item.status || item.videoStatus || '').toLowerCase();
+    const statusHint = (status === 'rendering' || status === 'processing' || status === 'pending')
+      ? 'Render is still in progress. Tap refresh in the phone monitor, then reopen review.'
+      : 'Preview source pending. Metadata and type surface verified.';
     return `<div class="review-surface">
       <h4>Media review surface</h4>
-      <p>${item.scriptTitle || item.productTitle || item.product || 'Preview source pending. Metadata and type surface verified.'}</p>
+      <p>${renderTitleOf(item) || statusHint}</p>
     </div>`;
   }
 
@@ -254,9 +368,9 @@
     modalState.open = true;
     modalState.item = item;
     const status = item.status || item.videoStatus || 'pending';
-    const platform = item.platform || item.channel || 'unknown';
+    const platform = renderPlatformOf(item);
     const created = item.created_at || item.createdAt;
-    const title = item.productTitle || item.product || item.scriptTitle || item.id || 'Untitled';
+    const title = renderTitleOf(item);
     const modal = document.createElement('div');
     modal.id = 'phoneReviewModal';
     modal.className = 'review-overlay';
@@ -505,6 +619,9 @@
       supportState.avatarSetup.profileId = String(parsed.profileId || '').trim() || '';
       supportState.avatarSetup.voiceCloneId = String(parsed.voiceCloneId || '').trim() || '';
       supportState.avatarSetup.voiceId = String(parsed.voiceId || '').trim() || '';
+      supportState.avatarSetup.qualityMode = String(parsed.qualityMode || 'elite').trim().toLowerCase() || 'elite';
+      supportState.avatarSetup.cinematicProfile = String(parsed.cinematicProfile || 'auto').trim().toLowerCase() || 'auto';
+      supportState.avatarSetup.cinematicIntensity = Math.max(1, Math.min(3, parseInt(parsed.cinematicIntensity, 10) || 2));
       supportState.avatarSetup.avatarId = String(parsed.avatarId || '').trim() || '';
       supportState.avatarSetup.requestId = String(parsed.requestId || '').trim() || '';
       supportState.avatarSetup.nativeAvatarJobId = String(parsed.nativeAvatarJobId || '').trim() || '';
@@ -613,6 +730,7 @@
         parts.push(supportState.avatarSetup.voiceFileUrl ? formatVoiceTimestamp(supportState.avatarSetup.voiceFileUpdatedAt) : 'Voice pending');
         parts.push(supportState.avatarSetup.selectedProduct ? `Product: ${supportState.avatarSetup.selectedProduct.title || 'selected'}` : 'Product pending');
         parts.push(`Platform: ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`);
+        parts.push(`Cinematic: ${supportState.avatarSetup.cinematicProfile || 'auto'} · L${supportState.avatarSetup.cinematicIntensity || 2}`);
         if (supportState.avatarSetup.avatarId) parts.push(`Avatar: ${supportState.avatarSetup.avatarId}`);
         avatarMonitor.textContent = parts.join(' · ');
       }
@@ -625,9 +743,11 @@
           supportState.avatarSetup.createdAvatar?.voiceId ||
           ''
         ).trim();
+        const qualityMode = String(supportState.avatarSetup.qualityMode || 'elite').trim().toLowerCase() || 'elite';
+        const qualityLabel = qualityMode === 'elite' ? 'Elite A+' : qualityMode === 'balanced' ? 'Balanced' : 'Speed';
         avatarBindingBadge.textContent = profileId
-          ? `Profile ID: ${profileId} · Voice ID: ${voiceId || 'pending'}`
-          : 'Profile ID: pending · Voice ID: pending';
+          ? `Profile ID: ${profileId} · Voice ID: ${voiceId || 'pending'} · Render: ${qualityLabel}`
+          : `Profile ID: pending · Voice ID: pending · Render: ${qualityLabel}`;
       }
       if (avatarCreatedCard && avatarCreatedTitle && avatarCreatedMeta && avatarReturnLink) {
         const created = supportState.avatarSetup.createdAvatar;
@@ -777,7 +897,8 @@
       proofVideoId,
       proofVideoUrl,
       proofThumbnailUrl: photoUrl,
-      proofStatus: proofVideoUrl ? 'completed' : (proofVideoId ? 'rendering' : 'pending')
+      proofStatus: proofVideoUrl ? 'completed' : (proofVideoId ? 'rendering' : 'pending'),
+      renderQualityMode: String(item && item.renderQualityMode || 'elite').trim().toLowerCase() || 'elite'
     };
   }
 
@@ -791,7 +912,13 @@
     }
     avatarLibraryPreview.classList.remove('hidden');
     avatarLibraryPreviewTitle.textContent = item.name || 'Affiliate avatar';
-    avatarLibraryPreviewMeta.textContent = statusText || (item.proofVideoUrl ? 'Proof ready to play.' : 'Rendering proof video for this avatar…');
+    const renderModeLabel = item.renderQualityMode === 'balanced'
+      ? 'Balanced'
+      : item.renderQualityMode === 'speed'
+        ? 'Speed'
+        : 'Elite A+';
+    avatarLibraryPreviewMeta.textContent = statusText
+      || (item.proofVideoUrl ? `Proof ready to play · ${renderModeLabel}` : `Rendering proof video for this avatar · ${renderModeLabel}`);
     avatarLibraryPreviewPrompt.textContent = item.proofStatus === 'completed'
       ? "This is my avatar, and it's time to get this blessing flowing!"
       : "Proof video is being rendered with your voice and photo.";
@@ -930,6 +1057,8 @@
         avatarId: item.avatarId || item.id,
         name: item.name,
         script: proofScript
+        ,
+        qualityMode: supportState.avatarSetup.qualityMode || 'elite'
       })
     });
     const status = String(response.status || '').toLowerCase();
@@ -996,7 +1125,27 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.success === false) throw new Error(payload.error || `Request failed: ${response.status}`);
       supportState.productVideos = Array.isArray(payload.videos)
-        ? payload.videos.filter((item) => isOwnedByActiveAffiliate(item))
+        ? payload.videos
+          .filter((item) => isOwnedByActiveAffiliate(item))
+          .map((item) => {
+            const directVideoUrl = [
+              item.videoUrl,
+              item.video_url,
+              item.outputMediaUrl,
+              item.output_media_url,
+              item.mediaUrl,
+              item.media_url,
+              item.playbackUrl,
+              item.previewUrl,
+              item.preview_url
+            ].find((value) => isSafeMediaUrl(value));
+            const resolvedThumb = item.thumbnailUrl || item.thumbnail_url || item.posterUrl || item.poster_url || '';
+            return {
+              ...item,
+              videoUrl: directVideoUrl ? String(directVideoUrl).trim() : '',
+              thumbnailUrl: resolvedThumb
+            };
+          })
         : [];
       renderProductVideoGallery();
     } catch (error) {
@@ -1201,6 +1350,9 @@
       if (item.avatarName || item.photoUrl) {
         metaLines.push(`🧑 Avatar: ${item.avatarName || 'Affiliate Avatar'}`);
       }
+      if (item.avatarAttireLabel) {
+        metaLines.push(`👔 Attire: ${item.avatarAttireLabel}`);
+      }
       // Voice ID used
       if (item.voiceId) {
         const voiceLabel = item.voiceType === 'clone' ? `Cloned Voice (${item.voiceId.substring(0, 8)}…)` : `Stock Voice (${item.voiceId.substring(0, 8)}…)`;
@@ -1210,6 +1362,81 @@
       if (item.qualityScore !== undefined && item.qualityScore !== null) {
         const scoreColor = item.qualityScore >= 80 ? '🟢' : item.qualityScore >= 60 ? '🟡' : '🔴';
         metaLines.push(`${scoreColor} AI Quality Score: ${item.qualityScore}/100`);
+      }
+      if (item.renderQualityMode) {
+        const renderModeLabel = item.renderQualityMode === 'elite'
+          ? 'Elite A+'
+          : item.renderQualityMode === 'balanced'
+            ? 'Balanced'
+            : 'Speed';
+        metaLines.push(`🎬 Render Profile: ${renderModeLabel}`);
+      }
+      if (item.background && typeof item.background === 'object') {
+        const bgMode = item.background.mode || item.background.type || 'dynamic';
+        const bgCategory = item.background.category ? ` · ${item.background.category}` : '';
+        metaLines.push(`🖼️ AI Background: ${bgMode}${bgCategory}`);
+      }
+      if (item.cinematicMode === 'elite') {
+        const engine = String(item.cinematicEngine || 'seedance2-style').trim();
+        const profile = String(item.cinematicProfile || supportState.avatarSetup.cinematicProfile || 'auto').trim();
+        const intensity = Number.parseInt(item.cinematicIntensity, 10) || supportState.avatarSetup.cinematicIntensity || 2;
+        metaLines.push(`🎞️ Cinematic Layer: ${engine} · ${profile} · Intensity L${intensity}`);
+        if (item.cinematicVariantMode && item.cinematicVariantMode !== 'disabled') {
+          metaLines.push(`🧪 Variant Mode: ${item.cinematicVariantMode}`);
+        }
+        if (item.cinematicBaseProfile && item.cinematicBaseProfile !== 'disabled' && item.cinematicBaseProfile !== profile) {
+          metaLines.push(`🧬 Base Profile: ${item.cinematicBaseProfile} → Winner: ${profile}`);
+        }
+        if (item.cinematicProfileSource && item.cinematicProfileSource !== 'disabled') {
+          metaLines.push(`🧭 Profile Source: ${item.cinematicProfileSource}`);
+        }
+        if (item.cinematicProfileReason) {
+          metaLines.push(`📝 Profile Reason: ${item.cinematicProfileReason}`);
+        }
+        if (item.cinematicVariantWinner && item.cinematicVariantWinner.variantId) {
+          const winner = item.cinematicVariantWinner;
+          const winnerLabel = [winner.variantId, winner.themeLabel].filter(Boolean).join(' · ');
+          metaLines.push(`🏁 Variant Winner: ${winnerLabel}${winner.winnerScore !== undefined ? ` (${winner.winnerScore}/100)` : ''}`);
+        }
+        if (Array.isArray(item.cinematicVariants) && item.cinematicVariants.length) {
+          const variantSummary = item.cinematicVariants
+            .map((variant) => {
+              const variantId = variant.variantId || '?';
+              const score = variant.winnerScore !== undefined
+                ? variant.winnerScore
+                : variant.cinematicPromptScore && variant.cinematicPromptScore.overall !== undefined
+                  ? variant.cinematicPromptScore.overall
+                  : null;
+              return score !== null ? `${variantId}:${score}` : variantId;
+            })
+            .join(' · ');
+          if (variantSummary) {
+            metaLines.push(`📊 Variant Scores: ${variantSummary}`);
+          }
+        }
+        if (item.cinematicPromptScore && item.cinematicPromptScore.overall !== undefined) {
+          const ps = item.cinematicPromptScore;
+          metaLines.push(`🧠 Prompt Score: ${ps.overall}/100 (Hook ${ps.hookScore}, Pacing ${ps.pacingScore}, CTA ${ps.ctaScore})`);
+        }
+        if (item.cinematicDirectorPack && item.cinematicDirectorPack.mode) {
+          const pack = item.cinematicDirectorPack;
+          if (pack.sceneCount && pack.durationTargetSeconds) {
+            metaLines.push(`🎬 Director Pack: ${pack.sceneCount} scenes · ~${pack.durationTargetSeconds}s · ${pack.mode}`);
+          }
+          if (pack.colorGrade || pack.audioBed) {
+            metaLines.push(`🎨 Grade/Audio: ${pack.colorGrade || 'standard'} · ${pack.audioBed || 'standard'}`);
+          }
+          if (pack.winnerContext && pack.winnerContext.variantId) {
+            metaLines.push(`🪄 Director Alignment: ${pack.winnerContext.variantId} · ${pack.winnerContext.themeLabel || 'Winner'}${pack.winnerContext.winnerScore ? ` (${pack.winnerContext.winnerScore}/100)` : ''}`);
+          }
+          if (Array.isArray(pack.scenes) && pack.scenes.length) {
+            const opener = pack.scenes[0];
+            const closer = pack.scenes[pack.scenes.length - 1];
+            const openerText = opener && opener.overlayText ? opener.overlayText : 'Hook open';
+            const closerText = closer && closer.overlayText ? closer.overlayText : 'CTA close';
+            metaLines.push(`🎞️ Scene Anchors: Open "${openerText}" → Close "${closerText}"`);
+          }
+        }
       }
       productVideoMeta.innerHTML = metaLines.map(l => `<span style="display:block;margin-bottom:3px">${escapeHtml(l)}</span>`).join('');
     }
@@ -1225,8 +1452,9 @@
 
     // Video player
     if (productVideoPlayer) {
-      if (item.videoUrl) {
-        productVideoPlayer.src = item.videoUrl;
+      const playableUrl = mediaUrlOf(item) || item.videoUrl || '';
+      if (playableUrl) {
+        productVideoPlayer.src = playableUrl;
         productVideoPlayer.classList.remove('hidden');
         productVideoPlayer.load();
       } else {
@@ -1242,7 +1470,8 @@
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         newBtn.addEventListener('click', async () => {
-          if (!item.videoUrl) { alert('Video is not ready yet.'); return; }
+          const postVideoUrl = mediaUrlOf(item) || item.videoUrl || '';
+          if (!postVideoUrl) { alert('Video is not ready yet.'); return; }
           newBtn.classList.add('posting');
           newBtn.textContent = '⏳ Posting…';
           const postStatus = document.getElementById('phoneProductVideoPostStatus');
@@ -1257,7 +1486,7 @@
                 affiliateCode: supportState.affiliateCode,
                 platform,
                 accountUrl: accountUrl || `https://${platform}.com/affiliate`,
-                videoUrl: item.videoUrl,
+                videoUrl: postVideoUrl,
                 productId: item.productId || null
               })
             });
@@ -1408,7 +1637,7 @@
         productImage.removeAttribute('src');
         productImage.classList.add('hidden');
       }
-      productMonitor.textContent = `${selected.title || 'Product selected'} · ${platformLabelOf(supportState.avatarSetup.selectedPlatform)}`;
+      productMonitor.textContent = `${selected.title || 'Product selected'} · ${platformLabelOf(supportState.avatarSetup.selectedPlatform)} · Cinematic ${supportState.avatarSetup.cinematicProfile || 'auto'} (L${supportState.avatarSetup.cinematicIntensity || 2})`;
       if (supportState.avatarSetup.productReferences.length) {
         productReferences.innerHTML = supportState.avatarSetup.productReferences.map((item) => {
           const title = item.title || item.scriptTitle || item.hook || item.name || 'Reference';
@@ -1880,6 +2109,26 @@
     const resolvedRequestId = String(request.requestId || requestId);
     supportState.avatarSetup.requestId = resolvedRequestId;
     supportState.avatarSetup.profileId = String(request.profileId || request.affiliateCode || supportState.affiliateCode || '').trim().toUpperCase();
+    supportState.avatarSetup.qualityMode = String(
+      request.avatar?.renderQualityMode
+      || request.renderQualityMode
+      || supportState.avatarSetup.qualityMode
+      || 'elite'
+    ).trim().toLowerCase() || 'elite';
+    supportState.avatarSetup.cinematicProfile = String(
+      request.cinematicProfile
+      || supportState.avatarSetup.cinematicProfile
+      || 'auto'
+    ).trim().toLowerCase() || 'auto';
+    supportState.avatarSetup.cinematicIntensity = Math.max(
+      1,
+      Math.min(3, parseInt(
+        request.cinematicIntensity
+        || supportState.avatarSetup.cinematicIntensity
+        || 2,
+        10
+      ) || 2)
+    );
     localStorage.setItem(`evicsPhoneAvatarRequest:${supportState.affiliateCode || 'default'}`, resolvedRequestId);
     supportState.avatarSetup.nativeAvatarJobId = String(request.nativeAvatarJobId || supportState.avatarSetup.nativeAvatarJobId || '').trim();
     supportState.avatarSetup.nativeAvatarStatusUrl = supportState.avatarSetup.nativeAvatarJobId
@@ -1892,6 +2141,8 @@
       supportState.avatarSetup.selectedPlatform = String(request.platform || supportState.avatarSetup.selectedPlatform || 'tiktok');
     }
     if (platformSelect) platformSelect.value = supportState.avatarSetup.selectedPlatform;
+    if (cinematicProfileSelect) cinematicProfileSelect.value = supportState.avatarSetup.cinematicProfile || 'auto';
+    if (cinematicIntensitySelect) cinematicIntensitySelect.value = String(supportState.avatarSetup.cinematicIntensity || 2);
     if (shouldHydrateRequestContext && request.attire && typeof request.attire === 'object') {
       supportState.avatarSetup.attire = {
         ...supportState.avatarSetup.attire,
@@ -2103,8 +2354,8 @@
       } else {
         list.innerHTML = renders.slice(0, 30).map((item) => {
           const status = item.status || item.videoStatus || 'pending';
-          const platform = item.platform || item.channel || 'unknown';
-          const title = item.productTitle || item.product || item.scriptTitle || item.id || 'Untitled';
+          const platform = renderPlatformOf(item);
+          const title = renderTitleOf(item);
           const created = item.created_at || item.createdAt || '';
           return `<li class="render-item" data-render-id="${item.id || item.video_id || item.job_id || ''}">
             <div class="topline">
@@ -2177,6 +2428,24 @@
       persistAvatarSetup();
       renderSelectedProductDetails();
       setStatus(`Platform set to ${platformLabelOf(platformSelect.value)}.`, 'success');
+    });
+  }
+  if (cinematicProfileSelect) {
+    cinematicProfileSelect.value = supportState.avatarSetup.cinematicProfile || 'auto';
+    cinematicProfileSelect.addEventListener('change', () => {
+      supportState.avatarSetup.cinematicProfile = String(cinematicProfileSelect.value || 'auto').trim().toLowerCase() || 'auto';
+      persistAvatarSetup();
+      renderSelectedProductDetails();
+      setStatus(`Cinematic profile set to ${supportState.avatarSetup.cinematicProfile}.`, 'success');
+    });
+  }
+  if (cinematicIntensitySelect) {
+    cinematicIntensitySelect.value = String(supportState.avatarSetup.cinematicIntensity || 2);
+    cinematicIntensitySelect.addEventListener('change', () => {
+      supportState.avatarSetup.cinematicIntensity = Math.max(1, Math.min(3, parseInt(cinematicIntensitySelect.value, 10) || 2));
+      persistAvatarSetup();
+      renderSelectedProductDetails();
+      setStatus(`Cinematic intensity set to level ${supportState.avatarSetup.cinematicIntensity}.`, 'success');
     });
   }
 
@@ -2419,6 +2688,8 @@
             source: 'phone-app',
             nativeAsync: true,
             avatarProvider: 'auto'
+            ,
+            qualityMode: supportState.avatarSetup.qualityMode || 'elite'
           })
         });
 
@@ -2592,18 +2863,34 @@
           body: JSON.stringify({
             affiliateCode: supportState.affiliateCode,
             avatarRequestId: selectedAvatar.requestId || supportState.avatarSetup.requestId || null,
+            avatarId: selectedAvatar.avatarId || selectedAvatar.id || null,
+            avatarAttire: selectedAvatar.attire || null,
+            avatarAttireLabel: selectedAvatar.attireLabel || null,
             productId: product.id || null,
             productHandle: product.handle || null,
             productTitle: product.title || null,
             productImageUrl: product.imageUrl || product.image || product.image_url || null,
             productPageUrl: product.productPageUrl || product.productUrl || null,
             productPrice: product.price || null,
-            platform: platformSelect ? platformSelect.value : 'tiktok'
+            platform: platformSelect ? platformSelect.value : 'tiktok',
+            qualityMode: supportState.avatarSetup.qualityMode || 'elite',
+            cinematicMode: true,
+            cinematicEngine: 'seedance2-style',
+            cinematicProfile: supportState.avatarSetup.cinematicProfile || (cinematicProfileSelect ? cinematicProfileSelect.value : 'auto') || 'auto',
+            cinematicIntensity: supportState.avatarSetup.cinematicIntensity || (cinematicIntensitySelect ? Number.parseInt(cinematicIntensitySelect.value, 10) : 2) || 2,
+            backgroundMode: 'lifestyle'
           })
         });
 
         setControlState(generateProductVideoBtn, 'completed', 2000);
-        if (productVideoStatus) { productVideoStatus.textContent = '✅ Video rendering started! Waiting for completion…'; productVideoStatus.className = 'create-avatar-status status-success'; }
+        if (productVideoStatus) {
+          const winner = payload.cinematicVariantWinner;
+          const winnerLine = winner && winner.variantId
+            ? ` Winner: Variant ${winner.variantId}${winner.themeLabel ? ` (${winner.themeLabel})` : ''}.`
+            : '';
+          productVideoStatus.textContent = `✅ Video rendering started!${winnerLine} Waiting for completion…`;
+          productVideoStatus.className = 'create-avatar-status status-success';
+        }
         sessionInfo.textContent = 'Product video rendering — this may take 30-90 seconds.';
 
         // Poll for completion
