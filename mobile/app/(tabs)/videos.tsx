@@ -1,8 +1,8 @@
-// app/(tabs)/videos.tsx — Video library screen with playback, metadata, and copy tools.
-import { useEffect, useState, useCallback } from 'react';
+// app/(tabs)/videos.tsx — Video library with playback, metadata, share, delete, and auto-poll.
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Image, ActivityIndicator, RefreshControl, Alert, Clipboard,
+  Image, ActivityIndicator, RefreshControl, Alert, Share, Clipboard,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,9 @@ import { getSession } from '@/lib/storage';
 import { fetchVideoLibrary, fetchVideoStatus } from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/media';
 import { AffiliateSession, VideoJob, MetadataPackage } from '@/lib/types';
-import { COLORS, PLATFORMS } from '@/constants/config';
+import { COLORS, PLATFORMS, API_BASE } from '@/constants/config';
+
+const POLL_INTERVAL_MS = 15_000;
 
 export default function VideosScreen() {
   const [session, setSession] = useState<AffiliateSession | null>(null);
@@ -18,44 +20,62 @@ export default function VideosScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function load() {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(prev => prev);
     const s = await getSession();
     setSession(s);
-    if (!s) return;
+    if (!s) { setLoading(false); return; }
     try {
       const vids = await fetchVideoLibrary(s.affiliateCode);
       setVideos(vids);
-      // Auto-refresh any still-rendering jobs
-      const renderingJobs = vids.filter(v => v.status === 'rendering');
-      for (const job of renderingJobs) {
-        try {
-          const updated = await fetchVideoStatus(job.videoJobId, s.affiliateCode);
-          if (updated.status !== 'rendering') {
-            setVideos(prev => prev.map(v => v.videoJobId === job.videoJobId ? updated : v));
-          }
-        } catch {}
-      }
     } catch {
-      setVideos([]);
+      if (!silent) setVideos([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  const refreshSingleJob = useCallback(async (jobId: string, affiliateCode: string) => {
+    try {
+      const updated = await fetchVideoStatus(jobId, affiliateCode);
+      setVideos(prev => prev.map(v => v.videoJobId === jobId ? updated : v));
+      return updated.status;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Auto-poll while any video is still rendering
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const hasRendering = videos.some(v => v.status === 'rendering');
+    if (!hasRendering || !session) return;
+    pollRef.current = setInterval(async () => {
+      const renderingJobs = videos.filter(v => v.status === 'rendering');
+      if (renderingJobs.length === 0) {
+        clearInterval(pollRef.current!);
+        return;
+      }
+      for (const job of renderingJobs) {
+        await refreshSingleJob(job.videoJobId, session.affiliateCode);
+      }
+    }, POLL_INTERVAL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [videos, session, refreshSingleJob]);
+
+  useEffect(() => {
+    load();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
+    await load(true);
     setRefreshing(false);
-  }, []);
-
-  function copyToClipboard(text: string, label: string) {
-    Clipboard.setString(text);
-    Alert.alert('Copied!', `${label} copied to clipboard.`);
-  }
+  }, [load]);
 
   function getVideoUrl(video: VideoJob): string | null {
     return resolveMediaUrl(video.gcsVideoUrl || video.videoUrl || null);
@@ -73,6 +93,62 @@ export default function VideosScreen() {
     return { label: 'Needs Work', color: COLORS.danger };
   };
 
+  async function handleShare(video: VideoJob) {
+    const url = getVideoUrl(video);
+    if (!url) { Alert.alert('No video URL', 'This video is not yet available.'); return; }
+    const meta = getPlatformMeta(video);
+    try {
+      await Share.share({
+        title: meta?.title ?? video.productTitle ?? 'My AI Video',
+        message: `${meta?.title ?? video.productTitle ?? 'Check out this AI product video!'}\n\n${url}${meta?.hashtags?.length ? '\n\n' + meta.hashtags.map(t => `#${t}`).join(' ') : ''}`,
+        url,
+      });
+    } catch {}
+  }
+
+  async function handleDelete(video: VideoJob) {
+    if (!session) return;
+    Alert.alert(
+      'Delete Video',
+      `Delete "${video.productTitle ?? 'this video'}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            setDeletingId(video.videoJobId);
+            try {
+              const res = await fetch(
+                `${API_BASE}/api/affiliate/product-video/${video.videoJobId}`,
+                {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ affiliateCode: session.affiliateCode }),
+                }
+              );
+              const data = await res.json();
+              if (res.ok && data.success) {
+                setVideos(prev => prev.filter(v => v.videoJobId !== video.videoJobId));
+                if (expandedId === video.videoJobId) setExpandedId(null);
+              } else {
+                Alert.alert('Delete failed', data.error ?? 'Could not delete video.');
+              }
+            } catch (e: unknown) {
+              Alert.alert('Error', (e as Error).message);
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function copyToClipboard(text: string, label: string) {
+    Clipboard.setString(text);
+    Alert.alert('Copied!', `${label} copied to clipboard.`);
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -81,6 +157,8 @@ export default function VideosScreen() {
     );
   }
 
+  const renderingCount = videos.filter(v => v.status === 'rendering').length;
+
   return (
     <ScrollView
       style={styles.container}
@@ -88,22 +166,32 @@ export default function VideosScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
     >
       <Text style={styles.screenTitle}>Video Library</Text>
-      <Text style={styles.screenSub}>{videos.length} video{videos.length !== 1 ? 's' : ''} · Pull to refresh</Text>
+      <Text style={styles.screenSub}>{videos.length} video{videos.length !== 1 ? 's' : ''}</Text>
+
+      {/* Live rendering badge */}
+      {renderingCount > 0 && (
+        <View style={styles.pollingBanner}>
+          <ActivityIndicator color={COLORS.warning} size="small" />
+          <Text style={styles.pollingText}>
+            {renderingCount} video{renderingCount > 1 ? 's' : ''} rendering · auto-refreshing every 15s
+          </Text>
+        </View>
+      )}
 
       {videos.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="videocam-outline" size={60} color={COLORS.textDim} />
           <Text style={styles.emptyTitle}>No videos yet</Text>
-          <Text style={styles.emptyText}>Select a product and generate your first AI video.</Text>
+          <Text style={styles.emptyText}>Select a product in Studio and generate your first AI video.</Text>
         </View>
       ) : (
         videos.map(video => {
           const isExpanded = expandedId === video.videoJobId;
-          const isPlaying = playingUrl === getVideoUrl(video);
           const meta = getPlatformMeta(video);
           const url = getVideoUrl(video);
           const grade = video.qualityScore != null ? scoreGrade(video.qualityScore) : null;
           const platformInfo = PLATFORMS.find(p => p.value === video.platform);
+          const isDeleting = deletingId === video.videoJobId;
 
           return (
             <View key={video.videoJobId} style={styles.videoCard}>
@@ -126,7 +214,10 @@ export default function VideosScreen() {
                   </Text>
                   <View style={styles.metaRow}>
                     {platformInfo && <Text style={styles.metaChip}>{platformInfo.icon} {platformInfo.label}</Text>}
-                    <View style={[styles.statusDot, video.status === 'completed' ? styles.dotGreen : video.status === 'failed' ? styles.dotRed : styles.dotYellow]} />
+                    <View style={[styles.statusDot,
+                      video.status === 'completed' ? styles.dotGreen :
+                      video.status === 'failed' ? styles.dotRed : styles.dotYellow
+                    ]} />
                     <Text style={styles.statusLabel}>{video.status}</Text>
                   </View>
                   <View style={styles.metaRow}>
@@ -140,7 +231,27 @@ export default function VideosScreen() {
                     )}
                   </View>
                 </View>
-                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.textDim} />
+                <View style={styles.cardActions}>
+                  {/* Share */}
+                  {video.status === 'completed' && url && (
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => handleShare(video)} activeOpacity={0.7}>
+                      <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                  {/* Delete */}
+                  <TouchableOpacity
+                    style={[styles.iconBtn, isDeleting && { opacity: 0.4 }]}
+                    onPress={() => handleDelete(video)}
+                    disabled={isDeleting}
+                    activeOpacity={0.7}
+                  >
+                    {isDeleting
+                      ? <ActivityIndicator size="small" color={COLORS.danger} />
+                      : <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                    }
+                  </TouchableOpacity>
+                  <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.textDim} />
+                </View>
               </TouchableOpacity>
 
               {/* Expanded Details */}
@@ -150,19 +261,29 @@ export default function VideosScreen() {
                   {video.status === 'completed' && url ? (
                     <>
                       <VideoPlayer url={url} />
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => copyToClipboard(url, 'Video URL')}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="copy" size={16} color={COLORS.primary} />
-                        <Text style={styles.actionBtnText}>Copy Video URL</Text>
-                      </TouchableOpacity>
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.actionBtn}
+                          onPress={() => copyToClipboard(url, 'Video URL')}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="copy" size={15} color={COLORS.primary} />
+                          <Text style={styles.actionBtnText}>Copy URL</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionBtn}
+                          onPress={() => handleShare(video)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="share-social" size={15} color={COLORS.primary} />
+                          <Text style={styles.actionBtnText}>Share</Text>
+                        </TouchableOpacity>
+                      </View>
                     </>
                   ) : video.status === 'rendering' ? (
                     <View style={styles.renderingBox}>
                       <ActivityIndicator color={COLORS.primary} size="small" />
-                      <Text style={styles.renderingText}>Rendering in progress… Pull to refresh for status.</Text>
+                      <Text style={styles.renderingText}>Rendering… auto-refreshing every 15 seconds.</Text>
                     </View>
                   ) : video.status === 'failed' ? (
                     <View style={styles.failedBox}>
@@ -259,7 +380,13 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingTop: 56, paddingBottom: 32 },
   centered: { flex: 1, backgroundColor: COLORS.bg, justifyContent: 'center', alignItems: 'center' },
   screenTitle: { color: COLORS.text, fontSize: 22, fontWeight: '900', marginBottom: 4 },
-  screenSub: { color: COLORS.textMuted, fontSize: 12, marginBottom: 20 },
+  screenSub: { color: COLORS.textMuted, fontSize: 12, marginBottom: 14 },
+  pollingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: COLORS.warning + '18', borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: COLORS.warning + '40', marginBottom: 14,
+  },
+  pollingText: { color: COLORS.warning, fontSize: 12, fontWeight: '600', flex: 1 },
   emptyState: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyTitle: { color: COLORS.text, fontSize: 18, fontWeight: '800' },
   emptyText: { color: COLORS.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
@@ -272,7 +399,7 @@ const styles = StyleSheet.create({
   thumbPlaceholder: { backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   cardInfo: { flex: 1 },
   cardProductTitle: { color: COLORS.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 },
   metaChip: { color: COLORS.textMuted, fontSize: 11 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   dotGreen: { backgroundColor: COLORS.success },
@@ -282,14 +409,15 @@ const styles = StyleSheet.create({
   voiceBadge: { color: COLORS.textMuted, fontSize: 11 },
   scoreBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   scoreText: { fontSize: 11, fontWeight: '700' },
-  expanded: {
-    borderTopWidth: 1, borderTopColor: COLORS.border, padding: 14, gap: 12,
-  },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { padding: 6 },
+  expanded: { borderTopWidth: 1, borderTopColor: COLORS.border, padding: 14, gap: 12 },
   videoPlayer: { width: '100%', height: 200, borderRadius: 10, backgroundColor: '#000', marginBottom: 8 },
+  actionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1, borderColor: COLORS.primary, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start',
+    paddingHorizontal: 12, paddingVertical: 8,
   },
   actionBtnText: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
   renderingBox: {
