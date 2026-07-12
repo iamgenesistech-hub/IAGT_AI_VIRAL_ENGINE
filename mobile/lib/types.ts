@@ -7,6 +7,7 @@ export interface AffiliateSession {
   voiceFileUrl?: string;
   voiceId?: string;
   voiceCloneId?: string;
+  expoPushToken?: string;
 }
 
 export interface AffiliateProfile {
@@ -18,6 +19,7 @@ export interface AffiliateProfile {
   voiceCloneId?: string | null;
   voiceId?: string | null;
   voiceFileUrl?: string | null;
+  expoPushToken?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -141,4 +143,62 @@ export interface DiscoverabilityResult {
   score: number;
   grade: 'excellent' | 'strong' | 'fair' | 'weak';
   suggestions: string[];
+}
+
+// ── Billing & Payouts ─────────────────────────────────────────────────────────
+
+export interface AffiliateBillingInfo {
+  affiliateCode: string;
+  plan?: string;
+  planId?: string;
+  subscriptionStatus?: string;
+  subscriptionRenewalDate?: string;
+  nextBillingDate?: string;
+  videosUsed?: number;
+  videosRemaining?: number | string;
+  videosPerMonth?: number | string;
+  watermark?: boolean;
+  voiceClone?: boolean;
+  balance?: string;
+  lifetimeEarned?: string;
+  lastPayoutDate?: string;
+  purchases?: AffiliatePurchase[];
+  commissionBalance?: number;
+  commissionCurrency?: string;
+  totalEarned?: number;
+  totalPaid?: number;
+  payoutMethods?: AffiliatePayoutMethod[];
+}
+
+export interface AffiliatePurchase {
+  id: string;
+  item: string;
+  productTitle?: string;
+  amount: string | number;
+  currency?: string;
+  date: string;
+  purchasedAt?: string;
+  status: string;
+}
+
+export interface AffiliatePayoutMethod {
+  type: 'btc' | 'eth' | 'usd' | 'stripe';
+  address?: string;
+  bankInfo?: string;
+  isDefault?: boolean;
+}
+
+// ── Support / Comms ───────────────────────────────────────────────────────────
+
+export interface AffiliateCommsMessage {
+  id?: string;
+  messageId?: string;
+  sessionId?: string;
+  sender?: 'AFFILIATE' | 'ADMIN' | 'AI' | 'support' | 'system';
+  role?: 'affiliate' | 'support' | 'system';
+  text?: string;
+  content?: string;
+  timestamp?: string;
+  sentAt?: string;
+  readAt?: string;
 }
