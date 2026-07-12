@@ -98,11 +98,12 @@ export default function HomeScreen() {
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
       <View style={styles.actionsGrid}>
-        <QuickAction icon="create" label="Edit Profile Assignment" color={COLORS.primary} onPress={() => router.push('/profile-editor')} />
+        <QuickAction icon="create" label="Edit Profile" color={COLORS.primary} onPress={() => router.push('/profile-editor')} />
         <QuickAction icon="person-add" label="Create Avatar" color={COLORS.accent} onPress={() => router.push('/(tabs)/avatar')} />
-        <QuickAction icon="videocam" label="Generate Video" color={COLORS.primary} onPress={() => router.push('/(tabs)/products')} />
+        <QuickAction icon="film" label="Video Studio" color={COLORS.primary} onPress={() => router.push('/(tabs)/studio')} />
         <QuickAction icon="grid" label="Browse Products" color={COLORS.success} onPress={() => router.push('/(tabs)/products')} />
         <QuickAction icon="library" label="Video Library" color={COLORS.warning} onPress={() => router.push('/(tabs)/videos')} />
+        <QuickAction icon="card" label="Billing & Payouts" color={COLORS.accent} onPress={() => router.push('/(tabs)/billing')} />
       </View>
 
       {/* Latest video preview */}
@@ -167,16 +168,9 @@ const styles = StyleSheet.create({
   name: { color: COLORS.text, fontSize: 22, fontWeight: '800' },
   code: { color: COLORS.primary, fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 2 },
   profilePic: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: COLORS.primary },
-  profilePlaceholder: {
-    width: 56, height: 56, borderRadius: 28,
-    borderWidth: 2, borderColor: COLORS.border,
-    backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center',
-  },
+  profilePlaceholder: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1,
-  },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   pillGreen: { backgroundColor: '#16a34a22', borderColor: '#22c55e44' },
   pillRed: { backgroundColor: '#dc262622', borderColor: '#ef444444' },
   dot: { width: 7, height: 7, borderRadius: 4 },
@@ -185,39 +179,21 @@ const styles = StyleSheet.create({
   pillText: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
   version: { color: COLORS.textDim, fontSize: 11 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  statCard: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1,
-    padding: 14, alignItems: 'center', gap: 4,
-  },
+  statCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 24, fontWeight: '900' },
   statLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: '600' },
-  sectionTitle: {
-    color: COLORS.textMuted, fontSize: 11, fontWeight: '700',
-    letterSpacing: 2, marginBottom: 10,
-  },
+  sectionTitle: { color: COLORS.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10 },
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  quickAction: {
-    width: '47%', backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1,
-    padding: 16, alignItems: 'center', gap: 8,
-  },
+  quickAction: { width: '47%', backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, padding: 16, alignItems: 'center', gap: 8 },
   quickLabel: { color: COLORS.text, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  videoPreviewCard: {
-    backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1,
-    borderColor: COLORS.border, flexDirection: 'row', overflow: 'hidden', marginBottom: 24,
-  },
+  videoPreviewCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
   videoThumb: { width: 100, height: 80 },
   videoThumbPlaceholder: { backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   videoPreviewInfo: { flex: 1, padding: 12, justifyContent: 'center', gap: 4 },
   videoPreviewTitle: { color: COLORS.text, fontWeight: '700', fontSize: 14 },
   videoPreviewMeta: { color: COLORS.textMuted, fontSize: 11 },
-  scoreBadge: {
-    backgroundColor: COLORS.primaryDim, borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start',
-  },
+  scoreBadge: { backgroundColor: COLORS.primaryDim, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
   scoreText: { color: COLORS.primary, fontSize: 11, fontWeight: '700' },
-  govBanner: {
-    backgroundColor: COLORS.accentDim, borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: COLORS.accent + '44',
-  },
+  govBanner: { backgroundColor: COLORS.accentDim, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: COLORS.accent + '44' },
   govText: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center' },
 });

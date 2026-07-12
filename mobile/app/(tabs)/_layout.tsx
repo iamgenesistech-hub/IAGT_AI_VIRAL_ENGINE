@@ -34,17 +34,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="avatar"
+        name="studio"
         options={{
-          title: 'Avatar',
-          tabBarIcon: ({ color, size }) => <TabIcon name="person" color={color} size={size} />,
+          title: 'Studio',
+          tabBarIcon: ({ color, size }) => <TabIcon name="film" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="products"
+        name="billing"
         options={{
-          title: 'Products',
-          tabBarIcon: ({ color, size }) => <TabIcon name="grid" color={color} size={size} />,
+          title: 'Billing',
+          tabBarIcon: ({ color, size }) => <TabIcon name="card" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -55,19 +55,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="upgrade"
-        options={{
-          title: 'Upgrade',
-          tabBarIcon: ({ color, size }) => <TabIcon name="flash" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
           tabBarIcon: ({ color, size }) => <TabIcon name="settings" color={color} size={size} />,
         }}
       />
+      {/* Hidden routes — accessible via deep link but not shown in tab bar */}
+      <Tabs.Screen name="avatar" options={{ href: null }} />
+      <Tabs.Screen name="products" options={{ href: null }} />
+      <Tabs.Screen name="upgrade" options={{ href: null }} />
     </Tabs>
   );
 }
