@@ -1,4 +1,4 @@
-// backend/server.js
+﻿successfully downloaded text file (SHA: edf6953c8b2154ada8be4e1f9510175acddc0bba)// backend/server.js
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
@@ -2882,140 +2882,12 @@ app.get('/api/admin/costs', requireAdminAccess, (req, res) => {
   }
 });
 
-/**
- * requireVideoDeleteAuth � middleware for video delete endpoints.
- *
- * Allows ONLY:
- *   1. The affiliate who owns the video (affiliateCode in request matches record owner)
- *   2. ADMIN � via x-admin-key header OR Bearer JWT with ADMIN role
- *      Admin has FULL CONTROL over ALL affiliate videos, IDs, and accounts.
- *
- * Sets req.deleteActor = { role, affiliateCode, isAdmin }
- * Ownership is double-checked inside each handler against the actual video record.
- */
-function requireVideoDeleteAuth(req, res, next) {
-  // -- Path 1: Admin via x-admin-key header -------------------------------------
-  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
-  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
-  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
-    req.deleteActor = { role: 'ADMIN', affiliateCode: null, isAdmin: true };
-    return next();
-  }
-
-  // -- Path 2: Admin or Affiliate via Bearer JWT ---------------------------------
-  const authHeader = req.headers.authorization || '';
-  if (authHeader.startsWith('Bearer ')) {
-    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
-    if (authEngine && typeof authEngine.validateToken === 'function') {
-      try {
-        const claims = authEngine.validateToken(authHeader);
-        const role = String(claims.role || '').toUpperCase();
-        if (role === 'ADMIN') {
-          req.deleteActor = { role: 'ADMIN', affiliateCode: claims.affiliateCode || null, isAdmin: true };
-          return next();
-        }
-        if (role === 'AFFILIATE') {
-          const code = normalizeAffiliateCode(claims.affiliateCode || claims.sub || '');
-          if (!code) return res.status(403).json({ success: false, error: 'AFFILIATE token missing affiliateCode claim.' });
-          req.deleteActor = { role: 'AFFILIATE', affiliateCode: code, isAdmin: false };
-          return next();
-        }
-        return res.status(403).json({ success: false, error: 'Only AFFILIATE or ADMIN accounts may delete videos.' });
-      } catch (err) {
-        return res.status(401).json({ success: false, error: `Token invalid: ${err.message}` });
-      }
-    }
-  }
-
-  // -- Path 3: Affiliate via affiliateCode (no JWT required for this surface) ----
-  // The affiliateCode is the account identity. Ownership is verified in each handler.
-  const affiliateCode = normalizeAffiliateCode(
-    req.query.affiliateCode || req.query.affiliateId ||
-    req.body?.affiliateCode || req.body?.affiliateId || ''
-  );
-  if (affiliateCode) {
-    req.deleteActor = { role: 'AFFILIATE', affiliateCode, isAdmin: false };
-    return next();
-  }
-
-  // -- No valid identity ---------------------------------------------------------
-  return res.status(401).json({
-    success: false,
-    error: 'Authentication required to delete videos. Affiliates: provide affiliateCode. Admin: provide x-admin-key header or Bearer JWT with ADMIN role.',
-    hint: { affiliate: 'Add affiliateCode to request body or query.', admin: 'Set x-admin-key header to ADMIN_API_KEY env var value.' }
-  });
-}
-
 // GET /api/admin/costs/affiliate?code=X � per-affiliate cost breakdown
 app.get('/api/admin/costs/affiliate', requireAdminAccess, (req, res) => {
   const code = req.query.code || req.query.affiliateCode || '';
   if (!code) return res.status(400).json({ success: false, error: 'code required' });
   res.json({ success: true, ...costTracker.getAffiliateCosts(code) });
 });
-
-/**
- * requireVideoDeleteAuth � middleware for video delete endpoints.
- *
- * Allows ONLY:
- *   1. The affiliate who owns the video (affiliateCode in request matches record owner)
- *   2. ADMIN � via x-admin-key header OR Bearer JWT with ADMIN role
- *      Admin has FULL CONTROL over ALL affiliate videos, IDs, and accounts.
- *
- * Sets req.deleteActor = { role, affiliateCode, isAdmin }
- * Ownership is double-checked inside each handler against the actual video record.
- */
-function requireVideoDeleteAuth(req, res, next) {
-  // -- Path 1: Admin via x-admin-key header -------------------------------------
-  const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
-  const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
-  if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
-    req.deleteActor = { role: 'ADMIN', affiliateCode: null, isAdmin: true };
-    return next();
-  }
-
-  // -- Path 2: Admin or Affiliate via Bearer JWT ---------------------------------
-  const authHeader = req.headers.authorization || '';
-  if (authHeader.startsWith('Bearer ')) {
-    const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
-    if (authEngine && typeof authEngine.validateToken === 'function') {
-      try {
-        const claims = authEngine.validateToken(authHeader);
-        const role = String(claims.role || '').toUpperCase();
-        if (role === 'ADMIN') {
-          req.deleteActor = { role: 'ADMIN', affiliateCode: claims.affiliateCode || null, isAdmin: true };
-          return next();
-        }
-        if (role === 'AFFILIATE') {
-          const code = normalizeAffiliateCode(claims.affiliateCode || claims.sub || '');
-          if (!code) return res.status(403).json({ success: false, error: 'AFFILIATE token missing affiliateCode claim.' });
-          req.deleteActor = { role: 'AFFILIATE', affiliateCode: code, isAdmin: false };
-          return next();
-        }
-        return res.status(403).json({ success: false, error: 'Only AFFILIATE or ADMIN accounts may delete videos.' });
-      } catch (err) {
-        return res.status(401).json({ success: false, error: `Token invalid: ${err.message}` });
-      }
-    }
-  }
-
-  // -- Path 3: Affiliate via affiliateCode (no JWT required for this surface) ----
-  // The affiliateCode is the account identity. Ownership is verified in each handler.
-  const affiliateCode = normalizeAffiliateCode(
-    req.query.affiliateCode || req.query.affiliateId ||
-    req.body?.affiliateCode || req.body?.affiliateId || ''
-  );
-  if (affiliateCode) {
-    req.deleteActor = { role: 'AFFILIATE', affiliateCode, isAdmin: false };
-    return next();
-  }
-
-  // -- No valid identity ---------------------------------------------------------
-  return res.status(401).json({
-    success: false,
-    error: 'Authentication required to delete videos. Affiliates: provide affiliateCode. Admin: provide x-admin-key header or Bearer JWT with ADMIN role.',
-    hint: { affiliate: 'Add affiliateCode to request body or query.', admin: 'Set x-admin-key header to ADMIN_API_KEY env var value.' }
-  });
-}
 
 // GET /api/admin/costs/unit-economics � standalone unit economics
 app.get('/api/admin/costs/unit-economics', requireAdminAccess, (req, res) => {
