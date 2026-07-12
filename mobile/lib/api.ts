@@ -309,3 +309,99 @@ export async function updateAffiliateProfile(params: {
   const data = await apiPost<{ profile: AffiliateProfile }>('/api/affiliate/profile', params);
   return data.profile;
 }
+
+// ── Billing & Payouts ─────────────────────────────────────────────────────────
+
+export interface AffiliateBillingInfo {
+  affiliateCode: string;
+  subscriptionPlan?: string;
+  subscriptionStatus?: string;
+  subscriptionRenewalDate?: string;
+  purchases?: Array<{
+    productTitle: string;
+    amount: number;
+    currency: string;
+    purchasedAt: string;
+    status: string;
+  }>;
+  commissionBalance?: number;
+  commissionCurrency?: string;
+  totalEarned?: number;
+  totalPaid?: number;
+  payoutMethods?: Array<{
+    type: 'btc' | 'eth' | 'usd';
+    address?: string;
+    bankInfo?: string;
+    isDefault?: boolean;
+  }>;
+}
+
+export async function fetchAffiliateBillingInfo(affiliateCode: string): Promise<AffiliateBillingInfo> {
+  const data = await apiGet<{ billing: AffiliateBillingInfo }>(
+    `/api/affiliate/billing/info?code=${encodeURIComponent(affiliateCode)}`
+  );
+  return data.billing;
+}
+
+export async function requestAffiliatePayout(params: {
+  affiliateCode: string;
+  method: 'btc' | 'eth' | 'usd';
+  walletAddress?: string;
+  bankInfo?: string;
+  amount?: number;
+}): Promise<{ payoutRequestId: string; status: string; estimatedArrival?: string }> {
+  const data = await apiPost<{ success: boolean; payoutRequestId: string; status: string; estimatedArrival?: string }>(
+    '/api/affiliate/billing/payout',
+    params
+  );
+  return {
+    payoutRequestId: data.payoutRequestId,
+    status: data.status,
+    estimatedArrival: data.estimatedArrival,
+  };
+}
+
+// ── Support / Comms ───────────────────────────────────────────────────────────
+
+export interface AffiliateCommsMessage {
+  messageId: string;
+  sessionId: string;
+  role: 'affiliate' | 'support' | 'system';
+  content: string;
+  sentAt: string;
+  readAt?: string;
+}
+
+export async function startAffiliateSupportSession(params: {
+  affiliateCode: string;
+  subject?: string;
+  initialMessage?: string;
+}): Promise<{ sessionId: string; status: string }> {
+  const data = await apiPost<{ success: boolean; sessionId: string; status: string }>(
+    '/api/affiliate/comms/session/start',
+    params
+  );
+  return { sessionId: data.sessionId, status: data.status };
+}
+
+export async function fetchAffiliateSupportConversation(
+  affiliateCode: string,
+  sessionId: string
+): Promise<AffiliateCommsMessage[]> {
+  const data = await apiGet<{ messages: AffiliateCommsMessage[] }>(
+    `/api/affiliate/comms/conversation?affiliateCode=${encodeURIComponent(affiliateCode)}&sessionId=${encodeURIComponent(sessionId)}`
+  );
+  return data.messages ?? [];
+}
+
+export async function sendAffiliateSupportMessage(params: {
+  affiliateCode: string;
+  sessionId: string;
+  content: string;
+}): Promise<AffiliateCommsMessage> {
+  const data = await apiPost<{ success: boolean; message: AffiliateCommsMessage }>(
+    '/api/affiliate/comms/message/send',
+    params
+  );
+  return data.message;
+}
