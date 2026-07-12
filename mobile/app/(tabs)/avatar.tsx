@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getSession, saveSession } from '@/lib/storage';
 import { uploadPhoto, uploadVoice, createAvatar, fetchAvatarGallery, fetchAvatarRequest, updateAffiliateProfile } from '@/lib/api';
 import { AffiliateSession, AvatarGalleryItem, AvatarRequest, AttireSelection } from '@/lib/types';
-import { COLORS } from '@/constants/config';
+import { COLORS, API_BASE } from '@/constants/config';
 
 type Step = 'photo' | 'voice' | 'attire' | 'review' | 'creating' | 'done';
 
@@ -18,6 +18,8 @@ const TOP_OPTIONS = ['dress-shirt', 'polo', 't-shirt', 'blouse', 'suit-jacket', 
 const BOTTOM_OPTIONS = ['dress-pants', 'slacks', 'jeans', 'skirt', 'shorts'];
 const STYLE_OPTIONS = ['professional', 'casual', 'business-casual', 'athletic', 'elegant'];
 const COLOR_OPTIONS = ['black', 'white', 'navy', 'grey', 'brown', 'blue', 'red'];
+
+const DEFAULT_VOICE_SCRIPT = 'I step into this journey with purpose. I will use this platform not just for my gain, but to bless others. I will learn with humility, act with integrity, and lead with compassion. I will seek wisdom before action, truth before convenience, and long-term benefit over short-term gain. May my success not only enrich me, but uplift my family, my community, and all I encounter. I choose to build, not tear down; to serve, not exploit; to love, not harm. In every step, may I be a blessing to others as I grow.';
 
 export default function AvatarScreen() {
   const [session, setSession] = useState<AffiliateSession | null>(null);
@@ -36,6 +38,7 @@ export default function AvatarScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPlayingId, setPreviewPlayingId] = useState<string | null>(null);
+  const [voiceReferenceScript, setVoiceReferenceScript] = useState<string>(DEFAULT_VOICE_SCRIPT);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewSoundRef = useRef<Audio.Sound | null>(null);
 
@@ -45,6 +48,11 @@ export default function AvatarScreen() {
       setSession(s);
       if (s) loadGallery(s.affiliateCode);
     })();
+    // Fetch voice reference script from API
+    fetch(`${API_BASE}/api/affiliate/avatar/voice-reference-script`)
+      .then(r => r.json())
+      .then(data => { if (data?.script?.scriptText) setVoiceReferenceScript(data.script.scriptText); })
+      .catch(() => {});
     return () => {
       if (pollTimer.current) clearInterval(pollTimer.current);
       if (previewSoundRef.current) {
@@ -64,7 +72,7 @@ export default function AvatarScreen() {
     setRefreshing(false);
   }, [session]);
 
-  // ── Photo ────────────────────────────────────────────────────────────────────
+  // ── Photo ────────────────────────────────────────────────────────────────────────
 
   async function pickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -107,7 +115,7 @@ export default function AvatarScreen() {
     }
   }
 
-  // ── Voice ────────────────────────────────────────────────────────────────────
+  // ── Voice ────────────────────────────────────────────────────────────────────────
 
   async function startRecording() {
     try {
@@ -131,7 +139,7 @@ export default function AvatarScreen() {
   }
 
   async function uploadVoiceAndNext() {
-    if (!voiceUri) { setStep('attire'); return; } // voice is optional
+    if (!voiceUri) { setStep('attire'); return; }
     setUploading(true);
     try {
       const url = await uploadVoice(voiceUri);
@@ -185,7 +193,6 @@ export default function AvatarScreen() {
       await stopVoicePreview();
       return;
     }
-
     setPreviewLoading(true);
     try {
       if (previewSoundRef.current) {
@@ -211,13 +218,13 @@ export default function AvatarScreen() {
     }
   }
 
-  // ── Attire ───────────────────────────────────────────────────────────────────
+  // ── Attire ──────────────────────────────────────────────────────────────────────
 
   function toggleUsePhoto() {
     setAttire(prev => ({ ...prev, usePhotoClothing: !prev.usePhotoClothing }));
   }
 
-  // ── Create Avatar ─────────────────────────────────────────────────────────────
+  // ── Create Avatar ──────────────────────────────────────────────────────────────────
 
   async function handleCreate() {
     if (!session || !photoUrl) return;
@@ -233,7 +240,6 @@ export default function AvatarScreen() {
         attire: attire.usePhotoClothing ? { usePhotoClothing: true } : attire,
       });
       setPendingRequestId(req.requestId);
-      // Poll until completed
       pollTimer.current = setInterval(async () => {
         try {
           const updated = await fetchAvatarRequest(req.requestId, session.affiliateCode);
@@ -248,7 +254,6 @@ export default function AvatarScreen() {
             Alert.alert('Avatar creation failed', updated.error ?? 'Unknown error.');
             setStep('review');
           }
-
         } catch {}
       }, 8000);
     } catch (e: unknown) {
@@ -328,7 +333,7 @@ export default function AvatarScreen() {
     setCreating(false);
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────────
 
   return (
     <ScrollView
@@ -390,9 +395,7 @@ export default function AvatarScreen() {
           <Text style={styles.cardSub}>Record 30–60 seconds of natural speech. Your voice will be cloned for your AI avatar videos. (Optional — skip to use stock voice)</Text>
           <View style={styles.voiceScript}>
             <Text style={styles.voiceScriptLabel}>SUGGESTED SCRIPT</Text>
-            <Text style={styles.voiceScriptText}>
-              "Hi, I'm {session?.affiliateName}. I'm excited to be part of I AM GENESIS TECH. I believe in creating real value for people and building something that truly makes a difference. I'm here to serve with purpose, share great products honestly, and grow with integrity. Let's make an impact together."
-            </Text>
+            <Text style={styles.voiceScriptText}>"{voiceReferenceScript}"</Text>
           </View>
           {isRecording ? (
             <TouchableOpacity style={styles.recordingBtn} onPress={stopRecording} activeOpacity={0.8}>
@@ -562,10 +565,7 @@ export default function AvatarScreen() {
                     <Text style={styles.galleryActionText}>Assign Picture</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[
-                      styles.galleryActionBtn,
-                      (!item.voiceFileUrl && !session?.voiceFileUrl) && styles.galleryActionBtnDisabled,
-                    ]}
+                    style={[styles.galleryActionBtn, (!item.voiceFileUrl && !session?.voiceFileUrl) && styles.galleryActionBtnDisabled]}
                     onPress={() => playVoicePreview(item)}
                     disabled={!item.voiceFileUrl && !session?.voiceFileUrl}
                     activeOpacity={0.8}
@@ -598,73 +598,39 @@ const styles = StyleSheet.create({
   screenTitle: { color: COLORS.text, fontSize: 22, fontWeight: '900', marginBottom: 16 },
   steps: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   stepItem: { alignItems: 'center', gap: 4 },
-  stepDot: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  stepDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center' },
   stepDotActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   stepNum: { color: COLORS.text, fontSize: 12, fontWeight: '700' },
   stepLabel: { color: COLORS.textDim, fontSize: 10, fontWeight: '600' },
   stepLabelActive: { color: COLORS.primary },
-  card: {
-    backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1,
-    borderColor: COLORS.border, padding: 20, marginBottom: 20,
-  },
+  card: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 20, marginBottom: 20 },
   cardTitle: { color: COLORS.text, fontSize: 18, fontWeight: '800', marginBottom: 6 },
   cardSub: { color: COLORS.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  photoPreview: {
-    width: '100%', height: 220, borderRadius: 12,
-    marginBottom: 16, resizeMode: 'cover',
-  },
-  photoPlaceholder: {
-    width: '100%', height: 220, borderRadius: 12,
-    backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16, borderWidth: 1, borderColor: COLORS.border,
-  },
+  photoPreview: { width: '100%', height: 220, borderRadius: 12, marginBottom: 16, resizeMode: 'cover' },
+  photoPlaceholder: { width: '100%', height: 220, borderRadius: 12, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
   btnRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  btnPrimary: {
-    flex: 1, backgroundColor: COLORS.primary, borderRadius: 12,
-    paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
-  },
+  btnPrimary: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   btnPrimaryText: { color: '#000', fontWeight: '900', fontSize: 15 },
-  btnSecondary: {
-    flex: 1, borderWidth: 1, borderColor: COLORS.primary, borderRadius: 12,
-    paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
-  },
+  btnSecondary: { flex: 1, borderWidth: 1, borderColor: COLORS.primary, borderRadius: 12, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   btnSecondaryText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
   btnGhost: { paddingVertical: 12, alignItems: 'center' },
   btnGhostText: { color: COLORS.textMuted, fontSize: 13 },
   btnDisabled: { opacity: 0.4 },
-  voiceScript: {
-    backgroundColor: COLORS.surface, borderRadius: 10, padding: 14, marginBottom: 16,
-    borderWidth: 1, borderColor: COLORS.border,
-  },
+  voiceScript: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
   voiceScriptLabel: { color: COLORS.textDim, fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
   voiceScriptText: { color: COLORS.textMuted, fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
-  recordingBtn: {
-    backgroundColor: '#ef444422', borderWidth: 1, borderColor: COLORS.danger,
-    borderRadius: 12, paddingVertical: 14, flexDirection: 'row',
-    justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 12,
-  },
+  recordingBtn: { backgroundColor: '#ef444422', borderWidth: 1, borderColor: COLORS.danger, borderRadius: 12, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 12 },
   recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.danger },
   recordingText: { color: COLORS.danger, fontWeight: '700', fontSize: 15 },
   voiceReady: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   voiceReadyText: { color: COLORS.success, fontSize: 13, fontWeight: '600' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  checkbox: {
-    width: 22, height: 22, borderRadius: 6,
-    borderWidth: 2, borderColor: COLORS.border,
-    backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center',
-  },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   checkboxChecked: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   checkLabel: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
   fieldLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 6, marginTop: 12 },
   chipScroll: { marginBottom: 4 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginRight: 8,
-  },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginRight: 8 },
   chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText: { color: COLORS.textMuted, fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: '#000' },
@@ -674,24 +640,14 @@ const styles = StyleSheet.create({
   reviewName: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   reviewDetail: { color: COLORS.textMuted, fontSize: 13 },
   sectionTitle: { color: COLORS.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10, marginTop: 4 },
-  galleryCard: {
-    backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1,
-    borderColor: COLORS.border, flexDirection: 'row', padding: 12, gap: 12, marginBottom: 10,
-  },
+  galleryCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row', padding: 12, gap: 12, marginBottom: 10 },
   galleryPhoto: { width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: COLORS.border },
   galleryPhotoPlaceholder: { backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   galleryInfo: { flex: 1, gap: 4 },
   galleryName: { color: COLORS.text, fontSize: 15, fontWeight: '700' },
   galleryMeta: { color: COLORS.textMuted, fontSize: 12 },
   galleryActions: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' },
-  galleryActionBtn: {
-    borderWidth: 1,
-    borderColor: COLORS.primary + '55',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: COLORS.primaryDim,
-  },
+  galleryActionBtn: { borderWidth: 1, borderColor: COLORS.primary + '55', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: COLORS.primaryDim },
   galleryActionBtnDisabled: { opacity: 0.4 },
   galleryActionText: { color: COLORS.primary, fontSize: 11, fontWeight: '800' },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
