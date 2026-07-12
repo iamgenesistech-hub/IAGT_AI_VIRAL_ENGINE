@@ -1,4 +1,4 @@
-/**
+﻿/**
  * renderWorker.js — Background Render Worker for Cloud Run
  * 
  * Long-running service that:
@@ -19,6 +19,7 @@ const express = require('express');
 const persistenceEngine = require('./persistenceEngine');
 const costTracker = require('./costTrackingEngine');
 const governance = require('./sacredIntelligenceGovernance');
+const { notifyVideoReady } = require('./pushNotifications');
 
 // HeyGen API calls
 const {
