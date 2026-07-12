@@ -10,7 +10,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '@/lib/storage';
 import { fetchAvatarGallery, fetchProducts, generateProductVideo, fetchVideoLibrary } from '@/lib/api';
 import { AffiliateSession, AvatarGalleryItem, Product, VideoJob } from '@/lib/types';
-import { COLORS } from '@/constants/config';
+import { COLORS, PLATFORMS, API_BASE } from '@/constants/config';
+
+const SCENE_OPTIONS = [
+  { id: 'studio',   label: 'Studio',   emoji: '🎬' },
+  { id: 'outdoor',  label: 'Outdoor',  emoji: '🌿' },
+  { id: 'beach',    label: 'Beach',    emoji: '🏖️' },
+  { id: 'office',   label: 'Office',   emoji: '💼' },
+  { id: 'nature',   label: 'Nature',   emoji: '🌲' },
+  { id: 'urban',    label: 'Urban',    emoji: '🏙️' },
+  { id: 'auto',     label: 'Auto',     emoji: '✨' },
+];
 
 export default function StudioScreen() {
   const router = useRouter();
@@ -20,6 +30,9 @@ export default function StudioScreen() {
   const [recentVideos, setRecentVideos] = useState<VideoJob[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarGalleryItem | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('tiktok');
+  const [selectedScene, setSelectedScene] = useState<string>('auto');
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,6 +58,21 @@ export default function StudioScreen() {
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
+  // Fetch a background URL when scene changes (non-auto)
+  useEffect(() => {
+    if (selectedScene === 'auto') { setBgUrl(null); return; }
+    fetch(`${API_BASE}/api/affiliate/avatar/background-options?scene=${selectedScene}`)
+      .then(r => r.json())
+      .then(data => {
+        const options = data?.options ?? data?.backgrounds ?? [];
+        if (Array.isArray(options) && options.length > 0) {
+          const pick = options[Math.floor(Math.random() * options.length)];
+          setBgUrl(typeof pick === 'string' ? pick : pick?.url ?? null);
+        }
+      })
+      .catch(() => setBgUrl(null));
+  }, [selectedScene]);
+
   async function handleGenerate() {
     if (!session) { Alert.alert('Not logged in', 'Please log in first.'); return; }
     if (!selectedProduct) { Alert.alert('No product selected', 'Select a product to generate a video.'); return; }
@@ -57,8 +85,9 @@ export default function StudioScreen() {
         productTitle: selectedProduct.title,
         productImageUrl: selectedProduct.imageUrl || selectedProduct.image,
         productPageUrl: selectedProduct.url,
-        platform: 'tiktok',
-      });
+        platform: selectedPlatform,
+        ...(bgUrl && selectedScene !== 'auto' ? { backgroundUrl: bgUrl } : {}),
+      } as Parameters<typeof generateProductVideo>[0]);
       Alert.alert(
         '🎬 Video Queued!',
         `Your cinematic video is being generated.\nJob: ${job.videoJobId}\n\nCheck the Videos tab for progress.`,
@@ -73,6 +102,8 @@ export default function StudioScreen() {
       setGenerating(false);
     }
   }
+
+  const platformInfo = PLATFORMS.find(p => p.value === selectedPlatform);
 
   return (
     <ScrollView
@@ -158,10 +189,55 @@ export default function StudioScreen() {
         )}
       </View>
 
+      {/* Platform Picker */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>PLATFORM</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {PLATFORMS.map(p => (
+            <TouchableOpacity
+              key={p.value}
+              style={[styles.platformChip, selectedPlatform === p.value && styles.platformChipActive]}
+              onPress={() => setSelectedPlatform(p.value)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.platformEmoji}>{p.icon}</Text>
+              <Text style={[styles.platformLabel, selectedPlatform === p.value && styles.platformLabelActive]}>
+                {p.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Scene / Background Picker */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>BACKGROUND SCENE</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {SCENE_OPTIONS.map(sc => (
+            <TouchableOpacity
+              key={sc.id}
+              style={[styles.sceneChip, selectedScene === sc.id && styles.sceneChipActive]}
+              onPress={() => setSelectedScene(sc.id)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.sceneEmoji}>{sc.emoji}</Text>
+              <Text style={[styles.sceneLabel, selectedScene === sc.id && styles.sceneLabelActive]}>{sc.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {bgUrl && selectedScene !== 'auto' && (
+          <Image source={{ uri: bgUrl }} style={styles.bgPreview} resizeMode="cover" />
+        )}
+      </View>
+
       {/* Cinematic info banner */}
       <View style={styles.cinematicBanner}>
-        <Ionicons name="film" size={16} color={COLORS.accent} />
-        <Text style={styles.cinematicText}>Cinematic mode on — Seedance post-render + camera motion applied automatically</Text>
+        <Ionicons name="film" size={15} color={COLORS.accent} />
+        <Text style={styles.cinematicText}>
+          Cinematic mode — Seedance post-render + camera motion applied
+          {platformInfo ? ` · Optimised for ${platformInfo.label}` : ''}
+          {selectedScene !== 'auto' ? ` · ${SCENE_OPTIONS.find(s => s.id === selectedScene)?.emoji} ${selectedScene} scene` : ''}
+        </Text>
       </View>
 
       {/* Generate button */}
@@ -215,7 +291,7 @@ const styles = StyleSheet.create({
   screenSub: { color: COLORS.textMuted, fontSize: 13, marginBottom: 24 },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sectionLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 },
   sectionAction: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
   emptyCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, padding: 24, alignItems: 'center', gap: 10 },
   emptyCardText: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center' },
@@ -232,8 +308,19 @@ const styles = StyleSheet.create({
   productName: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
   productNameActive: { color: COLORS.primary },
   productPrice: { color: COLORS.textMuted, fontSize: 11, marginTop: 4 },
+  platformChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.card, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8 },
+  platformChipActive: { backgroundColor: COLORS.primaryDim, borderColor: COLORS.primary },
+  platformEmoji: { fontSize: 14 },
+  platformLabel: { color: COLORS.textMuted, fontWeight: '600', fontSize: 13 },
+  platformLabelActive: { color: COLORS.primary },
+  sceneChip: { alignItems: 'center', gap: 4, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 12, paddingVertical: 10, marginRight: 8, minWidth: 68 },
+  sceneChipActive: { backgroundColor: COLORS.accentDim, borderColor: COLORS.accent },
+  sceneEmoji: { fontSize: 20 },
+  sceneLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: '600' },
+  sceneLabelActive: { color: COLORS.accent },
+  bgPreview: { width: '100%', height: 80, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: COLORS.border },
   cinematicBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.accentDim, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: COLORS.accent + '44', marginBottom: 16 },
-  cinematicText: { color: COLORS.textMuted, fontSize: 12, flex: 1 },
+  cinematicText: { color: COLORS.textMuted, fontSize: 12, flex: 1, lineHeight: 17 },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: COLORS.primary, borderRadius: 14, padding: 18, marginBottom: 28 },
   generateBtnText: { color: '#000', fontWeight: '900', fontSize: 16 },
   btnDisabled: { opacity: 0.4 },
