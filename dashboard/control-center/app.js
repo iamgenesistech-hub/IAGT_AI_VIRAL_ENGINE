@@ -900,6 +900,8 @@ function mapAd(row) {
     tags: row.tags || [],
     productMatch: row.product_match || "",
     emotion: row.emotion || "",
+    format: row.format || row.content_format || row.contentFormat || "Unknown format",
+    script: row.script || row.script_text || row.scriptText || "",
     structure: row.structure || []
   };
 }
@@ -1039,6 +1041,18 @@ function filteredAds() {
     const platformMatch = state.platform === "All" || ad.platform === state.platform;
     return categoryMatch && platformMatch;
   });
+}
+
+function mergeViralAds(newAds = []) {
+  if (!Array.isArray(newAds) || !newAds.length) return;
+  const seen = new Set();
+  const merged = [...newAds, ...viralAds].filter((item) => {
+    const key = `${String(item.platform || "").toLowerCase()}|${String(item.category || "").toLowerCase()}|${String(item.hook || item.title || "").toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  viralAds = merged.slice(0, 500);
 }
 
 function filteredCreatives() {
@@ -3000,6 +3014,7 @@ function renderViralIntelligence() {
                 <div>
                   <strong>${item.title}</strong>
                   <span>${item.platform} · ${item.category} · ${fmt(item.views)} views</span>
+                  <span>${item.format || "Format pending"} · ${item.script ? "Script ready" : "Script pending"}</span>
                 </div>
                 <small>${item.engagement}% ER</small>
               </button>
@@ -3021,6 +3036,8 @@ function renderViralIntelligence() {
           <dl>
             <div><dt>Product match</dt><dd>${ad.productMatch}</dd></div>
             <div><dt>Emotional pattern</dt><dd>${ad.emotion}</dd></div>
+            <div><dt>Format</dt><dd>${ad.format || "Format pending"}</dd></div>
+            <div><dt>Script</dt><dd>${ad.script ? escapeHtml(ad.script) : "Script pending"}</dd></div>
             <div><dt>CTA framework</dt><dd>${ad.cta}</dd></div>
           </dl>
           <div class="tag-cloud">${ad.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
@@ -7541,20 +7558,22 @@ function bindEvents() {
               id: `scan-${Date.now()}-${i}`,
               platform: t.platform || "TikTok",
               category: t.category || "Wellness",
-              title: t.hook.slice(0, 50),
+              title: (t.title || t.hook || "Trend").slice(0, 80),
               hook: t.hook,
-              views: t.views || 0,
-              engagement: t.engagement || 0,
-              velocity: t.velocity || 0,
-              conversion: 0,
-              cta: "",
-              tags: [],
-              productMatch: "",
-              emotion: "",
-              structure: []
+              views: Number(t.views || 0),
+              engagement: Number(t.engagement || 0),
+              velocity: Number(t.velocity || 0),
+              conversion: Number(t.conversion || 0),
+              cta: t.cta || "",
+              tags: Array.isArray(t.tags) ? t.tags : [],
+              productMatch: t.product_match || t.productMatch || "",
+              emotion: t.emotion || "",
+              format: t.format || t.content_format || t.contentFormat || "Unknown format",
+              script: t.script || t.script_text || t.scriptText || "",
+              structure: Array.isArray(t.structure) ? t.structure : []
             }));
           if (newAds.length) {
-            viralAds = [...newAds, ...viralAds].slice(0, 50);
+            mergeViralAds(newAds);
             state.selectedAdId = viralAds[0].id;
           }
         }
