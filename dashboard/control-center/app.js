@@ -184,9 +184,19 @@ const state = {
   scanning: false,
 
   // Winning Hooks
-  hookTarget: 100,
+  hookTarget: (() => {
+    try {
+      const storedHookTarget = Number(localStorage.getItem("evics_hook_target"));
+      if (Number.isFinite(storedHookTarget)) {
+        return Math.max(10, Math.min(500, Math.round(storedHookTarget)));
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+    return 100;
+  })(),
   hookSearching: false,
-  hooksFound: 73,
+  hooksFound: 0,
   showHooksList: false,
   selectedHooks: new Set(),
   hookAutoSelect: false,
@@ -7578,14 +7588,33 @@ function bindEvents() {
   // ── Hook search button → POST /api/agents/trend-scout/scan (hooks mode) ──
   const hookSearchBtn = document.getElementById("hook-search-btn");
   const hookTargetInput = document.getElementById("hook-target-input");
+  const normalizeHookTarget = (rawValue, fallbackValue = state.hookTarget) => {
+    const parsed = Number(rawValue);
+    const safeBase = Number.isFinite(parsed) ? parsed : Number(fallbackValue);
+    const normalized = Math.max(10, Math.min(500, Number.isFinite(safeBase) ? Math.round(safeBase) : 100));
+    return normalized;
+  };
+  const persistHookTarget = (value) => {
+    try {
+      localStorage.setItem("evics_hook_target", String(value));
+    } catch (e) {
+      // ignore storage errors
+    }
+  };
   if (hookTargetInput) {
-    hookTargetInput.addEventListener("change", () => {
-      state.hookTarget = Math.max(10, Math.min(500, Number(hookTargetInput.value) || 100));
-    });
+    const applyHookTargetValue = () => {
+      const normalized = normalizeHookTarget(hookTargetInput.value, state.hookTarget);
+      state.hookTarget = normalized;
+      hookTargetInput.value = String(normalized);
+      persistHookTarget(normalized);
+    };
+    hookTargetInput.addEventListener("input", applyHookTargetValue);
+    hookTargetInput.addEventListener("change", applyHookTargetValue);
   }
   if (hookSearchBtn) {
     hookSearchBtn.addEventListener("click", async () => {
-      state.hookTarget = Number(document.getElementById("hook-target-input")?.value || state.hookTarget);
+      state.hookTarget = normalizeHookTarget(document.getElementById("hook-target-input")?.value, state.hookTarget);
+      persistHookTarget(state.hookTarget);
       state.hookSearching = true;
       render();
       try {
