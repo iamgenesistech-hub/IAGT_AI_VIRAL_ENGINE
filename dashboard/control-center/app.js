@@ -7551,7 +7551,7 @@ function bindEvents() {
         const data = await agentFetch("/api/agents/trend-scout/scan", { amount: state.scanAmount });
         const newAds = (Array.isArray(data.trends) ? data.trends : [])
           .map((t, i) => ({
-            id: String(t.id || scan--),
+            id: String(t.id || ('scan-' + Date.now() + '-' + i)),
             platform: String(t.platform || "").trim(),
             category: String(t.category || "").trim(),
             title: String(t.title || t.hook || "").trim(),
@@ -7575,7 +7575,7 @@ function bindEvents() {
         state.scanCount = newAds.length;
         state.syncLevel = "connected";
         state.syncMessage = newAds.length
-          ? Trend Scout returned  scraped trends.
+          ? ('Trend Scout returned ' + newAds.length.toLocaleString() + ' scraped trends.')
           : "Trend Scout completed with no scraped trends.";
       } catch (err) {
         // Fallback: try backup endpoint
@@ -7642,7 +7642,7 @@ function bindEvents() {
         const data = await agentFetch("/api/agents/trend-scout/scan", { amount: state.scanAmount });
         const newAds = (Array.isArray(data.trends) ? data.trends : [])
           .map((t, i) => ({
-            id: String(t.id || scan--),
+            id: String(t.id || ('scan-' + Date.now() + '-' + i)),
             platform: String(t.platform || "").trim(),
             category: String(t.category || "").trim(),
             title: String(t.title || t.hook || "").trim(),
@@ -7666,7 +7666,7 @@ function bindEvents() {
         state.scanCount = newAds.length;
         state.syncLevel = "connected";
         state.syncMessage = newAds.length
-          ? Trend Scout returned  scraped trends.
+          ? ('Trend Scout returned ' + newAds.length.toLocaleString() + ' scraped trends.')
           : "Trend Scout completed with no scraped trends.";
       } catch (err) {
         state.connectSourcesError = err.message || "Failed to save credentials.";
