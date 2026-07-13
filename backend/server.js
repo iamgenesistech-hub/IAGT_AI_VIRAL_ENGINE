@@ -518,6 +518,7 @@ app.get(['/phone-app', '/phone-app/'], (req, res) => {
 });
 app.get(['/admin-hub', '/admin-hub/'], (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/admin-hub/index.html')));
 app.get('/affiliate-adminhub', (_req, res) => res.redirect('/admin-hub'));
+app.get(['/affiliate-hub', '/affiliate-hub/'], (_req, res) => res.redirect('/affiliate'));
 app.get('/ref/:code', (req, res) => {
   res.redirect(`/affiliate?ref=${encodeURIComponent(req.params.code)}`);
 });
@@ -3346,6 +3347,7 @@ app.get('/api/viral/gallery', async (req, res) => {
 app.get('/api/viral/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(Number(id))) return res.status(404).json({ success: false, error: 'Viral video not found.' });
     const { data, error } = await SupabaseConnector
       .from('evics_trends')
       .select('*')
