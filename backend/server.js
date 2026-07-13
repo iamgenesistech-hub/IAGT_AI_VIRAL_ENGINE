@@ -4374,7 +4374,7 @@ app.post('/api/agents/trend-scout/scan', async (req, res) => {
       count: trends.length,
       trends,
       message: trends.length
-        ? Trend Scout returned  scraped trends.
+        ? `Trend Scout returned ${trends.length} scraped trends.`
         : 'Trend Scout completed with no scraped trends returned.'
     });
   } catch (e) {
