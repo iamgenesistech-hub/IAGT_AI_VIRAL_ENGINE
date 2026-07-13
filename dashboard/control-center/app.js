@@ -9403,7 +9403,12 @@ function bindEvents() {
   const publishedRefreshBtn = document.getElementById("published-refresh-btn");
   if (publishedRefreshBtn) {
     publishedRefreshBtn.addEventListener("click", () => {
-      loadPublishedMedia();
+      if (typeof loadPublishedMedia === "function") {
+        loadPublishedMedia();
+      } else {
+        console.warn("Published media loader is unavailable.");
+        render();
+      }
     });
   }
 
