@@ -2061,7 +2061,35 @@ async function insertRenderRecord(record) {
     created_at: record.created_at || new Date().toISOString()
   };
 
+  // Primary attempt: satisfy the live table's NOT NULL legacy columns AND
+  // persist the rich media metadata (migration columns) in one row so nothing
+  // is dropped. Leaner shapes below are only tried if this is rejected.
+  const mergedRecord = {
+    render_name: record.render_name || `EVICS ${fullRecord.platform || 'internal'} render`,
+    sku: record.sku || 'EVICS-CLOSEOUT',
+    product_name: record.product_name || 'EVICS + EVIE Proof Render',
+    platform: fullRecord.platform,
+    render_grade: record.render_grade != null ? record.render_grade : 86,
+    product_fit: record.product_fit != null ? record.product_fit : 88,
+    brand_alignment: record.brand_alignment != null ? record.brand_alignment : 90,
+    conversion_potential: record.conversion_potential != null ? record.conversion_potential : 82,
+    viral_potential: record.viral_potential != null ? record.viral_potential : 86,
+    status: fullRecord.status,
+    vault_destination: record.vault_destination || fullRecord.video_url || '/generated/evics-sea-moss-proof-render.mp4',
+    job_id: fullRecord.job_id || null,
+    video_url: fullRecord.video_url || null,
+    thumbnail_url: record.thumbnail_url || null,
+    duration: record.duration || null,
+    script: fullRecord.script,
+    parameters: fullRecord.parameters,
+    source: fullRecord.source,
+    media_type: fullRecord.media_type,
+    render_status: record.render_status || fullRecord.status,
+    created_at: fullRecord.created_at
+  };
+
   const attempts = [
+    mergedRecord,
     fullRecord,
     {
       platform: fullRecord.platform,
@@ -3444,6 +3472,7 @@ app.post('/api/viral/:id/create-brief', async (req, res) => {
     const { error: insertError } = await SupabaseConnector
       .from('creatives')
       .insert([{
+        id: 'cr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         status: 'Draft',
         product,
         hook: brief.hook,
@@ -3683,6 +3712,7 @@ app.post('/api/viral/product/:productId/reproduce', async (req, res) => {
     let creative = null;
     try {
       const { data } = await SupabaseConnector.from('creatives').insert([{
+        id: 'cr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         status: 'Draft',
         hook: ad.hook || `${product.name} viral reproduction`,
         product: product.name,
@@ -4767,6 +4797,7 @@ app.post('/api/agents/script-writer/generate', async (req, res) => {
       await SupabaseConnector
         .from('creatives')
         .insert([{
+          id: 'cr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
           status: 'Draft',
           product: s.product,
           format: s.format,
@@ -5270,6 +5301,7 @@ app.post('/api/agents/auto-generate', async (req, res) => {
       await SupabaseConnector
         .from('creatives')
         .insert([{
+          id: creative.id,
           status: 'Draft',
           product: creative.product,
           format: creative.format,
@@ -5337,6 +5369,7 @@ app.post('/api/agent/reconstruct', async (req, res) => {
     const { data, error } = await SupabaseConnector
       .from('creatives')
       .insert([{
+        id: 'cr-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         status: 'Draft',
         hook: hook || 'AI-reconstructed hook',
         product: category || 'General',
@@ -5360,6 +5393,7 @@ app.post('/api/agent/generate-ads', async (req, res) => {
   try {
     const { products: productList, hooks } = req.body;
     const batch = (productList || []).slice(0, 5).map((product, i) => ({
+      id: 'cr-' + Date.now().toString(36) + '-' + i + Math.random().toString(36).slice(2, 6),
       status: 'Draft',
       product: product.name || product,
       hook: (hooks && hooks[i]) ? hooks[i].text || hooks[i] : 'AI-generated hook',
