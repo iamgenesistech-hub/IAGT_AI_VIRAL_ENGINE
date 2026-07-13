@@ -81,6 +81,13 @@ const costTracker = require('./costTrackingEngine');
 // Cinematic Layer Engine � Seedance/Kling post-render pass for camera motion + cinematic grading.
 const { applyCinematicLayer, getCinematicLayerStatus } = require('./cinematicLayerEngine');
 
+// Observability + Resilience telemetry -- structured request tracing, latency/error
+// metrics, and circuit-breaker state exposed via /metrics and /api/health.
+const { ObservabilityEngine, correlationIdMiddleware } = require('./observabilityEngine');
+const { getResilienceEngine } = require('./resilienceEngine');
+const observability = new ObservabilityEngine();
+const resilienceEngine = getResilienceEngine();
+
 // OpenAI client � initialised lazily so missing key only affects copilot routes
 let _openaiClient = null;
 function getOpenAI() {
@@ -93,6 +100,10 @@ function getOpenAI() {
 
 const app = express();
 const PORT = process.env.PORT || 4175;
+
+// Wire observability telemetry into every request (correlation IDs + latency/error metrics).
+app.locals.observability = observability;
+app.use(correlationIdMiddleware);
 const fs = require('fs');
 const dns = require('dns').promises;
 
@@ -2270,7 +2281,7 @@ app.get('/status', async (_req, res) => {
     heygen:    Boolean(process.env.HEYGEN_API_KEY),
     runway:    Boolean(process.env.RUNWAY_API_KEY),
     kling:     Boolean(process.env.KLING_API_KEY),
-    seedance:  Boolean(process.env.SEEDANCE_API_KEY),
+    seedance:  Boolean(process.env.AIMLAPI_KEY || process.env.SEEDANCE_API_KEY),
     vizard:    Boolean(process.env.VIZARD_API_KEY),
     predis:    Boolean(process.env.PREDIS_AI_API_KEY),
     canva:     Boolean(process.env.CANVA_API_KEY),
@@ -7147,14 +7158,16 @@ app.post('/api/affiliate/avatar/generate-video', async (req, res) => {
     } catch (e) {
       scr = `${productTitle || 'This product'} from I AM GENESIS TECH is changing lives. Get yours now at iamgenesistech.com � link in bio.`;
     }
-    if (!productImageUrl) {
-      return res.status(422).json({
-        success: false,
-        error: 'Primary product mockup image is required for affiliate product video rendering.'
-      });
-    }
-    const standardizedCinematicDirective = normalizeCinematicProductDirective(cinematic_directive || cinematicDirective || {});
   }
+
+  // Product mockup image is required for every affiliate product video render.
+  if (!productImageUrl) {
+    return res.status(422).json({
+      success: false,
+      error: 'Primary product mockup image is required for affiliate product video rendering.'
+    });
+  }
+  const standardizedCinematicDirective = normalizeCinematicProductDirective(cinematic_directive || cinematicDirective || {});
 
   // -- 2. Remove product background ? prepare mockup image ---------------------
   let processedImageUrl = null;
@@ -8828,12 +8841,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       if (selected && selected.requestId) {
         avatarRecord = findAvatarRequest(selected.requestId);
       }
-      if (!avatarRecord) {
-        return res.status(400).json({
-          success: false,
-          error: 'The selected avatar could not be resolved. Re-select a completed avatar and try again.'
-        });
-      }
+      // If requestedAvatarId doesn't match a custom gallery avatar, it may be a
+      // stock/HeyGen avatar ID -- fall through to the stock-avatar render path below.
     }
     if (!avatarRecord) {
       // Fall back to latest completed avatar for this affiliate ONLY
@@ -8843,52 +8852,42 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       }
     }
 
-    // If still no custom avatar record, check if affiliate has a selected stock/HeyGen avatar
+    // If still no custom avatar record, render directly with the affiliate's selected
+    // stock/HeyGen avatar (or the system default). No custom photo required -- the full
+    // HeyGen render + cinematic (Kling/Seedance) + GCS archive pipeline runs below.
     if (!avatarRecord || !avatarRecord.avatar) {
-      const profile = getAffiliateProfile(cleanCode);
-      if (profile?.selectedAvatarId) {
-        // Use the selected HeyGen stock avatar directly (no custom photo required)
-        const selectedAvatar = resolveAffiliateAvatar(cleanCode, null, null);
-        const videoJobId = `pvjob_${cleanCode}_${Date.now()}`;
-        const resolvedProductTitle = productTitle || 'Premium Product';
-        const resolvedProductImage = productImageUrl || '';
-        const resolvedPlatform = platform || 'tiktok';
-        const cinematicRequested = Boolean(cinematicMode) || true;
-        const standardizedCinematic = normalizeCinematicProductDirective({});
-        if (!resolvedProductImage) {
-          return res.status(422).json({
-            success: false,
-            error: 'productImageUrl is required for product video generation.'
-          });
-        }
-        // Route directly to the affiliate/avatar/generate-video flow
-        return res.status(202).json({
-          success: true,
-          videoJobId,
-          status: 'queued',
-          message: `Using selected avatar: ${selectedAvatar.avatarName}. Submit to /api/affiliate/avatar/generate-video with avatarId: "${selectedAvatar.avatarId}" to start rendering.`,
-          avatar: {
-            avatarId:     selectedAvatar.avatarId,
-            avatarName:   selectedAvatar.avatarName,
-            thumbnailUrl: selectedAvatar.avatarThumbnailUrl,
-            gender:       selectedAvatar.avatarGender,
-            type:         selectedAvatar.avatarType,
-            voiceId:      selectedAvatar.voiceId
-          },
-          productionTab: {
-            avatarId:     selectedAvatar.avatarId,
-            avatarName:   selectedAvatar.avatarName,
-            thumbnailUrl: selectedAvatar.avatarThumbnailUrl,
-            readyForRender: true
-          },
-          hint: 'POST /api/affiliate/avatar/generate-video with avatarId to render with this selected avatar.'
+      if (!productImageUrl) {
+        return res.status(422).json({
+          success: false,
+          error: 'productImageUrl is required for product video generation.'
         });
       }
-      return res.status(400).json({ success: false, error: 'No completed avatar found. Create an avatar first, or select a stock avatar from /api/affiliate/avatars.' });
+      const selectedAvatar = resolveAffiliateAvatar(cleanCode, requestedAvatarId || null, null);
+      // Synthesize a minimal avatar record so the shared render pipeline treats this
+      // stock avatar exactly like a custom one (renders via avatar_id, no talking_photo).
+      avatarRecord = {
+        requestId: avatarRequestId || null,
+        name: selectedAvatar.avatarName,
+        photoUrl: null,
+        productTitle,
+        productImageUrl,
+        productPageUrl,
+        platform,
+        isStockAvatar: true,
+        avatar: {
+          avatarId:        selectedAvatar.avatarId,
+          name:            selectedAvatar.avatarName,
+          previewImageUrl: selectedAvatar.avatarThumbnailUrl || null,
+          gender:          selectedAvatar.avatarGender || null,
+          voiceCloneId:    selectedAvatar.voiceId || null,
+          talkingPhotoId:  null,
+          attireLabel:     'Professional'
+        }
+      };
     }
 
     const photoUrl = avatarRecord.photoUrl || avatarRecord.avatar?.photoUrl || null;
-    if (!photoUrl) {
+    if (!photoUrl && !avatarRecord.isStockAvatar) {
       return res.status(400).json({ success: false, error: 'Avatar has no photo URL. Re-create your avatar with a photo.' });
     }
 
@@ -11721,7 +11720,7 @@ app.listen(PORT, () => {
   console.log(`➡️  Status:              http://127.0.0.1:${PORT}/status`);
 
   // Initialize Phase 2: Production Hardening
-  const phase2Ready = phase2Integration.initialize(app);
+  const phase2Ready = phase2Integration.initialize(app, null, { observability, resilienceEngine });
   if (phase2Ready) {
     phase2Integration.mountAuthRoutes(app);
     phase2Integration.mountBillingRoutes(app);

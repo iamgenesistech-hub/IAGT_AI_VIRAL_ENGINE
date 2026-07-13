@@ -294,25 +294,21 @@ class ObservabilityEngine {
  * Middleware: Attach correlation ID to response headers
  */
 function correlationIdMiddleware(req, res, next) {
-  const observability = req.app.locals.observability;
+  const observability = req.app && req.app.locals && req.app.locals.observability;
+  if (!observability) return next();
   observability.recordRequestStart(req, res);
 
   const ctx = getRequestContext();
-  res.set('X-Correlation-ID', ctx.correlationId);
+  if (!res.headersSent) res.set('X-Correlation-ID', ctx.correlationId);
 
-  // Wrap res.json() to log on response
-  const originalJson = res.json.bind(res);
-  res.json = function(body) {
-    observability.recordRequestEnd(req, res, res.statusCode);
-    return originalJson(body);
-  };
-
-  // Wrap res.send() to log on response
-  const originalSend = res.send.bind(res);
-  res.send = function(body) {
-    observability.recordRequestEnd(req, res, res.statusCode);
-    return originalSend(body);
-  };
+  // Record exactly once when the response is fully flushed. Using the 'finish' event
+  // avoids double-counting from Express res.json() internally calling res.send().
+  let recorded = false;
+  res.on('finish', () => {
+    if (recorded) return;
+    recorded = true;
+    try { observability.recordRequestEnd(req, res, res.statusCode); } catch (_) {}
+  });
 
   next();
 }
