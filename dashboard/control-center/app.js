@@ -2275,16 +2275,16 @@ async function loadViralGallery() {
     const res = await fetch(`/api/viral/gallery?${params.toString()}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && data.videos && data.videos.length) {
+      if (data.success && Array.isArray(data.videos)) {
         state.viralVideos = data.videos.map(mapViralVideo);
       } else {
-        state.viralVideos = getFilteredDemoViralVideos();
+        state.viralVideos = [];
       }
     } else {
-      state.viralVideos = getFilteredDemoViralVideos();
+      state.viralVideos = [];
     }
   } catch {
-    state.viralVideos = getFilteredDemoViralVideos();
+    state.viralVideos = [];
   }
   state.viralLoading = false;
   render();
@@ -2338,8 +2338,8 @@ async function generateViralAnalysis(videoId) {
     }
   } catch { /* fall through to demo */ }
   // Demo analysis
-  const video = (state.viralVideos.length ? state.viralVideos : viralAds).find((v) => v.id === videoId) || viralAds[0];
-  state.viralAnalysis = {
+  const video = state.viralVideos.find((v) => v.id === videoId) || state.viralVideos[0] || null;
+  if (!video) {`n    state.viralAnalysis = null;`n    state.viralAnalysisLoading = false;`n    render();`n    return;`n  }`n  state.viralAnalysis = {
     id: videoId,
     whatsWorking: [
       { label: "Hook strength", score: Math.round(70 + (video.velocity || 80) * 0.2), note: `"${video.hook || "Pattern-matched hook"}" — strong curiosity trigger` },
@@ -2367,9 +2367,9 @@ async function generateViralAnalysis(videoId) {
 }
 
 function renderViralGallery() {
-  const displayVideos = state.viralVideos.length ? state.viralVideos : getFilteredDemoViralVideos();
-  const allPlatforms = ["All", ...new Set(viralAds.map((a) => a.platform))];
-  const allCategories = ["All", ...new Set(viralAds.map((a) => a.category))];
+  const displayVideos = state.viralVideos;
+  const allPlatforms = ["All", ...new Set(displayVideos.map((a) => a.platform).filter(Boolean))];
+  const allCategories = ["All", ...new Set(displayVideos.map((a) => a.category).filter(Boolean))];
 
   return `
     <section class="viral-gallery-section panel">
@@ -2377,7 +2377,7 @@ function renderViralGallery() {
         <div class="viral-gallery-title-row">
           <div>
             <h2>${icon("video")} Viral Content Gallery</h2>
-            <p>${displayVideos.length} scraped viral videos · Filter by platform or category to find patterns</p>
+            <p>${displayVideos.length} live EVICS viral videos · Filter by platform or category to find patterns</p>
           </div>
           <div class="viral-gallery-controls">
             <label class="viral-filter-label">
@@ -7608,6 +7608,81 @@ function bindEvents() {
   }
 
   // ── Hook search button → POST /api/agents/trend-scout/scan (hooks mode) ──
+  const viralRefreshBtn = document.getElementById("viral-gallery-refresh");
+  if (viralRefreshBtn) {
+    viralRefreshBtn.addEventListener("click", () => {
+      loadViralGallery();
+    });
+  }
+
+  const viralPlatformFilter = document.getElementById("viral-platform-filter");
+  if (viralPlatformFilter) {
+    viralPlatformFilter.addEventListener("change", () => {
+      state.viralFilterPlatform = viralPlatformFilter.value;
+      loadViralGallery();
+    });
+  }
+
+  const viralCategoryFilter = document.getElementById("viral-category-filter");
+  if (viralCategoryFilter) {
+    viralCategoryFilter.addEventListener("change", () => {
+      state.viralFilterCategory = viralCategoryFilter.value;
+      loadViralGallery();
+    });
+  }
+
+  const toggleViralGalleryBtn = document.getElementById("toggle-viral-gallery");
+  if (toggleViralGalleryBtn) {
+    toggleViralGalleryBtn.addEventListener("click", () => {
+      state.viralGalleryOpen = !state.viralGalleryOpen;
+      render();
+    });
+  }
+
+  document.querySelectorAll("[data-viral-video-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const selected = state.viralVideos.find((v) => String(v.id) === String(btn.dataset.viralVideoId));
+      if (selected) {
+        state.viralSelectedVideo = selected;
+        state.viralAnalysis = null;
+        render();
+      }
+    });
+  });
+
+  const runViralAnalysisBtn = document.getElementById("run-viral-analysis");
+  if (runViralAnalysisBtn) {
+    runViralAnalysisBtn.addEventListener("click", () => {
+      const videoId = runViralAnalysisBtn.dataset.videoId;
+      if (videoId) generateViralAnalysis(videoId);
+    });
+  }
+
+  const createViralBriefBtn = document.getElementById("create-viral-brief");
+  if (createViralBriefBtn) {
+    createViralBriefBtn.addEventListener("click", async () => {
+      const videoId = createViralBriefBtn.dataset.videoId;
+      if (!videoId) return;
+      state.viralBriefLoading = true;
+      render();
+      try {
+        const res = await fetch(`/api/viral/${videoId}/create-brief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productName: "EVICS Product" })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            state.viralBriefResult = data.brief;
+          }
+        }
+      } catch {}
+      state.viralBriefLoading = false;
+      render();
+    });
+  }
+
   const hookSearchBtn = document.getElementById("hook-search-btn");
   const hookTargetInput = document.getElementById("hook-target-input");
   const normalizeHookTarget = (rawValue, fallbackValue = state.hookTarget) => {
