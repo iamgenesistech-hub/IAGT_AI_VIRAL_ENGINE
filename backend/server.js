@@ -1,4 +1,4 @@
-﻿successfully downloaded text file (SHA: edf6953c8b2154ada8be4e1f9510175acddc0bba)// backend/server.js
+// backend/server.js
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
@@ -5883,15 +5883,24 @@ app.get('/api/analytics/quality-report', async (_req, res) => {
 // -------------------------
 app.post('/api/quality/validate', async (req, res) => {
   try {
-    const { hookStrength, pacingScore, ctaClarity, visualStyle, overallQuality, creativeId } = req.body;
+    const { hookStrength, pacingScore, ctaClarity, visualStyle, overallQuality, creativeId, thresholds: requestedThresholds } = req.body;
 
-    const thresholds = {
+    // Elite defaults — overridable per request so the dashboard's adjustable
+    // thresholds actually drive the server-side gate instead of being hard-coded.
+    const DEFAULT_ELITE_THRESHOLDS = {
       hookStrength: 75,
       pacingScore: 70,
       ctaClarity: 75,
       visualStyle: 80,
       overallQuality: 80
     };
+    const thresholds = { ...DEFAULT_ELITE_THRESHOLDS };
+    if (requestedThresholds && typeof requestedThresholds === 'object') {
+      Object.keys(thresholds).forEach((key) => {
+        const v = Number(requestedThresholds[key]);
+        if (Number.isFinite(v)) thresholds[key] = Math.max(0, Math.min(100, Math.round(v)));
+      });
+    }
 
     const scores = { hookStrength, pacingScore, ctaClarity, visualStyle, overallQuality };
     const failures = [];
