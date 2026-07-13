@@ -345,6 +345,11 @@ const state = {
   publishedMedia: [],
   publishedMediaLoading: false,
   publishedMediaFilter: "All",
+
+  // Live EVICS media library (evics_renders) — real EVICS-created videos only, no placeholders
+  mediaLibrary: [],
+  mediaLibraryLoading: false,
+  mediaLibraryError: false,
   selectedPublishedId: null,
   publishActionStatus: null,
 
@@ -1962,7 +1967,8 @@ function filteredPublishedMedia() {
 }
 
 function filteredMedia() {
-  return DEMO_MEDIA.filter((item) => {
+  const library = Array.isArray(state.mediaLibrary) ? state.mediaLibrary : [];
+  return library.filter((item) => {
     const typeMatch = state.selectedMediaType === "All" || item.media_type === state.selectedMediaType;
     const appMatch  = state.selectedRenderApp  === "All" || item.platform    === state.selectedRenderApp;
     return typeMatch && appMatch;
@@ -1970,7 +1976,8 @@ function filteredMedia() {
 }
 
 function selectedMedia() {
-  return DEMO_MEDIA.find((m) => m.id === state.selectedMediaId) || null;
+  const library = Array.isArray(state.mediaLibrary) ? state.mediaLibrary : [];
+  return library.find((m) => String(m.id) === String(state.selectedMediaId)) || null;
 }
 
 function mediaTypeLabel(id) {
@@ -2123,7 +2130,15 @@ function renderMediaArea(sectionId) {
           </div>
           <div class="media-grid">
             ${items.length === 0
-              ? `<div class="media-empty">No media found for the selected filters.</div>`
+              ? `<div class="media-empty">${
+                  state.mediaLibraryError
+                    ? "Live media service is offline. Restore the EVICS database connection to load real EVICS videos."
+                    : (state.mediaLibraryLoading
+                        ? "Loading live EVICS media..."
+                        : ((state.selectedMediaType !== "All" || state.selectedRenderApp !== "All")
+                            ? "No EVICS media matches the selected filters."
+                            : "No EVICS-created media yet. Generate a render to populate the library."))
+                }</div>`
               : items.map((item) => `
                 <button class="media-card ${item.id === state.selectedMediaId ? "media-card-selected" : ""}" data-media-id="${item.id}">
                   <div class="media-card-thumb media-thumb-${item.media_type}">
@@ -2287,6 +2302,71 @@ async function loadViralGallery() {
     state.viralVideos = [];
   }
   state.viralLoading = false;
+  render();
+}
+
+// ── Live EVICS Media Library (evics_renders) ──
+
+function normalizeRenderStatus(status) {
+  const s = String(status || "").toLowerCase().trim();
+  if (!s) return "complete";
+  if (s === "completed" || s === "ready" || s === "published" || s === "live") return "complete";
+  if (s === "processing" || s === "rendering" || s === "queued" || s === "in_progress") return "pending";
+  return s;
+}
+
+function mapRenderToMediaItem(row) {
+  const renderId = row.render_id || row.id || row.job_id || row.video_id || "";
+  const directUrl = row.video_url || row.final_video_url || row.render_url || row.output_url || row.storage_url || "";
+  const status = normalizeRenderStatus(row.status);
+  const isComplete = status === "complete" || status === "approved";
+  const playbackUrl = directUrl || (renderId && isComplete ? ("/api/media/playback/" + encodeURIComponent(renderId)) : "");
+  const rawScore = row.score != null ? row.score
+    : row.render_grade != null ? row.render_grade
+    : row.quality_score != null ? row.quality_score
+    : row.viral_potential != null ? row.viral_potential
+    : 0;
+  const score = Number(rawScore);
+  return {
+    id: String(renderId || ("render-" + Math.random().toString(36).slice(2))),
+    media_type: String(row.media_type || row.mediaType || "video").toLowerCase(),
+    platform: row.platform || row.render_app || "internal",
+    status: status,
+    script: row.script || row.title || row.product_title || row.product_name || row.render_name || "EVICS render",
+    score: Number.isFinite(score) ? Math.round(score) : 0,
+    created_at: row.created_at || row.updated_at || new Date().toISOString(),
+    video_url: playbackUrl,
+    thumbnail_url: row.thumbnail_url || row.poster_url || null,
+    product: row.product_title || row.product_name || row.product || "",
+    hook: row.hook || row.script || "",
+    parameters: row.parameters || null,
+    source: "evics_generated"
+  };
+}
+
+async function loadMediaLibrary() {
+  state.mediaLibraryLoading = true;
+  state.mediaLibraryError = false;
+  render();
+  try {
+    const res = await fetch("/api/renders");
+    if (res.ok) {
+      const data = await res.json();
+      const rows = Array.isArray(data.renders) ? data.renders
+        : Array.isArray(data.media) ? data.media
+        : Array.isArray(data.results) ? data.results
+        : [];
+      state.mediaLibrary = rows.map(mapRenderToMediaItem);
+      state.mediaLibraryError = false;
+    } else {
+      state.mediaLibrary = [];
+      state.mediaLibraryError = true;
+    }
+  } catch {
+    state.mediaLibrary = [];
+    state.mediaLibraryError = true;
+  }
+  state.mediaLibraryLoading = false;
   render();
 }
 
@@ -7066,20 +7146,8 @@ function bindEvents() {
     mediaRefreshBtn.addEventListener("click", async () => {
       mediaRefreshBtn.textContent = "Refreshing…";
       mediaRefreshBtn.disabled = true;
-      // Try to fetch from backend; fall back to demo data
-      try {
-        let url = "/api/renders";
-        if (state.selectedMediaType !== "All" && state.selectedRenderApp !== "All") {
-          url = `/api/media/by-type/${state.selectedMediaType}/by-app/${state.selectedRenderApp}`;
-        } else if (state.selectedMediaType !== "All") {
-          url = `/api/media/by-type/${state.selectedMediaType}`;
-        } else if (state.selectedRenderApp !== "All") {
-          url = `/api/media/by-app/${state.selectedRenderApp}`;
-        }
-        await fetch(url);
-      } catch { /* demo mode */ }
-      await new Promise((r) => setTimeout(r, 600));
-      render();
+      // Reload live EVICS renders from the backend (evics_renders)
+      await loadMediaLibrary();
     });
   }
 
@@ -7097,7 +7165,7 @@ function bindEvents() {
     const openReview = (event) => {
       event.stopPropagation();
       const id = btn.dataset.mediaReviewId;
-      const item = DEMO_MEDIA.find((entry) => String(entry.id) === String(id));
+      const item = (state.mediaLibrary || []).find((entry) => String(entry.id) === String(id));
       if (!item) return;
       state.selectedMediaId = id;
       openMediaReviewModal(item);
@@ -7126,7 +7194,7 @@ function bindEvents() {
     btn.addEventListener("click", async () => {
       const action = btn.dataset.mediaAction;
       const id     = btn.dataset.mediaId;
-      const item   = DEMO_MEDIA.find((m) => m.id === id);
+      const item   = (state.mediaLibrary || []).find((m) => String(m.id) === String(id));
       if (!item) return;
 
       if (action === "approve") {
@@ -8094,6 +8162,7 @@ async function boot() {
   await hydrateFromSupabase();
   await hydrateFromServerApi();
   await loadViralGallery();
+  await loadMediaLibrary();
   // Pre-load API service configs in background
   loadServicesConfig().catch(() => {
     state.servicesConfig = buildDemoServices();
