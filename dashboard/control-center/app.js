@@ -9384,17 +9384,7 @@ function bindEvents() {
       state.publishedMediaOpen = !state.publishedMediaOpen;
       if (state.publishedMediaOpen && state.publishedMedia.length === 0) {
         if (typeof loadPublishedMedia === "function") {
-          if (typeof loadPublishedMedia === "function") {
-        if (typeof loadPublishedMedia === "function") {
           loadPublishedMedia();
-        } else {
-          console.warn("Published media loader is unavailable.");
-          render();
-        }
-      } else {
-        console.warn("Published media loader is unavailable.");
-        render();
-      }
         } else {
           console.warn("Published media loader is unavailable.");
           render();
