@@ -3391,7 +3391,7 @@ app.post('/api/viral/:id/create-brief', async (req, res) => {
 // -------------------------
 app.post('/api/viral/rescan', async (req, res) => {
   try {
-    const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 1284));
+    const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 3000));
 
     // Record the rescan request in Supabase
     const { error } = await SupabaseConnector
@@ -4325,50 +4325,44 @@ app.post('/api/video/callback', async (req, res) => {
 app.post('/api/agents/trend-scout/scan', async (req, res) => {
   try {
     const { keyword, amount } = req.body;
-    const scanAmount = Math.max(100, Math.min(10000, Number(amount) || 1284));
+    const scanAmount = Math.max(100, Math.min(10000, Number(amount) || 3000));
+    const queryLimit = Math.min(scanAmount, 500);
 
-    // Pull recent trends from Supabase
-    let query = SupabaseConnector
+    const { data, error } = await SupabaseConnector
       .from('evics_trends')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(queryLimit);
 
-    const { data, error } = await query;
-    if (error) console.warn('Trend scout Supabase read failed:', error.message);
+    if (error) throw new Error(error.message);
 
-    // Log the scan
-    await SupabaseConnector
-      .from('evics_trends')
-      .insert([{
-        title: keyword ? `Keyword scan: ${keyword}` : `Trend scout scan — ${scanAmount} ads`,
-        source: 'trend_scout_agent',
-        scan_amount: scanAmount,
-        hook: keyword || null,
-        created_at: new Date().toISOString()
-      }])
-      .then(({ error: insertErr }) => {
-        if (insertErr) console.warn('Trend scout log insert failed:', insertErr.message);
-      });
-
-    const trends = (data || []).map((row) => ({
-      id: row.id,
-      title: row.title || 'Untitled trend',
-      hook: row.hook || '',
-      platform: row.platform || 'Multi',
-      category: row.category || 'General',
-      velocity: row.velocity || Math.floor(Math.random() * 40) + 60,
-      confidence: row.confidence || 'Medium'
-    }));
-
-    // Demo fallback trends if Supabase is empty
-    if (!trends.length) {
-      trends.push(
-        { id: 'ts-1', title: 'Morning ritual reset', hook: 'Nobody talks about this morning habit...', platform: 'TikTok', category: 'Wellness', velocity: 92, confidence: 'High' },
-        { id: 'ts-2', title: 'Skin glow transformation', hook: 'This changed my skin in 7 days...', platform: 'Instagram', category: 'Beauty', velocity: 78, confidence: 'High' },
-        { id: 'ts-3', title: 'Focus stack founder', hook: 'My 2 PM crash disappeared when...', platform: 'YouTube', category: 'Nootropics', velocity: 71, confidence: 'Medium' }
-      );
-    }
+    const blockedSources = new Set(['trend_scout_agent', 'manual_rescan', 'agent_viral_scan']);
+    const trends = (data || [])
+      .filter((row) => !blockedSources.has(String(row.source || '').toLowerCase()))
+      .filter((row) => {
+        const title = String(row.title || '').trim();
+        const hook = String(row.hook || '').trim();
+        const script = String(row.script || row.script_text || '').trim();
+        return Boolean(title || hook || script);
+      })
+      .map((row) => ({
+        id: row.id,
+        title: row.title || row.hook || '',
+        hook: row.hook || '',
+        script: row.script || row.script_text || '',
+        format: row.format || row.content_format || '',
+        platform: row.platform || '',
+        category: row.category || '',
+        views: Number(row.views || 0),
+        engagement: Number(row.engagement || 0),
+        velocity: Number(row.velocity || row.signal_quality || 0),
+        conversion: Number(row.conversion || 0),
+        cta: row.cta || '',
+        tags: Array.isArray(row.tags) ? row.tags : [],
+        product_match: row.product_match || '',
+        emotion: row.emotion || '',
+        structure: Array.isArray(row.structure) ? row.structure : []
+      }));
 
     noStore(res);
     res.json({
@@ -4377,10 +4371,11 @@ app.post('/api/agents/trend-scout/scan', async (req, res) => {
       scanned: scanAmount,
       keyword: keyword || null,
       found: trends.length,
+      count: trends.length,
       trends,
-      message: keyword
-        ? `Trend Scout found ${trends.length} trends matching "${keyword}".`
-        : `Trend Scout scanned ${scanAmount} ads and found ${trends.length} active trends.`
+      message: trends.length
+        ? Trend Scout returned  scraped trends.
+        : 'Trend Scout completed with no scraped trends returned.'
     });
   } catch (e) {
     res.status(500).json({ success: false, agent: 'trend-scout', error: e.message || String(e) });
@@ -4973,7 +4968,7 @@ app.post('/api/agents/auto-generate', async (req, res) => {
 // /api/agent/viral-scan — trigger viral intelligence scan
 app.post('/api/agent/viral-scan', async (req, res) => {
   try {
-    const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 1284));
+    const amount = Math.max(100, Math.min(10000, Number(req.body.amount) || 3000));
     const { error } = await SupabaseConnector
       .from('evics_trends')
       .insert([{
@@ -5455,7 +5450,7 @@ app.get('/api/agents/status', async (_req, res) => {
         name: 'Trend Scout Agent',
         role: 'Scanning viral content across TikTok, Instagram, YouTube, Facebook, Pinterest',
         status: 'active',
-        currentTask: 'Scanning 1,284 viral ads for hook patterns',
+        currentTask: 'Scanning viral ads for hook patterns',
         processingTime: '2.4s avg',
         lastResult: 'Found 12 high-confidence hooks in Beauty + Weight Loss categories',
         qualityScore: 94,
