@@ -2252,7 +2252,10 @@ app.get('/status', async (_req, res) => {
       if (!keys.supabase) return { service: 'supabase', status: 'no_key', pingMs: null };
       const t0 = Date.now();
       try {
-        await SupabaseConnector.from('evics_renders').select('id').limit(1);
+        const probe = await SupabaseConnector.from('evics_renders').select('id').limit(1);
+        if (probe && probe.error) {
+          return { service: 'supabase', status: 'error', error: (probe.error.message || String(probe.error)), pingMs: Date.now() - t0 };
+        }
         return { service: 'supabase', status: 'ok', pingMs: Date.now() - t0 };
       } catch (e) { return { service: 'supabase', status: 'error', error: e.message, pingMs: Date.now() - t0 }; }
     })(),
