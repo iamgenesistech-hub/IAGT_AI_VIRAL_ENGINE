@@ -7593,7 +7593,7 @@ function bindEvents() {
             state.scanCount = backupAds.length;
           } else {
             await new Promise((r) => setTimeout(r, 1800));
-            state.scanCount = state.scanAmount;
+            viralAds = [];`n            state.selectedAdId = null;`n            state.scanCount = 0;
           }
         } catch {
           await new Promise((r) => setTimeout(r, 1800));
