@@ -8064,7 +8064,7 @@ async function boot() {
   syncSectionInUrl(state.currentSection);
   render();
   await hydrateFromSupabase();
-  await hydrateFromServerApi();
+  await hydrateFromServerApi();`n  await loadViralGallery();
   await loadViralGallery();
   // Pre-load API service configs in background
   loadServicesConfig().catch(() => {
