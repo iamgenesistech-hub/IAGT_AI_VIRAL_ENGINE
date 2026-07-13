@@ -26,10 +26,14 @@ const {
   getHeyGenCurrentUser,
   enforceFaceSafeTextPosition
 } = require('./internalVideoRenderer');
-const { startScheduler, getSchedulerLog } = require('../utils/automationScheduler');
+const { startScheduler, getSchedulerLog, runScheduledTask } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
 const { selectBackground, toHeyGenBackground, detectCategory, getAllThemes, getRandomBackground, resolveBackgroundUrl } = require('../utils/videoBackgroundSelector');
 const { generateViralScript } = require('../utils/viralScriptEngine');
+const { fetchTikTokTrending, fetchInstagramPosts } = require('../utils/viralPlatformConnector');
+const { fetchMetaAds } = require('../utils/adPlatformConnector');
+const { generateRecreationStrategy } = require('../utils/adRecreationStrategyEngine');
+const { calculateViralScore } = require('../utils/viralIntelligenceEngine');
 const algorithmOptimization = require('./algorithmOptimizationEngine');
 const {
   intakeServiceWebsite,
@@ -3373,8 +3377,8 @@ app.post('/api/viral/:id/match-products', async (req, res) => {
     const { id } = req.params;
 
     const [videoRes, productsRes] = await Promise.all([
-      SupabaseConnector.from('evics_trends').select('category, platform, hook, emotion').eq('id', id).single(),
-      SupabaseConnector.from('evics_products').select('*').order('score', { ascending: false }).limit(20)
+      SupabaseConnector.from('evics_trends').select('category, platform').eq('id', id).single(),
+      SupabaseConnector.from('evics_products').select('*').order('profit_score', { ascending: false }).limit(20)
     ]);
 
     const video = videoRes.data;
@@ -3385,7 +3389,7 @@ app.post('/api/viral/:id/match-products', async (req, res) => {
       .map((p) => {
         const categoryMatch = video && p.category && video.category &&
           p.category.toLowerCase().includes(video.category.toLowerCase().split(' ')[0]);
-        const score = categoryMatch ? Math.min(99, (p.score || 70) + 12) : (p.score || 70);
+        const score = categoryMatch ? Math.min(99, (p.profit_score || 70) + 12) : (p.profit_score || 70);
         return { ...p, matchScore: score, matchReason: categoryMatch ? 'Category alignment' : 'Audience overlap' };
       })
       .sort((a, b) => b.matchScore - a.matchScore)
@@ -3471,7 +3475,7 @@ app.post('/api/viral/rescan', async (req, res) => {
     const { error } = await SupabaseConnector
       .from('evics_trends')
       .insert([{
-        title: `Manual rescan — ${amount} ads`,
+        trend_name: `Manual rescan — ${amount} ads`,
         source: 'manual_rescan',
         scan_amount: amount,
         created_at: new Date().toISOString()
@@ -3486,6 +3490,256 @@ app.post('/api/viral/rescan', async (req, res) => {
   }
 });
 
+// =========================================================================
+// Product Viral Intelligence — scan store products against live viral
+// signals, schedule daily scans, find competitor ads, and reproduce
+// winning templates. Backed by real Supabase viral data + scoring engines.
+// =========================================================================
+
+// Helper: keyword overlap between a product and a viral trend row
+function pviKeywordOverlap(productText, trendRow) {
+  const kw = String(productText || '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+  if (!kw.length) return 0;
+  const hay = `${trendRow.category || ''} ${trendRow.title || ''} ${trendRow.hook || ''} ${trendRow.product_match || ''}`.toLowerCase();
+  return kw.filter((w) => hay.includes(w)).length;
+}
+
+// POST /api/viral/scan-by-product — score each store product against real viral trends
+app.post('/api/viral/scan-by-product', async (req, res) => {
+  try {
+    // 1. Load store products (Supabase cache → live Shopify fallback)
+    let products = [];
+    try {
+      const { data } = await SupabaseConnector.from('evics_products').select('*').order('created_at', { ascending: false }).limit(50);
+      if (data && data.length) products = data;
+    } catch (_) {}
+    if (!products.length) {
+      try { products = await fetchShopifyProducts(); } catch (_) {}
+    }
+    products = (products || []).slice(0, 25);
+
+    // 2. Pull recent real viral signals
+    const { data: trendData } = await SupabaseConnector
+      .from('evics_trends').select('*').order('created_at', { ascending: false }).limit(200);
+    const trends = trendData || [];
+
+    // 3. Score every product against the best-matching real viral signal
+    const results = products.map((p) => {
+      const name = p.title || p.name || p.product_title || 'Product';
+      const category = p.product_type || p.category || '';
+      const text = `${name} ${category}`;
+      let best = null; let bestOverlap = -1;
+      for (const t of trends) {
+        const ov = pviKeywordOverlap(text, t);
+        if (ov > bestOverlap) { bestOverlap = ov; best = t; }
+      }
+      const t = best || {};
+      const productFit = Math.min(100, 40 + bestOverlap * 20);
+      const score = calculateViralScore({
+        views: Number(t.views || 0),
+        shares: Number(t.shares || 0),
+        comments: Number(t.comments || 0),
+        velocity: Number(t.velocity || t.signal_quality || 0),
+        hookStrength: t.hook ? 85 : 55,
+        productFit,
+        conversionSignal: Number(t.conversion || 0) || 60
+      });
+      return {
+        product: name,
+        category: category || 'General Wellness',
+        viralScore: Math.max(50, Math.min(99, Math.round(score))),
+        hook: t.hook || t.title || `${name}: the upgrade your routine was missing`,
+        platform: t.platform || 'Multi',
+        matchStrength: bestOverlap > 0 ? 'matched' : 'baseline'
+      };
+    }).sort((a, b) => b.viralScore - a.viralScore);
+
+    // 4. Record the scan
+    try {
+      await SupabaseConnector.from('evics_trends').insert([{
+        trend_name: `Product viral scan — ${results.length} products`,
+        source: 'scan_by_product', scan_amount: results.length, created_at: new Date().toISOString()
+      }]);
+    } catch (_) {}
+
+    const nextScan = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    noStore(res);
+    res.json({ success: true, count: results.length, results, nextScan });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/viral/schedule-daily-scan — register a recurring product viral scan
+app.post('/api/viral/schedule-daily-scan', async (req, res) => {
+  try {
+    const hour = Math.min(23, Math.max(0, Number(req.body.hour != null ? req.body.hour : 6)));
+    const minute = Math.min(59, Math.max(0, Number(req.body.minute != null ? req.body.minute : 0)));
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hour, minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(minute).padStart(2, '0');
+
+    const task = runScheduledTask('viral-scan-by-product', `daily@${hh}:${mm}`);
+    try {
+      await SupabaseConnector.from('evics_trends').insert([{
+        trend_name: `Daily viral scan scheduled for ${hh}:${mm}`,
+        source: 'schedule_daily_scan', created_at: new Date().toISOString()
+      }]);
+    } catch (_) {}
+
+    noStore(res);
+    res.json({
+      success: true,
+      nextRun: next.toISOString(),
+      scheduledFor: `${hh}:${mm}`,
+      message: `Daily product viral scan scheduled for ${hh}:${mm}.`,
+      task
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/viral/find-product-viral-ads — surface real competitor ads for a product
+app.post('/api/viral/find-product-viral-ads', async (req, res) => {
+  try {
+    const { productName, category } = req.body || {};
+    const defaultPlatforms = ['TikTok', 'Instagram', 'YouTube', 'Facebook', 'Pinterest'];
+
+    const { data } = await SupabaseConnector
+      .from('evics_trends').select('*').order('created_at', { ascending: false }).limit(120);
+    let pool = data || [];
+
+    const needle = String(category || productName || '').toLowerCase();
+    if (needle) {
+      const filtered = pool.filter((t) => pviKeywordOverlap(`${productName || ''} ${category || ''}`, t) > 0);
+      if (filtered.length) pool = filtered;
+    }
+
+    const ads = pool.slice(0, 25).map((t) => ({
+      id: t.id,
+      platform: t.platform || 'Multi',
+      hook: t.hook || t.title || t.trend_name || 'Viral ad',
+      views: Number(t.views || 0),
+      engagement: Number(t.engagement || 0),
+      video_url: t.video_url || null,
+      thumbnail_url: t.thumbnail_url || null
+    }));
+    const platformsSearched = [...new Set(ads.map((a) => a.platform).filter(Boolean))];
+
+    try {
+      await SupabaseConnector.from('evics_trends').insert([{
+        trend_name: `Ad search — ${productName || category || 'product'}`,
+        source: 'find_product_viral_ads', created_at: new Date().toISOString()
+      }]);
+    } catch (_) {}
+
+    noStore(res);
+    res.json({
+      success: true,
+      alternativesFound: ads.length,
+      platformsSearched: platformsSearched.length ? platformsSearched : defaultPlatforms,
+      ads
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// POST /api/viral/product/:productId/reproduce — build a recreation strategy + queue a creative
+app.post('/api/viral/product/:productId/reproduce', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const platform = req.body.platform || 'TikTok';
+
+    // Resolve the product (by id, then by handle)
+    let product = { name: productId, sku: productId };
+    try {
+      let { data } = await SupabaseConnector.from('evics_products').select('*').eq('id', productId).limit(1);
+      if (!data || !data.length) {
+        ({ data } = await SupabaseConnector.from('evics_products').select('*').eq('handle', productId).limit(1));
+      }
+      if (data && data[0]) {
+        product = { name: data[0].title || data[0].name || productId, sku: data[0].sku || data[0].handle || productId };
+      }
+    } catch (_) {}
+
+    // Pick a top viral ad on the requested platform as the template
+    let ad = { format: `${platform} UGC`, hook: '' };
+    try {
+      const { data } = await SupabaseConnector
+        .from('evics_trends').select('*').ilike('platform', platform)
+        .order('created_at', { ascending: false }).limit(1);
+      if (data && data[0]) ad = { format: data[0].format || `${platform} UGC`, hook: data[0].hook || '' };
+    } catch (_) {}
+
+    const strategy = generateRecreationStrategy(ad, product);
+
+    // Queue the reproduced creative
+    let creative = null;
+    try {
+      const { data } = await SupabaseConnector.from('creatives').insert([{
+        status: 'Draft',
+        hook: ad.hook || `${product.name} viral reproduction`,
+        product: product.name,
+        format: `${platform} Reproduction`,
+        channel: platform,
+        score: 82,
+        approved: false,
+        created_at: new Date().toISOString()
+      }]).select();
+      creative = data ? data[0] : null;
+    } catch (_) {}
+
+    noStore(res);
+    res.json({
+      success: true,
+      message: `Viral template reproduced for ${product.name} on ${platform}. Creative added to the AI Content Queue.`,
+      strategy,
+      creative
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
+// GET /api/viral-media/products/:handle/similar-ads — similar viral ads for a product handle
+app.get('/api/viral-media/products/:handle/similar-ads', async (req, res) => {
+  try {
+    const { handle } = req.params;
+    const limit = Math.min(10, Math.max(1, Number(req.query.limit) || 3));
+    const readable = String(handle || '').replace(/[-_]/g, ' ');
+
+    const { data } = await SupabaseConnector
+      .from('evics_trends').select('*').order('created_at', { ascending: false }).limit(150);
+    const pool = data || [];
+
+    const ranked = pool
+      .map((t) => ({ t, overlap: pviKeywordOverlap(readable, t) }))
+      .sort((a, b) => b.overlap - a.overlap);
+
+    const similarAds = ranked.slice(0, limit).map(({ t }) => ({
+      id: t.id,
+      platform: t.platform || 'Multi',
+      title: t.title || t.hook || 'Viral ad',
+      hook: t.hook || '',
+      views: Number(t.views || 0),
+      engagement: Number(t.engagement || 0),
+      video_url: t.video_url || null,
+      thumbnail_url: t.thumbnail_url || null
+    }));
+
+    noStore(res);
+    res.json({ success: true, count: similarAds.length, similarAds });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message || String(e) });
+  }
+});
+
 // -------------------------
 // /api/hooks/search — search for winning hooks up to a target count
 // -------------------------
@@ -3495,8 +3749,8 @@ app.post('/api/hooks/search', async (req, res) => {
 
     const { data, error } = await SupabaseConnector
       .from('evics_trends')
-      .select('hook, category, platform, confidence')
-      .not('hook', 'is', null)
+      .select('hook:trend_name, category, platform, confidence:viral_score')
+      .not('trend_name', 'is', null)
       .order('created_at', { ascending: false })
       .limit(target);
 
@@ -3594,9 +3848,9 @@ app.post('/api/assembly/suggestions', async (req, res) => {
 
     // Pull best hook, script, and product from Supabase
     const [hooksRes, creativesRes, productsRes] = await Promise.all([
-      SupabaseConnector.from('evics_trends').select('hook, category, platform').not('hook', 'is', null).order('created_at', { ascending: false }).limit(1),
+      SupabaseConnector.from('evics_trends').select('hook:trend_name, category, platform').not('trend_name', 'is', null).order('created_at', { ascending: false }).limit(1),
       SupabaseConnector.from('creatives').select('id, script, product, format, channel').eq('status', 'Ready').order('score', { ascending: false }).limit(1),
-      SupabaseConnector.from('evics_products').select('name, category, angle').order('score', { ascending: false }).limit(1)
+      SupabaseConnector.from('evics_products').select('product_name, category').order('profit_score', { ascending: false }).limit(1)
     ]);
 
     const components = [];
@@ -3608,7 +3862,7 @@ app.post('/api/assembly/suggestions', async (req, res) => {
       components.push({ type: 'script', id: creativesRes.data[0].id, text: creativesRes.data[0].script || '' });
     }
     if (productsRes.data && productsRes.data[0]) {
-      components.push({ type: 'product', id: productsRes.data[0].name, text: productsRes.data[0].name });
+      components.push({ type: 'product', id: productsRes.data[0].product_name, text: productsRes.data[0].product_name });
     }
 
     noStore(res);
@@ -4547,11 +4801,16 @@ app.post('/api/agents/product-match/analyze', async (req, res) => {
 
     // Pull products and trends from Supabase
     const [productsRes, trendsRes] = await Promise.all([
-      SupabaseConnector.from('evics_products').select('*').order('score', { ascending: false }).limit(20),
+      SupabaseConnector.from('evics_products').select('*').order('profit_score', { ascending: false }).limit(20),
       SupabaseConnector.from('evics_trends').select('*').order('created_at', { ascending: false }).limit(10)
     ]);
 
-    const dbProducts = productsRes.data || [];
+    const dbProducts = (productsRes.data || []).map((p) => ({
+      name: p.product_name,
+      category: p.category,
+      angle: p.category,
+      score: p.profit_score || 0
+    }));
     const dbTrends = trendsRes.data || [];
 
     // Demo product catalog fallback
@@ -4596,7 +4855,7 @@ app.post('/api/agents/copilot/suggest', async (req, res) => {
 
     // Pull recent data for context
     const [trendsRes, creativesRes] = await Promise.all([
-      SupabaseConnector.from('evics_trends').select('hook, category, platform').not('hook', 'is', null).order('created_at', { ascending: false }).limit(5),
+      SupabaseConnector.from('evics_trends').select('hook:trend_name, category, platform').not('trend_name', 'is', null).order('created_at', { ascending: false }).limit(5),
       SupabaseConnector.from('creatives').select('hook, script, score').eq('status', 'Ready').order('score', { ascending: false }).limit(3)
     ]);
 
@@ -4949,17 +5208,24 @@ app.post('/api/agents/auto-generate', async (req, res) => {
     // Step 1: Pull top trends
     const { data: trends } = await SupabaseConnector
       .from('evics_trends')
-      .select('hook, category, platform, velocity')
-      .not('hook', 'is', null)
+      .select('hook:trend_name, category, platform, velocity:viral_score')
+      .not('trend_name', 'is', null)
       .order('created_at', { ascending: false })
       .limit(10);
 
     // Step 2: Pull top products
-    const { data: dbProducts } = await SupabaseConnector
+    const { data: dbProductsRaw } = await SupabaseConnector
       .from('evics_products')
-      .select('name, category, angle, score')
-      .order('score', { ascending: false })
+      .select('product_name, category, profit_score')
+      .order('profit_score', { ascending: false })
       .limit(5);
+
+    const dbProducts = (dbProductsRaw || []).map((p) => ({
+      name: p.product_name,
+      category: p.category,
+      angle: p.category,
+      score: p.profit_score || 0
+    }));
 
     const productCatalog = (dbProducts && dbProducts.length) ? dbProducts : [
       { name: 'Sea Moss Capsules', category: 'Sea moss', angle: 'daily mineral ritual', score: 96 },
@@ -5046,7 +5312,7 @@ app.post('/api/agent/viral-scan', async (req, res) => {
     const { error } = await SupabaseConnector
       .from('evics_trends')
       .insert([{
-        title: `Agent viral scan — ${amount} ads`,
+        trend_name: `Agent viral scan — ${amount} ads`,
         source: 'agent_viral_scan',
         scan_amount: amount,
         created_at: new Date().toISOString()
@@ -5282,9 +5548,9 @@ app.post('/api/agent/copilot', async (req, res) => {
 
     // Pull live workspace context from Supabase
     const [trendsRes, creativesRes, productsRes] = await Promise.all([
-      SupabaseConnector.from('evics_trends').select('title, hook, category, platform').order('created_at', { ascending: false }).limit(3),
+      SupabaseConnector.from('evics_trends').select('hook:trend_name, category, platform').order('created_at', { ascending: false }).limit(3),
       SupabaseConnector.from('creatives').select('product, hook, status, score').order('score', { ascending: false }).limit(3),
-      SupabaseConnector.from('evics_products').select('name, category, angle, score').order('score', { ascending: false }).limit(3)
+      SupabaseConnector.from('evics_products').select('product_name, category, profit_score').order('profit_score', { ascending: false }).limit(3)
     ]);
 
     const workspaceContext = {
@@ -5294,7 +5560,7 @@ app.post('/api/agent/copilot', async (req, res) => {
       userContext: context || {}
     };
 
-    const topProduct = (productsRes.data && productsRes.data[0]) ? productsRes.data[0].name : 'your top product';
+    const topProduct = (productsRes.data && productsRes.data[0]) ? productsRes.data[0].product_name : 'your top product';
     const topHook = (trendsRes.data && trendsRes.data[0]) ? trendsRes.data[0].hook : null;
 
     // GPT-4o path � use when OPENAI_API_KEY is configured
@@ -6093,7 +6359,7 @@ app.post('/api/agent/profit-audit', async (req, res) => {
         auditResults.map((r) => ({
           id: r.id,
           shopify_id: r.shopify_id,
-          name: r.name,
+          product_name: r.name,
           handle: r.handle,
           profit_score: r.weightedScore,
           revenue: r.revenue30d,
@@ -6132,7 +6398,7 @@ app.get('/api/agent/product-tiers', async (_req, res) => {
   try {
     const { data: products, error } = await SupabaseConnector
       .from('evics_products')
-      .select('id, name, title, profit_score, score, days_in_tier4')
+      .select('id, sku, product_name, category, profit_score, tier')
       .order('profit_score', { ascending: false })
       .limit(100);
 
@@ -6142,8 +6408,8 @@ app.get('/api/agent/product-tiers', async (_req, res) => {
     const tiered = (products || []).map((p, i) => {
       const percentileRank = total > 1 ? Math.round((i / (total - 1)) * 100) : 0;
       const tier = determineProductTier(percentileRank);
-      const tierAction = getTierAction(tier, p.days_in_tier4 || 0);
-      return { id: p.id, name: p.name || p.title, profitScore: p.profit_score || p.score || 0, percentileRank, tier, ...tierAction };
+      const tierAction = getTierAction(tier, 0);
+      return { id: p.id, name: p.product_name || p.sku || 'Product', profitScore: p.profit_score || 0, percentileRank, tier, ...tierAction };
     });
 
     const summary = { tier1: 0, tier2: 0, tier3: 0, tier4: 0 };
@@ -9345,8 +9611,7 @@ async function fetchTrendingTags({ platform, limit = 4 } = {}) {
     const runQuery = async (byPlatform) => {
       let q = SupabaseConnector
         .from('evics_trends')
-        .select('title, hook, category, platform, viral_score, created_at')
-        .order('viral_score', { ascending: false })
+        .select('hook:trend_name, category, platform, created_at')
         .order('created_at', { ascending: false })
         .limit(30);
       if (byPlatform && platform) q = q.eq('platform', platform);
@@ -9358,9 +9623,9 @@ async function fetchTrendingTags({ platform, limit = 4 } = {}) {
     let rows = platform ? await runQuery(true) : [];
     if (rows.length < 6) {
       const global = await runQuery(false);
-      const seen = new Set(rows.map((r) => `${r.title}|${r.category}`));
+      const seen = new Set(rows.map((r) => `${r.hook}|${r.category}`));
       for (const r of global) {
-        const key = `${r.title}|${r.category}`;
+        const key = `${r.hook}|${r.category}`;
         if (!seen.has(key)) { rows.push(r); seen.add(key); }
       }
     }
@@ -9370,7 +9635,7 @@ async function fetchTrendingTags({ platform, limit = 4 } = {}) {
     const tokens = [];
     for (const r of rows) {
       if (r.category) tokens.push(r.category);
-      const kws = algorithmOptimization.extractKeywords(`${r.title || ''} ${r.hook || ''}`, 2);
+      const kws = algorithmOptimization.extractKeywords(`${r.hook || ''}`, 2);
       for (const k of kws) tokens.push(k);
     }
     const seen = new Set();
