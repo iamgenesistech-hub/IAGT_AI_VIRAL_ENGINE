@@ -7516,7 +7516,8 @@ function bindEvents() {
   }
   if (rescanBtn) {
     rescanBtn.addEventListener("click", async () => {
-      state.scanAmount = normalizeScanAmount(document.getElementById("scan-amount-input")?.value, state.scanAmount);`n      persistScanAmount(state.scanAmount);
+      state.scanAmount = normalizeScanAmount(document.getElementById("scan-amount-input")?.value, state.scanAmount);
+      persistScanAmount(state.scanAmount);
       state.scanning = true;
       render();
       try {
