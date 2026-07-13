@@ -8065,6 +8065,7 @@ async function boot() {
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
+  await loadViralGallery();
   // Pre-load API service configs in background
   loadServicesConfig().catch(() => {
     state.servicesConfig = buildDemoServices();
