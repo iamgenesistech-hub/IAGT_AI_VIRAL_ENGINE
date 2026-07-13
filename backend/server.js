@@ -419,6 +419,24 @@ app.use('/processed-images', express.static(BG_CACHE_DIR));
 app.use('/processed-videos', express.static(path.join(__dirname, '../processed-videos')));
 
 // Serve generated proof renders and other render artifacts
+app.get('/generated/evics-sea-moss-proof-render.mp4', async (_req, res, next) => {
+  const localProofPath = path.join(__dirname, '../generated', 'evics-sea-moss-proof-render.mp4');
+  if (fs.existsSync(localProofPath)) {
+    return res.sendFile(localProofPath);
+  }
+
+  try {
+    const liveProofState = await findLatestLiveHeyGenProof();
+    const liveProof = liveProofState && liveProofState.proof;
+    if (liveProof && isHeyGenMediaUrl(liveProof.video_url)) {
+      return res.redirect(liveProof.video_url);
+    }
+  } catch (error) {
+    console.error('[generated-proof-fallback] failed to resolve fallback proof', error && error.message ? error.message : error);
+  }
+
+  return next();
+});
 app.use('/generated', express.static(path.join(__dirname, '../generated')));
 
 app.get(['/affiliate-login', '/affiliate-login/'], (_req, res) => {
