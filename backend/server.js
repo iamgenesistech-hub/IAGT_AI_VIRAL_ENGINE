@@ -3839,7 +3839,7 @@ app.post('/api/assembly/drafts', async (req, res) => {
       .from('video_assembly_drafts')
       .insert([{
         components: JSON.stringify(draft.components),
-        duration: draft.duration || '15s',
+        duration: (function () { const n = parseFloat(String(draft.duration)); return Number.isFinite(n) ? n : 15; })(),
         style: draft.style || 'UGC',
         voice: draft.voice || 'Female',
         background: draft.background || 'Music',
