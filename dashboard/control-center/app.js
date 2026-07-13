@@ -7723,7 +7723,6 @@ function bindEvents() {
       state.hookSearching = true;
       render();
       try {
-        // Primary: Trend Scout agent
         const data = await agentFetch("/api/agents/trend-scout/scan", {
           amount: state.hookTarget,
           keyword: state.hookSearchKeyword || undefined
@@ -7733,7 +7732,7 @@ function bindEvents() {
           const newHooks = data.trends
             .filter((entry) => entry.hook)
             .map((entry, index) => ({
-              id: `h-agent-${Date.now()}-${index}`,
+              id: h-agent--,
               text: entry.hook,
               category: entry.category || "Discovered",
               platform: entry.platform || "Multi",
@@ -7744,12 +7743,11 @@ function bindEvents() {
           if (uniqueHooks.length) winningHooks.push(...uniqueHooks);
         }
         state.syncLevel = "connected";
-        state.syncMessage = `Found ${state.hooksFound} hooks via Trend Scout.`;
+        state.syncMessage = Found  hooks via Trend Scout.;
         state.showHooksList = true;
       } catch {
-        // Fallback: backup hooks/search endpoint
         try {
-          const res = await fetch(`${API_BASE}/api/hooks/search`, {
+          const res = await fetch(${API_BASE}/api/hooks/search, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ target: state.hookTarget })
@@ -7759,7 +7757,7 @@ function bindEvents() {
             state.hooksFound = data.found || state.hookTarget;
             if (data.hooks && data.hooks.length) {
               winningHooks.push(...data.hooks.map((hook, index) => ({
-                id: `h-api-${Date.now()}-${index}`,
+                id: h-api--,
                 text: hook.text || hook,
                 category: hook.category || "Discovered",
                 platform: hook.platform || "Multi",
