@@ -5,6 +5,9 @@ const express = require('express');
 // EVICS Sacred Intelligence Governance Engine — governs VP/Board agent output.
 const governance = require('./sacredIntelligenceGovernance');
 
+// EVICS Decision Engine - routing/priority decisions for the autonomous VP pipeline.
+const { makeEVICSDecision } = require('../utils/evicsDecisionEngine');
+
 const DEFAULT_PRODUCTS = [
   {
     id: 'ignite-focus-stack',
@@ -101,6 +104,7 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
       timeline: Array.isArray(source.timeline) ? source.timeline : [],
       renderJobs: source.renderJobs && typeof source.renderJobs === 'object' ? source.renderJobs : {},
       vpMissions: source.vpMissions && typeof source.vpMissions === 'object' ? source.vpMissions : {},
+      learningInsights: Array.isArray(source.learningInsights) ? source.learningInsights : [],
       scanner: {
         enabled: source.scanner?.enabled !== false,
         status: source.scanner?.status || 'idle',
@@ -333,6 +337,143 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
       publishedCount: Array.isArray(mission.mediaIds) ? mission.mediaIds.length : Number(mission.publishedCount || 0),
       updatedAt: nowIso()
     };
+  }
+
+  function clampNum(n, lo, hi) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return lo;
+    return Math.max(lo, Math.min(hi, x));
+  }
+
+  function activeBrandProfile(state) {
+    const profiles = Array.isArray(state.brandProfiles) && state.brandProfiles.length ? state.brandProfiles : [DEFAULT_BRAND_PROFILE];
+    return profiles.find((p) => p.id === state.selectedProfileId) || profiles[0];
+  }
+
+  // Data-grounded creative concept for a real catalog product. Generated from real
+  // product fields + brand voice, then routed through the governance gate. When an
+  // OpenAI key is present a richer copy layer can replace this; it is never a static
+  // placeholder.
+  function buildConcept(product, brand) {
+    const name = product.title || product.product_name || product.name || 'this product';
+    const type = String(product.product_type || product.category || 'wellness').toLowerCase();
+    const voice = String((brand && brand.brandVoice) || 'Executive, premium, clear').split(',')[0].trim();
+    const firstWord = String(name).split(' ')[0];
+    const hook = 'Why people serious about ' + type + ' keep coming back to ' + name + '.';
+    const script = 'Meet ' + name + '. If ' + type + ' is part of your daily routine, this is built to support it without the noise: clear quality, premium ingredients, and a brand that respects your time. ' + voice + ' from the first second to the last.';
+    const cta = 'Tap the link to try ' + firstWord + ' today.';
+    return { hook: hook, script: script, cta: cta };
+  }
+
+  // Explainable sub-scores (0-100) derived from real signals in the concept + product.
+  function scoreConcept(product, concept) {
+    const hook = String(concept.hook || '');
+    const script = String(concept.script || '');
+    const cta = String(concept.cta || '');
+    const name = String(product.title || product.product_name || product.name || '');
+    const firstWord = name.split(' ')[0].toLowerCase();
+    const combined = (hook + ' ' + script).toLowerCase();
+    const hookStrength = clampNum(45 + Math.min(hook.length, 90) * 0.4 + (/\?|!|stop|secret|why|nobody/i.test(hook) ? 12 : 0), 0, 100);
+    const productClarity = clampNum((firstWord && combined.indexOf(firstWord) !== -1 ? 72 : 48) + (name ? 18 : 0), 0, 100);
+    const ctaStrength = clampNum((cta ? 58 : 25) + (/(shop|try|get|order|link|today)/i.test(cta) ? 22 : 0), 0, 100);
+    const compliance = clampNum(100 - (/(cure|treat|guarantee|miracle|clinically proven|fda|disease)/i.test(combined) ? 48 : 0), 0, 100);
+    const platformFit = clampNum(58 + (script.length < 320 ? 22 : 0) + (hook.length < 90 ? 10 : 0), 0, 100);
+    const emotionalPull = clampNum(50 + (/you|your/i.test(script) ? 18 : 0) + (/(confiden|clear|calm|focus|energy|glow|premium)/i.test(script) ? 16 : 0), 0, 100);
+    return { hookStrength: hookStrength, productClarity: productClarity, ctaStrength: ctaStrength, compliance: compliance, platformFit: platformFit, emotionalPull: emotionalPull };
+  }
+
+  // Real multi-role Board of Directors: each advisor scores + votes, weighted by the
+  // live verPolicy dimensions, producing a weighted consensus, decision, and dissent.
+  function runBoardConsensus(product, concept, policy) {
+    const s = scoreConcept(product, concept);
+    const w = {
+      viral: clampNum(policy.viralWeight, 0, 100),
+      evidence: clampNum(policy.evidenceWeight, 0, 100),
+      renderQuality: clampNum(policy.renderQualityWeight, 0, 100),
+      compliance: clampNum(policy.complianceWeight, 0, 100)
+    };
+    const threshold = clampNum(policy.minimumApprovalScore, 0, 100) || 82;
+    const roles = [
+      { role: 'Brand Strategist', weightKey: 'evidence', score: Math.round((s.productClarity + s.emotionalPull) / 2), note: 'Hold the premium tone and clear positioning.' },
+      { role: 'Viral Growth Advisor', weightKey: 'viral', score: Math.round((s.hookStrength + s.platformFit) / 2), note: 'Sharpen the first three seconds with one stronger hook.' },
+      { role: 'Compliance Officer', weightKey: 'compliance', score: Math.round(s.compliance), note: 'Keep language support-based; no medical claims.' },
+      { role: 'Conversion Copywriter', weightKey: 'renderQuality', score: Math.round(s.ctaStrength), note: 'Make the CTA direct and visible on the final card.' },
+      { role: 'Platform Algorithm Analyst', weightKey: 'viral', score: Math.round(s.platformFit), note: 'Match the format to the destination platform.' },
+      { role: 'Customer Psychology Advisor', weightKey: 'evidence', score: Math.round(s.emotionalPull), note: 'Lead with confidence, clarity, and low friction.' }
+    ];
+    const weightFor = function (key) {
+      return key === 'viral' ? w.viral : key === 'evidence' ? w.evidence : key === 'renderQuality' ? w.renderQuality : w.compliance;
+    };
+    roles.forEach(function (r) {
+      r.vote = r.score >= threshold ? 'approve' : r.score >= threshold - 15 ? 'revise' : 'reject';
+    });
+    let weighted = 0;
+    let weightTotal = 0;
+    roles.forEach(function (r) { const wf = weightFor(r.weightKey) || 1; weighted += r.score * wf; weightTotal += wf; });
+    const approvalScore = Math.round(weighted / (weightTotal || 1));
+    const approvals = roles.filter(function (r) { return r.vote === 'approve'; }).length;
+    const rejects = roles.filter(function (r) { return r.vote === 'reject'; }).length;
+    const consensus = Math.round((approvals / roles.length) * 100);
+    const decision = (rejects > 0 && rejects >= approvals)
+      ? 'Needs Regeneration'
+      : (approvalScore >= threshold && consensus >= 60)
+        ? 'Approved'
+        : (approvalScore >= threshold - 12)
+          ? 'Needs Review'
+          : 'Needs Regeneration';
+    const dissent = roles.filter(function (r) { return r.vote !== 'approve'; }).map(function (r) { return { role: r.role, vote: r.vote, note: r.note }; });
+    return { approvalScore: approvalScore, consensus: consensus, decision: decision, threshold: threshold, roles: roles, dissent: dissent, subScores: s };
+  }
+
+  // Continuous learning loop: persist a per-mission insight and self-tune the Board's
+  // verPolicy weights toward the dimension that drove the strongest results (bounded).
+  function recordMissionLearning(mission) {
+    const decisions = Array.isArray(mission.decisions) ? mission.decisions : [];
+    if (!decisions.length) return null;
+    const approved = decisions.filter(function (d) { return d.finalStatus === 'approved_queued'; });
+    const best = decisions.slice().sort(function (a, b) { return b.boardScore - a.boardScore; })[0];
+    const dimTotals = {};
+    decisions.forEach(function (d) {
+      const sub = d.subScores || {};
+      Object.keys(sub).forEach(function (k) { dimTotals[k] = (dimTotals[k] || 0) + Number(sub[k] || 0); });
+    });
+    const strongestDimension = Object.keys(dimTotals).sort(function (a, b) { return dimTotals[b] - dimTotals[a]; })[0] || null;
+    const govPass = decisions.filter(function (d) { return d.governanceApproved; }).length;
+    const insight = {
+      id: 'insight-' + mission.missionId,
+      missionId: mission.missionId,
+      evaluated: decisions.length,
+      approved: approved.length,
+      approvalRate: Math.round((approved.length / decisions.length) * 100),
+      topProduct: best ? best.productName : null,
+      topBoardScore: best ? best.boardScore : 0,
+      strongestDimension: strongestDimension,
+      governancePassRate: Math.round((govPass / decisions.length) * 100),
+      createdAt: nowIso()
+    };
+    const dimToWeight = {
+      hookStrength: 'viralWeight', platformFit: 'viralWeight',
+      productClarity: 'evidenceWeight', emotionalPull: 'evidenceWeight',
+      ctaStrength: 'renderQualityWeight', compliance: 'complianceWeight'
+    };
+    updateState(function (draft) {
+      draft.learningInsights = Array.isArray(draft.learningInsights) ? draft.learningInsights : [];
+      draft.learningInsights.unshift(insight);
+      draft.learningInsights = draft.learningInsights.slice(0, 50);
+      const key = dimToWeight[strongestDimension];
+      if (key) {
+        const pol = draft.verPolicy || {};
+        const others = ['viralWeight', 'evidenceWeight', 'renderQualityWeight', 'complianceWeight'].filter(function (k) { return k !== key; });
+        pol[key] = clampNum((pol[key] || 25) + 2, 5, 70);
+        others.forEach(function (k) { pol[k] = clampNum((pol[k] || 25) - (2 / 3), 5, 70); });
+        pol.updatedAt = nowIso();
+        pol.lastTunedBy = 'vp-learning-loop';
+        pol.lastTuneReason = 'Reinforced ' + strongestDimension + ' after mission ' + mission.missionId + '.';
+        draft.verPolicy = pol;
+      }
+      draft.updatedAt = nowIso();
+    });
+    return insight;
   }
 
   function scoreQuality(media) {
@@ -826,26 +967,131 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
 
   app.post('/api/agents/vp-mission', async (req, res) => {
     try {
-      const targetCount = Math.max(1, Math.min(Number(req.body?.targetCount || req.body?.maxConcepts || 1), 12));
+      const targetCount = clampNum(Number(req.body?.targetCount || req.body?.maxConcepts || 3), 1, 12);
       const missionId = 'vp-' + Date.now();
+      const startedAt = nowIso();
+      const stateNow = readState();
+      const policy = stateNow.verPolicy || {};
+      const brand = activeBrandProfile(stateNow);
+      const products = await loadProducts(50);
+      const chosen = products.slice(0, targetCount);
+
+      const decisions = [];
+      const steps = [];
+      let approvedCount = 0;
+      let reviewCount = 0;
+      let blockedCount = 0;
+      let queuedCount = 0;
+
+      for (let i = 0; i < chosen.length; i++) {
+        const product = chosen[i];
+        const concept = buildConcept(product, brand);
+        const board = runBoardConsensus(product, concept, policy);
+        const conceptText = concept.hook + ' ' + concept.script + ' ' + concept.cta;
+        const gov = governance.evaluateOutput(conceptText, {
+          agentName: 'vp_copilot',
+          workflowName: 'vp-mission',
+          autoRewrite: true,
+          log: true
+        });
+        const decision = makeEVICSDecision({
+          product: product,
+          boardScore: board.approvalScore,
+          governanceApproved: gov.approved,
+          manipulationRisk: gov.manipulationRisk,
+          truthScore: gov.truthScore,
+          policy: policy
+        });
+
+        let finalStatus;
+        if (!gov.approved) {
+          finalStatus = 'blocked';
+          blockedCount += 1;
+        } else if (board.approvalScore >= board.threshold && board.decision === 'Approved') {
+          finalStatus = 'approved_queued';
+          approvedCount += 1;
+          queuedCount += 1;
+        } else {
+          finalStatus = 'needs_review';
+          reviewCount += 1;
+        }
+
+        decisions.push({
+          productId: product.id,
+          productName: product.title || product.product_name || product.name || 'Product',
+          concept: { hook: concept.hook, cta: concept.cta },
+          boardScore: board.approvalScore,
+          boardConsensus: board.consensus,
+          boardDecision: board.decision,
+          roles: board.roles,
+          dissent: board.dissent,
+          subScores: board.subScores,
+          governanceApproved: gov.approved,
+          governanceStatus: gov.status,
+          governanceScores: {
+            love: gov.loveScore,
+            truth: gov.truthScore,
+            integrity: gov.integrityScore,
+            dignity: gov.dignityScore,
+            manipulationRisk: gov.manipulationRisk
+          },
+          decision: decision,
+          finalStatus: finalStatus,
+          finalMessage: gov.finalApprovedOutput || gov.suggestedRewrite || conceptText,
+          evaluatedAt: nowIso()
+        });
+        steps.push({
+          step: i + 1,
+          product: product.title || product.product_name || product.name || 'Product',
+          status: finalStatus,
+          boardScore: board.approvalScore,
+          action: decision.action,
+          channel: decision.routing.primaryChannel,
+          createdAt: nowIso()
+        });
+      }
+
+      const summaryMessage = 'VP mission evaluated ' + chosen.length + ' product(s): ' + approvedCount + ' approved & queued, ' + reviewCount + ' held for review, ' + blockedCount + ' blocked by governance.';
       const mission = {
-        missionId,
-        status: 'running',
-        targetCount,
+        missionId: missionId,
+        status: 'completed',
+        targetCount: targetCount,
+        evaluatedCount: chosen.length,
+        approvedCount: approvedCount,
+        queuedCount: queuedCount,
+        reviewCount: reviewCount,
+        blockedCount: blockedCount,
         publishedCount: 0,
+        authorityModel: 'governance-gated-autonomy',
         mediaIds: [],
         originSectionId: req.body?.originSectionId || 'vp-terminal',
-        logs: [{ level: 'info', message: 'VP mission initialized.', createdAt: nowIso() }],
-        createdAt: nowIso(),
-        updatedAt: nowIso()
+        brandProfileId: brand.id,
+        policySnapshot: {
+          minimumApprovalScore: policy.minimumApprovalScore,
+          viralWeight: policy.viralWeight,
+          evidenceWeight: policy.evidenceWeight,
+          renderQualityWeight: policy.renderQualityWeight,
+          complianceWeight: policy.complianceWeight
+        },
+        governanceSummary: {
+          evaluated: decisions.length,
+          approved: decisions.filter(function (d) { return d.governanceApproved; }).length
+        },
+        decisions: decisions,
+        steps: steps,
+        logs: [{ level: 'info', message: summaryMessage, createdAt: nowIso() }],
+        createdAt: startedAt,
+        updatedAt: nowIso(),
+        completedAt: nowIso()
       };
       updateState((state) => {
         state.vpMissions[missionId] = mission;
       });
-      logTimeline('vp_mission_started', 'VP mission started.', { missionId, targetCount });
-      return sendJson(res, 200, { success: true, mission: buildMissionSnapshot(mission) });
+      const learningInsight = recordMissionLearning(mission);
+      logTimeline('vp_mission_completed', summaryMessage, { missionId: missionId, approvedCount: approvedCount, reviewCount: reviewCount, blockedCount: blockedCount });
+      return sendJson(res, 200, { success: true, mission: buildMissionSnapshot(mission), learningInsight: learningInsight });
     } catch (error) {
-      return sendJson(res, 500, { success: false, error: error.message || 'Could not start VP mission.' });
+      return sendJson(res, 500, { success: false, error: error.message || 'Could not run VP mission.' });
     }
   });
 
@@ -853,6 +1099,22 @@ function registerEvicsEliteRoutes(app, dependencies = {}) {
     const mission = readState().vpMissions[String(req.params.missionId || '')];
     if (!mission) return sendJson(res, 404, { success: false, error: 'VP mission was not found.' });
     return sendJson(res, 200, { success: true, mission: buildMissionSnapshot(mission) });
+  });
+
+  app.get('/api/agents/vp-intelligence', (_req, res) => {
+    const state = readState();
+    const missions = Object.keys(state.vpMissions || {})
+      .map(function (k) { return state.vpMissions[k]; })
+      .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); })
+      .slice(0, 10)
+      .map(buildMissionSnapshot);
+    return sendJson(res, 200, {
+      success: true,
+      authorityModel: 'governance-gated-autonomy',
+      policy: state.verPolicy,
+      learningInsights: (state.learningInsights || []).slice(0, 20),
+      recentMissions: missions
+    });
   });
 
   app.get('/api/product-intel/status', (_req, res) => {

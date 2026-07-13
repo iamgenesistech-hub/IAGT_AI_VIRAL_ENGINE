@@ -5390,12 +5390,21 @@ function renderExecutiveWorkspace() {
           </div>
           <div class="automation-status-card" style="margin-top:12px">
             ${vpMission ? `
-              <div class="pulse-row"><i></i> ${escapeHtml(vpMission.status || "running")} · ${escapeHtml(vpMission.originSectionId || "executive-workspace")}</div>
+              <div class="pulse-row"><i></i> ${escapeHtml(vpMission.status || "running")} · ${escapeHtml(vpMission.authorityModel || "governance-gated-autonomy")}</div>
               <div style="margin-top:8px;font-size:0.9em;display:grid;gap:4px">
                 <div><strong>Mission ID:</strong> ${escapeHtml(vpMission.missionId || "")}</div>
-                <div><strong>Target Count:</strong> ${Number(vpMission.targetCount || 0)}</div>
-                <div><strong>Published Count:</strong> ${Number(vpMission.publishedCount || 0)}</div>
+                <div><strong>Evaluated:</strong> ${Number(vpMission.evaluatedCount || vpMission.targetCount || 0)} &nbsp; <strong>Approved + Queued:</strong> ${Number(vpMission.approvedCount || 0)}</div>
+                <div><strong>Held for Review:</strong> ${Number(vpMission.reviewCount || 0)} &nbsp; <strong>Blocked by Governance:</strong> ${Number(vpMission.blockedCount || 0)}</div>
+                <div><strong>Published:</strong> ${Number(vpMission.publishedCount || 0)} <span style="opacity:0.7">(publish stays gated)</span></div>
               </div>
+              ${Array.isArray(vpMission.decisions) && vpMission.decisions.length ? `
+                <div style="margin-top:8px;font-size:0.85em;display:grid;gap:4px">
+                  <div style="opacity:0.8;text-transform:uppercase;letter-spacing:0.04em">Top board decisions</div>
+                  ${vpMission.decisions.slice(0, 3).map((d) => `
+                    <div>${escapeHtml(d.productName || "Concept")} - board ${Number(d.boardScore || 0)}, ${escapeHtml(d.finalStatus === "approved_queued" ? "approved + queued" : d.finalStatus === "blocked" ? "blocked" : "needs review")}${d.decision && d.decision.routing ? " -> " + escapeHtml(d.decision.routing.primaryChannel || "") : ""}</div>
+                  `).join("")}
+                </div>
+              ` : ""}
             ` : `
               <div class="pulse-row"><i></i> No active mission. Launch a VP mission to begin executive oversight.</div>
             `}
@@ -6824,8 +6833,10 @@ function renderVpAssistant() {
           </div>
           <div class="vp-assistant-mission-details">
             ${mission ? `
-              <div><strong>Target:</strong> ${Number(mission.targetCount || 0)}</div>
-              <div><strong>Published:</strong> ${Number(mission.publishedCount || 0)}</div>
+              <div><strong>Authority:</strong> ${escapeHtml(mission.authorityModel || "governance-gated-autonomy")}</div>
+              <div><strong>Evaluated:</strong> ${Number(mission.evaluatedCount || mission.targetCount || 0)}</div>
+              <div><strong>Approved + Queued:</strong> ${Number(mission.approvedCount || 0)} &nbsp; <strong>Review:</strong> ${Number(mission.reviewCount || 0)} &nbsp; <strong>Blocked:</strong> ${Number(mission.blockedCount || 0)}</div>
+              <div><strong>Published:</strong> ${Number(mission.publishedCount || 0)} <span style="opacity:0.7">(gated)</span></div>
               <div><strong>Origin:</strong> ${escapeHtml(mission.originSectionId || "executive-workspace")}</div>
             ` : `
               <div>Launch a mission or ask a question to start the VP workflow.</div>
@@ -6956,6 +6967,11 @@ async function sendVpAssistantMessage(message, options = {}) {
         vpMission: state.vpMission ? {
           missionId: state.vpMission.missionId,
           status: state.vpMission.status,
+          authorityModel: state.vpMission.authorityModel,
+          evaluatedCount: state.vpMission.evaluatedCount,
+          approvedCount: state.vpMission.approvedCount,
+          reviewCount: state.vpMission.reviewCount,
+          blockedCount: state.vpMission.blockedCount,
           targetCount: state.vpMission.targetCount,
           publishedCount: state.vpMission.publishedCount,
           originSectionId: state.vpMission.originSectionId
