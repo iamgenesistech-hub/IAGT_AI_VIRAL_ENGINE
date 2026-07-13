@@ -7587,7 +7587,10 @@ function bindEvents() {
           });
           if (res.ok) {
             const data = await res.json();
-            const backupAds = (Array.isArray(data.trends) ? data.trends : []).filter((t) => t && (t.title || t.hook || t.script));`n            viralAds = backupAds;`n            state.selectedAdId = backupAds.length ? String(backupAds[0].id || "") : null;`n            state.scanCount = backupAds.length;
+            const backupAds = (Array.isArray(data.trends) ? data.trends : []).filter((t) => t && (t.title || t.hook || t.script));
+            viralAds = backupAds;
+            state.selectedAdId = backupAds.length ? String(backupAds[0].id || "") : null;
+            state.scanCount = backupAds.length;
           } else {
             await new Promise((r) => setTimeout(r, 1800));
             state.scanCount = state.scanAmount;
