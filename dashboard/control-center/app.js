@@ -2339,7 +2339,13 @@ async function generateViralAnalysis(videoId) {
   } catch { /* fall through to demo */ }
   // Demo analysis
   const video = state.viralVideos.find((v) => v.id === videoId) || state.viralVideos[0] || null;
-  if (!video) {`n    state.viralAnalysis = null;`n    state.viralAnalysisLoading = false;`n    render();`n    return;`n  }`n  state.viralAnalysis = {
+  if (!video) {
+    state.viralAnalysis = null;
+    state.viralAnalysisLoading = false;
+    render();
+    return;
+  }
+  state.viralAnalysis = {
     id: videoId,
     whatsWorking: [
       { label: "Hook strength", score: Math.round(70 + (video.velocity || 80) * 0.2), note: `"${video.hook || "Pattern-matched hook"}" — strong curiosity trigger` },
@@ -7599,7 +7605,9 @@ function bindEvents() {
           }
         } catch {
           await new Promise((r) => setTimeout(r, 1800));
-          viralAds = [];`n          state.selectedAdId = null;`n          state.scanCount = 0;
+          viralAds = [];
+          state.selectedAdId = null;
+          state.scanCount = 0;
         }
       }
       state.scanning = false;
