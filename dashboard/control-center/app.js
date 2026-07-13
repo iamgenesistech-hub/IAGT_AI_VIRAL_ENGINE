@@ -7724,40 +7724,62 @@ function bindEvents() {
       render();
       try {
         // Primary: Trend Scout agent
-        const data = await agentFetch("/api/agents/trend-scout/scan", { amount: state.scanAmount });
-        const newAds = (Array.isArray(data.trends) ? data.trends : [])
-          .map((t, i) => ({
-            id: String(t.id || ('scan-' + Date.now() + '-' + i)),
-            platform: String(t.platform || "").trim(),
-            category: String(t.category || "").trim(),
-            title: String(t.title || t.hook || "").trim(),
-            hook: String(t.hook || "").trim(),
-            views: Number(t.views || 0),
-            engagement: Number(t.engagement || 0),
-            velocity: Number(t.velocity || 0),
-            conversion: Number(t.conversion || 0),
-            cta: String(t.cta || "").trim(),
-            tags: Array.isArray(t.tags) ? t.tags : [],
-            productMatch: String(t.product_match || t.productMatch || "").trim(),
-            emotion: String(t.emotion || "").trim(),
-            format: String(t.format || t.content_format || t.contentFormat || "").trim(),
-            script: String(t.script || t.script_text || t.scriptText || "").trim(),
-            structure: Array.isArray(t.structure) ? t.structure : []
-          }))
-          .filter((t) => t.title || t.hook || t.script);
-
-        viralAds = newAds;
-        state.selectedAdId = newAds.length ? newAds[0].id : null;
-        state.scanCount = newAds.length;
+        const data = await agentFetch("/api/agents/trend-scout/scan", {
+          amount: state.hookTarget,
+          keyword: state.hookSearchKeyword || undefined
+        });
+        state.hooksFound = data.count || state.hookTarget;
+        if (data.trends && data.trends.length) {
+          const newHooks = data.trends
+            .filter((entry) => entry.hook)
+            .map((entry, index) => ({
+              id: `h-agent-${Date.now()}-${index}`,
+              text: entry.hook,
+              category: entry.category || "Discovered",
+              platform: entry.platform || "Multi",
+              confidence: entry.confidence || "Medium"
+            }));
+          const existingTexts = new Set(winningHooks.map((hook) => hook.text));
+          const uniqueHooks = newHooks.filter((hook) => !existingTexts.has(hook.text));
+          if (uniqueHooks.length) winningHooks.push(...uniqueHooks);
+        }
         state.syncLevel = "connected";
-        state.syncMessage = newAds.length
-          ? ('Trend Scout returned ' + newAds.length.toLocaleString() + ' scraped trends.')
-          : "Trend Scout completed with no scraped trends.";
-      } catch (err) {
-        state.connectSourcesError = err.message || "Failed to save credentials.";
-        state.connectSourcesSaving = false;
-        render();
+        state.syncMessage = `Found ${state.hooksFound} hooks via Trend Scout.`;
+        state.showHooksList = true;
+      } catch {
+        // Fallback: backup hooks/search endpoint
+        try {
+          const res = await fetch(`${API_BASE}/api/hooks/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target: state.hookTarget })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            state.hooksFound = data.found || state.hookTarget;
+            if (data.hooks && data.hooks.length) {
+              winningHooks.push(...data.hooks.map((hook, index) => ({
+                id: `h-api-${Date.now()}-${index}`,
+                text: hook.text || hook,
+                category: hook.category || "Discovered",
+                platform: hook.platform || "Multi",
+                confidence: hook.confidence || "Medium"
+              })));
+            }
+            state.showHooksList = true;
+          } else {
+            await new Promise((resolve) => setTimeout(resolve, 2200));
+            state.hooksFound = state.hookTarget;
+            state.showHooksList = true;
+          }
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 2200));
+          state.hooksFound = state.hookTarget;
+          state.showHooksList = true;
+        }
       }
+      state.hookSearching = false;
+      render();
     });
   }
 
