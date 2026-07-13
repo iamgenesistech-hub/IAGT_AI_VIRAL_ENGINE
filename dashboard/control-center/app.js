@@ -1917,7 +1917,7 @@ async function validateQuality(controlEl = document.getElementById("quality-vali
     const res = await fetch("/api/quality/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state.qualityScores)
+      body: JSON.stringify({ ...state.qualityScores, thresholds: state.qualityThresholds })
     });
     if (res.ok) {
       const data = await res.json();
@@ -1958,6 +1958,197 @@ function enforceEliteStandards(scores) {
       ? "Video meets elite quality standards. Approved for publishing."
       : `Video failed ${failures.length} quality check(s). Action: ${action}.`
   };
+}
+
+// ── Elite Quality: shared config + scoring model over the most recent scan ──
+const QUALITY_METRIC_LABELS = {
+  hookStrength: "Hook Strength",
+  pacingScore: "Pacing Score",
+  ctaClarity: "CTA Clarity",
+  visualStyle: "Visual Style",
+  overallQuality: "Overall Quality"
+};
+
+const QUALITY_DEFAULT_THRESHOLDS = {
+  hookStrength: 75,
+  pacingScore: 70,
+  ctaClarity: 75,
+  visualStyle: 80,
+  overallQuality: 80
+};
+
+const QUALITY_VISUAL_TAG_HINTS = [
+  "luxury", "cinematic", "slow motion", "slow-motion", "gold", "flatlay", "lifestyle",
+  "product reveal", "routine", "bathroom", "gym scene", "desk setup", "ambient",
+  "subtitles", "split screen", "b-roll", "voiceover", "aesthetic", "premium"
+];
+
+let __qualityImpactRaf = null;
+
+function clampQualityScore(n) {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(100, v));
+}
+
+// Derive the five elite dimensions from the REAL scraped signals on a scanned
+// item (velocity, engagement, views, conversion, hook, cta, structure, tags).
+// Deterministic — reflects the actual scan, never random placeholders.
+function deriveScanQualityDimensions(ad) {
+  if (!ad || typeof ad !== "object") {
+    return { hookStrength: 0, pacingScore: 0, ctaClarity: 0, visualStyle: 0, overallQuality: 0 };
+  }
+  const views = Number(ad.views || 0);
+  const engagement = Number(ad.engagement || 0);
+  const velocity = Number(ad.velocity || 0);
+  const conversion = Number(ad.conversion || 0);
+  const hook = String(ad.hook || ad.title || "").trim();
+  const cta = String(ad.cta || "").trim();
+  const structure = Array.isArray(ad.structure) ? ad.structure : [];
+  const tags = Array.isArray(ad.tags) ? ad.tags.map((t) => String(t).toLowerCase()) : [];
+
+  const vel = clampQualityScore(velocity);
+  const eng = clampQualityScore(engagement * 7);
+  const conv = clampQualityScore(conversion);
+  const viewsScore = clampQualityScore(((Math.log10(Math.max(views, 1)) - 3) / 4) * 100);
+  const structureDepth = clampQualityScore((structure.length / 6) * 100);
+  const ctaScore = cta.length >= 4 ? clampQualityScore(60 + cta.length) : 25;
+  const visualHits = tags.filter((t) => QUALITY_VISUAL_TAG_HINTS.some((h) => t.includes(h))).length;
+  const visualTagScore = clampQualityScore(35 + visualHits * 18);
+  const hookScore = hook.length >= 8 ? clampQualityScore(55 + Math.min(hook.length, 60) * 0.4) : 20;
+
+  const hookStrength = clampQualityScore(0.50 * vel + 0.25 * eng + 0.15 * viewsScore + 0.10 * hookScore);
+  const pacingScore = clampQualityScore(0.40 * vel + 0.35 * structureDepth + 0.25 * eng);
+  const ctaClarity = clampQualityScore(0.55 * conv + 0.45 * ctaScore);
+  const visualStyle = clampQualityScore(0.45 * eng + 0.30 * viewsScore + 0.25 * visualTagScore);
+  const overallQuality = clampQualityScore((hookStrength + pacingScore + ctaClarity + visualStyle) / 4);
+
+  return { hookStrength, pacingScore, ctaClarity, visualStyle, overallQuality };
+}
+
+function getMostRecentScanItems() {
+  return Array.isArray(viralAds) ? viralAds : [];
+}
+
+function computeScanEliteImpact(thresholds) {
+  const th = thresholds || state.qualityThresholds || QUALITY_DEFAULT_THRESHOLDS;
+  const items = getMostRecentScanItems().map((ad, i) => {
+    const dims = deriveScanQualityDimensions(ad);
+    const failedMetrics = Object.keys(th).filter((k) => Number(dims[k]) < Number(th[k]));
+    return {
+      id: String(ad.id || ("scan-" + i)),
+      title: String(ad.title || ad.hook || "Untitled scan item"),
+      platform: String(ad.platform || ""),
+      dims,
+      passed: failedMetrics.length === 0,
+      failedMetrics
+    };
+  });
+  const passing = items.filter((it) => it.passed).length;
+  return { total: items.length, passing, items };
+}
+
+function persistQualityThresholds() {
+  try {
+    localStorage.setItem("evics_quality_thresholds", JSON.stringify(state.qualityThresholds));
+  } catch (e) { /* ignore storage errors */ }
+}
+
+function loadPersistedQualityThresholds() {
+  if (window.__evicsQualityThresholdsLoaded) return;
+  window.__evicsQualityThresholdsLoaded = true;
+  try {
+    const raw = localStorage.getItem("evics_quality_thresholds");
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      Object.keys(state.qualityThresholds).forEach((k) => {
+        const v = Number(parsed[k]);
+        if (Number.isFinite(v)) state.qualityThresholds[k] = Math.max(0, Math.min(100, Math.round(v)));
+      });
+    }
+  } catch (e) { /* ignore malformed storage */ }
+}
+
+function renderScanImpactPanel() {
+  const impact = computeScanEliteImpact(state.qualityThresholds);
+  const scanContext = state.scanCount
+    ? `${Number(state.scanCount).toLocaleString()} scanned trends`
+    : `${impact.total} scanned ${impact.total === 1 ? "item" : "items"}`;
+  const dateNote = state.lastScanDate
+    ? ` · last scan ${new Date(state.lastScanDate).toLocaleString()}`
+    : "";
+  const passRate = impact.total ? Math.round((impact.passing / impact.total) * 100) : 0;
+
+  const body = impact.total === 0
+    ? `<p class="quality-scan-empty">No scan data yet. Run a scan in the <strong>Viral Trends Monitor</strong> to grade real scraped videos against your elite thresholds.</p>`
+    : `
+      <div class="quality-scan-summary">
+        <div class="quality-scan-stat">
+          <strong class="quality-scan-pass">${impact.passing}</strong>
+          <span>of ${impact.total} meet elite standards</span>
+        </div>
+        <div class="quality-scan-rate">
+          <div class="quality-scan-rate-track">
+            <div class="quality-scan-rate-fill" style="width:${passRate}%"></div>
+          </div>
+          <span>${passRate}% elite pass rate</span>
+        </div>
+      </div>
+      <ul class="quality-scan-list">
+        ${impact.items.map((it) => `
+          <li class="quality-scan-item ${it.passed ? "is-pass" : "is-fail"}">
+            <div class="quality-scan-item-head">
+              <span class="quality-scan-badge">${it.passed ? "ELITE" : "BELOW"}</span>
+              <span class="quality-scan-title">${escapeHtml(it.title)}</span>
+              ${it.platform ? `<span class="quality-scan-platform">${escapeHtml(it.platform)}</span>` : ""}
+            </div>
+            <div class="quality-scan-dims">
+              ${Object.keys(QUALITY_METRIC_LABELS).map((k) => {
+                const failed = it.failedMetrics.includes(k);
+                const abbr = QUALITY_METRIC_LABELS[k].split(" ").map((w) => w[0]).join("");
+                return `<span class="quality-scan-dim ${failed ? "dim-fail" : "dim-pass"}" title="${QUALITY_METRIC_LABELS[k]}: ${it.dims[k]}">${abbr} ${it.dims[k]}</span>`;
+              }).join("")}
+            </div>
+          </li>
+        `).join("")}
+      </ul>`;
+
+  return `
+    <div class="quality-scan-impact" id="quality-scan-impact">
+      <div class="quality-scan-impact-head">
+        <h3>${icon("radar")} Live Scan Impact</h3>
+        <span class="quality-scan-context">${scanContext}${dateNote}</span>
+      </div>
+      ${body}
+      <p class="quality-scan-note">Each dimension is derived from the item's real scraped signals — velocity, engagement, views, conversion, CTA and structure. Adjust the thresholds above to change what qualifies as elite.</p>
+    </div>
+  `;
+}
+
+function refreshQualityImpactDOM() {
+  const th = state.qualityThresholds;
+  const sc = state.qualityScores;
+  Object.keys(th).forEach((k) => {
+    const tv = document.getElementById("quality-threshold-val-" + k);
+    if (tv) tv.textContent = String(th[k]);
+    const sm = document.getElementById("quality-scoremin-" + k);
+    if (sm) sm.textContent = "min " + th[k];
+    const sv = document.getElementById("quality-val-" + k);
+    if (sv) {
+      sv.textContent = String(sc[k]);
+      const pass = Number(sc[k]) >= Number(th[k]);
+      sv.classList.toggle("quality-pass-text", pass);
+      sv.classList.toggle("quality-fail-text", !pass);
+    }
+  });
+  if (__qualityImpactRaf) return;
+  const schedule = window.requestAnimationFrame || ((f) => setTimeout(f, 16));
+  __qualityImpactRaf = schedule(() => {
+    __qualityImpactRaf = null;
+    const impactEl = document.getElementById("quality-scan-impact");
+    if (impactEl) impactEl.outerHTML = renderScanImpactPanel();
+  });
 }
 
 function filteredPublishedMedia() {
@@ -4959,52 +5150,54 @@ function renderQualityValidator() {
   const scores = state.qualityScores;
   const result = state.qualityResult;
 
-  const metricLabels = {
-    hookStrength: "Hook Strength",
-    pacingScore: "Pacing Score",
-    ctaClarity: "CTA Clarity",
-    visualStyle: "Visual Style",
-    overallQuality: "Overall Quality"
-  };
+  const metricLabels = QUALITY_METRIC_LABELS;
 
   return `
     <div class="quality-validator-section panel">
       <div class="quality-validator-header">
         <div>
           <h2>${icon("check")} Elite Quality Rendering Standards</h2>
-          <p>Enforce minimum quality thresholds before publishing. Auto-reject below threshold, auto-requeue for improvement.</p>
+          <p>Set the minimum quality bar, then validate renders and the latest scan against it. Auto-reject below threshold, auto-requeue for improvement.</p>
         </div>
       </div>
 
       <div class="quality-validator-body">
-        <!-- Thresholds Reference -->
+        <!-- Adjustable Thresholds -->
         <div class="quality-thresholds-panel">
-          <h3>Elite Quality Thresholds</h3>
+          <div class="quality-thresholds-head">
+            <h3>Elite Quality Thresholds</h3>
+            <button class="toggle-link" id="quality-reset-thresholds">Reset to elite defaults</button>
+          </div>
+          <p class="quality-input-desc">Drag to set the minimum score each dimension must hit to qualify as elite. Changes persist and drive both the validator and the live scan impact below.</p>
           <div class="quality-thresholds-grid">
             ${Object.entries(thresholds).map(([key, min]) => `
               <div class="quality-threshold-card">
                 <span class="quality-threshold-label">${metricLabels[key] || key}</span>
-                <strong class="quality-threshold-min">${min}+</strong>
+                <div class="quality-threshold-controls">
+                  <input type="range" class="quality-range quality-threshold-range" data-threshold-key="${key}"
+                    min="0" max="100" step="1" value="${min}" aria-label="${metricLabels[key] || key} threshold" />
+                  <strong class="quality-threshold-min"><span id="quality-threshold-val-${key}">${min}</span>+</strong>
+                </div>
                 <span class="quality-threshold-desc">minimum required</span>
               </div>
             `).join("")}
           </div>
         </div>
 
-        <!-- Score Input Panel -->
+        <!-- Manual Score Validator -->
         <div class="quality-input-panel">
           <h3>Validate Video Quality</h3>
-          <p class="quality-input-desc">Enter scores for each dimension to validate against elite standards.</p>
+          <p class="quality-input-desc">Enter scores for each dimension to validate a render against your elite standards.</p>
           <div class="quality-inputs-grid">
             ${Object.entries(scores).map(([key, val]) => `
               <div class="quality-input-row">
                 <label class="quality-input-label">
                   ${metricLabels[key] || key}
-                  <span class="quality-input-min">min ${thresholds[key]}</span>
+                  <span class="quality-input-min" id="quality-scoremin-${key}">min ${thresholds[key]}</span>
                 </label>
                 <div class="quality-input-controls">
                   <input type="range" class="quality-range" data-quality-key="${key}"
-                    min="0" max="100" value="${val}" />
+                    min="0" max="100" step="1" value="${val}" aria-label="${metricLabels[key] || key} score" />
                   <span class="quality-range-val ${val >= thresholds[key] ? "quality-pass-text" : "quality-fail-text"}"
                     id="quality-val-${key}">${val}</span>
                 </div>
@@ -5016,6 +5209,9 @@ function renderQualityValidator() {
             ${state.qualityValidating ? `${icon("radar")} Validating…` : `${icon("check")} Validate Against Elite Standards`}
           </button>
         </div>
+
+        <!-- Live Scan Impact -->
+        ${renderScanImpactPanel()}
 
         <!-- Validation Result -->
         ${result ? `
@@ -7800,7 +7996,7 @@ function bindEvents() {
           const newHooks = data.trends
             .filter((entry) => entry.hook)
             .map((entry, index) => ({
-              id: h-agent--,
+              id: `h-agent-${index}`,
               text: entry.hook,
               category: entry.category || "Discovered",
               platform: entry.platform || "Multi",
@@ -7811,11 +8007,11 @@ function bindEvents() {
           if (uniqueHooks.length) winningHooks.push(...uniqueHooks);
         }
         state.syncLevel = "connected";
-        state.syncMessage = Found  hooks via Trend Scout.;
+        state.syncMessage = `Found ${state.hooksFound} hooks via Trend Scout.`;
         state.showHooksList = true;
       } catch {
         try {
-          const res = await fetch(${API_BASE}/api/hooks/search, {
+          const res = await fetch(`${API_BASE}/api/hooks/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ target: state.hookTarget })
@@ -7825,7 +8021,7 @@ function bindEvents() {
             state.hooksFound = data.found || state.hookTarget;
             if (data.hooks && data.hooks.length) {
               winningHooks.push(...data.hooks.map((hook, index) => ({
-                id: h-api--,
+                id: `h-api-${index}`,
                 text: hook.text || hook,
                 category: hook.category || "Discovered",
                 platform: hook.platform || "Multi",
@@ -8146,6 +8342,54 @@ function bindEvents() {
     });
     window.__evicsCreativeDelegatesBound = true;
   }
+
+  // ── Elite Quality Rendering Standards: adjustable thresholds + validation ──
+  loadPersistedQualityThresholds();
+
+  document.querySelectorAll(".quality-threshold-range").forEach((el) => {
+    const key = el.dataset.thresholdKey;
+    if (!key || !(key in state.qualityThresholds)) return;
+    const onInput = () => {
+      state.qualityThresholds[key] = Math.max(0, Math.min(100, Math.round(Number(el.value) || 0)));
+      persistQualityThresholds();
+      refreshQualityImpactDOM();
+    };
+    el.addEventListener("input", onInput);
+    el.addEventListener("change", onInput);
+  });
+
+  document.querySelectorAll(".quality-range[data-quality-key]").forEach((el) => {
+    const key = el.dataset.qualityKey;
+    if (!key || !(key in state.qualityScores)) return;
+    const onInput = () => {
+      state.qualityScores[key] = Math.max(0, Math.min(100, Math.round(Number(el.value) || 0)));
+      refreshQualityImpactDOM();
+    };
+    el.addEventListener("input", onInput);
+    el.addEventListener("change", onInput);
+  });
+
+  const qualityValidateBtn = document.getElementById("quality-validate-btn");
+  if (qualityValidateBtn) {
+    qualityValidateBtn.addEventListener("click", () => validateQuality(qualityValidateBtn));
+  }
+
+  const qualityClearBtn = document.getElementById("quality-clear-result");
+  if (qualityClearBtn) {
+    qualityClearBtn.addEventListener("click", () => {
+      state.qualityResult = null;
+      render();
+    });
+  }
+
+  const qualityResetBtn = document.getElementById("quality-reset-thresholds");
+  if (qualityResetBtn) {
+    qualityResetBtn.addEventListener("click", () => {
+      state.qualityThresholds = { ...QUALITY_DEFAULT_THRESHOLDS };
+      persistQualityThresholds();
+      render();
+    });
+  }
 }
 
 async function boot() {
@@ -8158,6 +8402,7 @@ async function boot() {
     }
   }
   syncSectionInUrl(state.currentSection);
+  loadPersistedQualityThresholds();
   render();
   await hydrateFromSupabase();
   await hydrateFromServerApi();
