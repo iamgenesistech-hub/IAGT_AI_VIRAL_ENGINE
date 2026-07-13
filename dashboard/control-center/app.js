@@ -162,7 +162,7 @@ const state = {
   category: "All",
   platform: "All",
   queueMode: "Ready",
-  selectedAdId: "ad-001",
+  selectedAdId: null,
   approvals: new Set(["cr-001", "cr-003"]),
   dataSource: "Demo",
   syncLevel: "demo",
@@ -7548,37 +7548,35 @@ function bindEvents() {
       state.scanning = true;
       render();
       try {
-        const data = await agentFetch("/api/agents/trend-scout/scan", { limit: state.scanAmount });
-        state.scanCount = data.count || state.scanAmount;
-        // Merge any returned trends into viralAds display
-        if (data.trends && data.trends.length) {
-          const newAds = data.trends
-            .filter((t) => t.hook)
-            .map((t, i) => ({
-              id: `scan-${Date.now()}-${i}`,
-              platform: t.platform || "TikTok",
-              category: t.category || "Wellness",
-              title: (t.title || t.hook || "Trend").slice(0, 80),
-              hook: t.hook,
-              views: Number(t.views || 0),
-              engagement: Number(t.engagement || 0),
-              velocity: Number(t.velocity || 0),
-              conversion: Number(t.conversion || 0),
-              cta: t.cta || "",
-              tags: Array.isArray(t.tags) ? t.tags : [],
-              productMatch: t.product_match || t.productMatch || "",
-              emotion: t.emotion || "",
-              format: t.format || t.content_format || t.contentFormat || "Unknown format",
-              script: t.script || t.script_text || t.scriptText || "",
-              structure: Array.isArray(t.structure) ? t.structure : []
-            }));
-          if (newAds.length) {
-            mergeViralAds(newAds);
-            state.selectedAdId = viralAds[0].id;
-          }
-        }
+        const data = await agentFetch("/api/agents/trend-scout/scan", { amount: state.scanAmount });
+        const newAds = (Array.isArray(data.trends) ? data.trends : [])
+          .map((t, i) => ({
+            id: String(t.id || `scan-${Date.now()}-${i}`),
+            platform: String(t.platform || "").trim(),
+            category: String(t.category || "").trim(),
+            title: String(t.title || t.hook || "").trim(),
+            hook: String(t.hook || "").trim(),
+            views: Number(t.views || 0),
+            engagement: Number(t.engagement || 0),
+            velocity: Number(t.velocity || 0),
+            conversion: Number(t.conversion || 0),
+            cta: String(t.cta || "").trim(),
+            tags: Array.isArray(t.tags) ? t.tags : [],
+            productMatch: String(t.product_match || t.productMatch || "").trim(),
+            emotion: String(t.emotion || "").trim(),
+            format: String(t.format || t.content_format || t.contentFormat || "").trim(),
+            script: String(t.script || t.script_text || t.scriptText || "").trim(),
+            structure: Array.isArray(t.structure) ? t.structure : []
+          }))
+          .filter((t) => t.title || t.hook || t.script);
+
+        viralAds = newAds;
+        state.selectedAdId = newAds.length ? newAds[0].id : null;
+        state.scanCount = newAds.length;
         state.syncLevel = "connected";
-        state.syncMessage = `Trend Scout scanned ${state.scanCount.toLocaleString()} ads.`;
+        state.syncMessage = newAds.length
+          ? `Trend Scout returned ${newAds.length.toLocaleString()} scraped trends.`
+          : "Trend Scout completed with no scraped trends.";
       } catch (err) {
         // Fallback: try backup endpoint
         try {
@@ -7589,7 +7587,7 @@ function bindEvents() {
           });
           if (res.ok) {
             const data = await res.json();
-            state.scanCount = data.count || state.scanAmount;
+            const backupAds = (Array.isArray(data.trends) ? data.trends : []).filter((t) => t && (t.title || t.hook || t.script));`n            viralAds = backupAds;`n            state.selectedAdId = backupAds.length ? String(backupAds[0].id || "") : null;`n            state.scanCount = backupAds.length;
           } else {
             await new Promise((r) => setTimeout(r, 1800));
             state.scanCount = state.scanAmount;
