@@ -169,8 +169,18 @@ const state = {
   syncMessage: "Add Supabase credentials in config.js to load live workspace data.",
 
   // Viral Ads Scan
-  scanAmount: 1284,
-  scanCount: 1284,
+  scanAmount: (() => {
+    try {
+      const storedScanAmount = Number(localStorage.getItem("evics_scan_amount"));
+      if (Number.isFinite(storedScanAmount)) {
+        return Math.max(100, Math.min(10000, Math.round(storedScanAmount)));
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+    return 3000;
+  })(),
+  scanCount: 0,
   scanning: false,
 
   // Winning Hooks
@@ -1744,7 +1754,7 @@ const DEMO_AGENT_STATUSES = [
     name: "Trend Scout Agent",
     role: "Scanning viral content across TikTok, Instagram, YouTube, Facebook, Pinterest",
     status: "active",
-    currentTask: "Scanning 1,284 viral ads for hook patterns",
+    currentTask: "Scanning viral ads for hook patterns",
     processingTime: "2.4s avg",
     lastResult: "Found 12 high-confidence hooks in Beauty + Weight Loss categories",
     qualityScore: 94,
@@ -7481,14 +7491,32 @@ function bindEvents() {
   // ── Rescan button → POST /api/agents/trend-scout/scan ──
   const rescanBtn = document.getElementById("rescan-btn");
   const scanInput = document.getElementById("scan-amount-input");
+  const normalizeScanAmount = (rawValue, fallbackValue = state.scanAmount) => {
+    const parsed = Number(rawValue);
+    const safeBase = Number.isFinite(parsed) ? parsed : Number(fallbackValue);
+    const normalized = Math.max(100, Math.min(10000, Number.isFinite(safeBase) ? Math.round(safeBase) : 3000));
+    return normalized;
+  };
+  const persistScanAmount = (value) => {
+    try {
+      localStorage.setItem("evics_scan_amount", String(value));
+    } catch (e) {
+      // ignore storage errors
+    }
+  };
   if (scanInput) {
-    scanInput.addEventListener("change", () => {
-      state.scanAmount = Math.max(100, Math.min(10000, Number(scanInput.value) || 1284));
-    });
+    const applyScanInputValue = () => {
+      const normalized = normalizeScanAmount(scanInput.value, state.scanAmount);
+      state.scanAmount = normalized;
+      scanInput.value = String(normalized);
+      persistScanAmount(normalized);
+    };
+    scanInput.addEventListener("input", applyScanInputValue);
+    scanInput.addEventListener("change", applyScanInputValue);
   }
   if (rescanBtn) {
     rescanBtn.addEventListener("click", async () => {
-      state.scanAmount = Number(document.getElementById("scan-amount-input")?.value || state.scanAmount);
+      state.scanAmount = normalizeScanAmount(document.getElementById("scan-amount-input")?.value, state.scanAmount);`n      persistScanAmount(state.scanAmount);
       state.scanning = true;
       render();
       try {
