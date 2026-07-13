@@ -3204,20 +3204,92 @@ app.get('/api/viral/gallery', async (req, res) => {
   try {
     const { platform, category } = req.query;
 
-    let query = SupabaseConnector
-      .from('evics_trends')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const [trendsRes, rendersRes] = await Promise.all([
+      SupabaseConnector
+        .from('evics_trends')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      SupabaseConnector
+        .from('evics_renders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200)
+    ]);
 
-    if (platform && platform !== 'All') query = query.eq('platform', platform);
-    if (category && category !== 'All') query = query.eq('category', category);
+    if (trendsRes.error) throw new Error(trendsRes.error.message);
+    if (rendersRes.error) throw new Error(rendersRes.error.message);
 
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const trends = (trendsRes.data || []).map((row) => ({
+      id: row.id,
+      platform: row.platform || 'Unknown',
+      category: row.category || 'Uncategorized',
+      title: row.title || row.hook || 'Untitled viral trend',
+      hook: row.hook || '',
+      views: Number(row.views || 0),
+      engagement: Number(row.engagement || 0),
+      velocity: Number(row.velocity || row.signal_quality || 0),
+      conversion: Number(row.conversion || 0),
+      cta: row.cta || '',
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      product_match: row.product_match || '',
+      emotion: row.emotion || '',
+      structure: Array.isArray(row.structure) ? row.structure : [],
+      video_url: row.video_url || null,
+      thumbnail_url: row.thumbnail_url || null,
+      source: row.source || 'scraped',
+      _sort_ts: row.created_at || row.updated_at || null
+    }));
+
+    const renders = (rendersRes.data || [])
+      .filter((row) => {
+        const status = String(row.status || '').toLowerCase();
+        const hasPlayableVideo = Boolean(row.video_url || row.final_video_url || row.render_url || row.output_url);
+        if (!hasPlayableVideo) return false;
+        if (!status) return true;
+        return status.includes('complete') || status.includes('ready') || status.includes('published');
+      })
+      .map((row) => ({
+        id: row.render_id || row.id,
+        platform: row.platform || 'Unknown',
+        category: row.category || row.product_category || 'EVICS Render',
+        title: row.title || row.product_title || row.product_name || 'EVICS generated video',
+        hook: row.hook || row.script || row.script_text || '',
+        views: Number(row.views || 0),
+        engagement: Number(row.engagement || 0),
+        velocity: Number(row.velocity || row.render_grade || 0),
+        conversion: Number(row.conversion || 0),
+        cta: row.cta || row.destination_url || '',
+        tags: Array.isArray(row.tags) ? row.tags : [],
+        product_match: row.product_title || row.product_name || '',
+        emotion: row.emotion || '',
+        structure: Array.isArray(row.structure) ? row.structure : [],
+        video_url: row.video_url || row.final_video_url || row.render_url || row.output_url || null,
+        thumbnail_url: row.thumbnail_url || row.poster_url || null,
+        source: 'evics_generated',
+        _sort_ts: row.created_at || row.updated_at || null
+      }));
+
+    let videos = [...renders, ...trends];
+
+    if (platform && platform !== 'All') {
+      videos = videos.filter((item) => String(item.platform || '').toLowerCase() === String(platform).toLowerCase());
+    }
+    if (category && category !== 'All') {
+      videos = videos.filter((item) => String(item.category || '').toLowerCase() === String(category).toLowerCase());
+    }
+
+    videos = videos
+      .sort((a, b) => {
+        const at = new Date(a._sort_ts || 0).getTime();
+        const bt = new Date(b._sort_ts || 0).getTime();
+        return bt - at;
+      })
+      .slice(0, 300)
+      .map(({ _sort_ts, ...rest }) => rest);
 
     noStore(res);
-    res.json({ success: true, count: (data || []).length, videos: data || [] });
+    res.json({ success: true, count: videos.length, videos });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message || String(e) });
   }
