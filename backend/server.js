@@ -3230,15 +3230,15 @@ app.get('/api/viral/gallery', async (req, res) => {
       id: row.id,
       platform: row.platform || 'Unknown',
       category: row.category || 'Uncategorized',
-      title: row.title || row.hook || 'Untitled viral trend',
-      hook: row.hook || '',
+      title: row.trend_name || row.title || row.hook || 'Untitled viral trend',
+      hook: row.hook || row.trend_name || row.recommendation || '',
       views: Number(row.views || 0),
       engagement: Number(row.engagement || 0),
-      velocity: Number(row.velocity || row.signal_quality || 0),
+      velocity: Number(row.viral_score || row.velocity || row.signal_quality || 0),
       conversion: Number(row.conversion || 0),
       cta: row.cta || '',
       tags: Array.isArray(row.tags) ? row.tags : [],
-      product_match: row.product_match || '',
+      product_match: row.product_match || row.product_fit || '',
       emotion: row.emotion || '',
       structure: Array.isArray(row.structure) ? row.structure : [],
       video_url: row.video_url || null,
@@ -3259,11 +3259,11 @@ app.get('/api/viral/gallery', async (req, res) => {
         id: row.render_id || row.id,
         platform: row.platform || 'Unknown',
         category: row.category || row.product_category || 'EVICS Render',
-        title: row.title || row.product_title || row.product_name || 'EVICS generated video',
+        title: row.render_name || row.title || row.product_title || row.product_name || 'EVICS generated video',
         hook: row.hook || row.script || row.script_text || '',
         views: Number(row.views || 0),
         engagement: Number(row.engagement || 0),
-        velocity: Number(row.velocity || row.render_grade || 0),
+        velocity: Number(row.viral_potential || row.conversion_potential || row.velocity || 0),
         conversion: Number(row.conversion || 0),
         cta: row.cta || row.destination_url || '',
         tags: Array.isArray(row.tags) ? row.tags : [],
@@ -3351,7 +3351,7 @@ app.post('/api/viral/:id/analyze', async (req, res) => {
         { label: 'Product reveal timing', note: 'Product shown too early — move to 40% mark for better conversion' }
       ],
       formatBreakdown: {
-        hook: video?.hook || 'Pattern-matched curiosity hook',
+        hook: video?.trend_name || video?.hook || 'Pattern-matched curiosity hook',
         pacing: video?.platform === 'TikTok' ? 'Fast (1–2s cuts)' : video?.platform === 'YouTube' ? 'Medium (3–5s cuts)' : 'Medium-fast (2–3s cuts)',
         cta: video?.cta || 'Benefit-led CTA',
         platform: video?.platform || 'Multi-platform',
@@ -3418,9 +3418,9 @@ app.post('/api/viral/:id/create-brief', async (req, res) => {
 
     if (error) throw new Error(error.message);
 
-    const product = productName || (video && video.product_match) || 'your product';
+    const product = productName || (video && (video.product_match || video.product_fit)) || 'your product';
     const platform = (video && video.platform) || 'TikTok';
-    const hook = (video && video.hook) || 'Pattern-matched hook';
+    const hook = (video && (video.trend_name || video.hook)) || 'Pattern-matched hook';
     const cta = (video && video.cta) || 'Shop now';
     const structure = (video && video.structure) || ['Hook', 'Problem', 'Solution', 'CTA'];
 
@@ -3501,7 +3501,7 @@ function pviKeywordOverlap(productText, trendRow) {
   const kw = String(productText || '')
     .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
   if (!kw.length) return 0;
-  const hay = `${trendRow.category || ''} ${trendRow.title || ''} ${trendRow.hook || ''} ${trendRow.product_match || ''}`.toLowerCase();
+  const hay = `${trendRow.category || ''} ${trendRow.trend_name || ''} ${trendRow.title || ''} ${trendRow.hook || ''} ${trendRow.recommendation || ''} ${trendRow.product_match || ''}`.toLowerCase();
   return kw.filter((w) => hay.includes(w)).length;
 }
 
@@ -3526,7 +3526,7 @@ app.post('/api/viral/scan-by-product', async (req, res) => {
 
     // 3. Score every product against the best-matching real viral signal
     const results = products.map((p) => {
-      const name = p.title || p.name || p.product_title || 'Product';
+      const name = p.product_name || p.title || p.name || p.product_title || 'Product';
       const category = p.product_type || p.category || '';
       const text = `${name} ${category}`;
       let best = null; let bestOverlap = -1;
@@ -3540,8 +3540,8 @@ app.post('/api/viral/scan-by-product', async (req, res) => {
         views: Number(t.views || 0),
         shares: Number(t.shares || 0),
         comments: Number(t.comments || 0),
-        velocity: Number(t.velocity || t.signal_quality || 0),
-        hookStrength: t.hook ? 85 : 55,
+        velocity: Number(t.viral_score || t.velocity || t.signal_quality || 0),
+        hookStrength: (t.trend_name || t.hook) ? 85 : 55,
         productFit,
         conversionSignal: Number(t.conversion || 0) || 60
       });
@@ -3549,7 +3549,7 @@ app.post('/api/viral/scan-by-product', async (req, res) => {
         product: name,
         category: category || 'General Wellness',
         viralScore: Math.max(50, Math.min(99, Math.round(score))),
-        hook: t.hook || t.title || `${name}: the upgrade your routine was missing`,
+        hook: t.trend_name || t.hook || t.title || `${name}: the upgrade your routine was missing`,
         platform: t.platform || 'Multi',
         matchStrength: bestOverlap > 0 ? 'matched' : 'baseline'
       };
@@ -3664,7 +3664,7 @@ app.post('/api/viral/product/:productId/reproduce', async (req, res) => {
         ({ data } = await SupabaseConnector.from('evics_products').select('*').eq('handle', productId).limit(1));
       }
       if (data && data[0]) {
-        product = { name: data[0].title || data[0].name || productId, sku: data[0].sku || data[0].handle || productId };
+        product = { name: data[0].product_name || data[0].title || data[0].name || productId, sku: data[0].sku || data[0].handle || productId };
       }
     } catch (_) {}
 
@@ -3674,7 +3674,7 @@ app.post('/api/viral/product/:productId/reproduce', async (req, res) => {
       const { data } = await SupabaseConnector
         .from('evics_trends').select('*').ilike('platform', platform)
         .order('created_at', { ascending: false }).limit(1);
-      if (data && data[0]) ad = { format: data[0].format || `${platform} UGC`, hook: data[0].hook || '' };
+      if (data && data[0]) ad = { format: data[0].format || `${platform} UGC`, hook: data[0].trend_name || data[0].hook || '' };
     } catch (_) {}
 
     const strategy = generateRecreationStrategy(ad, product);
@@ -3722,11 +3722,16 @@ app.get('/api/viral-media/products/:handle/similar-ads', async (req, res) => {
       .map((t) => ({ t, overlap: pviKeywordOverlap(readable, t) }))
       .sort((a, b) => b.overlap - a.overlap);
 
-    const similarAds = ranked.slice(0, limit).map(({ t }) => ({
+    const similarAds = ranked.slice(0, limit).map(({ t, overlap }) => ({
       id: t.id,
       platform: t.platform || 'Multi',
-      title: t.title || t.hook || 'Viral ad',
-      hook: t.hook || '',
+      title: t.trend_name || t.title || t.hook || 'Viral ad',
+      hook: t.trend_name || t.hook || t.recommendation || '',
+      category: t.category || null,
+      viralScore: Number(t.viral_score || 0),
+      productFit: t.product_fit || null,
+      recommendation: t.recommendation || null,
+      matchScore: Number(overlap || 0),
       views: Number(t.views || 0),
       engagement: Number(t.engagement || 0),
       video_url: t.video_url || null,
@@ -4668,22 +4673,22 @@ app.post('/api/agents/trend-scout/scan', async (req, res) => {
     const trends = (data || [])
       .filter((row) => !blockedSources.has(String(row.source || '').toLowerCase()))
       .filter((row) => {
-        const title = String(row.title || '').trim();
-        const hook = String(row.hook || '').trim();
+        const title = String(row.trend_name || row.title || '').trim();
+        const hook = String(row.hook || row.recommendation || '').trim();
         const script = String(row.script || row.script_text || '').trim();
         return Boolean(title || hook || script);
       })
       .map((row) => ({
         id: row.id,
-        title: row.title || row.hook || '',
-        hook: row.hook || '',
+        title: row.trend_name || row.title || row.hook || '',
+        hook: row.hook || row.recommendation || '',
         script: row.script || row.script_text || '',
         format: row.format || row.content_format || '',
         platform: row.platform || '',
         category: row.category || '',
         views: Number(row.views || 0),
         engagement: Number(row.engagement || 0),
-        velocity: Number(row.velocity || row.signal_quality || 0),
+        velocity: Number(row.viral_score || row.velocity || row.signal_quality || 0),
         conversion: Number(row.conversion || 0),
         cta: row.cta || '',
         tags: Array.isArray(row.tags) ? row.tags : [],
