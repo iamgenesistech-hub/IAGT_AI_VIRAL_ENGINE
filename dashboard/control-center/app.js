@@ -492,6 +492,7 @@ const state = {
   viralFilterPlatform: "All",
   viralMemoriesLoading: false,
   productViralMemories: [],
+  pviError: null,
   selectedProductViral: null,
   viralScheduleResult: null,
   liveRenders: [],
@@ -690,90 +691,6 @@ let winningHooks = [
   { id: "h-010", text: "What if your energy problem was never about sleep?", category: "Reframe", platform: "YouTube", confidence: "High" },
   { id: "h-011", text: "I tried every supplement. This is the only one I kept.", category: "Proof", platform: "TikTok", confidence: "High" },
   { id: "h-012", text: "The morning ritual that changed my entire output.", category: "Transformation", platform: "Instagram", confidence: "Medium" }
-];
-
-// ── Demo product viral memories ──
-let demoProductViralMemories = [
-  {
-    product_id: "sea-moss-capsules",
-    product_name: "Sea Moss Capsules",
-    most_viral_ad_id: "ad-001",
-    viral_score: 94,
-    hook: "Nobody tells you minerals can change your whole morning.",
-    pacing: "Fast cuts (0–2s hook, 2–5s mineral gap, 5–12s morning ritual, 12–15s CTA)",
-    cta: "Start your mineral ritual",
-    visual_style: "UGC testimonial",
-    emotional_triggers: ["curiosity", "wellness", "ritual"],
-    structure: ["Hook", "Mineral gap", "Morning ritual", "Product close-up", "CTA"],
-    platform_breakdown: { TikTok: 48, Instagram: 28, YouTube: 14, Facebook: 10 },
-    last_updated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    reproduction_count: 7,
-    performance_metrics: { avg_views: 1240000, avg_engagement: 11.4, avg_conversion: 3.2 }
-  },
-  {
-    product_id: "metabolic-ignite",
-    product_name: "Metabolic Ignite",
-    most_viral_ad_id: "ad-001",
-    viral_score: 91,
-    hook: "I lost the bloat in 7 days doing this one thing every morning…",
-    pacing: "Fast cuts (0–2s hook, 2–6s before state, 6–12s discovery, 12–15s CTA)",
-    cta: "Start your reset today",
-    visual_style: "UGC testimonial",
-    emotional_triggers: ["hope", "transformation", "urgency"],
-    structure: ["Hook", "Before state", "Discovery moment", "Product ritual", "CTA"],
-    platform_breakdown: { TikTok: 52, Instagram: 26, Facebook: 14, YouTube: 8 },
-    last_updated: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    reproduction_count: 12,
-    performance_metrics: { avg_views: 2100000, avg_engagement: 13.1, avg_conversion: 4.1 }
-  },
-  {
-    product_id: "genesis-glow-collagen",
-    product_name: "Genesis Glow Collagen",
-    most_viral_ad_id: "ad-002",
-    viral_score: 88,
-    hook: "This changed my skin in 7 days — no filter, no edits.",
-    pacing: "Slow luxury cuts (0–3s hook, 3–8s mirror proof, 8–13s routine, 13–15s CTA)",
-    cta: "Shop the glow stack",
-    visual_style: "Luxury lifestyle routine",
-    emotional_triggers: ["aspiration", "confidence", "trust"],
-    structure: ["Hook", "Mirror proof", "Ingredient flash", "Routine", "CTA"],
-    platform_breakdown: { Instagram: 44, Pinterest: 28, TikTok: 18, YouTube: 10 },
-    last_updated: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    reproduction_count: 5,
-    performance_metrics: { avg_views: 980000, avg_engagement: 9.8, avg_conversion: 2.9 }
-  },
-  {
-    product_id: "apex-testosterone-support",
-    product_name: "Apex Testosterone Support",
-    most_viral_ad_id: "ad-003",
-    viral_score: 86,
-    hook: "Your training does not need more hype. It needs foundation.",
-    pacing: "Gym-paced cuts (0–2s hook, 2–7s low-energy problem, 7–12s workout proof, 12–15s CTA)",
-    cta: "Build your foundation",
-    visual_style: "Gym UGC commercial",
-    emotional_triggers: ["discipline", "strength", "control"],
-    structure: ["Hook", "Low-energy problem", "Workout proof", "Product reveal", "CTA"],
-    platform_breakdown: { TikTok: 40, YouTube: 30, Facebook: 20, Instagram: 10 },
-    last_updated: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    reproduction_count: 4,
-    performance_metrics: { avg_views: 760000, avg_engagement: 8.9, avg_conversion: 2.6 }
-  },
-  {
-    product_id: "neurorise-focus",
-    product_name: "NeuroRise Focus",
-    most_viral_ad_id: "ad-004",
-    viral_score: 82,
-    hook: "My 2 PM crash disappeared when I started doing this…",
-    pacing: "Desk-paced cuts (0–2s hook, 2–6s daily pain, 6–11s ingredient cue, 11–15s CTA)",
-    cta: "Upgrade your focus stack",
-    visual_style: "Founder desk UGC",
-    emotional_triggers: ["clarity", "ambition", "momentum"],
-    structure: ["Hook", "Daily pain", "Ingredient cue", "Focus result", "CTA"],
-    platform_breakdown: { YouTube: 38, TikTok: 32, Facebook: 20, Instagram: 10 },
-    last_updated: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    reproduction_count: 3,
-    performance_metrics: { avg_views: 540000, avg_engagement: 8.2, avg_conversion: 2.4 }
-  }
 ];
 
 let workflow = [
@@ -2643,6 +2560,127 @@ async function generateViralAnalysis(videoId) {
   render();
 }
 
+// Product Viral Intelligence — per-product viral memory backed by real /api/viral/* endpoints.
+// Scan the catalog for winning ad patterns, inspect a product's viral profile, find more ads, reproduce winners.
+function renderProductViralIntelligence() {
+  const memories = state.productViralMemories || [];
+  const selected = state.selectedProductViral;
+  const scanning = state.viralScanInProgress;
+  const lastScan = state.lastScanDate ? new Date(state.lastScanDate).toLocaleString() : "Never";
+  const nextScan = state.nextScanScheduled ? new Date(state.nextScanScheduled).toLocaleString() : "Not scheduled";
+
+  return `
+    <section class="pvi-section panel">
+      <div class="viral-gallery-header">
+        <div class="viral-gallery-title-row">
+          <div>
+            <h2>${icon("radar")} Product Viral Intelligence</h2>
+            <p>${memories.length} product viral ${memories.length === 1 ? "memory" : "memories"} · scan your catalog for winning ad patterns, then reproduce the winners</p>
+          </div>
+          <div class="viral-gallery-controls">
+            <button class="metric-btn ${scanning ? "scanning" : ""}" id="pvi-scan-btn" ${scanning ? "disabled" : ""}>
+              ${scanning ? `${icon("radar")} Scanning…` : `${icon("radar")} Scan products now`}
+            </button>
+            <button class="ghost" id="pvi-schedule-btn">${icon("bell")} Schedule daily scan</button>
+          </div>
+        </div>
+        <div class="pvi-scan-meta">
+          <span>Last scan: <b>${escapeHtml(lastScan)}</b></span>
+          <span>Next scheduled: <b>${escapeHtml(nextScan)}</b></span>
+        </div>
+      </div>
+
+      ${state.pviError ? `<div class="pvi-banner error">${escapeHtml(state.pviError)}</div>` : ""}
+      ${state.viralScheduleResult ? `<div class="pvi-banner success">${escapeHtml(state.viralScheduleResult)}</div>` : ""}
+
+      <div class="pvi-body">
+        ${memories.length === 0
+          ? `<div class="pvi-empty">
+               <div class="pvi-empty-icon">${icon("radar")}</div>
+               <p>No product viral memories yet.</p>
+               <small>Run a scan to match your catalog against viral ad patterns across TikTok, Instagram, YouTube, Facebook and Pinterest.</small>
+             </div>`
+          : `<div class="pvi-layout">
+               <div class="pvi-grid">
+                 ${memories.map((m) => renderPviCard(m, selected)).join("")}
+               </div>
+               <div class="pvi-detail-col">
+                 ${selected
+                   ? renderPviDetail(selected)
+                   : `<div class="pvi-detail-empty">
+                        <div class="pvi-empty-icon">${icon("spark")}</div>
+                        <p>Select a product to view its viral profile</p>
+                        <small>Then find more viral ads or reproduce the winning template.</small>
+                      </div>`
+                 }
+               </div>
+             </div>`
+        }
+        ${state.reproductionResult ? `
+          <div class="pvi-banner success pvi-result">
+            <span>${escapeHtml(state.reproductionResult)}</span>
+            <button class="ghost" id="pvi-dismiss-result">Dismiss</button>
+          </div>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function renderPviCard(m, selected) {
+  const isSel = selected && selected.product_id === m.product_id;
+  const score = Number(m.viral_score) || 0;
+  return `
+    <button class="pvi-product-card ${isSel ? "selected" : ""}" data-pvi-product="${escapeHtml(m.product_id)}">
+      <div class="pvi-card-head">
+        <strong>${escapeHtml(m.product_name)}</strong>
+        <span class="pvi-score">${score}</span>
+      </div>
+      <p class="pvi-card-hook">${escapeHtml(m.hook || "")}</p>
+      <div class="pvi-card-foot">
+        <span>${escapeHtml(m.visual_style || "")}</span>
+        <span>${Number(m.reproduction_count) || 0} reproduced</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderPviDetail(m) {
+  const finding = state.viralFindInProgress;
+  const reproducing = state.reproductionInProgress;
+  const pb = m.platform_breakdown || {};
+  const pid = escapeHtml(m.product_id);
+  return `
+    <div class="panel insight pvi-detail">
+      <div class="panel-head compact">
+        <h2>${escapeHtml(m.product_name)}</h2>
+        <span>Viral score ${Number(m.viral_score) || 0}</span>
+      </div>
+      <div class="hook-card">
+        <span>Top hook</span>
+        <strong>${escapeHtml(m.hook || "")}</strong>
+      </div>
+      ${(m.structure && m.structure.length) ? `<div class="structure">
+        ${m.structure.map((step, i) => `<div><b>${i + 1}</b><span>${escapeHtml(step)}</span></div>`).join("")}
+      </div>` : ""}
+      <dl>
+        <div><dt>Pacing</dt><dd>${escapeHtml(m.pacing || "-")}</dd></div>
+        <div><dt>CTA</dt><dd>${escapeHtml(m.cta || "-")}</dd></div>
+        <div><dt>Visual style</dt><dd>${escapeHtml(m.visual_style || "-")}</dd></div>
+      </dl>
+      ${(m.emotional_triggers && m.emotional_triggers.length) ? `<div class="tag-cloud">${m.emotional_triggers.map((t) => `<span>${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+      ${Object.keys(pb).length ? `<div class="pvi-platform-breakdown">${Object.keys(pb).map((k) => `<div class="pvi-pb-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(String(pb[k]))}%</span></div>`).join("")}</div>` : ""}
+      <div class="pvi-detail-actions">
+        <button class="ghost ${finding ? "scanning" : ""}" id="pvi-find-ads-btn" data-pvi-product="${pid}" ${finding ? "disabled" : ""}>
+          ${finding ? `${icon("radar")} Searching…` : `${icon("radar")} Find more viral ads`}
+        </button>
+        <button class="metric-btn ${reproducing ? "scanning" : ""}" id="pvi-reproduce-btn" data-pvi-product="${pid}" ${reproducing ? "disabled" : ""}>
+          ${reproducing ? `${icon("spark")} Reproducing…` : `${icon("spark")} Reproduce for my product`}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderViralGallery() {
   const displayVideos = state.viralVideos;
   const allPlatforms = ["All", ...new Set(displayVideos.map((a) => a.platform).filter(Boolean))];
@@ -3320,6 +3358,8 @@ function renderViralIntelligence() {
           <div class="tag-cloud">${ad.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
         </div>
       </section>
+
+      ${renderProductViralIntelligence()}
 
       ${renderViralGallery()}
 
@@ -7451,10 +7491,7 @@ function bindEvents() {
     if (btn.classList.contains("pvi-product-card")) {
       btn.addEventListener("click", () => {
         const productId = btn.dataset.pviProduct;
-        const memories = state.productViralMemories.length > 0
-          ? state.productViralMemories
-          : demoProductViralMemories;
-        const mem = memories.find((m) => m.product_id === productId);
+        const mem = state.productViralMemories.find((m) => m.product_id === productId);
         if (mem) {
           state.selectedProductViral = mem;
           state.reproductionResult = null;
@@ -7469,6 +7506,7 @@ function bindEvents() {
   if (pviScanBtn) {
     pviScanBtn.addEventListener("click", async () => {
       state.viralScanInProgress = true;
+      state.pviError = null;
       render();
       try {
         const res = await fetch("/api/viral/scan-by-product", {
@@ -7495,17 +7533,14 @@ function bindEvents() {
               reproduction_count: 0,
               performance_metrics: { avg_views: 0, avg_engagement: 0, avg_conversion: 0 }
             }));
+          } else {
+            state.productViralMemories = [];
           }
         } else {
-          // Demo fallback: simulate scan
-          await new Promise((r) => setTimeout(r, 2000));
-          state.lastScanDate = new Date().toISOString();
-          state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          state.pviError = `Scan failed (HTTP ${res.status}). Please try again.`;
         }
-      } catch {
-        await new Promise((r) => setTimeout(r, 2000));
-        state.lastScanDate = new Date().toISOString();
-        state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      } catch (err) {
+        state.pviError = `Scan failed: ${err && err.message ? err.message : "network error"}.`;
       }
       state.viralScanInProgress = false;
       render();
@@ -7516,6 +7551,7 @@ function bindEvents() {
   const pviScheduleBtn = document.getElementById("pvi-schedule-btn");
   if (pviScheduleBtn) {
     pviScheduleBtn.addEventListener("click", async () => {
+      state.pviError = null;
       try {
         const res = await fetch("/api/viral/schedule-daily-scan", {
           method: "POST",
@@ -7527,12 +7563,10 @@ function bindEvents() {
           state.nextScanScheduled = data.nextRun;
           state.viralScheduleResult = `✓ ${data.message}`;
         } else {
-          state.viralScheduleResult = "✓ Daily scan scheduled for 6:00 AM (demo mode).";
-          state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          state.pviError = `Could not schedule daily scan (HTTP ${res.status}).`;
         }
-      } catch {
-        state.viralScheduleResult = "✓ Daily scan scheduled for 6:00 AM (demo mode).";
-        state.nextScanScheduled = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      } catch (err) {
+        state.pviError = `Could not schedule daily scan: ${err && err.message ? err.message : "network error"}.`;
       }
       render();
       setTimeout(() => { state.viralScheduleResult = null; render(); }, 4000);
@@ -7544,13 +7578,11 @@ function bindEvents() {
   if (pviFindAdsBtn) {
     pviFindAdsBtn.addEventListener("click", async () => {
       const productId = pviFindAdsBtn.dataset.pviProduct;
-      const memories = state.productViralMemories.length > 0
-        ? state.productViralMemories
-        : demoProductViralMemories;
-      const mem = memories.find((m) => m.product_id === productId);
+      const mem = state.productViralMemories.find((m) => m.product_id === productId);
       if (!mem) return;
 
       state.viralFindInProgress = true;
+      state.pviError = null;
       render();
       try {
         const res = await fetch("/api/viral/find-product-viral-ads", {
@@ -7566,12 +7598,10 @@ function bindEvents() {
           const data = await res.json();
           state.reproductionResult = `✓ Found ${data.alternativesFound} viral ad templates across ${(data.platformsSearched || []).length} platforms.`;
         } else {
-          await new Promise((r) => setTimeout(r, 1500));
-          state.reproductionResult = `✓ Found 5 viral ad templates across TikTok, Instagram, YouTube, Facebook, Pinterest (demo mode).`;
+          state.pviError = `Ad search failed (HTTP ${res.status}). Please try again.`;
         }
-      } catch {
-        await new Promise((r) => setTimeout(r, 1500));
-        state.reproductionResult = `✓ Found 5 viral ad templates across TikTok, Instagram, YouTube, Facebook, Pinterest (demo mode).`;
+      } catch (err) {
+        state.pviError = `Ad search failed: ${err && err.message ? err.message : "network error"}.`;
       }
       state.viralFindInProgress = false;
       render();
@@ -7583,14 +7613,12 @@ function bindEvents() {
   if (pviReproduceBtn) {
     pviReproduceBtn.addEventListener("click", async () => {
       const productId = pviReproduceBtn.dataset.pviProduct;
-      const memories = state.productViralMemories.length > 0
-        ? state.productViralMemories
-        : demoProductViralMemories;
-      const mem = memories.find((m) => m.product_id === productId);
+      const mem = state.productViralMemories.find((m) => m.product_id === productId);
       if (!mem) return;
 
       state.reproductionInProgress = true;
       state.reproductionResult = null;
+      state.pviError = null;
       render();
       try {
         const res = await fetch(`/api/viral/product/${encodeURIComponent(productId)}/reproduce`, {
@@ -7601,17 +7629,12 @@ function bindEvents() {
         if (res.ok) {
           const data = await res.json();
           state.reproductionResult = `✓ ${data.message}`;
-          // Increment local reproduction count
           mem.reproduction_count = (mem.reproduction_count || 0) + 1;
         } else {
-          await new Promise((r) => setTimeout(r, 1200));
-          state.reproductionResult = `✓ Viral template reproduced for ${mem.product_name}. Creative added to AI Content Queue (demo mode).`;
-          mem.reproduction_count = (mem.reproduction_count || 0) + 1;
+          state.pviError = `Reproduce failed (HTTP ${res.status}). Please try again.`;
         }
-      } catch {
-        await new Promise((r) => setTimeout(r, 1200));
-        state.reproductionResult = `✓ Viral template reproduced for ${mem.product_name}. Creative added to AI Content Queue (demo mode).`;
-        mem.reproduction_count = (mem.reproduction_count || 0) + 1;
+      } catch (err) {
+        state.pviError = `Reproduce failed: ${err && err.message ? err.message : "network error"}.`;
       }
       state.reproductionInProgress = false;
       render();
