@@ -13,7 +13,7 @@ const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
-const { createViralMediaRouter } = require('./viralMediaRoutesClean');
+const { registerViralMediaRoutes } = require('./viralMediaRoutes');
 const { buildPublicMediaUrlFromObjectPath } = require('./mediaUrl');
 const {
   startHeyGenRender,
@@ -2968,8 +2968,7 @@ app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
 console.log('? [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====
-const viralMediaRouter = createViralMediaRouter();
-app.use('/api/viral-media', viralMediaRouter);
+registerViralMediaRoutes(app);
 console.log('? [EVICS] Viral Media routes registered at /api/viral-media');
 
 // ===== REGISTER EVICS SCRAPER CONTROL PLANE =====
