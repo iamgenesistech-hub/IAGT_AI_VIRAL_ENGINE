@@ -38,6 +38,10 @@ async function readErrorMessage(res, fallback = "Request failed.") {
   return fallback;
 }
 
+function getErrorMessage(error, fallback = "network error") {
+  return error && error.message ? error.message : fallback;
+}
+
 function execControlClass(state) {
   if (state === "running") return "state-running";
   if (state === "completed") return "state-completed";
@@ -1360,14 +1364,17 @@ async function legacyLoadMediaGallery() {
     }
     const galleryData = await galleryRes.json();
     const statsData = await statsRes.json();
-    state.mediaVideos = Array.isArray(galleryData.items) ? galleryData.items : (galleryData.videos || []);
+    if (!Array.isArray(galleryData.items)) {
+      throw new Error("Media gallery payload missing items array.");
+    }
+    state.mediaVideos = galleryData.items;
     state.mediaStats = statsData.stats || statsData.summary || state.mediaStats;
     state.syncLevel = "connected";
   } catch (err) {
     state.mediaVideos = [];
     state.mediaStats = { total: 0, approved: 0, pending: 0, rerender: 0, discarded: 0 };
     state.syncLevel = "error";
-    state.syncMessage = `Media gallery unavailable: ${err && err.message ? err.message : "Unknown backend error."}`;
+    state.syncMessage = `Media gallery unavailable: ${getErrorMessage(err, "Unknown backend error.")}`;
   }
   state.mediaLoading = false;
   render();
@@ -6328,14 +6335,17 @@ async function legacyLoadMediaGallery() {
     }
     const galleryData = await galleryRes.json();
     const statsData = await statsRes.json();
-    state.mediaVideos = Array.isArray(galleryData.items) ? galleryData.items : (galleryData.videos || []);
+    if (!Array.isArray(galleryData.items)) {
+      throw new Error("Media gallery payload missing items array.");
+    }
+    state.mediaVideos = galleryData.items;
     state.mediaStats = statsData.stats || statsData.summary || state.mediaStats;
     state.syncLevel = "connected";
   } catch (err) {
     state.mediaVideos = [];
     state.mediaStats = { total: 0, approved: 0, pending: 0, rerender: 0, discarded: 0 };
     state.syncLevel = "error";
-    state.syncMessage = `Media gallery unavailable: ${err && err.message ? err.message : "Unknown backend error."}`;
+    state.syncMessage = `Media gallery unavailable: ${getErrorMessage(err, "Unknown backend error.")}`;
   }
   state.mediaLoading = false;
   render();
@@ -7476,7 +7486,7 @@ function bindEvents() {
           state.mediaActionStatus = { id, type: "success", message: "✓ Approved" };
         } catch (err) {
           item.status = previousStatus;
-          state.mediaActionStatus = { id, type: "warning", message: `Approve failed: ${err && err.message ? err.message : "network error"}.` };
+          state.mediaActionStatus = { id, type: "warning", message: `Approve failed: ${getErrorMessage(err)}` };
         }
       } else if (action === "reject") {
         const previousStatus = item.status;
@@ -7493,7 +7503,7 @@ function bindEvents() {
           state.mediaActionStatus = { id, type: "warning", message: "✕ Rejected — returned to draft" };
         } catch (err) {
           item.status = previousStatus;
-          state.mediaActionStatus = { id, type: "warning", message: `Reject failed: ${err && err.message ? err.message : "network error"}.` };
+          state.mediaActionStatus = { id, type: "warning", message: `Reject failed: ${getErrorMessage(err)}` };
         }
       } else if (action === "requeue") {
         item.status = "pending";
@@ -7518,7 +7528,7 @@ function bindEvents() {
             state.mediaActionStatus = { id, type: "warning", message: await readErrorMessage(res, `Download failed (HTTP ${res.status}).`) };
           }
         } catch (err) {
-          state.mediaActionStatus = { id, type: "warning", message: `Download failed: ${err && err.message ? err.message : "network error"}.` };
+          state.mediaActionStatus = { id, type: "warning", message: `Download failed: ${getErrorMessage(err)}` };
         }
       }
       render();
@@ -7582,7 +7592,7 @@ function bindEvents() {
           state.productViralMemories = [];
         }
       } catch (err) {
-        state.pviError = `Scan failed: ${err && err.message ? err.message : "network error"}.`;
+        state.pviError = `Scan failed: ${getErrorMessage(err)}`;
       }
       state.viralScanInProgress = false;
       render();
@@ -7607,7 +7617,7 @@ function bindEvents() {
         state.nextScanScheduled = data.nextRun;
         state.viralScheduleResult = `✓ ${data.message}`;
       } catch (err) {
-        state.pviError = `Could not schedule daily scan: ${err && err.message ? err.message : "network error"}.`;
+        state.pviError = `Could not schedule daily scan: ${getErrorMessage(err)}`;
       }
       render();
       setTimeout(() => { state.viralScheduleResult = null; render(); }, 4000);
@@ -7641,7 +7651,7 @@ function bindEvents() {
         }
         state.reproductionResult = `✓ Found ${data.alternativesFound} viral ad templates across ${(data.platformsSearched || []).length} platforms.`;
       } catch (err) {
-        state.pviError = `Ad search failed: ${err && err.message ? err.message : "network error"}.`;
+        state.pviError = `Ad search failed: ${getErrorMessage(err)}`;
       }
       state.viralFindInProgress = false;
       render();
@@ -7673,7 +7683,7 @@ function bindEvents() {
         state.reproductionResult = `✓ ${data.message}`;
         mem.reproduction_count = (mem.reproduction_count || 0) + 1;
       } catch (err) {
-        state.pviError = `Reproduce failed: ${err && err.message ? err.message : "network error"}.`;
+        state.pviError = `Reproduce failed: ${getErrorMessage(err)}`;
       }
       state.reproductionInProgress = false;
       render();

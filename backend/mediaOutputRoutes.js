@@ -121,11 +121,14 @@ function parsePositiveInt(value, fallback, max) {
 }
 
 function normalizeGalleryStatus(value) {
-  const status = String(value || '').toLowerCase();
+  const approvedStatuses = ['approved', 'published', 'live'];
+  const rerenderStatuses = ['needs_rerender', 'rerender', 'requeue', 'requeued', 'retry', 'retrying', 'rejected'];
+  const discardedStatuses = ['discarded', 'archived', 'archive'];
+  const status = String(value || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
   if (!status) return 'pending';
-  if (status.includes('approved') || status.includes('published') || status.includes('live')) return 'approved';
-  if (status.includes('rerender') || status.includes('requeue') || status.includes('retry')) return 'needs_rerender';
-  if (status.includes('discard') || status.includes('archive')) return 'discarded';
+  if (approvedStatuses.includes(status)) return 'approved';
+  if (rerenderStatuses.includes(status)) return 'needs_rerender';
+  if (discardedStatuses.includes(status)) return 'discarded';
   return 'pending';
 }
 
@@ -156,19 +159,19 @@ function summarizeMediaGallery(items = []) {
 }
 
 function applyMediaGalleryFilters(items = [], query = {}) {
-  const statusFilter = String(query.status || 'all').toLowerCase();
-  const mediaTypeFilter = String(query.mediaType || query.type || 'all').toLowerCase();
-  const providerFilter = String(query.provider || 'all').toLowerCase();
-  const searchFilter = String(query.q || query.search || '').trim().toLowerCase();
+  const statusCriteria = String(query.status || 'all').toLowerCase();
+  const mediaTypeCriteria = String(query.mediaType || query.type || 'all').toLowerCase();
+  const providerCriteria = String(query.provider || 'all').toLowerCase();
+  const searchQuery = String(query.q || query.search || '').trim().toLowerCase();
 
   const filteredItems = items.filter((item) => {
     const normalizedStatus = normalizeGalleryStatus(item.status);
-    if (statusFilter !== 'all' && normalizedStatus !== statusFilter) return false;
+    if (statusCriteria !== 'all' && normalizedStatus !== statusCriteria) return false;
     const normalizedType = String(item.mediaType || '').toLowerCase();
-    if (mediaTypeFilter !== 'all' && normalizedType !== mediaTypeFilter) return false;
+    if (mediaTypeCriteria !== 'all' && normalizedType !== mediaTypeCriteria) return false;
     const normalizedProvider = String(item.sourceProvider || '').toLowerCase();
-    if (providerFilter !== 'all' && normalizedProvider !== providerFilter) return false;
-    if (!searchFilter) return true;
+    if (providerCriteria !== 'all' && normalizedProvider !== providerCriteria) return false;
+    if (!searchQuery) return true;
     const haystack = [
       item.id,
       item.title,
@@ -180,16 +183,16 @@ function applyMediaGalleryFilters(items = [], query = {}) {
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
-    return haystack.includes(searchFilter);
+    return haystack.includes(searchQuery);
   });
 
   return {
     filteredItems,
     filters: {
-      status: statusFilter,
-      mediaType: mediaTypeFilter,
-      provider: providerFilter,
-      search: searchFilter
+      status: statusCriteria,
+      mediaType: mediaTypeCriteria,
+      provider: providerCriteria,
+      search: searchQuery
     }
   };
 }
@@ -345,12 +348,10 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
       if (item && item.id) mergedMap.set(String(item.id), item);
     }
 
-    const items = Array.from(mergedMap.values()).sort((a, b) => {
-      const ta = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta || String(b.id).localeCompare(String(a.id));
-    });
-    return items;
+    return Array.from(mergedMap.values())
+      .map((item) => ({ item, ts: item && item.createdAt ? Date.parse(item.createdAt) || 0 : 0 }))
+      .sort((a, b) => b.ts - a.ts || String(b.item.id).localeCompare(String(a.item.id)))
+      .map(({ item }) => item);
   }
 
   app.get('/api/media-output/outputs', async (_req, res) => {
