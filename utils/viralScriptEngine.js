@@ -28,7 +28,14 @@ function sanitizeGeneratedCopy(text) {
   const input = String(text || '');
   if (!input) return '';
   const stripped = PROHIBITED_MARKETING_CLAIMS.reduce((next, pattern) => next.replace(pattern, ''), input);
-  return stripped.replace(/\s+/g, ' ').trim();
+  return stripped
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\((?:[^)(]*?(?:camera|scene|visual|b-?roll|sfx|music|caption|direction)[^)(]*)\)/gi, ' ')
+    .replace(/^\s*(?:scene|camera|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption)\s*:\s.*$/gim, ' ')
+    .replace(/^\s*(?:narrator|host|speaker|avatar|voice(?:over)?)\s*:\s*/gim, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // ── Platform specs ────────────────────────────────────────────────────────────
@@ -182,10 +189,73 @@ function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function normalizeText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeBenefitList(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeText(entry)).filter(Boolean);
+  }
+  return normalizeText(value)
+    .split(/[\n;|]+/)
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean);
+}
+
+function splitProductFacts(product = {}) {
+  const description = normalizeText(product.description || product.body_html || '');
+  const benefits = normalizeBenefitList(product.benefits);
+  const howToUse = normalizeText(product.howToUse || product.usageInstructions);
+  return {
+    description,
+    benefits,
+    howToUse
+  };
+}
+
+function buildProductFocusedTemplate({ title, platform, price, affiliateCode, product = {} }) {
+  const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.tiktok;
+  const facts = splitProductFacts(product);
+  const ctaBank = CTAS[platform] || CTAS.default;
+  let cta = pickRandom(ctaBank);
+  if (affiliateCode && !cta.includes(affiliateCode)) {
+    cta = cta.replace('iamgenesistech.com', `iamgenesistech.com/?ref=${affiliateCode}`);
+  }
+
+  const hook = spec.maxSeconds <= 20
+    ? `If you've been looking at ${title}, here's what actually makes it worth trying.`
+    : `Let me show you exactly why ${title} stands out.`;
+  const lines = [hook];
+
+  if (facts.description) {
+    const summary = facts.description.split('. ').slice(0, 2).join('. ').trim();
+    lines.push(/[.!?]$/.test(summary) ? summary : `${summary}.`);
+  }
+  if (facts.benefits[0]) {
+    lines.push(`What I like most is ${facts.benefits[0].replace(/^[•✔✅-]\s*/, '')}.`);
+  }
+  if (facts.benefits[1]) {
+    lines.push(`You also get ${facts.benefits[1].replace(/^[•✔✅-]\s*/, '')}.`);
+  }
+  if (facts.howToUse) {
+    lines.push(`How to use it is simple: ${facts.howToUse.replace(/\.$/, '')}.`);
+  }
+  if (price) {
+    lines.push(`It starts at $${parseFloat(price).toFixed(2)}.`);
+  }
+  lines.push(`If ${title} fits your routine, ${cta}`);
+  return sanitizeGeneratedCopy(lines.join(' '));
+}
+
 /**
  * Build a script from templates — no API needed.
  */
-function buildTemplateScript({ title, category, mood, platform, hookPattern, price }) {
+function buildTemplateScript({ title, category, mood, platform, hookPattern, price, product = {}, affiliateCode }) {
+  const facts = splitProductFacts(product);
+  if (facts.description || facts.benefits.length || facts.howToUse) {
+    return buildProductFocusedTemplate({ title, platform, price, affiliateCode, product });
+  }
   const spec     = PLATFORM_SPECS[platform] || PLATFORM_SPECS.default || PLATFORM_SPECS.tiktok;
   const hookBank = (HOOKS[hookPattern] || HOOKS.transformation);
   const hook     = pickRandom(hookBank[category] || hookBank.default || HOOKS.transformation.default);
@@ -197,17 +267,17 @@ function buildTemplateScript({ title, category, mood, platform, hookPattern, pri
 
   // Short script (TikTok/Instagram)
   if (spec.maxSeconds <= 25) {
-    return [hook, `This is the ${title} from I AM GENESIS TECH.`, bridge, `${priceTag}`, cta].filter(Boolean).join(' ');
+    return [hook, `This is the ${title}.`, bridge, `${priceTag}`, cta].filter(Boolean).join(' ');
   }
 
   // Medium script (Facebook)
   if (spec.maxSeconds <= 35) {
     return [
       hook,
-      `Let me show you something. This is the ${title} from I AM GENESIS TECH.`,
+      `Let me show you something. This is the ${title}.`,
       `I have been using this consistently and the results are real.`,
       bridge,
-      `Every product at I AM GENESIS TECH is designed for people who are serious about elevating their life.${priceTag}`,
+      `This is built for people who are serious about elevating their routine.${priceTag}`,
       cta
     ].join(' ');
   }
@@ -215,11 +285,11 @@ function buildTemplateScript({ title, category, mood, platform, hookPattern, pri
   // Long script (YouTube)
   return [
     hook,
-    `Let me break this down for you. This is the ${title} from I AM GENESIS TECH.`,
+    `Let me break this down for you. This is the ${title}.`,
     `I want to be real with you — I was skeptical. I have tried a lot of products in this space and most of them overpromise and underdeliver.`,
     `But this one is different. Here is why.`,
     bridge,
-    `The team at I AM GENESIS TECH built this for people who are done settling. People who are ready to invest in themselves — in their health, their mindset, their future.`,
+    `It is built for people who are done settling and want something they can actually use consistently.`,
     `If you are watching this, that is you.${priceTag}`,
     cta
   ].join(' ');
@@ -227,15 +297,16 @@ function buildTemplateScript({ title, category, mood, platform, hookPattern, pri
 
 // ── OpenAI-enhanced generator ─────────────────────────────────────────────────
 
-async function buildOpenAIScript({ title, category, mood, platform, hookPattern, price, emotional_trigger }) {
+async function buildOpenAIScript({ title, category, mood, platform, hookPattern, price, emotional_trigger, product = {}, affiliateCode }) {
   const OpenAI = require('openai');
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const spec   = PLATFORM_SPECS[platform] || PLATFORM_SPECS.tiktok;
+  const facts = splitProductFacts(product);
 
   const systemPrompt = `You are an elite viral video ad scriptwriter specializing in authentic, high-converting social media ads. 
-You write scripts that feel REAL — not salesy. You speak to the soul, not just the wallet.
-The brand is I AM GENESIS TECH (iamgenesistech.com) — a spiritually-aligned wellness, education, and abundance platform.
-Core values: God-consciousness, self-improvement, wealth as spiritual birthright, community, love, purpose.
+You write scripts that feel REAL — not salesy.
+Use only supplied product facts. Do not invent testimonials, outcomes, diagnoses, or health claims.
+The brand is I AM GENESIS TECH (iamgenesistech.com), but you may mention the brand at most once, ideally only in the closing CTA.
 Never include unverified military-affiliation claims unless explicit legal authorization is provided (it is not authorized by default).`;
 
   const userPrompt = `Write a ${spec.maxSeconds}-second viral ${platform} video ad script for: "${title}"
@@ -245,14 +316,18 @@ Emotional mood: ${mood}
 Hook pattern: ${hookPattern}
 Emotional trigger: ${emotional_trigger || 'transformation and purpose'}
 ${price ? `Price: $${parseFloat(price).toFixed(0)}` : ''}
+Product description facts: ${facts.description || 'Use only the product name and provided benefits.'}
+Product benefits: ${facts.benefits.length ? facts.benefits.join(' | ') : 'None supplied'}
+How to use: ${facts.howToUse || 'Not supplied'}
 
 Requirements:
 - Start with a POWERFUL hook that stops the scroll (first 3 seconds decide everything)
 - Use the ${hookPattern} pattern naturally — never forced
-- Mention the product by name naturally in conversation (do NOT use brackets or stage directions)
-- Bridge to the emotional payoff (the ${mood} feeling they will get)
-- Weave in IAGT's spiritual/purpose-driven brand voice authentically
-- End with a clear, urgent CTA directing to iamgenesistech.com and "${PLATFORM_SPECS[platform]?.captionCTA || 'link in bio'}"
+- Mention the product by name naturally in conversation
+- Keep the script product-first: explain what it is, why it helps, and how it is used
+- Do NOT add any claim that is not explicitly supported by the provided facts
+- Mention the brand no more than once, preferably only in the CTA
+- End with a clear CTA directing to ${affiliateCode ? `iamgenesistech.com/?ref=${affiliateCode}` : 'iamgenesistech.com'} and "${PLATFORM_SPECS[platform]?.captionCTA || 'link in bio'}"
 - Write ONLY the words the avatar will speak out loud — absolutely NO stage directions, NO brackets like [Hold up product], NO action cues
 - Approximately ${spec.maxWords} words maximum
 - Sound like a real person sharing their genuine experience, not a commercial
@@ -338,7 +413,9 @@ async function generateViralScript({
         platform,
         hookPattern:        detectedHook,
         price:              productPrice,
-        emotional_trigger:  emotional_trigger || theme.mood
+        emotional_trigger:  emotional_trigger || theme.mood,
+        product,
+        affiliateCode
       });
       if (scriptText) source = 'openai';
     } catch (e) {
@@ -354,7 +431,9 @@ async function generateViralScript({
       mood:        detectedMood,
       platform,
       hookPattern: detectedHook,
-      price:       productPrice
+      price:       productPrice,
+      product,
+      affiliateCode
     });
   }
 

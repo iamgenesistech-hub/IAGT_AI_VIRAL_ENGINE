@@ -47,6 +47,55 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function sanitizeSpokenDialogue(script) {
+  const source = String(script || '');
+  if (!source.trim()) {
+    const error = new Error('A spoken script is required for avatar rendering.');
+    error.code = 'SCRIPT_REQUIRED';
+    throw error;
+  }
+
+  const withoutFences = source
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`+/g, ' ');
+  const lines = withoutFences.split(/\r?\n/);
+  const spoken = [];
+
+  for (let line of lines) {
+    let next = String(line || '').trim();
+    if (!next) continue;
+
+    if (/^(scene|camera|visual|b-?roll|sfx|music|audio|shot|on-?screen(?:\s+text)?|lower\s*third|caption|super|graphic|transition|cut\s+to|fade\s+in|fade\s+out|timestamp)\b/i.test(next)) {
+      continue;
+    }
+    if (/^\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[-–—])?/i.test(next)) {
+      continue;
+    }
+
+    next = next
+      .replace(/^\s*(narrator|host|speaker|avatar|voice(?:over)?|assistant|customer|affiliate)\s*:\s*/i, '')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/\((?:[^)(]*?(?:camera|shot|scene|visual|b-?roll|sfx|music|caption|text|graphic|direction|pause|beat|smile|look|hold|show|display|cut|zoom|pan|tilt|dolly|fade|transition|instruction)[^)(]*)\)/gi, ' ')
+      .replace(/\b(?:camera|scene|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic|direction)\s*:\s*.*$/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!next) continue;
+    if (/^(scene|camera|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic)\b/i.test(next)) {
+      continue;
+    }
+    spoken.push(next);
+  }
+
+  const sanitized = spoken.join(' ').replace(/\s+/g, ' ').trim();
+  if (!sanitized) {
+    const error = new Error('No spoken dialogue remained after removing production directions. Provide only the words the avatar should speak.');
+    error.code = 'SCRIPT_DIALOGUE_EMPTY';
+    throw error;
+  }
+  return sanitized;
+}
+
 function createIdempotencyKey({ script, avatar_id, voice_id, config = {} }) {
   const explicit = config.idempotency_key || config.idempotencyKey;
   if (explicit) return String(explicit);
@@ -172,9 +221,7 @@ async function heygenFetch(path, options = {}, attempt = 1) {
 }
 
 async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
-  // Strip ALL stage directions (brackets) from script — avatar speaks only pure dialogue
-  const cleanScript = String(script || '').trim().replace(/\[.*?\]/g, '').replace(/\s{2,}/g, ' ').trim();
-  if (!cleanScript) throw new Error('script is required.');
+  const cleanScript = sanitizeSpokenDialogue(script);
   if (!avatar_id) throw new Error('avatar_id is required.');
   if (!voice_id) throw new Error('voice_id is required.');
 
@@ -420,6 +467,7 @@ module.exports = {
   pollHeyGenVideoAgentSession,
   pollHeyGenVideo,
   createIdempotencyKey,
+  sanitizeSpokenDialogue,
   validateJordanAvatar,
   resolveAvatarId,
   TEXT_OVERLAY_RULE,

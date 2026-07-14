@@ -13,6 +13,47 @@ function stripHtml(value) {
   return normalizeText(String(value || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '));
 }
 
+function extractSection(text, heading, nextHeadings = []) {
+  const source = String(text || '');
+  if (!source) return '';
+  const headingPattern = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const nextPattern = nextHeadings.length
+    ? `(?:${nextHeadings.map((entry) => entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`
+    : '$';
+  const match = source.match(new RegExp(`${headingPattern}\\s*[:\\-]?\\s*([\\s\\S]*?)(?=${nextPattern}|$)`, 'i'));
+  return normalizeText(match && match[1] ? match[1] : '');
+}
+
+function extractBenefits(value) {
+  const section = extractSection(value, 'Key Benefits', [
+    'How to Use',
+    'How To Use',
+    'Key Ingredients',
+    'Who It',
+    'Quality Commitment',
+    'Important Use Note'
+  ]);
+  if (!section) return [];
+  const cleaned = section
+    .replace(/[•✔✅💪🔥⚡🧠🍫]/g, ' ')
+    .split(/(?:\s{2,}|;|\.\s+(?=[A-Z])|\n|\r|(?<=\w)\s+[—-]\s+)/)
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean);
+  return cleaned.slice(0, 6);
+}
+
+function extractHowToUse(value) {
+  return extractSection(value, 'How To Use', [
+    'Who It',
+    'Quality Commitment',
+    'Important Use Note'
+  ]) || extractSection(value, 'How to Use', [
+    'Who It',
+    'Quality Commitment',
+    'Important Use Note'
+  ]);
+}
+
 function normalizeUrl(value) {
   const raw = normalizeText(value);
   if (!raw) return '';
@@ -36,6 +77,8 @@ function normalizeProductEntry(product) {
   const id = normalizeText(product.id || product.shopify_id || product.product_id || '');
   const handle = normalizeText(product.handle || product.product_handle || '');
   const title = normalizeText(product.title || product.name || product.productTitle || '');
+  const rawDescription = String(product.description || product.body_html || product.bodyHtml || '');
+  const description = stripHtml(rawDescription);
   const primaryImageUrl = normalizeUrl(
     product.primaryImageUrl ||
     product.imageUrl ||
@@ -50,7 +93,6 @@ function normalizeProductEntry(product) {
     product.productUrl ||
     (handle ? `https://iamgenesistech.myshopify.com/products/${handle}` : '')
   );
-  const description = stripHtml(product.description || product.body_html || product.bodyHtml || '');
   if (!id && !handle && !title) return null;
   return {
     productId: id || handle || title.toLowerCase().replace(/\s+/g, '-'),
@@ -58,7 +100,14 @@ function normalizeProductEntry(product) {
     title,
     primaryImageUrl,
     productPageUrl,
+    price: normalizeText(product.price || product.productPrice || product.minPrice || ''),
+    category: normalizeText(product.category || product.product_type || ''),
+    vendor: normalizeText(product.vendor || ''),
     description,
+    benefits: Array.isArray(product.benefits) && product.benefits.length
+      ? product.benefits.map((entry) => normalizeText(entry)).filter(Boolean)
+      : extractBenefits(rawDescription || description),
+    howToUse: normalizeText(product.howToUse || product.usageInstructions || extractHowToUse(rawDescription || description)),
     source: normalizeText(product.source || 'shopify'),
     syncedAt: new Date().toISOString()
   };

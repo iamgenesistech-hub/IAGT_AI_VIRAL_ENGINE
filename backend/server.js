@@ -24,7 +24,8 @@ const {
   pollHeyGenVideoAgentSession,
   pollHeyGenVideo,
   getHeyGenCurrentUser,
-  enforceFaceSafeTextPosition
+  enforceFaceSafeTextPosition,
+  sanitizeSpokenDialogue
 } = require('./internalVideoRenderer');
 const { startScheduler, getSchedulerLog, runScheduledTask } = require('../utils/automationScheduler');
 const { removeBackground, batchPreprocessProducts, getCacheManifest, getCacheStats, CACHE_DIR: BG_CACHE_DIR, PROCESSED_URL_PREFIX } = require('../utils/productBgRemover');
@@ -56,6 +57,12 @@ const {
   buildAPlusVideoAgentPrompt,
   gradeCompletedRender
 } = require('./renderQualityValidator');
+const {
+  normalizeAffiliateProductVideoRequest,
+  buildProductVideoQuality,
+  advanceProductVideoJob,
+  isTransientAdvanceError
+} = require('./productVideoPipeline');
 
 // EVICS Sacred Intelligence Governance Engine � centralized AI operating standard.
 const governance = require('./sacredIntelligenceGovernance');
@@ -79,7 +86,15 @@ const cdnEngine = require('./cdnEngine');
 const costTracker = require('./costTrackingEngine');
 
 // Cinematic Layer Engine � Seedance/Kling post-render pass for camera motion + cinematic grading.
-const { applyCinematicLayer, getCinematicLayerStatus } = require('./cinematicLayerEngine');
+const {
+  applyCinematicLayer,
+  getCinematicLayerStatus,
+  resolveProvider: resolveCinematicProvider,
+  startSeedanceJob,
+  getSeedanceJobStatus,
+  startKlingJob,
+  getKlingJobStatus
+} = require('./cinematicLayerEngine');
 
 // Observability + Resilience telemetry -- structured request tracing, latency/error
 // metrics, and circuit-breaker state exposed via /metrics and /api/health.
@@ -3988,7 +4003,7 @@ app.post('/api/video/generate', async (req, res) => {
       } catch {}
     }
     const productTitle = (resolvedProduct && resolvedProduct.title) || requestedProductTitle;
-    const productImageUrl = (resolvedProduct && resolvedProduct.primaryImageUrl) || requestedProductImageUrl;
+    const productImageUrl = requestedProductImageUrl || (resolvedProduct && resolvedProduct.primaryImageUrl) || '';
     const productPageUrl = (resolvedProduct && resolvedProduct.productPageUrl) || requestedProductPageUrl;
     const productDescription = (resolvedProduct && resolvedProduct.description) || '';
     const companyLabel = body.companyLabel || config.companyLabel || 'I AM GENESIS TECH';
@@ -8735,7 +8750,7 @@ app.post('/api/affiliate/social/post', async (req, res) => {
 
 // -- Product Video Generation -------------------------------------------------
 
-// In-memory store for product video records (same pattern as avatar requests)
+// In-memory store for product video records (same pattern as avatar requests) ���������
 const PRODUCT_VIDEO_RECORDS = new Map();
 
 function upsertProductVideoRecord(record) {
@@ -8764,6 +8779,323 @@ function getProductVideosByAffiliate(affiliateCode) {
     if (normalizeAffiliateCode(rec.affiliateCode || rec.affiliateId || '') === upper) results.push(rec);
   }
   return results.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+function pickResolvedString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return '';
+}
+
+function normalizeRequestedBenefits(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  return String(value || '')
+    .split(/[\n;|]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+async function verifyDownloadableImageUrl(imageUrl) {
+  const normalized = normalizeExternalUrl(imageUrl);
+  if (!normalized || !/^https?:\/\//i.test(normalized)) {
+    return { ok: false, code: 'PRODUCT_IMAGE_URL_INVALID', detail: 'Product image URL must be an absolute http(s) URL.' };
+  }
+  if (!isTrustedStoreProductUrl(normalized)) {
+    return { ok: false, code: 'PRODUCT_IMAGE_URL_UNTRUSTED', detail: 'Product image URL must be a trusted Shopify or I AM GENESIS TECH product asset.' };
+  }
+  try {
+    let response = await fetch(normalized, {
+      method: 'HEAD',
+      headers: { Accept: 'image/*' },
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!response.ok && (response.status === 405 || response.status === 501)) {
+      response = await fetch(normalized, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0', Accept: 'image/*' },
+        signal: AbortSignal.timeout(12000)
+      });
+    }
+    if (!response.ok) {
+      return { ok: false, code: 'PRODUCT_IMAGE_URL_UNAVAILABLE', detail: `Product image check failed with HTTP ${response.status}.` };
+    }
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (contentType && !contentType.startsWith('image/')) {
+      return { ok: false, code: 'PRODUCT_IMAGE_CONTENT_TYPE_INVALID', detail: `Expected image content but received ${contentType}.` };
+    }
+    return { ok: true, contentType };
+  } catch (error) {
+    return { ok: false, code: 'PRODUCT_IMAGE_URL_UNAVAILABLE', detail: error.message };
+  }
+}
+
+async function resolveAffiliateProductRenderData(req, requestData, avatarRecord) {
+  const lookup = {
+    productId: requestData.productId || '',
+    productHandle: requestData.productHandle || '',
+    productTitle: requestData.productTitle || '',
+    productPageUrl: requestData.productPageUrl || ''
+  };
+
+  let resolvedProduct = resolveProductMockup(lookup);
+  if (!resolvedProduct) {
+    try {
+      const liveProducts = await fetchShopifyProducts();
+      if (liveProducts.length) {
+        writeProductMockupLibrary(liveProducts, 'shopify');
+        resolvedProduct = resolveProductMockup(lookup, liveProducts);
+      }
+    } catch {}
+  }
+  if (!resolvedProduct) {
+    const error = new Error('A matching live/store product is required before affiliate product video rendering can begin.');
+    error.statusCode = 422;
+    error.code = 'PRODUCT_RESOLUTION_REQUIRED';
+    throw error;
+  }
+
+  const explicitProductTitleSupplied = Boolean(requestData.productTitle);
+  const explicitProductImageSupplied = Boolean(requestData.productImageUrl);
+  let resolvedProductTitle = pickResolvedString(
+    requestData.productTitle,
+    avatarRecord?.productTitle,
+    resolvedProduct?.title
+  );
+  const fallbackTitle = resolvedProduct?.title || avatarRecord?.productTitle || '';
+  if (!resolvedProductTitle && explicitProductTitleSupplied) {
+    resolvedProductTitle = requestData.productTitle;
+  }
+  if (!resolvedProductTitle) {
+    resolvedProductTitle = fallbackTitle;
+  }
+  if (!resolvedProductTitle) {
+    const error = new Error('A real product title is required for affiliate product video rendering.');
+    error.statusCode = 422;
+    error.code = 'PRODUCT_TITLE_REQUIRED';
+    throw error;
+  }
+
+  const requestedImageUrl = pickResolvedString(requestData.productImageUrl);
+  let resolvedProductImage = pickResolvedString(
+    requestedImageUrl,
+    resolvedProduct.primaryImageUrl,
+    avatarRecord?.productImageUrl
+  );
+  let imageValidation = await verifyDownloadableImageUrl(resolvedProductImage);
+  if (!imageValidation.ok) {
+    const error = new Error(imageValidation.detail);
+    error.statusCode = 422;
+    error.code = imageValidation.code;
+    error.details = {
+      requestedImageUrl: explicitProductImageSupplied ? requestedImageUrl : null,
+      fallbackImageUrl: resolvedProduct?.primaryImageUrl || null
+    };
+    throw error;
+  }
+
+  const resolvedProductPage = pickResolvedString(
+    requestData.productPageUrl,
+    avatarRecord?.productPageUrl,
+    resolvedProduct?.productPageUrl
+  );
+  const resolvedProductPrice = pickResolvedString(
+    requestData.productPrice,
+    resolvedProduct?.price
+  ) || null;
+  const resolvedProductDescription = pickResolvedString(
+    requestData.productDescription,
+    resolvedProduct?.description
+  );
+  const resolvedProductBenefits = normalizeRequestedBenefits(
+    requestData.productBenefits && requestData.productBenefits.length
+      ? requestData.productBenefits
+      : resolvedProduct?.benefits
+  );
+  const resolvedHowToUse = pickResolvedString(
+    requestData.howToUse,
+    resolvedProduct?.howToUse
+  );
+
+  let processedProductImageUrl = absolutizePublicAssetUrl(req, resolvedProductImage);
+  let productBgActuallyRemoved = false;
+  let bgRemovalMethod = 'passthrough';
+  let bgRemovalFromCache = false;
+  try {
+    const bgResult = await removeBackground(resolvedProductImage);
+    productBgActuallyRemoved = Boolean(bgResult.method && bgResult.method !== 'passthrough');
+    bgRemovalMethod = bgResult.method || 'passthrough';
+    bgRemovalFromCache = Boolean(bgResult.fromCache);
+    processedProductImageUrl = absolutizePublicAssetUrl(req, bgResult.processedUrl || resolvedProductImage);
+  } catch {}
+
+  return {
+    productResolved: resolvedProduct ? {
+      productId: resolvedProduct.productId || null,
+      handle: resolvedProduct.handle || null,
+      matchType: lookup.productId ? 'productId' : lookup.productHandle ? 'productHandle' : lookup.productTitle ? 'productTitle' : lookup.productPageUrl ? 'productPageUrl' : 'record'
+    } : null,
+    productId: pickResolvedString(requestData.productId, resolvedProduct?.productId) || null,
+    productHandle: pickResolvedString(requestData.productHandle, resolvedProduct?.handle) || null,
+    productTitle: resolvedProductTitle,
+    productImageUrl: resolvedProductImage,
+    productPageUrl: resolvedProductPage,
+    productPrice: resolvedProductPrice,
+    productDescription: resolvedProductDescription,
+    productBenefits: resolvedProductBenefits,
+    howToUse: resolvedHowToUse,
+    processedProductImageUrl,
+    productBgActuallyRemoved,
+    bgRemovalMethod,
+    bgRemovalFromCache
+  };
+}
+
+async function startAffiliateProductCinematic(record) {
+  const provider = resolveCinematicProvider();
+  const motionPromptParts = [
+    record.productTitle,
+    record.productDescription,
+    Array.isArray(record.productBenefits) && record.productBenefits[0] ? record.productBenefits[0] : '',
+    record.howToUse ? `How to use: ${record.howToUse}` : ''
+  ].filter(Boolean);
+  const motionPrompt = motionPromptParts.join('. ');
+  if (provider === 'seedance') {
+    if (!record.processedProductImageUrl || !record.productBgActuallyRemoved) {
+      return {
+        provider: 'passthrough',
+        passthrough: true,
+        fallback: true,
+        error: 'Seedance requires a processed transparent product mockup. Using deterministic post-processing instead.'
+      };
+    }
+    const job = await startSeedanceJob({
+      imageUrl: record.processedProductImageUrl,
+      cameraMoves: record.cameraMoves || ['zoom-in', 'pan-right'],
+      intensity: record.cinematicIntensity || 2,
+      motionPrompt,
+      aspectRatio: record.platform === 'facebook' ? '16:9' : '9:16',
+      tier: 'fast'
+    });
+    return { provider: 'seedance', jobId: job.job_id, pending: true, useAsFinalBase: false };
+  }
+  if (provider === 'kling') {
+    const job = await startKlingJob({
+      videoUrl: record.heygenVideoUrl,
+      cameraMoves: record.cameraMoves || ['zoom-in', 'pan-right'],
+      intensity: record.cinematicIntensity || 2,
+      motionPrompt,
+      aspectRatio: record.platform === 'facebook' ? '16:9' : '9:16'
+    });
+    return { provider: 'kling', jobId: job.job_id, pending: true, useAsFinalBase: false };
+  }
+  return { provider: 'passthrough', passthrough: true, videoUrl: record.heygenVideoUrl, useAsFinalBase: false };
+}
+
+async function getAffiliateProductCinematicStatus(record) {
+  if (!record.cinematicJobId) {
+    return {
+      status: 'completed',
+      provider: record.cinematicProvider || 'passthrough',
+      passthrough: Boolean(record.cinematicPassthrough),
+      fallback: Boolean(record.cinematicFallback),
+      videoUrl: record.cinematicVideoUrl || record.heygenVideoUrl,
+      useAsFinalBase: false
+    };
+  }
+  if (record.cinematicProvider === 'seedance') {
+    const status = await getSeedanceJobStatus(record.cinematicJobId);
+    const preservedFullAd = status.status === 'completed';
+    return {
+      status: status.status,
+      provider: 'seedance',
+      videoUrl: status.video_url || null,
+      passthrough: false,
+      fallback: preservedFullAd || status.status === 'failed',
+      error: status.status === 'failed' ? 'Seedance job failed.' : (preservedFullAd ? 'Seedance clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
+      useAsFinalBase: false
+    };
+  }
+  if (record.cinematicProvider === 'kling') {
+    const status = await getKlingJobStatus(record.cinematicJobId);
+    const preservedFullAd = status.status === 'completed';
+    return {
+      status: status.status,
+      provider: 'kling',
+      videoUrl: status.video_url || null,
+      passthrough: false,
+      fallback: preservedFullAd || status.status === 'failed',
+      error: status.status === 'failed' ? 'Kling job failed.' : (preservedFullAd ? 'Kling clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
+      useAsFinalBase: false
+    };
+  }
+  return {
+    status: 'completed',
+    provider: 'passthrough',
+    passthrough: true,
+    videoUrl: record.heygenVideoUrl,
+    useAsFinalBase: false
+  };
+}
+
+async function postProcessAffiliateProductRecord(record, sourceVideoUrl) {
+  const result = await postProcessVideo({
+    videoUrl: sourceVideoUrl,
+    videoId: record.videoJobId,
+    productImageUrl: record.processedProductImageUrl || record.productImageUrl || null,
+    productTitle: record.productTitle || '',
+    productPageUrl: record.productPageUrl || '',
+    affiliateCode: record.affiliateCode || '',
+    specialEffects: ['product-entrance-fade'],
+    textOverlayPosition: 'bottom',
+    ctaText: `Shop ${record.productTitle || 'now'}`
+  });
+  if (result && result.processedVideoUrl && result.processedVideoUrl.startsWith('/')) {
+    result.processedVideoUrl = `${getConfiguredPublicAppOrigin()}${result.processedVideoUrl}`;
+  }
+  return result;
+}
+
+async function archiveAffiliateProductRecord(record) {
+  if (record.gcsVideoUrl) return record.gcsVideoUrl;
+  if (record.processedVideoPath && fs.existsSync(record.processedVideoPath)) {
+    return uploadToGcs(record.processedVideoPath, `evics-videos/${record.affiliateCode}/${record.videoJobId}.mp4`, 'video/mp4');
+  }
+  if (record.videoUrl && /^https?:\/\//i.test(String(record.videoUrl || ''))) {
+    return persistenceEngine.gcsDownloadUrl(
+      record.videoUrl,
+      `evics-videos/${record.affiliateCode}/${record.videoJobId}.mp4`,
+      'video/mp4'
+    );
+  }
+  return null;
+}
+
+async function advanceAffiliateProductVideoRecord(record) {
+  const updated = await advanceProductVideoJob(record, {
+    getHeyGenVideoStatus,
+    startCinematic: startAffiliateProductCinematic,
+    getCinematicStatus: getAffiliateProductCinematicStatus,
+    postProcess: postProcessAffiliateProductRecord,
+    archiveFinal: archiveAffiliateProductRecord
+  });
+  return updated;
+}
+
+function decorateProductVideoRecord(record) {
+  const quality = buildProductVideoQuality(record || {});
+  return {
+    ...(record || {}),
+    qualityScore: quality.score,
+    qualityGrade: quality.grade,
+    qualityEvidence: quality.evidence,
+    eliteReady: quality.aPlus
+  };
 }
 
 /**
@@ -8805,34 +9137,29 @@ async function deleteProductVideoRecord(videoJobId, affiliateCode) {
 // POST /api/affiliate/product-video/generate � create a product video with the affiliate's avatar
 app.post('/api/affiliate/product-video/generate', async (req, res) => {
   try {
+    const requestData = normalizeAffiliateProductVideoRequest(req.body || {});
     const {
       affiliateCode,
       avatarRequestId,
       avatarId: requestedAvatarId,
+      voiceId: requestedVoiceId,
       avatarAttire,
       avatarAttireLabel,
-      productId,
-      productHandle,
-      productTitle,
-      productImageUrl,
-      productPageUrl,
-      productPrice,
-      platform,
-      customScript,
       qualityMode,
+      platform,
       cinematicMode,
       cinematicEngine,
       cinematicProfile,
       cinematicIntensity,
       backgroundMode,
       backgroundUrl,
-      backgroundQuery
-    } = req.body || {};
+      backgroundQuery,
+      cinematicDirective
+    } = requestData;
 
     const cleanCode = String(affiliateCode || '').trim().toUpperCase();
     if (!cleanCode) return res.status(400).json({ success: false, error: 'affiliateCode is required.' });
 
-    // -- Plan enforcement: check monthly video limit ---------------------------
     const planInfo = await stripeEngine.getPlanForAffiliate(cleanCode);
     if (!planInfo.canGenerateVideo) {
       const plan = planInfo.plan;
@@ -8844,15 +9171,13 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         videosUsed: planInfo.videosUsed,
         videosPerMonth: plan.videosPerMonth,
         upgradeRequired: true,
-        upgradeMessage: 'Upgrade to Creator ($29/mo) for 20 videos/month, or Elite ($79/mo) for unlimited videos.',
+        upgradeMessage: 'Upgrade to Creator ($29/mo) for 20 videos/month, or Elite ($79/mo) for unlimited videos.'
       });
     }
 
-    // Resolve the avatar from the request record
     let avatarRecord = null;
     if (avatarRequestId) {
       avatarRecord = findAvatarRequest(avatarRequestId);
-      // AFFILIATE ISOLATION: verify this affiliate owns the avatar
       if (avatarRecord && avatarRecord.affiliateCode && avatarRecord.affiliateCode !== cleanCode) {
         return res.status(403).json({ success: false, error: 'This avatar belongs to a different affiliate account.' });
       }
@@ -8868,47 +9193,29 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       if (selected && selected.requestId) {
         avatarRecord = findAvatarRequest(selected.requestId);
       }
-      // If requestedAvatarId doesn't match a custom gallery avatar, it may be a
-      // stock/HeyGen avatar ID -- fall through to the stock-avatar render path below.
     }
     if (!avatarRecord) {
-      // Fall back to latest completed avatar for this affiliate ONLY
       const allRecords = await getAvatarGalleryRecords(cleanCode);
       if (allRecords.length) {
         avatarRecord = findAvatarRequest(allRecords[0].requestId);
       }
     }
 
-    // If still no custom avatar record, render directly with the affiliate's selected
-    // stock/HeyGen avatar (or the system default). No custom photo required -- the full
-    // HeyGen render + cinematic (Kling/Seedance) + GCS archive pipeline runs below.
     if (!avatarRecord || !avatarRecord.avatar) {
-      if (!productImageUrl) {
-        return res.status(422).json({
-          success: false,
-          error: 'productImageUrl is required for product video generation.'
-        });
-      }
-      const selectedAvatar = resolveAffiliateAvatar(cleanCode, requestedAvatarId || null, null);
-      // Synthesize a minimal avatar record so the shared render pipeline treats this
-      // stock avatar exactly like a custom one (renders via avatar_id, no talking_photo).
+      const selectedAvatar = resolveAffiliateAvatar(cleanCode, requestedAvatarId || null, requestedVoiceId || null);
       avatarRecord = {
         requestId: avatarRequestId || null,
         name: selectedAvatar.avatarName,
         photoUrl: null,
-        productTitle,
-        productImageUrl,
-        productPageUrl,
-        platform,
         isStockAvatar: true,
         avatar: {
-          avatarId:        selectedAvatar.avatarId,
-          name:            selectedAvatar.avatarName,
+          avatarId: selectedAvatar.avatarId,
+          name: selectedAvatar.avatarName,
           previewImageUrl: selectedAvatar.avatarThumbnailUrl || null,
-          gender:          selectedAvatar.avatarGender || null,
-          voiceCloneId:    selectedAvatar.voiceId || null,
-          talkingPhotoId:  null,
-          attireLabel:     'Professional'
+          gender: selectedAvatar.avatarGender || null,
+          voiceCloneId: requestedVoiceId || selectedAvatar.voiceId || null,
+          talkingPhotoId: null,
+          attireLabel: 'Professional'
         }
       };
     }
@@ -8918,7 +9225,6 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Avatar has no photo URL. Re-create your avatar with a photo.' });
     }
 
-    // Resolve avatar metadata
     const avatarName = avatarRecord.name || avatarRecord.avatar?.name || 'Affiliate Avatar';
     const avatarId = avatarRecord.avatar?.avatarId || avatarRecord.avatar?.id || null;
     const talkingPhotoId = avatarRecord.avatar?.talkingPhotoId || avatarRecord.talkingPhotoId || null;
@@ -8951,68 +9257,83 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       });
     }
 
-    // Resolve product info
-    const resolvedProductTitle = productTitle || avatarRecord.productTitle || 'Premium Product';
-    const resolvedProductImage = productImageUrl || avatarRecord.productImageUrl || '';
-    const resolvedProductPage = productPageUrl || avatarRecord.productPageUrl || '';
-    const resolvedProductPrice = productPrice || null;
-    const resolvedPlatform = platform || avatarRecord.platform || 'tiktok';
     const renderQualityMode = String(qualityMode || avatarRecord.avatar?.renderQualityMode || 'elite').trim().toLowerCase() || 'elite';
+    const resolvedPlatform = platform || avatarRecord.platform || 'tiktok';
     const cinematicRequested = Boolean(cinematicMode) || renderQualityMode === 'elite';
 
-    // Generate a compelling product script.
-    let script = String(customScript || '').trim();
+    const productData = await resolveAffiliateProductRenderData(req, requestData, avatarRecord);
+    if (renderQualityMode === 'elite' && !productData.productBgActuallyRemoved) {
+      return res.status(422).json({
+        success: false,
+        code: 'PRODUCT_BG_REMOVAL_REQUIRED',
+        error: 'Elite product renders require a verified transparent product mockup before HeyGen rendering.',
+        details: {
+          productTitle: productData.productTitle,
+          productImageUrl: productData.productImageUrl,
+          bgRemovalMethod: productData.bgRemovalMethod
+        }
+      });
+    }
+
+    let script = String(requestData.spokenScript || '').trim();
     if (!script) {
-      if (cinematicRequested) {
-        try {
-          const scriptResult = await generateViralScript({
-            title: resolvedProductTitle,
-            product: {
-              title: resolvedProductTitle,
-              imageUrl: resolvedProductImage,
-              product_type: productHandle || ''
-            },
-            platform: resolvedPlatform,
-            affiliateCode: cleanCode
-          });
-          script = String(scriptResult?.scriptText || '').trim();
-        } catch (_) {}
-      }
+      try {
+        const scriptResult = await generateViralScript({
+          title: productData.productTitle,
+          product: {
+            title: productData.productTitle,
+            description: productData.productDescription,
+            benefits: productData.productBenefits,
+            howToUse: productData.howToUse,
+            price: productData.productPrice,
+            product_type: productData.productHandle || ''
+          },
+          platform: resolvedPlatform,
+          affiliateCode: cleanCode
+        });
+        script = String(scriptResult?.scriptText || '').trim();
+      } catch (_) {}
       if (!script) {
         script = generateProductVideoScript({
-          productTitle: resolvedProductTitle,
-          productPageUrl: resolvedProductPage,
+          productTitle: productData.productTitle,
+          productPageUrl: productData.productPageUrl,
+          productDescription: productData.productDescription,
+          productBenefits: productData.productBenefits,
+          howToUse: productData.howToUse,
           platform: resolvedPlatform
         });
       }
     }
 
-    let processedProductImageUrl = null;
-    let productBgActuallyRemoved = false;
-    if (resolvedProductImage) {
-      try {
-        const bgResult = await removeBackground(resolvedProductImage);
-        // Only treat as "removed" when a real provider ran — passthrough means no API key was available
-        productBgActuallyRemoved = bgResult.method && bgResult.method !== 'passthrough';
-        processedProductImageUrl = bgResult.processedUrl || resolvedProductImage;
-        if (processedProductImageUrl && processedProductImageUrl.startsWith('/processed-images/')) {
-          const host = process.env.EVICS_HOST || process.env.HOST || `https://evics-api-480958062306.us-central1.run.app`;
-          processedProductImageUrl = `${host}${processedProductImageUrl}`;
-        }
-        if (productBgActuallyRemoved) {
-          console.log(`[ProductVideo] Product bg removed via ${bgResult.method}${bgResult.fromCache ? ' (cache)' : ''}: ${processedProductImageUrl}`);
-        } else {
-          console.log(`[ProductVideo] No bg-removal provider available (set REMOVE_BG_API_KEY). Using lifestyle background instead of product image.`);
-        }
-      } catch {
-        processedProductImageUrl = resolvedProductImage;
-      }
+    let sanitizedScript;
+    try {
+      sanitizedScript = sanitizeSpokenDialogue(script);
+    } catch (validationError) {
+      return res.status(422).json({
+        success: false,
+        code: validationError.code || 'SCRIPT_INVALID',
+        error: validationError.message
+      });
+    }
+
+    let finalSanitizedScript;
+    try {
+      finalSanitizedScript = sanitizeSpokenDialogue(sanitizedScript);
+    } catch (validationError) {
+      return res.status(422).json({ success: false, code: validationError.code || 'SCRIPT_INVALID', error: validationError.message });
+    }
+    if (!finalSanitizedScript) {
+      return res.status(422).json({ success: false, code: 'SCRIPT_DIALOGUE_EMPTY', error: 'Sanitized spoken dialogue is empty. Provide only the words the avatar should speak.' });
     }
 
     let resolvedBackground = null;
     let heygenBackground = { type: 'color', value: '#0b1016' };
     if (cinematicRequested) {
-      const productObj = { title: resolvedProductTitle, imageUrl: resolvedProductImage, product_type: productHandle || '' };
+      const productObj = {
+        title: productData.productTitle,
+        imageUrl: productData.productImageUrl,
+        product_type: productData.productHandle || ''
+      };
       if (backgroundUrl) {
         resolvedBackground = {
           type: 'image',
@@ -9022,27 +9343,21 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
           query: backgroundQuery || null
         };
       } else {
-        // Only use the product image as the video background when the background was actually removed.
-        // Without bg removal the product sits on a white/coloured background which looks amateur.
-        // Fall back to the per-category cinematic lifestyle image from videoBackgroundSelector.
         const bgUserOverride = String(backgroundMode || '').toLowerCase();
-        const mode = productBgActuallyRemoved
+        const mode = productData.productBgActuallyRemoved
           ? 'product'
           : (bgUserOverride === 'color' ? 'color' : 'lifestyle');
-        resolvedBackground = selectBackground(productObj, productBgActuallyRemoved ? processedProductImageUrl : null, mode);
+        resolvedBackground = selectBackground(productObj, productData.productBgActuallyRemoved ? productData.processedProductImageUrl : null, mode);
       }
       heygenBackground = toHeyGenBackground(resolvedBackground);
     }
 
-    // Use the affiliate's voice clone if available, otherwise fall back to default
     const defaultVoice = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
     const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
-    let voiceId = cloneVoice || defaultVoice;
+    let voiceId = requestedVoiceId || cloneVoice || defaultVoice;
 
-    // Render with avatar_id when possible so selected avatar styling/attire is preserved.
-    // Fall back to talking_photo for older records missing avatar IDs.
     const attemptAvatarRender = async (vid) => startHeyGenRender({
-      script,
+      script: finalSanitizedScript,
       avatar_id: avatarIdForRender,
       voice_id: vid,
       config: {
@@ -9055,7 +9370,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const attemptTalkingPhotoRender = async (vid) => heygenApiJson('/v2/video/generate', {
       video_inputs: [{
         character: { type: 'talking_photo', talking_photo_id: talkingPhotoId },
-        voice: { type: 'text', input_text: script, voice_id: vid }
+        voice: { type: 'text', input_text: finalSanitizedScript, voice_id: vid }
       }],
       dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 1080, height: 1920 },
       caption: true
@@ -9084,7 +9399,6 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     try {
       videoResult = await renderWithVoice(voiceId);
     } catch (voiceErr) {
-      // If voice clone is invalid, retry with default voice
       if (cloneVoice && voiceId !== defaultVoice && /voice.*not found|invalid.*voice/i.test(voiceErr.message)) {
         console.log(`[ProductVideo] Voice clone ${voiceId} invalid, falling back to default voice.`);
         voiceId = defaultVoice;
@@ -9100,27 +9414,12 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     }
 
     const videoJobId = `pvid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // Compute AI quality render score (0-100) based on input completeness and rendering factors
-    const qualityScore = computeRenderQualityScore({
-      hasPhoto: !!photoUrl,
-      hasVoiceClone: voiceId !== defaultVoice,
-      hasProductImage: !!resolvedProductImage,
-      hasProductPage: !!resolvedProductPage,
-      hasCustomScript: !!customScript,
-      scriptLength: script.length,
-      platform: resolvedPlatform
-    });
-
-    // Algorithm Amplification: build per-platform SEO/discovery metadata packages
-    // (title, description, hashtags, keywords, cover text, posting time, format spec,
-    // and a 0-100 Discoverability Score). Live tags come from the evics_trends feed.
     const trendingTags = await fetchTrendingTags({ platform: resolvedPlatform, limit: 4 });
     const metadata = buildVideoMetadataPackage({
-      productTitle: resolvedProductTitle,
-      productPrice: resolvedProductPrice,
-      productPageUrl: resolvedProductPage,
-      script,
+      productTitle: productData.productTitle,
+      productPrice: productData.productPrice,
+      productPageUrl: productData.productPageUrl,
+      script: finalSanitizedScript,
       primaryPlatform: resolvedPlatform,
       trendingTags,
       hasCaptions: true,
@@ -9139,24 +9438,44 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       photoUrl,
       voiceId,
       voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
-      productId: productId || null,
-      productHandle: productHandle || null,
-      productTitle: resolvedProductTitle,
-      productPrice: resolvedProductPrice,
-      productImageUrl: resolvedProductImage,
-      productPageUrl: resolvedProductPage,
+      productId: productData.productId,
+      productHandle: productData.productHandle,
+      productTitle: productData.productTitle,
+      productPrice: productData.productPrice,
+      productImageUrl: productData.productImageUrl,
+      productPageUrl: productData.productPageUrl,
+      productDescription: productData.productDescription,
+      productBenefits: productData.productBenefits,
+      howToUse: productData.howToUse,
+      productResolved: productData.productResolved,
+      productBgActuallyRemoved: productData.productBgActuallyRemoved,
+      bgRemovalMethod: productData.bgRemovalMethod,
+      bgRemovalFromCache: productData.bgRemovalFromCache,
+      processedProductImageUrl: productData.processedProductImageUrl,
       platform: resolvedPlatform,
-      script,
+      script: finalSanitizedScript,
+      pureSpokenDialogue: true,
       renderQualityMode,
+      cinematicRequested,
       cinematicMode: cinematicRequested ? 'elite' : 'standard',
       cinematicEngine: String(cinematicEngine || 'seedance2-style').trim(),
       cinematicProfile: String(cinematicProfile || 'auto').trim().toLowerCase() || 'auto',
       cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
+      cinematicDirective: { ...(cinematicDirective || {}), cameraMoves: requestData.cameraMoves || [] },
+      cameraMoves: requestData.cameraMoves || [],
       background: resolvedBackground,
-      processedProductImageUrl: processedProductImageUrl || null,
-      qualityScore,
       metadata,
       status: 'rendering',
+      postProcessed: false,
+      productOverlayApplied: false,
+      heygenVideoUrl: null,
+      cinematicVideoUrl: null,
+      cinematicProvider: null,
+      cinematicPassthrough: false,
+      cinematicFallback: false,
+      cinematicError: null,
+      cinematicJobId: null,
+      gcsVideoUrl: null,
       videoUrl: null,
       thumbnailUrl: null,
       createdAt: new Date().toISOString(),
@@ -9164,24 +9483,22 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       error: null
     });
 
-    // Increment monthly video usage count for billing enforcement
     stripeEngine.incrementVideoUsage(cleanCode).catch(() => {});
-
-    // Track HeyGen cost for this video render
     costTracker.logCost({
       operation: 'VIDEO_GENERATE',
       affiliateCode: cleanCode,
       jobId: videoJobId,
       durationSeconds: costTracker.HEYGEN_RATES.DEFAULT_VIDEO_SECS,
-      notes: `${resolvedPlatform} product video � ${resolvedProductTitle}`
+      notes: `${resolvedPlatform} product video - ${productData.productTitle}`
     });
 
+    const responseRecord = decorateProductVideoRecord(record);
     res.json({
       success: true,
       videoJobId,
       heygenVideoId: videoId,
       status: 'rendering',
-      script,
+      script: finalSanitizedScript,
       avatarName,
       avatarId,
       avatarPhotoUrl: photoUrl,
@@ -9189,8 +9506,14 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       avatarAttireLabel: resolvedAttireLabel,
       voiceId,
       voiceType: voiceId === defaultVoice ? 'stock' : 'clone',
-      productTitle: resolvedProductTitle,
-      productPrice: resolvedProductPrice,
+      productTitle: productData.productTitle,
+      productPrice: productData.productPrice,
+      productDescription: productData.productDescription,
+      productBenefits: productData.productBenefits,
+      howToUse: productData.howToUse,
+      processedProductImageUrl: productData.processedProductImageUrl,
+      productBgActuallyRemoved: productData.productBgActuallyRemoved,
+      productResolved: productData.productResolved,
       platform: resolvedPlatform,
       renderQualityMode,
       cinematicMode: cinematicRequested ? 'elite' : 'standard',
@@ -9199,104 +9522,28 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
       cinematicLayerStatus: getCinematicLayerStatus(),
       background: resolvedBackground,
-      qualityScore,
+      qualityScore: responseRecord.qualityScore,
+      qualityGrade: responseRecord.qualityGrade,
+      qualityEvidence: responseRecord.qualityEvidence,
       metadata,
-      // Production tab � full avatar card
       productionTab: {
-        avatarId:     avatarId || avatarRecord?.avatar?.avatarId || null,
-        avatarName:   avatarName,
+        avatarId: avatarId || avatarRecord?.avatar?.avatarId || null,
+        avatarName,
         thumbnailUrl: avatarRecord?.avatar?.previewImageUrl || avatarRecord?.photoUrl || photoUrl || null,
-        gender:       avatarRecord?.avatar?.gender || null,
-        type:         'custom',
-        voiceId:      voiceId,
+        gender: avatarRecord?.avatar?.gender || null,
+        type: 'custom',
+        voiceId,
         readyForRender: true
       }
     });
-
-    // Background poll for video completion
-    (async () => {
-      try {
-        for (let i = 0; i < 40; i++) {
-          await new Promise(r => setTimeout(r, 5000));
-          const s = await getHeyGenVideoStatus(videoId);
-          if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
-            // -- Cinematic pass: run Seedance/Kling camera-motion layer after HeyGen --
-            let finalVideoUrl = s.video_url;
-            let cinematicResult = null;
-            if (cinematicRequested) {
-              try {
-                const cinematicCameraMoves = record.cinematicDirective?.cameraMoves
-                  || ['zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
-                const cinematicIntensityVal = Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2));
-                const cinematicAspect = resolvedPlatform === 'facebook' ? '16:9' : '9:16';
-                const cinematicMotionPrompt = `${resolvedProductTitle} product commercial, natural avatar body movement, product mockup visible.`;
-                console.log(`[ProductVideo] Starting cinematic layer for ${videoJobId}�`);
-                cinematicResult = await applyCinematicLayer(s.video_url, {
-                  productImageUrl: photoUrl || record.productImageUrl || null,
-                  cameraMoves: cinematicCameraMoves,
-                  intensity: cinematicIntensityVal,
-                  motionPrompt: cinematicMotionPrompt,
-                  aspectRatio: cinematicAspect,
-                  tier: record.cinematicTier || 'fast',
-                  jobId: videoJobId
-                });
-                if (cinematicResult && cinematicResult.videoUrl) {
-                  finalVideoUrl = cinematicResult.videoUrl;
-                  console.log(`[ProductVideo] Cinematic layer complete (${cinematicResult.provider}): ${finalVideoUrl.substring(0, 80)}�`);
-                }
-              } catch (cinematicErr) {
-                console.warn(`[ProductVideo] Cinematic layer error for ${videoJobId}: ${cinematicErr.message}. Using HeyGen video.`);
-              }
-            }
-            const completedRecord = {
-              ...record,
-              status: 'completed',
-              videoUrl: finalVideoUrl,
-              heygenVideoUrl: s.video_url,
-              cinematicVideoUrl: cinematicResult && !cinematicResult.passthrough ? cinematicResult.videoUrl : null,
-              cinematicProvider: cinematicResult ? cinematicResult.provider : null,
-              cinematicPassthrough: cinematicResult ? Boolean(cinematicResult.passthrough) : true,
-              thumbnailUrl: s.thumbnail_url || photoUrl,
-              completedAt: new Date().toISOString()
-            };
-            upsertProductVideoRecord(completedRecord);
-            console.log(`[ProductVideo] Completed ${videoJobId}: ${finalVideoUrl.substring(0, 80)}�`);
-            // Archive final video to GCS � HeyGen CDN URLs expire in 7 days; GCS is permanent
-            persistenceEngine.gcsDownloadUrl(
-              finalVideoUrl,
-              `evics-videos/${cleanCode}/${videoJobId}.mp4`,
-              'video/mp4'
-            ).then(gcsUrl => {
-              if (gcsUrl) {
-                upsertProductVideoRecord({ ...completedRecord, gcsVideoUrl: gcsUrl });
-                console.log(`[ProductVideo] GCS archive ready: ${gcsUrl}`);
-              }
-            }).catch(() => {});
-            break;
-          }
-          if (s && s.status === 'failed') {
-            upsertProductVideoRecord({
-              ...record,
-              status: 'failed',
-              error: s.error || 'HeyGen rendering failed',
-              completedAt: new Date().toISOString()
-            });
-            break;
-          }
-        }
-      } catch (pollErr) {
-        console.error(`[ProductVideo] Poll error for ${videoJobId}: ${pollErr.message}`);
-        upsertProductVideoRecord({
-          ...record,
-          status: 'failed',
-          error: pollErr.message,
-          completedAt: new Date().toISOString()
-        });
-      }
-    })();
   } catch (err) {
     console.error('[ProductVideo] Generate error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(err.statusCode || 500).json({
+      success: false,
+      code: err.code || 'PRODUCT_VIDEO_GENERATE_FAILED',
+      error: err.message,
+      details: err.details || null
+    });
   }
 });
 
@@ -9305,41 +9552,26 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || req.query.code || '');
   if (!affiliateCode) return res.status(400).json({ success: false, error: 'affiliateCode is required for product video status access' });
-  const record = findProductVideoRecord(req.params.videoJobId, affiliateCode);
+  let record = findProductVideoRecord(req.params.videoJobId, affiliateCode);
   if (!record) {
     return res.status(404).json({ success: false, error: 'Product video job not found.' });
   }
-  // If still rendering, check HeyGen directly
-  if (record.status === 'rendering' && record.heygenVideoId) {
-    try {
-      const s = await getHeyGenVideoStatus(record.heygenVideoId);
-      if (s && (s.status === 'completed' || s.status === 'done') && s.video_url) {
-        record.status = 'completed';
-        record.videoUrl = s.video_url;
-        record.thumbnailUrl = s.thumbnail_url || record.photoUrl;
-        record.completedAt = new Date().toISOString();
-        upsertProductVideoRecord(record);
-        // Archive to GCS if not already done
-        if (!record.gcsVideoUrl) {
-          const archiveCode = record.affiliateCode || 'unknown';
-          persistenceEngine.gcsDownloadUrl(
-            s.video_url,
-            `evics-videos/${archiveCode}/${record.videoJobId}.mp4`,
-            'video/mp4'
-          ).then(gcsUrl => {
-            if (gcsUrl) upsertProductVideoRecord({ ...record, gcsVideoUrl: gcsUrl });
-          }).catch(() => {});
-        }
-      } else if (s && s.status === 'failed') {
-        record.status = 'failed';
-        record.error = s.error || 'Rendering failed';
-        upsertProductVideoRecord(record);
-      }
-    } catch (_) {}
+  try {
+    if (record.status !== 'completed' && record.status !== 'failed') {
+      const advanced = await advanceAffiliateProductVideoRecord(record);
+      record = upsertProductVideoRecord(advanced);
+    }
+  } catch (error) {
+    if (isTransientAdvanceError(error)) {
+      record = upsertProductVideoRecord({ ...record, lastAdvanceError: error.message, lastAdvanceErrorAt: new Date().toISOString() });
+    } else {
+      record = upsertProductVideoRecord({ ...record, status: 'failed', error: error.message, completedAt: new Date().toISOString() });
+    }
   }
+  record = decorateProductVideoRecord(ensureVideoMetadata(record));
   res.json({
     success: true,
-    ...ensureVideoMetadata(record)
+    ...record
   });
 });
 
@@ -9737,19 +9969,21 @@ async function fetchTrendingTags({ platform, limit = 4 } = {}) {
 
 // Backfill metadata on records that predate the algorithm engine (defensive).
 function ensureVideoMetadata(record) {
-  if (!record || (record.metadata && record.metadata.platforms)) return record;
-  const metadata = buildVideoMetadataPackage({
-    productTitle: record.productTitle,
-    productPrice: record.productPrice,
-    productPageUrl: record.productPageUrl,
-    script: record.script,
-    primaryPlatform: record.platform
-  });
-  if (metadata) {
-    record.metadata = metadata;
-    upsertProductVideoRecord(record);
+  if (!record) return record;
+  if (!record.metadata || !record.metadata.platforms) {
+    const metadata = buildVideoMetadataPackage({
+      productTitle: record.productTitle,
+      productPrice: record.productPrice,
+      productPageUrl: record.productPageUrl,
+      script: record.script,
+      primaryPlatform: record.platform
+    });
+    if (metadata) {
+      record.metadata = metadata;
+      upsertProductVideoRecord(record);
+    }
   }
-  return record;
+  return decorateProductVideoRecord(record);
 }
 
 function normalizePhoneRenderFeedItem(item) {
@@ -9820,15 +10054,24 @@ function normalizePhoneRenderFeedItem(item) {
   };
 }
 
-function generateProductVideoScript({ productTitle, productPageUrl, platform }) {
+function generateProductVideoScript({ productTitle, productPageUrl, productDescription = '', productBenefits = [], howToUse = '', platform }) {
   const platformHook = {
-    tiktok: "Listen up � I found something that's about to change the game.",
+    tiktok: "If you're curious about this product, here's what actually matters.",
     instagram: "Stop scrolling! You need to see this.",
-    youtube: "Hey everyone � I've been using something incredible and I had to share it.",
+    youtube: "Hey everyone, let me walk you through this product clearly.",
     facebook: "I rarely post about products, but this one deserves the attention."
   };
   const hook = platformHook[platform] || platformHook.tiktok;
-  return `${hook} I'm talking about ${productTitle}. This isn't just another product � this is real quality, real results, and I can personally vouch for it. If you've been looking for something that actually delivers, this is it. Click the link and see for yourself. Trust me, you won't regret it.`;
+  const lines = [hook, `I'm talking about ${productTitle}.`];
+  if (productDescription) {
+    const summary = productDescription.split('. ').slice(0, 2).join('. ').trim();
+    lines.push(/[.!?]$/.test(summary) ? summary : `${summary}.`);
+  }
+  if (Array.isArray(productBenefits) && productBenefits[0]) lines.push(`One reason people pick it is ${productBenefits[0].replace(/\.$/, '')}.`);
+  if (Array.isArray(productBenefits) && productBenefits[1]) lines.push(`Another helpful detail is ${productBenefits[1].replace(/\.$/, '')}.`);
+  if (howToUse) lines.push(`How to use it is simple: ${howToUse.replace(/\.$/, '')}.`);
+  lines.push(`If ${productTitle} looks like a fit for you, check the link to learn more at iamgenesistech.com.`);
+  return lines.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 // AI Quality Render Score � evaluates input completeness and render configuration

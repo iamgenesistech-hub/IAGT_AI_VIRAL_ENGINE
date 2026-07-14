@@ -7,7 +7,7 @@ ENV NODE_ENV=production
 ENV PORT=8080
 
 # Install system dependencies including ffmpeg and vips (required by sharp for local bg removal)
-RUN apk add --no-cache ffmpeg vips-dev python3 make g++
+RUN apk add --no-cache ffmpeg vips-dev python3 make g++ fontconfig ttf-dejavu
 
 # Create app directory
 WORKDIR /app
