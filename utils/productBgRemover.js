@@ -24,6 +24,35 @@ const CACHE_DIR = path.join(__dirname, '../data/processed-images');
 const CACHE_MANIFEST = path.join(CACHE_DIR, 'manifest.json');
 const PROCESSED_URL_PREFIX = '/processed-images';
 
+function isBlockedHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase();
+  return host === 'localhost'
+    || host === 'metadata.google.internal'
+    || host.endsWith('.internal')
+    || /^127\./.test(host)
+    || /^10\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^169\.254\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    || host === '0.0.0.0';
+}
+
+function validateRemoteImageUrl(imageUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(imageUrl || ''));
+  } catch {
+    throw new Error('Only absolute http(s) product image URLs are allowed.');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Only http(s) product image URLs are allowed.');
+  }
+  if (isBlockedHost(parsed.hostname)) {
+    throw new Error('Private or local product image hosts are not allowed.');
+  }
+  return parsed;
+}
+
 function ensureCacheDir() {
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
 }
@@ -43,8 +72,10 @@ function urlHash(url) {
 
 function downloadToBuffer(imageUrl, timeoutMs = 12000) {
   return new Promise((resolve, reject) => {
-    const proto = imageUrl.startsWith('https') ? https : http;
-    const req = proto.get(imageUrl, { timeout: timeoutMs }, (res) => {
+    const parsed = validateRemoteImageUrl(imageUrl);
+    const normalizedUrl = parsed.toString();
+    const proto = normalizedUrl.startsWith('https') ? https : http;
+    const req = proto.get(normalizedUrl, { timeout: timeoutMs }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return downloadToBuffer(res.headers.location, timeoutMs).then(resolve).catch(reject);
       }

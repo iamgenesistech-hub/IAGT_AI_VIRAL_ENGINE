@@ -229,7 +229,8 @@ function buildProductFocusedTemplate({ title, platform, price, affiliateCode, pr
   const lines = [hook];
 
   if (facts.description) {
-    lines.push(facts.description.split('. ').slice(0, 2).join('. ').replace(/\.$/, '') + '.');
+    const summary = facts.description.split('. ').slice(0, 2).join('. ').trim();
+    lines.push(/[.!?]$/.test(summary) ? summary : `${summary}.`);
   }
   if (facts.benefits[0]) {
     lines.push(`What I like most is ${facts.benefits[0].replace(/^[•✔✅-]\s*/, '')}.`);

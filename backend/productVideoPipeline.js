@@ -1,5 +1,7 @@
 'use strict';
 
+const STAGE_LOCK_MS = 4 * 60 * 1000;
+
 function pickFirstString(...values) {
   for (const value of values) {
     if (typeof value === 'string') {
@@ -147,7 +149,7 @@ function buildProductVideoQuality(record = {}) {
   };
 }
 
-function shouldRestartLock(startedAt, lockMs = 4 * 60 * 1000) {
+function shouldRestartLock(startedAt, lockMs = STAGE_LOCK_MS) {
   if (!startedAt) return true;
   const started = Date.parse(startedAt);
   if (!Number.isFinite(started)) return true;

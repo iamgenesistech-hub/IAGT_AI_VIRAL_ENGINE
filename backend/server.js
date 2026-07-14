@@ -8805,14 +8805,24 @@ async function verifyDownloadableImageUrl(imageUrl) {
   if (!normalized || !/^https?:\/\//i.test(normalized)) {
     return { ok: false, code: 'PRODUCT_IMAGE_URL_INVALID', detail: 'Product image URL must be an absolute http(s) URL.' };
   }
+  if (!isTrustedStoreProductUrl(normalized)) {
+    return { ok: false, code: 'PRODUCT_IMAGE_URL_UNTRUSTED', detail: 'Product image URL must be a trusted Shopify or I AM GENESIS TECH product asset.' };
+  }
   try {
-    const response = await fetch(normalized, {
-      method: 'GET',
-      headers: { Range: 'bytes=0-0', Accept: 'image/*' },
+    let response = await fetch(normalized, {
+      method: 'HEAD',
+      headers: { Accept: 'image/*' },
       signal: AbortSignal.timeout(12000)
     });
+    if (!response.ok && (response.status === 405 || response.status === 501)) {
+      response = await fetch(normalized, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0', Accept: 'image/*' },
+        signal: AbortSignal.timeout(12000)
+      });
+    }
     if (!response.ok) {
-      return { ok: false, code: 'PRODUCT_IMAGE_URL_UNAVAILABLE', detail: `Product image download failed with HTTP ${response.status}.` };
+      return { ok: false, code: 'PRODUCT_IMAGE_URL_UNAVAILABLE', detail: `Product image check failed with HTTP ${response.status}.` };
     }
     const contentType = String(response.headers.get('content-type') || '').toLowerCase();
     if (contentType && !contentType.startsWith('image/')) {
@@ -8997,25 +9007,27 @@ async function getAffiliateProductCinematicStatus(record) {
   }
   if (record.cinematicProvider === 'seedance') {
     const status = await getSeedanceJobStatus(record.cinematicJobId);
+    const preservedFullAd = status.status === 'completed';
     return {
       status: status.status,
       provider: 'seedance',
       videoUrl: status.video_url || null,
       passthrough: false,
-      fallback: status.status === 'completed' ? true : status.status !== 'completed',
-      error: status.status === 'failed' ? 'Seedance job failed.' : (status.status === 'completed' ? 'Seedance clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
+      fallback: preservedFullAd || status.status === 'failed',
+      error: status.status === 'failed' ? 'Seedance job failed.' : (preservedFullAd ? 'Seedance clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
       useAsFinalBase: false
     };
   }
   if (record.cinematicProvider === 'kling') {
     const status = await getKlingJobStatus(record.cinematicJobId);
+    const preservedFullAd = status.status === 'completed';
     return {
       status: status.status,
       provider: 'kling',
       videoUrl: status.video_url || null,
       passthrough: false,
-      fallback: status.status === 'completed' ? true : status.status !== 'completed',
-      error: status.status === 'failed' ? 'Kling job failed.' : (status.status === 'completed' ? 'Kling clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
+      fallback: preservedFullAd || status.status === 'failed',
+      error: status.status === 'failed' ? 'Kling job failed.' : (preservedFullAd ? 'Kling clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
       useAsFinalBase: false
     };
   }
@@ -10039,7 +10051,10 @@ function generateProductVideoScript({ productTitle, productPageUrl, productDescr
   };
   const hook = platformHook[platform] || platformHook.tiktok;
   const lines = [hook, `I'm talking about ${productTitle}.`];
-  if (productDescription) lines.push(productDescription.split('. ').slice(0, 2).join('. ').replace(/\.$/, '') + '.');
+  if (productDescription) {
+    const summary = productDescription.split('. ').slice(0, 2).join('. ').trim();
+    lines.push(/[.!?]$/.test(summary) ? summary : `${summary}.`);
+  }
   if (Array.isArray(productBenefits) && productBenefits[0]) lines.push(`One reason people pick it is ${productBenefits[0].replace(/\.$/, '')}.`);
   if (Array.isArray(productBenefits) && productBenefits[1]) lines.push(`Another helpful detail is ${productBenefits[1].replace(/\.$/, '')}.`);
   if (howToUse) lines.push(`How to use it is simple: ${howToUse.replace(/\.$/, '')}.`);
