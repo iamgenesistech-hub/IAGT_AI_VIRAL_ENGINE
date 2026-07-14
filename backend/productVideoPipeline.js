@@ -279,8 +279,34 @@ async function advanceProductVideoJob(record, deps = {}) {
   return { ...next, quality: buildProductVideoQuality(next) };
 }
 
+/**
+ * Returns true for transient errors (network timeouts, rate-limiting, 5xx
+ * responses, or generic fetch failures) that should NOT mark a job as
+ * terminally failed.  Non-transient errors (e.g. invalid job config, missing
+ * required data) still result in a permanent failure.
+ */
+function isTransientAdvanceError(err) {
+  if (!err) return false;
+  // Fetch-level network errors (DNS failure, connection refused, etc.)
+  if (err instanceof TypeError && /fetch|network|failed to fetch/i.test(err.message)) return true;
+  // AbortError from a request timeout
+  if (err.name === 'AbortError') return true;
+  // HTTP status code attached by upstream helpers (e.g. 429, 500-599)
+  const status = err.statusCode || err.status || err.code;
+  if (typeof status === 'number') {
+    if (status === 429) return true;
+    if (status >= 500 && status <= 599) return true;
+  }
+  // Status code embedded in the error message
+  if (/\b(429|50[0-9]|51[0-9])\b/.test(String(err.message || ''))) return true;
+  // Explicit timeout signals
+  if (/timeout|timed[- ]?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED/i.test(String(err.message || ''))) return true;
+  return false;
+}
+
 module.exports = {
   normalizeAffiliateProductVideoRequest,
   buildProductVideoQuality,
-  advanceProductVideoJob
+  advanceProductVideoJob,
+  isTransientAdvanceError
 };

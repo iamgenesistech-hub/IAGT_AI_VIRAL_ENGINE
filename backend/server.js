@@ -60,7 +60,8 @@ const {
 const {
   normalizeAffiliateProductVideoRequest,
   buildProductVideoQuality,
-  advanceProductVideoJob
+  advanceProductVideoJob,
+  isTransientAdvanceError
 } = require('./productVideoPipeline');
 
 // EVICS Sacred Intelligence Governance Engine � centralized AI operating standard.
@@ -4002,7 +4003,7 @@ app.post('/api/video/generate', async (req, res) => {
       } catch {}
     }
     const productTitle = (resolvedProduct && resolvedProduct.title) || requestedProductTitle;
-    const productImageUrl = (resolvedProduct && resolvedProduct.primaryImageUrl) || requestedProductImageUrl;
+    const productImageUrl = requestedProductImageUrl || (resolvedProduct && resolvedProduct.primaryImageUrl) || '';
     const productPageUrl = (resolvedProduct && resolvedProduct.productPageUrl) || requestedProductPageUrl;
     const productDescription = (resolvedProduct && resolvedProduct.description) || '';
     const companyLabel = body.companyLabel || config.companyLabel || 'I AM GENESIS TECH';
@@ -9551,12 +9552,23 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
       record = upsertProductVideoRecord(advanced);
     }
   } catch (error) {
-    record = upsertProductVideoRecord({
-      ...record,
-      status: 'failed',
-      error: error.message,
-      completedAt: new Date().toISOString()
-    });
+    if (isTransientAdvanceError(error)) {
+      // Transient failure (timeout, 429, 5xx, network) — keep the job in its
+      // current non-terminal state and record metadata for observability.
+      record = upsertProductVideoRecord({
+        ...record,
+        lastAdvanceError: error.message,
+        lastAdvanceErrorAt: new Date().toISOString()
+      });
+    } else {
+      // Non-transient error — the job cannot progress; mark it terminal.
+      record = upsertProductVideoRecord({
+        ...record,
+        status: 'failed',
+        error: error.message,
+        completedAt: new Date().toISOString()
+      });
+    }
   }
   record = decorateProductVideoRecord(ensureVideoMetadata(record));
   res.json({

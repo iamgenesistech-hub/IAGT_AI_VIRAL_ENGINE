@@ -8,7 +8,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const {
   normalizeAffiliateProductVideoRequest,
-  advanceProductVideoJob
+  advanceProductVideoJob,
+  isTransientAdvanceError
 } = require(path.join(ROOT, 'backend', 'productVideoPipeline'));
 const { sanitizeSpokenDialogue } = require(path.join(ROOT, 'backend', 'internalVideoRenderer'));
 const {
@@ -184,6 +185,126 @@ async function run() {
     assert.strictEqual(postProcesses, 1);
     assert.strictEqual(archives, 1);
   });
+
+  // ── Fix 1: transient error classification ────────────────────────────────────
+
+  await test('isTransientAdvanceError: network TypeError is transient', async () => {
+    const err = new TypeError('Failed to fetch');
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: AbortError (timeout) is transient', async () => {
+    const err = new Error('Request aborted');
+    err.name = 'AbortError';
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: statusCode 429 is transient', async () => {
+    const err = new Error('Too many requests');
+    err.statusCode = 429;
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: statusCode 503 is transient', async () => {
+    const err = new Error('Service unavailable');
+    err.statusCode = 503;
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: ETIMEDOUT message is transient', async () => {
+    const err = new Error('connect ETIMEDOUT 192.0.2.1:443');
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: ECONNRESET message is transient', async () => {
+    const err = new Error('read ECONNRESET');
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: 429 in message is transient', async () => {
+    const err = new Error('HeyGen returned 429: rate limit exceeded');
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: 500 in message is transient', async () => {
+    const err = new Error('Upstream returned 500 Internal Server Error');
+    assert.strictEqual(isTransientAdvanceError(err), true);
+  });
+
+  await test('isTransientAdvanceError: non-transient error is not transient', async () => {
+    const err = new Error('No source video is available for post-processing.');
+    assert.strictEqual(isTransientAdvanceError(err), false);
+  });
+
+  await test('isTransientAdvanceError: null/undefined is not transient', async () => {
+    assert.strictEqual(isTransientAdvanceError(null), false);
+    assert.strictEqual(isTransientAdvanceError(undefined), false);
+  });
+
+  await test('transient advance error preserves job status and records lastAdvanceError', async () => {
+    // Simulate the server-side catch logic: transient errors must NOT mutate status.
+    const transientErr = new Error('connect ETIMEDOUT 1.2.3.4:443');
+    const record = { videoJobId: 'job-t1', status: 'rendering', heygenVideoId: 'hg-1' };
+
+    let updated;
+    if (isTransientAdvanceError(transientErr)) {
+      updated = { ...record, lastAdvanceError: transientErr.message, lastAdvanceErrorAt: new Date().toISOString() };
+    } else {
+      updated = { ...record, status: 'failed', error: transientErr.message, completedAt: new Date().toISOString() };
+    }
+
+    assert.strictEqual(updated.status, 'rendering', 'Transient error must not change status to failed');
+    assert.strictEqual(updated.lastAdvanceError, transientErr.message);
+    assert(updated.lastAdvanceErrorAt, 'lastAdvanceErrorAt must be set');
+    assert.strictEqual(updated.completedAt, undefined, 'completedAt must not be set on transient error');
+  });
+
+  await test('non-transient advance error marks job as failed', async () => {
+    const fatalErr = new Error('Critical config error: missing required field');
+    const record = { videoJobId: 'job-f1', status: 'rendering', heygenVideoId: 'hg-2' };
+
+    let updated;
+    if (isTransientAdvanceError(fatalErr)) {
+      updated = { ...record, lastAdvanceError: fatalErr.message, lastAdvanceErrorAt: new Date().toISOString() };
+    } else {
+      updated = { ...record, status: 'failed', error: fatalErr.message, completedAt: new Date().toISOString() };
+    }
+
+    assert.strictEqual(updated.status, 'failed', 'Non-transient error must mark job as failed');
+    assert.strictEqual(updated.error, fatalErr.message);
+    assert(updated.completedAt, 'completedAt must be set on non-transient error');
+  });
+
+  // ── Fix 2: product image URL priority ────────────────────────────────────────
+
+  await test('explicit requestedProductImageUrl overrides resolvedProduct.primaryImageUrl', async () => {
+    // Simulate the product render data resolution logic after the fix.
+    const requestedProductImageUrl = 'https://caller.example.com/override.jpg';
+    const resolvedProduct = { title: 'Test Product', primaryImageUrl: 'https://catalog.example.com/stale.jpg', productPageUrl: 'https://catalog.example.com/product' };
+
+    // After fix: requestedProductImageUrl takes priority
+    const productImageUrl = requestedProductImageUrl || (resolvedProduct && resolvedProduct.primaryImageUrl) || '';
+    assert.strictEqual(productImageUrl, 'https://caller.example.com/override.jpg',
+      'Explicit caller productImageUrl must win over catalog primaryImageUrl');
+  });
+
+  await test('resolvedProduct.primaryImageUrl is used when no requestedProductImageUrl is provided', async () => {
+    const requestedProductImageUrl = '';
+    const resolvedProduct = { title: 'Test Product', primaryImageUrl: 'https://catalog.example.com/primary.jpg', productPageUrl: 'https://catalog.example.com/product' };
+
+    const productImageUrl = requestedProductImageUrl || (resolvedProduct && resolvedProduct.primaryImageUrl) || '';
+    assert.strictEqual(productImageUrl, 'https://catalog.example.com/primary.jpg',
+      'Catalog primaryImageUrl must be used when caller did not provide one');
+  });
+
+  await test('product image falls back to empty string when neither source provides one', async () => {
+    const requestedProductImageUrl = '';
+    const resolvedProduct = { title: 'Test Product', primaryImageUrl: '', productPageUrl: 'https://catalog.example.com/product' };
+
+    const productImageUrl = requestedProductImageUrl || (resolvedProduct && resolvedProduct.primaryImageUrl) || '';
+    assert.strictEqual(productImageUrl, '');
+  });
+
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 
   if (failed > 0) {
@@ -192,7 +313,7 @@ async function run() {
     process.exit(1);
   }
 
-  console.log('🎬 Product video pipeline aliases, sanitization, cache invalidation, and idempotent finalization validated.\n');
+  console.log('🎬 Product video pipeline aliases, sanitization, cache invalidation, idempotent finalization, transient error handling, and image URL priority validated.\n');
 }
 
 run().catch((error) => {
