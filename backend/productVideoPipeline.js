@@ -253,9 +253,17 @@ async function advanceProductVideoJob(record, deps = {}) {
         return { ...next, quality: buildProductVideoQuality(next) };
       }
       next.postProcessStartedAt = nowIso;
-      const processed = await deps.postProcess(next, sourceVideoUrl);
+      let processed;
+      try {
+        processed = await deps.postProcess(next, sourceVideoUrl);
+      } catch (error) {
+        next.status = 'failed';
+        next.error = error && error.message ? error.message : 'Video post-processing failed.';
+        next.completedAt = nowIso;
+        return { ...next, quality: buildProductVideoQuality(next) };
+      }
       next.postProcessed = Boolean(processed && processed.success);
-      next.productOverlayApplied = Boolean(processed && processed.productOverlayApplied !== false);
+      next.productOverlayApplied = Boolean(processed && processed.productOverlayApplied);
       next.videoUrl = processed?.processedVideoUrl || sourceVideoUrl;
       next.processedVideoPath = processed?.processedVideoPath || null;
       next.finalSourceVideoUrl = sourceVideoUrl;
@@ -265,6 +273,17 @@ async function advanceProductVideoJob(record, deps = {}) {
         next.completedAt = nowIso;
         return { ...next, quality: buildProductVideoQuality(next) };
       }
+      if (!next.productOverlayApplied) {
+        next.status = 'failed';
+        next.error = processed?.error || 'Product overlay was not applied during post-processing.';
+        next.completedAt = nowIso;
+        return { ...next, quality: buildProductVideoQuality(next) };
+      }
+    } else if (!next.productOverlayApplied) {
+      next.status = 'failed';
+      next.error = next.error || 'Product overlay was not applied during post-processing.';
+      next.completedAt = nowIso;
+      return { ...next, quality: buildProductVideoQuality(next) };
     }
 
     if (!next.gcsVideoUrl && shouldRestartLock(next.archiveStartedAt)) {

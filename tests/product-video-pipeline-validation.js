@@ -86,6 +86,18 @@ async function run() {
     assert.throws(() => sanitizeSpokenDialogue('[camera move only]\n(SFX: rise)'), /No spoken dialogue remained/);
   });
 
+  await test('server regression guards keep explicit productImageUrl precedence and final 422 sanitized-dialogue guard', async () => {
+    const serverSource = fs.readFileSync(path.join(ROOT, 'backend', 'server.js'), 'utf8');
+    assert(
+      /pickResolvedString\(\s*requestedImageUrl,\s*resolvedProduct\.primaryImageUrl,/m.test(serverSource),
+      'resolveAffiliateProductRenderData should prioritize requestData.productImageUrl before resolved product image.'
+    );
+    assert(
+      serverSource.includes("code: 'SCRIPT_DIALOGUE_EMPTY'"),
+      'Final pre-HeyGen sanitized-dialogue guard should return explicit SCRIPT_DIALOGUE_EMPTY code.'
+    );
+  });
+
   await test('passthrough cache entries are invalidated instead of reused', async () => {
     const manifestPath = path.join(CACHE_DIR, 'manifest.json');
     const originalManifest = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf8') : null;
@@ -183,6 +195,54 @@ async function run() {
     assert.strictEqual(cinematicStarts, 1);
     assert.strictEqual(postProcesses, 1);
     assert.strictEqual(archives, 1);
+  });
+
+  await test('postprocessing fails if product overlay is not explicitly applied', async () => {
+    const record = {
+      videoJobId: 'job-overlay-missing',
+      affiliateCode: 'ABC123',
+      status: 'postprocessing',
+      heygenVideoUrl: 'https://cdn.example.com/raw.mp4',
+      postProcessed: false,
+      productOverlayApplied: false
+    };
+
+    const updated = await advanceProductVideoJob(record, {
+      postProcess: async () => ({
+        success: true,
+        processedVideoUrl: 'https://cdn.example.com/final.mp4',
+        productOverlayApplied: false
+      }),
+      archiveFinal: async () => null
+    });
+
+    assert.strictEqual(updated.status, 'failed');
+    assert.strictEqual(updated.postProcessed, true);
+    assert.strictEqual(updated.productOverlayApplied, false);
+    assert.match(updated.error, /Product overlay was not applied/i);
+  });
+
+  await test('postprocessing exceptions become terminal failed status with explicit error', async () => {
+    const record = {
+      videoJobId: 'job-postprocess-throw',
+      affiliateCode: 'ABC123',
+      status: 'postprocessing',
+      heygenVideoUrl: 'https://cdn.example.com/raw.mp4',
+      postProcessed: false,
+      productOverlayApplied: false
+    };
+
+    const updated = await advanceProductVideoJob(record, {
+      postProcess: async () => {
+        throw new Error('ffmpeg crashed');
+      },
+      archiveFinal: async () => null
+    });
+
+    assert.strictEqual(updated.status, 'failed');
+    assert.strictEqual(updated.postProcessed, false);
+    assert.strictEqual(updated.productOverlayApplied, false);
+    assert.strictEqual(updated.error, 'ffmpeg crashed');
   });
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 

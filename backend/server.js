@@ -8882,8 +8882,8 @@ async function resolveAffiliateProductRenderData(req, requestData, avatarRecord)
 
   const requestedImageUrl = pickResolvedString(requestData.productImageUrl);
   let resolvedProductImage = pickResolvedString(
-    resolvedProduct.primaryImageUrl,
     requestedImageUrl,
+    resolvedProduct.primaryImageUrl,
     avatarRecord?.productImageUrl
   );
   let imageValidation = await verifyDownloadableImageUrl(resolvedProductImage);
@@ -9341,12 +9341,30 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       heygenBackground = toHeyGenBackground(resolvedBackground);
     }
 
+    let finalSanitizedScript;
+    try {
+      finalSanitizedScript = sanitizeSpokenDialogue(sanitizedScript);
+    } catch (validationError) {
+      return res.status(422).json({
+        success: false,
+        code: validationError.code || 'SCRIPT_INVALID',
+        error: validationError.message
+      });
+    }
+    if (!finalSanitizedScript) {
+      return res.status(422).json({
+        success: false,
+        code: 'SCRIPT_DIALOGUE_EMPTY',
+        error: 'Sanitized spoken dialogue is empty. Provide only the words the avatar should speak.'
+      });
+    }
+
     const defaultVoice = process.env.HEYGEN_VOICE_ID || 'fd407cedebcc4f29bdbd75ba45c01ea7';
     const cloneVoice = avatarRecord.avatar?.voiceCloneId || avatarRecord.voiceCloneId || null;
     let voiceId = requestedVoiceId || cloneVoice || defaultVoice;
 
     const attemptAvatarRender = async (vid) => startHeyGenRender({
-      script: sanitizedScript,
+      script: finalSanitizedScript,
       avatar_id: avatarIdForRender,
       voice_id: vid,
       config: {
@@ -9359,7 +9377,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     const attemptTalkingPhotoRender = async (vid) => heygenApiJson('/v2/video/generate', {
       video_inputs: [{
         character: { type: 'talking_photo', talking_photo_id: talkingPhotoId },
-        voice: { type: 'text', input_text: sanitizedScript, voice_id: vid }
+        voice: { type: 'text', input_text: finalSanitizedScript, voice_id: vid }
       }],
       dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 1080, height: 1920 },
       caption: true
@@ -9408,7 +9426,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       productTitle: productData.productTitle,
       productPrice: productData.productPrice,
       productPageUrl: productData.productPageUrl,
-      script: sanitizedScript,
+      script: finalSanitizedScript,
       primaryPlatform: resolvedPlatform,
       trendingTags,
       hasCaptions: true,
@@ -9442,7 +9460,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       bgRemovalFromCache: productData.bgRemovalFromCache,
       processedProductImageUrl: productData.processedProductImageUrl,
       platform: resolvedPlatform,
-      script: sanitizedScript,
+      script: finalSanitizedScript,
       pureSpokenDialogue: true,
       renderQualityMode,
       cinematicRequested,
@@ -9487,7 +9505,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       videoJobId,
       heygenVideoId: videoId,
       status: 'rendering',
-      script: sanitizedScript,
+      script: finalSanitizedScript,
       avatarName,
       avatarId,
       avatarPhotoUrl: photoUrl,
