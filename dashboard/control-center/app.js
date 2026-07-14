@@ -29,6 +29,15 @@ async function apiFetch(endpoint, options = {}) {
   return res.json();
 }
 
+async function readErrorMessage(res, fallback = "Request failed.") {
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.error === "string" && payload.error.trim()) return payload.error.trim();
+    if (payload && typeof payload.message === "string" && payload.message.trim()) return payload.message.trim();
+  } catch {}
+  return fallback;
+}
+
 function execControlClass(state) {
   if (state === "running") return "state-running";
   if (state === "completed") return "state-completed";
@@ -1341,24 +1350,24 @@ async function legacyLoadMediaGallery() {
       fetch("/api/media/gallery"),
       fetch("/api/media/stats")
     ]);
-    if (galleryRes.ok) {
-      const data = await galleryRes.json();
-      state.mediaVideos = data.videos || [];
+    if (!galleryRes.ok) {
+      const reason = await readErrorMessage(galleryRes, `Media gallery failed (HTTP ${galleryRes.status}).`);
+      throw new Error(reason);
     }
-    if (statsRes.ok) {
-      const data = await statsRes.json();
-      state.mediaStats = data.stats || state.mediaStats;
+    if (!statsRes.ok) {
+      const reason = await readErrorMessage(statsRes, `Media stats failed (HTTP ${statsRes.status}).`);
+      throw new Error(reason);
     }
-  } catch {
-    // Demo mode: populate with sample data from existing renders
-    state.mediaVideos = legacyBuildDemoMediaVideos();
-    state.mediaStats = {
-      total: state.mediaVideos.length,
-      approved: state.mediaVideos.filter((v) => v.approvalStatus === "approved").length,
-      pending: state.mediaVideos.filter((v) => v.approvalStatus === "pending").length,
-      rerender: state.mediaVideos.filter((v) => v.approvalStatus === "needs_rerender").length,
-      discarded: state.mediaVideos.filter((v) => v.approvalStatus === "discarded").length,
-    };
+    const galleryData = await galleryRes.json();
+    const statsData = await statsRes.json();
+    state.mediaVideos = Array.isArray(galleryData.items) ? galleryData.items : (galleryData.videos || []);
+    state.mediaStats = statsData.stats || statsData.summary || state.mediaStats;
+    state.syncLevel = "connected";
+  } catch (err) {
+    state.mediaVideos = [];
+    state.mediaStats = { total: 0, approved: 0, pending: 0, rerender: 0, discarded: 0 };
+    state.syncLevel = "error";
+    state.syncMessage = `Media gallery unavailable: ${err && err.message ? err.message : "Unknown backend error."}`;
   }
   state.mediaLoading = false;
   render();
@@ -6309,22 +6318,24 @@ async function legacyLoadMediaGallery() {
       fetch(`/api/media/gallery?status=${state.mediaFilter}&limit=50`),
       fetch("/api/media/stats")
     ]);
-    if (galleryRes.ok) {
-      const galleryData = await galleryRes.json();
-      if (galleryData.success && galleryData.videos && galleryData.videos.length > 0) {
-        state.mediaVideos = galleryData.videos;
-      } else {
-        state.mediaVideos = legacyBuildDemoMediaVideos();
-      }
-    } else {
-      state.mediaVideos = legacyBuildDemoMediaVideos();
+    if (!galleryRes.ok) {
+      const reason = await readErrorMessage(galleryRes, `Media gallery failed (HTTP ${galleryRes.status}).`);
+      throw new Error(reason);
     }
-    if (statsRes.ok) {
-      const statsData = await statsRes.json();
-      if (statsData.success) state.mediaStats = statsData.stats;
+    if (!statsRes.ok) {
+      const reason = await readErrorMessage(statsRes, `Media stats failed (HTTP ${statsRes.status}).`);
+      throw new Error(reason);
     }
-  } catch {
-    state.mediaVideos = buildDemoMediaVideos();
+    const galleryData = await galleryRes.json();
+    const statsData = await statsRes.json();
+    state.mediaVideos = Array.isArray(galleryData.items) ? galleryData.items : (galleryData.videos || []);
+    state.mediaStats = statsData.stats || statsData.summary || state.mediaStats;
+    state.syncLevel = "connected";
+  } catch (err) {
+    state.mediaVideos = [];
+    state.mediaStats = { total: 0, approved: 0, pending: 0, rerender: 0, discarded: 0 };
+    state.syncLevel = "error";
+    state.syncMessage = `Media gallery unavailable: ${err && err.message ? err.message : "Unknown backend error."}`;
   }
   state.mediaLoading = false;
   render();
@@ -7450,26 +7461,40 @@ function bindEvents() {
       if (!item) return;
 
       if (action === "approve") {
+        const previousStatus = item.status;
         item.status = "approved";
-        state.mediaActionStatus = { id, type: "success", message: "✓ Approved" };
+        state.mediaActionStatus = { id, type: "info", message: "Saving approval…" };
+        render();
         // Persist to backend
         try {
-          await fetch("/api/agent/approve-creative", {
+          const res = await fetch("/api/agent/approve-creative", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id, approved: true })
           });
-        } catch { /* demo ok */ }
+          if (!res.ok) throw new Error(await readErrorMessage(res, `Approve failed (HTTP ${res.status}).`));
+          state.mediaActionStatus = { id, type: "success", message: "✓ Approved" };
+        } catch (err) {
+          item.status = previousStatus;
+          state.mediaActionStatus = { id, type: "warning", message: `Approve failed: ${err && err.message ? err.message : "network error"}.` };
+        }
       } else if (action === "reject") {
+        const previousStatus = item.status;
         item.status = "draft";
-        state.mediaActionStatus = { id, type: "warning", message: "✕ Rejected — returned to draft" };
+        state.mediaActionStatus = { id, type: "info", message: "Saving rejection…" };
+        render();
         try {
-          await fetch("/api/agent/approve-creative", {
+          const res = await fetch("/api/agent/approve-creative", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id, approved: false, rejectionReason: "Rejected via media manager" })
           });
-        } catch { /* demo ok */ }
+          if (!res.ok) throw new Error(await readErrorMessage(res, `Reject failed (HTTP ${res.status}).`));
+          state.mediaActionStatus = { id, type: "warning", message: "✕ Rejected — returned to draft" };
+        } catch (err) {
+          item.status = previousStatus;
+          state.mediaActionStatus = { id, type: "warning", message: `Reject failed: ${err && err.message ? err.message : "network error"}.` };
+        }
       } else if (action === "requeue") {
         item.status = "pending";
         state.mediaActionStatus = { id, type: "info", message: "↺ Requeued for rendering" };
@@ -7489,9 +7514,11 @@ function bindEvents() {
             } else {
               state.mediaActionStatus = { id, type: "warning", message: "No file URL available yet" };
             }
+          } else {
+            state.mediaActionStatus = { id, type: "warning", message: await readErrorMessage(res, `Download failed (HTTP ${res.status}).`) };
           }
-        } catch {
-          state.mediaActionStatus = { id, type: "warning", message: "Download unavailable in demo mode" };
+        } catch (err) {
+          state.mediaActionStatus = { id, type: "warning", message: `Download failed: ${err && err.message ? err.message : "network error"}.` };
         }
       }
       render();
@@ -7529,31 +7556,30 @@ function bindEvents() {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
-        if (res.ok) {
-          const data = await res.json();
-          state.lastScanDate = new Date().toISOString();
-          state.nextScanScheduled = data.nextScan || null;
-          if (data.results && data.results.length) {
-            state.productViralMemories = data.results.map((r, i) => ({
-              product_id: r.product,
-              product_name: r.product,
-              viral_score: r.viralScore,
-              hook: r.hook,
-              pacing: "Fast cuts (0–2s hook, 2–5s problem, 5–12s proof, 12–15s CTA)",
-              cta: "Try it risk-free today",
-              visual_style: "UGC testimonial",
-              emotional_triggers: ["curiosity", "transformation", "trust"],
-              structure: ["Hook", "Problem", "Proof", "Product reveal", "CTA"],
-              platform_breakdown: { TikTok: 45, Instagram: 30, YouTube: 15, Facebook: 10 },
-              last_updated: new Date().toISOString(),
-              reproduction_count: 0,
-              performance_metrics: { avg_views: 0, avg_engagement: 0, avg_conversion: 0 }
-            }));
-          } else {
-            state.productViralMemories = [];
-          }
+        const data = await res.json();
+        if (!res.ok || data.success === false) {
+          throw new Error((data && (data.error || data.message)) || `Scan failed (HTTP ${res.status}).`);
+        }
+        state.lastScanDate = new Date().toISOString();
+        state.nextScanScheduled = data.nextScan || null;
+        if (data.results && data.results.length) {
+          state.productViralMemories = data.results.map((r, i) => ({
+            product_id: r.product,
+            product_name: r.product,
+            viral_score: r.viralScore,
+            hook: r.hook,
+            pacing: "Fast cuts (0–2s hook, 2–5s problem, 5–12s proof, 12–15s CTA)",
+            cta: "Try it risk-free today",
+            visual_style: "UGC testimonial",
+            emotional_triggers: ["curiosity", "transformation", "trust"],
+            structure: ["Hook", "Problem", "Proof", "Product reveal", "CTA"],
+            platform_breakdown: { TikTok: 45, Instagram: 30, YouTube: 15, Facebook: 10 },
+            last_updated: new Date().toISOString(),
+            reproduction_count: 0,
+            performance_metrics: { avg_views: 0, avg_engagement: 0, avg_conversion: 0 }
+          }));
         } else {
-          state.pviError = `Scan failed (HTTP ${res.status}). Please try again.`;
+          state.productViralMemories = [];
         }
       } catch (err) {
         state.pviError = `Scan failed: ${err && err.message ? err.message : "network error"}.`;
@@ -7574,13 +7600,12 @@ function bindEvents() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ hour: 6, minute: 0 })
         });
-        if (res.ok) {
-          const data = await res.json();
-          state.nextScanScheduled = data.nextRun;
-          state.viralScheduleResult = `✓ ${data.message}`;
-        } else {
-          state.pviError = `Could not schedule daily scan (HTTP ${res.status}).`;
+        const data = await res.json();
+        if (!res.ok || data.success === false) {
+          throw new Error((data && (data.error || data.message)) || `Could not schedule daily scan (HTTP ${res.status}).`);
         }
+        state.nextScanScheduled = data.nextRun;
+        state.viralScheduleResult = `✓ ${data.message}`;
       } catch (err) {
         state.pviError = `Could not schedule daily scan: ${err && err.message ? err.message : "network error"}.`;
       }
@@ -7610,12 +7635,11 @@ function bindEvents() {
             category: mem.visual_style
           })
         });
-        if (res.ok) {
-          const data = await res.json();
-          state.reproductionResult = `✓ Found ${data.alternativesFound} viral ad templates across ${(data.platformsSearched || []).length} platforms.`;
-        } else {
-          state.pviError = `Ad search failed (HTTP ${res.status}). Please try again.`;
+        const data = await res.json();
+        if (!res.ok || data.success === false) {
+          throw new Error((data && (data.error || data.message)) || `Ad search failed (HTTP ${res.status}).`);
         }
+        state.reproductionResult = `✓ Found ${data.alternativesFound} viral ad templates across ${(data.platformsSearched || []).length} platforms.`;
       } catch (err) {
         state.pviError = `Ad search failed: ${err && err.message ? err.message : "network error"}.`;
       }
@@ -7642,13 +7666,12 @@ function bindEvents() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ platform: "TikTok" })
         });
-        if (res.ok) {
-          const data = await res.json();
-          state.reproductionResult = `✓ ${data.message}`;
-          mem.reproduction_count = (mem.reproduction_count || 0) + 1;
-        } else {
-          state.pviError = `Reproduce failed (HTTP ${res.status}). Please try again.`;
+        const data = await res.json();
+        if (!res.ok || data.success === false) {
+          throw new Error((data && (data.error || data.message)) || `Reproduce failed (HTTP ${res.status}).`);
         }
+        state.reproductionResult = `✓ ${data.message}`;
+        mem.reproduction_count = (mem.reproduction_count || 0) + 1;
       } catch (err) {
         state.pviError = `Reproduce failed: ${err && err.message ? err.message : "network error"}.`;
       }
