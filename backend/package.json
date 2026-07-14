@@ -8,7 +8,10 @@
     "@supabase/supabase-js": "^2.49.4",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "openai": "^4.104.0"
+    "express-rate-limit": "^8.5.2",
+    "multer": "^2.2.0",
+    "openai": "^4.104.0",
+    "sharp": "^0.33.5"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
