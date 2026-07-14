@@ -6,8 +6,8 @@ FROM node:20-alpine
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Install system dependencies including ffmpeg
-RUN apk add --no-cache ffmpeg
+# Install system dependencies including ffmpeg and vips (required by sharp for local bg removal)
+RUN apk add --no-cache ffmpeg vips-dev python3 make g++
 
 # Create app directory
 WORKDIR /app

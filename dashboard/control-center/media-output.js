@@ -201,7 +201,7 @@
       playbackUrl: item?.playbackUrl || item?.previewUrl || "",
       storageUrl: item?.storageUrl || "",
       posterUrl: item?.posterUrl || "",
-      productUrl: item?.productUrl || "",
+      productUrl: item?.productUrl || item?.cta_url || item?.productPageUrl || "",
       ctaText: item?.ctaText || "Buy Now",
       notes: item?.notes || ""
     };

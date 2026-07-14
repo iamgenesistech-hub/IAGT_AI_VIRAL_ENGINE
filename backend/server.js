@@ -7508,6 +7508,29 @@ async function getCachedHeygenAvatars(defaults) {
   return heygenAvatarState.inFlight;
 }
 
+// GET /api/heygen/live-avatars -- proxy HeyGen v3/avatars so the UI can discover valid IDs
+app.get('/api/heygen/live-avatars', async (_req, res) => {
+  noStore(res);
+  if (!process.env.HEYGEN_API_KEY) {
+    return res.status(503).json({ success: false, error: 'HEYGEN_API_KEY not set', avatars: [] });
+  }
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch('https://api.heygen.com/v3/avatars', {
+      signal: ctrl.signal,
+      headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY, Accept: 'application/json' }
+    });
+    clearTimeout(to);
+    if (!r.ok) throw new Error(`HeyGen avatars (${r.status})`);
+    const payload = await r.json();
+    const avatars = mapHeygenAvatarResponse(payload);
+    res.json({ success: true, count: avatars.length, avatars, source: 'heygen-live' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, avatars: [] });
+  }
+});
+
 // GET /api/affiliate/avatars � full avatar catalogue with selection state
 app.get('/api/affiliate/avatars', async (req, res) => {
   noStore(res);
@@ -7515,10 +7538,12 @@ app.get('/api/affiliate/avatars', async (req, res) => {
   const profile = affiliateCode ? getAffiliateProfile(affiliateCode) : null;
   const selectedId = profile?.selectedAvatarId || null;
 
+  // Only Abigail_expressive_2024112501 is confirmed valid for this HeyGen account.
+  // Angela-inblackskirt-20220820 and Tyler-incasualsuit-20220721 were stale (HeyGen returns
+  // "avatar look not found" for both). When HEYGEN_API_KEY is set, getCachedHeygenAvatars()
+  // replaces this list with the live catalog from GET https://api.heygen.com/v3/avatars.
   const defaults = [
-    { id: 'Abigail_expressive_2024112501', name: 'Abigail (Expressive)', gender: 'female', type: 'stock', preview_url: null, is_custom: false },
-    { id: 'Angela-inblackskirt-20220820',  name: 'Angela',               gender: 'female', type: 'stock', preview_url: null, is_custom: false },
-    { id: 'Tyler-incasualsuit-20220721',   name: 'Tyler',                 gender: 'male',   type: 'stock', preview_url: null, is_custom: false }
+    { id: 'Abigail_expressive_2024112501', name: 'Abigail (Expressive)', gender: 'female', type: 'stock', preview_url: null, is_custom: false }
   ];
 
   // Merge HeyGen stock avatars + affiliate's custom gallery avatars
@@ -8963,13 +8988,21 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     }
 
     let processedProductImageUrl = null;
+    let productBgActuallyRemoved = false;
     if (resolvedProductImage) {
       try {
         const bgResult = await removeBackground(resolvedProductImage);
+        // Only treat as "removed" when a real provider ran — passthrough means no API key was available
+        productBgActuallyRemoved = bgResult.method && bgResult.method !== 'passthrough';
         processedProductImageUrl = bgResult.processedUrl || resolvedProductImage;
         if (processedProductImageUrl && processedProductImageUrl.startsWith('/processed-images/')) {
           const host = process.env.EVICS_HOST || process.env.HOST || `https://evics-api-480958062306.us-central1.run.app`;
           processedProductImageUrl = `${host}${processedProductImageUrl}`;
+        }
+        if (productBgActuallyRemoved) {
+          console.log(`[ProductVideo] Product bg removed via ${bgResult.method}${bgResult.fromCache ? ' (cache)' : ''}: ${processedProductImageUrl}`);
+        } else {
+          console.log(`[ProductVideo] No bg-removal provider available (set REMOVE_BG_API_KEY). Using lifestyle background instead of product image.`);
         }
       } catch {
         processedProductImageUrl = resolvedProductImage;
@@ -8989,8 +9022,14 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
           query: backgroundQuery || null
         };
       } else {
-        const mode = processedProductImageUrl ? 'product' : (String(backgroundMode || '').toLowerCase() === 'color' ? 'color' : 'lifestyle');
-        resolvedBackground = selectBackground(productObj, processedProductImageUrl || resolvedProductImage, mode);
+        // Only use the product image as the video background when the background was actually removed.
+        // Without bg removal the product sits on a white/coloured background which looks amateur.
+        // Fall back to the per-category cinematic lifestyle image from videoBackgroundSelector.
+        const bgUserOverride = String(backgroundMode || '').toLowerCase();
+        const mode = productBgActuallyRemoved
+          ? 'product'
+          : (bgUserOverride === 'color' ? 'color' : 'lifestyle');
+        resolvedBackground = selectBackground(productObj, productBgActuallyRemoved ? processedProductImageUrl : null, mode);
       }
       heygenBackground = toHeyGenBackground(resolvedBackground);
     }
@@ -9018,7 +9057,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         character: { type: 'talking_photo', talking_photo_id: talkingPhotoId },
         voice: { type: 'text', input_text: script, voice_id: vid }
       }],
-      dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 720, height: 1280 },
+      dimension: resolvedPlatform === 'facebook' ? { width: 1920, height: 1080 } : { width: 1080, height: 1920 },
       caption: true
     });
 

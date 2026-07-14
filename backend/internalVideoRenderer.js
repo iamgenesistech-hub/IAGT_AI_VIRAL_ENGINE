@@ -400,9 +400,11 @@ async function validateJordanAvatar() {
 }
 
 function resolveAvatarId(requestedId) {
-  // If Jordan is requested but known invalid, use fallback
-  if (requestedId === JORDAN_AVATAR_ID) {
-    return JORDAN_FALLBACK_AVATAR; // Until Jordan is re-created in HeyGen dashboard
+  // Jordan is the primary presenter avatar. Honour HEYGEN_AVATAR_ID or REACT_APP_JORDAN_AVATAR_ID
+  // env-var overrides so the Cloud Run secret can supply the live ID without a code change.
+  const activeJordanId = process.env.HEYGEN_AVATAR_ID || process.env.REACT_APP_JORDAN_AVATAR_ID || JORDAN_AVATAR_ID;
+  if (requestedId === JORDAN_AVATAR_ID || requestedId === activeJordanId) {
+    return activeJordanId;
   }
   return requestedId;
 }
