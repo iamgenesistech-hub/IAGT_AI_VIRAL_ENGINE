@@ -8,7 +8,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const {
   normalizeAffiliateProductVideoRequest,
-  advanceProductVideoJob
+  advanceProductVideoJob,
+  isTransientAdvanceError
 } = require(path.join(ROOT, 'backend', 'productVideoPipeline'));
 const { sanitizeSpokenDialogue } = require(path.join(ROOT, 'backend', 'internalVideoRenderer'));
 const {
@@ -184,8 +185,6 @@ async function run() {
     assert.strictEqual(postProcesses, 1);
     assert.strictEqual(archives, 1);
   });
-  const { isTransientAdvanceError } = require(path.join(ROOT, 'backend', 'productVideoPipeline'));
-
   await test('isTransientAdvanceError — TypeError fetch is transient', async () => {
     const err = new TypeError('Failed to fetch');
     assert.strictEqual(isTransientAdvanceError(err), true);
