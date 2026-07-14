@@ -115,20 +115,16 @@ function createJwtToken(header, payload, secret) {
 }
 
 function getKlingAuthHeaders() {
-  const apiKey = getKlingKey();
-  if (apiKey) {
-    return { Authorization: 'Bearer ' + apiKey };
-  }
   const accessKey = getKlingLegacyAccessKey();
   const secretKey = getKlingLegacySecretKey();
-  if (!accessKey || !secretKey) return {};
-  const now = Math.floor(Date.now() / 1000);
-  const token = createJwtToken(
-    { alg: 'HS256', typ: 'JWT' },
-    { iss: accessKey, exp: now + 300, iat: now },
-    secretKey
-  );
-  return { Authorization: 'Bearer ' + token };
+  if (accessKey && secretKey) {
+    const now = Math.floor(Date.now() / 1000);
+    const token = createJwtToken({ alg: 'HS256', typ: 'JWT' }, { iss: accessKey, exp: now + 300, iat: now }, secretKey);
+    return { Authorization: 'Bearer ' + token };
+  }
+  const apiKey = getKlingKey();
+  if (apiKey) return { Authorization: 'Bearer ' + apiKey };
+  return {};
 }
 
 function resolveProvider() {

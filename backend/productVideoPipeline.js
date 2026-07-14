@@ -149,6 +149,17 @@ function buildProductVideoQuality(record = {}) {
   };
 }
 
+function isTransientAdvanceError(err) {
+  if (!err) return false;
+  if (err instanceof TypeError && /fetch|network|failed to fetch/i.test(err.message)) return true;
+  if (err.name === 'AbortError') return true;
+  const status = err.statusCode || err.status || err.code;
+  if (typeof status === 'number') { if (status === 429) return true; if (status >= 500 && status <= 599) return true; }
+  if (/\b(429|50[0-9]|51[0-9])\b/.test(String(err.message || ''))) return true;
+  if (/timeout|timed[- ]?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED/i.test(String(err.message || ''))) return true;
+  return false;
+}
+
 function shouldRestartLock(startedAt, lockMs = STAGE_LOCK_MS) {
   if (!startedAt) return true;
   const started = Date.parse(startedAt);
@@ -253,9 +264,17 @@ async function advanceProductVideoJob(record, deps = {}) {
         return { ...next, quality: buildProductVideoQuality(next) };
       }
       next.postProcessStartedAt = nowIso;
-      const processed = await deps.postProcess(next, sourceVideoUrl);
+      let processed;
+      try {
+        processed = await deps.postProcess(next, sourceVideoUrl);
+      } catch (postProcessErr) {
+        next.status = 'failed';
+        next.error = postProcessErr.message;
+        next.completedAt = nowIso;
+        return { ...next, quality: buildProductVideoQuality(next) };
+      }
       next.postProcessed = Boolean(processed && processed.success);
-      next.productOverlayApplied = Boolean(processed && processed.productOverlayApplied !== false);
+      next.productOverlayApplied = Boolean(processed && processed.productOverlayApplied);
       next.videoUrl = processed?.processedVideoUrl || sourceVideoUrl;
       next.processedVideoPath = processed?.processedVideoPath || null;
       next.finalSourceVideoUrl = sourceVideoUrl;
@@ -265,6 +284,13 @@ async function advanceProductVideoJob(record, deps = {}) {
         next.completedAt = nowIso;
         return { ...next, quality: buildProductVideoQuality(next) };
       }
+    }
+
+    if (!next.productOverlayApplied) {
+      next.status = 'failed';
+      next.error = 'Product overlay was not applied during post-processing.';
+      next.completedAt = nowIso;
+      return { ...next, quality: buildProductVideoQuality(next) };
     }
 
     if (!next.gcsVideoUrl && shouldRestartLock(next.archiveStartedAt)) {
@@ -282,5 +308,6 @@ async function advanceProductVideoJob(record, deps = {}) {
 module.exports = {
   normalizeAffiliateProductVideoRequest,
   buildProductVideoQuality,
-  advanceProductVideoJob
+  advanceProductVideoJob,
+  isTransientAdvanceError
 };
