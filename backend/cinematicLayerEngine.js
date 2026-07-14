@@ -33,6 +33,8 @@
 
 'use strict';
 
+const crypto = require('crypto');
+
 // AIML API is the verified production gateway for Seedance (ByteDance authorized reseller).
 // Direct seedance.ai domain does not exist. VolcEngine Ark is CN-only.
 const AIMLAPI_BASE_URL = 'https://api.aimlapi.com';
@@ -86,10 +88,53 @@ function getKlingKey() {
   return String(process.env.KLING_API_KEY || '').trim();
 }
 
+function getKlingLegacyAccessKey() {
+  return String(process.env.KLING_ACCESS_KEY || '').trim();
+}
+
+function getKlingLegacySecretKey() {
+  return String(process.env.KLING_SECRET_KEY || '').trim();
+}
+
+function createJwtToken(header, payload, secret) {
+  const encode = (value) => Buffer.from(JSON.stringify(value))
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  const encodedHeader = encode(header);
+  const encodedPayload = encode(payload);
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+function getKlingAuthHeaders() {
+  const apiKey = getKlingKey();
+  if (apiKey) {
+    return { Authorization: 'Bearer ' + apiKey };
+  }
+  const accessKey = getKlingLegacyAccessKey();
+  const secretKey = getKlingLegacySecretKey();
+  if (!accessKey || !secretKey) return {};
+  const now = Math.floor(Date.now() / 1000);
+  const token = createJwtToken(
+    { alg: 'HS256', typ: 'JWT' },
+    { iss: accessKey, exp: now + 300, iat: now },
+    secretKey
+  );
+  return { Authorization: 'Bearer ' + token };
+}
+
 function resolveProvider() {
   if (!isCinematicEnabled()) return 'passthrough';
   if (getAimlApiKey()) return 'seedance';
-  if (getKlingKey()) return 'kling';
+  if (getKlingKey() || (getKlingLegacyAccessKey() && getKlingLegacySecretKey())) return 'kling';
   return 'passthrough';
 }
 
@@ -234,10 +279,10 @@ async function pollSeedanceJob(jobId, { timeoutMs = DEFAULT_POLL_TIMEOUT_MS, int
 // Endpoint: POST /v1/videos/video2video  Poll: GET /v1/videos/video2video/{task_id}
 
 async function klingFetch(path, options = {}) {
-  const key = getKlingKey();
   const url = KLING_BASE_URL + path;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const authHeaders = getKlingAuthHeaders();
   let response;
   try {
     response = await fetch(url, {
@@ -246,7 +291,7 @@ async function klingFetch(path, options = {}) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${key}`,
+        ...authHeaders,
         ...(options.headers || {})
       }
     });
@@ -257,8 +302,13 @@ async function klingFetch(path, options = {}) {
   let payload;
   try { payload = JSON.parse(text); } catch { payload = { raw: text.slice(0, 800) }; }
   if (!response.ok) {
-    const msg = payload?.message || payload?.error || `Kling HTTP ${response.status}`;
-    const err = new Error(msg);
+    const detail = payload?.message
+      || payload?.error?.message
+      || payload?.error
+      || payload?.raw
+      || text.slice(0, 500)
+      || `Kling HTTP ${response.status}`;
+    const err = new Error(`Kling HTTP ${response.status}: ${String(detail).slice(0, 500)}`);
     err.statusCode = response.status;
     err.payload = payload;
     throw err;
@@ -280,8 +330,8 @@ async function startKlingJob({ videoUrl, cameraMoves = [], intensity = 2, motion
 
   const prompt = [
     motionPrompt,
-    'Professional product commercial, natural presenter body movement,',
-    'cinematic depth of field, product clearly visible, elite social media quality.'
+    'Product-first commercial, natural presenter body movement,',
+    'product mockup stays prominent, restrained cinematic grade, elite social media quality.'
   ].filter(Boolean).join(' ').trim();
 
   const body = {
@@ -454,11 +504,13 @@ function getCinematicLayerStatus() {
     enabled: isCinematicEnabled(),
     provider,
     seedanceConfigured: Boolean(getAimlApiKey()),
-    klingConfigured:    Boolean(getKlingKey()),
+    klingConfigured:    Boolean(getKlingKey() || (getKlingLegacyAccessKey() && getKlingLegacySecretKey())),
     aimlApiBaseUrl:     AIMLAPI_BASE_URL,
     requiredEnvVars: {
       AIMLAPI_KEY:       getAimlApiKey() ? 'set' : 'missing',
       KLING_API_KEY:     getKlingKey()   ? 'set' : 'missing',
+      KLING_ACCESS_KEY:  getKlingLegacyAccessKey() ? 'set' : 'missing',
+      KLING_SECRET_KEY:  getKlingLegacySecretKey() ? 'set' : 'missing',
       CINEMATIC_ENABLED: process.env.CINEMATIC_ENABLED || 'true (default)'
     },
     notes: {
