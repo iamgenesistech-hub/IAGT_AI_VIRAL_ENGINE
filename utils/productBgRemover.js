@@ -29,12 +29,29 @@ function isBlockedHost(hostname) {
   return host === 'localhost'
     || host === 'metadata.google.internal'
     || host.endsWith('.internal')
+    || host === '::1'
+    || /^fe8/i.test(host)
+    || /^fe9/i.test(host)
+    || /^fea/i.test(host)
+    || /^feb/i.test(host)
+    || /^fc/i.test(host)
+    || /^fd/i.test(host)
     || /^127\./.test(host)
     || /^10\./.test(host)
     || /^192\.168\./.test(host)
     || /^169\.254\./.test(host)
     || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
     || host === '0.0.0.0';
+}
+
+function isAllowedRemoteHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase();
+  return host === 'cdn.shopify.com'
+    || host === 'iamgenesistech.com'
+    || host === 'iamgenesistech.myshopify.com'
+    || host.endsWith('.iamgenesistech.com')
+    || host.endsWith('.shopify.com')
+    || host.endsWith('.shopifycdn.com');
 }
 
 function validateRemoteImageUrl(imageUrl) {
@@ -49,6 +66,9 @@ function validateRemoteImageUrl(imageUrl) {
   }
   if (isBlockedHost(parsed.hostname)) {
     throw new Error('Private or local product image hosts are not allowed.');
+  }
+  if (!isAllowedRemoteHost(parsed.hostname)) {
+    throw new Error('Only trusted Shopify or I AM GENESIS TECH product image hosts are allowed.');
   }
   return parsed;
 }

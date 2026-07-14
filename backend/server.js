@@ -8852,6 +8852,12 @@ async function resolveAffiliateProductRenderData(req, requestData, avatarRecord)
       }
     } catch {}
   }
+  if (!resolvedProduct) {
+    const error = new Error('A matching live/store product is required before affiliate product video rendering can begin.');
+    error.statusCode = 422;
+    error.code = 'PRODUCT_RESOLUTION_REQUIRED';
+    throw error;
+  }
 
   const explicitProductTitleSupplied = Boolean(requestData.productTitle);
   const explicitProductImageSupplied = Boolean(requestData.productImageUrl);
@@ -8876,15 +8882,11 @@ async function resolveAffiliateProductRenderData(req, requestData, avatarRecord)
 
   const requestedImageUrl = pickResolvedString(requestData.productImageUrl);
   let resolvedProductImage = pickResolvedString(
+    resolvedProduct.primaryImageUrl,
     requestedImageUrl,
-    avatarRecord?.productImageUrl,
-    resolvedProduct?.primaryImageUrl
+    avatarRecord?.productImageUrl
   );
   let imageValidation = await verifyDownloadableImageUrl(resolvedProductImage);
-  if (requestedImageUrl && !imageValidation.ok && resolvedProduct?.primaryImageUrl && resolvedProduct.primaryImageUrl !== requestedImageUrl) {
-    resolvedProductImage = resolvedProduct.primaryImageUrl;
-    imageValidation = await verifyDownloadableImageUrl(resolvedProductImage);
-  }
   if (!imageValidation.ok) {
     const error = new Error(imageValidation.detail);
     error.statusCode = 422;
