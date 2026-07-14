@@ -136,7 +136,7 @@ function getHeyGenApiKey() {
 async function heygenFetch(path, options = {}, attempt = 1) {
   const auth = getHeyGenApiKey();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   let response;
   try {
     response = await fetch(HEYGEN_API_BASE + path, {
