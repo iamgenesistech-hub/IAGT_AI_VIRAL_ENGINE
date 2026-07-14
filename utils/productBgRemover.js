@@ -187,7 +187,7 @@ async function tryLocalSharpRemoval(imageUrl, hash) {
   }
 }
 
-
+async function tryRemoveBg(imageUrl, hash) {
   const apiKey = process.env.REMOVE_BG_API_KEY;
   if (!apiKey) return null;
 
