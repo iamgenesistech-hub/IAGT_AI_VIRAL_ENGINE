@@ -1,6 +1,8 @@
 'use strict';
 
 const { buildEliteCommercialBlueprint, evaluateEliteCommercialEvidence } = require('./eliteCommercialBlueprint');
+const { buildToolRoutingPlan } = require('./eliteApiCapabilityRegistry');
+const { buildJsonRenderLogic } = require('./eliteRenderJsonLogic');
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -46,7 +48,7 @@ function buildAgentWorkflow(context = {}) {
   return [
     {
       id: 'product-intelligence-agent',
-      toolSurface: 'shopify/product resolver + mockup library + background remover',
+      toolSurface: 'Shopify + Supabase + product mockup library',
       objective: 'Verify exact product/service identity, image, destination, price, benefits, and label asset before creative planning.',
       requiredInputs: ['productId or productHandle', 'affiliateCode'],
       requiredOutputs: ['verifiedProductMatch', 'productImageUrl', 'processedProductImageUrl', 'productPageUrl'],
@@ -54,7 +56,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'viral-strategy-agent',
-      toolSurface: 'trend scout + EVICS intelligence scoring + algorithm optimization engine',
+      toolSurface: 'Apify + TikTok/Instagram connectors + OpenAI + algorithm optimization engine',
       objective: 'Choose platform, hook angle, keywords, caption package, and short-form pacing before script generation.',
       requiredInputs: ['product category', 'platform', 'benefits'],
       requiredOutputs: ['hookAngle', 'platformOptimization', 'searchKeywords', 'viralScoreTarget'],
@@ -70,7 +72,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'cinematic-director-agent',
-      toolSurface: 'elite commercial blueprint + cinematic layer engine',
+      toolSurface: 'elite commercial blueprint + JSON render logic + cinematic layer engine',
       objective: 'Convert product strategy into a shot-by-shot commercial with moving background, camera motion, product hero shot, and label close-up.',
       requiredInputs: ['hookAngle', 'product mockup', 'platform'],
       requiredOutputs: ['shotPlan', 'cameraMoves', 'cinematicDirective'],
@@ -86,7 +88,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'motion-generation-agent',
-      toolSurface: 'Kling/Seedance/Runway-style motion providers',
+      toolSurface: 'Kling + Seedance/AIMLAPI + Runway + Gemini/Veo',
       objective: 'Generate cinematic b-roll, moving environment, product hero label shot, and benefit proof clips.',
       requiredInputs: ['product mockup', 'cinematicDirective', 'cameraMoves'],
       requiredOutputs: ['motionBackground', 'productHeroClip', 'labelCloseupClip'],
@@ -102,7 +104,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'elite-quality-gate-agent',
-      toolSurface: 'elite evidence evaluator + render quality validator',
+      toolSurface: 'elite evidence evaluator + render quality validator + Gemini/OpenAI vision when available',
       objective: 'Fail or hold the render unless every Elite A+ evidence gate is true.',
       requiredInputs: ['final record', 'media URLs', 'quality evidence'],
       requiredOutputs: ['eliteReady', 'blockers', 'publishApproval'],
@@ -219,29 +221,57 @@ function buildPreRenderQualityGates(context = {}) {
   };
 }
 
-function buildProviderRoute(context = {}) {
-  const cinematicEngine = normalizeText(context.cinematicEngine || 'kling-omni').toLowerCase();
+function compactRoute(route = {}) {
+  return Object.fromEntries(Object.entries(route).map(([stage, capability]) => [stage, capability ? {
+    id: capability.id,
+    label: capability.label,
+    configured: capability.configured,
+    strengths: capability.strengths
+  } : null]));
+}
+
+function buildProviderRoute(context = {}, routingPlan = null) {
+  const plan = routingPlan || buildToolRoutingPlan();
+  const route = compactRoute(plan.route);
+  const cinematicEngine = normalizeText(context.cinematicEngine || route.productMotion?.id || 'kling-omni').toLowerCase();
   return {
-    strategy: 'shot-based-commercial-assembly',
-    primaryMotionProvider: cinematicEngine.includes('seedance') ? 'seedance' : 'kling-omni',
-    fallbackMotionProvider: cinematicEngine.includes('seedance') ? 'kling-omni' : 'seedance-or-runway',
-    avatarProvider: normalizeText(context.avatarProvider || 'heygen-avatar'),
-    editor: 'ffmpeg-editor',
-    persistence: 'gcs-media-output',
-    note: 'HeyGen is the presenter layer. Motion providers and editor assembly are responsible for cinematic evidence.'
+    strategy: 'json-driven-shot-based-commercial-assembly',
+    primaryMotionProvider: route.productMotion || null,
+    fallbackMotionProvider: route.lifestyleMotion || null,
+    avatarProvider: route.presenter || null,
+    productIntelligence: route.productIntelligence || null,
+    reasoning: route.reasoning || null,
+    assetPrep: route.assetPrep || null,
+    design: route.design || null,
+    visualQa: route.visualQa || null,
+    editor: route.editor || null,
+    persistence: route.persistence || null,
+    repurpose: route.repurpose || null,
+    publishing: route.publishing || null,
+    billing: route.billing || null,
+    selectedEngineHint: cinematicEngine,
+    note: 'Provider selection is based on configured API secret names/environment signals. HeyGen is the presenter layer; motion providers and editor assembly create cinematic evidence.'
   };
 }
 
-function buildEliteRenderWorkflow(context = {}) {
+function buildEliteRenderWorkflow(context = {}, options = {}) {
   const enrichedContext = {
     ...context,
     productTitle: context.productTitle || context.product?.title,
     productImageUrl: context.productImageUrl || context.product?.imageUrl || context.product?.image,
     productPageUrl: context.productPageUrl || context.product?.productPageUrl || context.product?.url
   };
+  const routingPlan = buildToolRoutingPlan({ env: options.env || process.env, secretNames: options.secretNames || [] });
   const cinematicDirective = buildCinematicDirective(enrichedContext);
+  const providerRoute = buildProviderRoute(enrichedContext, routingPlan);
+  const jsonRenderLogic = buildJsonRenderLogic({
+    ...enrichedContext,
+    cinematicDirective,
+    shotPlan: buildShotPlan(enrichedContext),
+    cameraMoves: cinematicDirective.cameraMoves
+  }, routingPlan);
   const workflow = {
-    version: 'elite-render-workflow-v1',
+    version: 'elite-render-workflow-v2',
     renderStandard: 'Elite A+ cinematic commercial',
     mission: 'Use every EVICS intelligence, creative, render, post-process, persistence, and quality tool in sequence before and after rendering.',
     product: {
@@ -250,11 +280,13 @@ function buildEliteRenderWorkflow(context = {}) {
       hookAngle: pickHookAngle(enrichedContext),
       destination: normalizeText(enrichedContext.productPageUrl || enrichedContext.destinationUrl || '')
     },
+    apiCapabilities: routingPlan.report,
     agentWorkflow: buildAgentWorkflow(enrichedContext),
     shotPlan: buildShotPlan(enrichedContext),
     cinematicDirective,
     cameraMoves: cinematicDirective.cameraMoves,
-    providerRoute: buildProviderRoute(enrichedContext),
+    providerRoute,
+    jsonRenderLogic,
     preRenderQualityGates: buildPreRenderQualityGates(enrichedContext),
     eliteCommercialBlueprint: buildEliteCommercialBlueprint(enrichedContext),
     successDefinition: 'Final video must contain cinematic motion, avatar performance evidence, readable product label close-up, foreground product presentation, CTA, and persistent final media URL.'
@@ -267,8 +299,11 @@ function evaluateWorkflowReadiness(record = {}) {
   const commercial = evaluateEliteCommercialEvidence(record);
   return {
     workflow,
-    preRenderReady: Boolean(workflow.preRenderQualityGates?.passed),
-    preRenderBlockers: workflow.preRenderQualityGates?.blockers || [],
+    preRenderReady: Boolean(workflow.preRenderQualityGates?.passed) && Boolean(workflow.jsonRenderLogic?.ready),
+    preRenderBlockers: [
+      ...(workflow.preRenderQualityGates?.blockers || []),
+      ...(workflow.jsonRenderLogic?.blockers || [])
+    ],
     finalReady: commercial.ready,
     finalBlockers: commercial.blockers,
     evidence: commercial.evidence
