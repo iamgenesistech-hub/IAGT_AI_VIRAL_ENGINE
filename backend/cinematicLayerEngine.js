@@ -37,7 +37,7 @@ const crypto = require('crypto');
 // AIML API is the verified production gateway for Seedance (ByteDance authorized reseller).
 // Direct seedance.ai domain does not exist. VolcEngine Ark is CN-only.
 const AIMLAPI_BASE_URL = 'https://api.aimlapi.com';
-const KLING_BASE_URL   = 'https://api.klingai.com';
+const KLING_BASE_URL   = String(process.env.KLING_API_BASE_URL || process.env.KLING_BASE_URL || 'https://api-singapore.klingai.com').trim().replace(/\/+$/, '');
 
 const DEFAULT_POLL_INTERVAL_MS = 15000; // Seedance typical time: 34s–3.5min
 const DEFAULT_POLL_TIMEOUT_MS  = 8 * 60 * 1000;
