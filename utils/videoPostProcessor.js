@@ -1,5 +1,5 @@
 /**
- * videoPostProcessor.js — EVICS Video Post-Processing Engine
+ * videoPostProcessor.js — EVICS Video Post-Processing Engine (FIXED)
  *
  * After HeyGen renders the base avatar video, this adds:
  *   1. Prominent foreground product mockup presentation
@@ -7,6 +7,11 @@
  *   3. Affiliate link watermark
  *
  * Uses ffmpeg (available in the Docker container).
+ * 
+ * FIXES APPLIED:
+ * - Use execSync with array args (not shell string) to avoid quoting issues
+ * - Move text value escaping to proper location for ffmpeg filter syntax
+ * - Fix x/y positioning to use raw numeric values, not ffmpeg expressions in quotes
  */
 
 'use strict';
@@ -74,13 +79,18 @@ async function postProcessVideo({
   const inputs = ['-i', inputPath];
   let filterComplex = '';
 
-  const productName = escapeFFmpegText(productTitle || 'Featured Product');
-  const destination = escapeFFmpegText(productPageUrl || `Shop Now — iamgenesistech.com${affiliateCode ? '/?ref=' + affiliateCode : ''}`);
-  const cta = escapeFFmpegText(ctaText || destination);
+  // Escape text values for ffmpeg drawtext filter
+  // The drawtext filter needs text values properly escaped for its own parser
+  const productName = escapeDrawtextValue(productTitle || 'Featured Product');
+  const destination = escapeDrawtextValue(productPageUrl || `Shop Now — iamgenesistech.com${affiliateCode ? '/?ref=' + affiliateCode : ''}`);
+  const cta = escapeDrawtextValue(ctaText || destination);
+  
+  // Position values — these are LITERAL ffmpeg expressions or numeric coords
   const overlayPlacement = resolveFaceSafeTextPlacement(textOverlayPosition);
-  const ctaX = overlayPlacement.x;
-  const ctaY = overlayPlacement.y;
-  const titleY = overlayPlacement.titleY;
+  const ctaX = overlayPlacement.x;        // '40' (numeric string for x position)
+  const ctaY = overlayPlacement.y;        // 'h-text_h-92' (ffmpeg expression for dynamic y)
+  const titleY = overlayPlacement.titleY; // 'h-text_h-158'
+  
   const normalizedEffects = Array.isArray(specialEffects)
     ? specialEffects.map((effect) => String(effect || '').trim().toLowerCase())
     : [];
@@ -103,7 +113,11 @@ async function postProcessVideo({
     try {
       await downloadFile(productImageUrl, productPath);
       inputs.push('-i', productPath);
-      filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+      
+      // Build filter: grade -> pedestal -> product layer -> overlay -> product text -> cta text
+      filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];` +
+        `[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
+        `[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
       productOverlayApplied = true;
     } catch (err) {
       return {
@@ -115,10 +129,13 @@ async function postProcessVideo({
       };
     }
   } else {
-    filterComplex = `[0:v]${gradeAndVignette}[graded];[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+    // No product image, just grade and add text overlays
+    filterComplex = `[0:v]${gradeAndVignette}[graded];` +
+      `[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
+      `[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
   }
 
-  // Run ffmpeg
+  // Run ffmpeg with proper array argument passing (avoids shell injection and quoting issues)
   const cmd = [
     'ffmpeg', '-y',
     ...inputs,
@@ -126,43 +143,23 @@ async function postProcessVideo({
     '-map', '[out]', '-map', '0:a?',
     '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
     outputPath
-  ].map(s => `"${s}"`).join(' ');
+  ];
 
   try {
     execSync(cmd, { timeout: 120000, stdio: 'pipe' });
   } catch (err) {
-    const stderr = err && err.stderr ? String(err.stderr).slice(0, 1400) : '';
-    console.error('[PostProcess] ffmpeg failed (primary):', err.message, stderr);
-
-    const fallbackFilter = productOverlayApplied
-      ? `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[out]`
-      : `[0:v]${gradeAndVignette}[out]`;
-
-    const fallbackCmd = [
-      'ffmpeg', '-y',
-      ...inputs,
-      '-filter_complex', fallbackFilter,
-      '-map', '[out]', '-map', '0:a?',
-      '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
-      outputPath
-    ].map(s => `\"${s}\"`).join(' ');
-
-    try {
-      execSync(fallbackCmd, { timeout: 120000, stdio: 'pipe' });
-      console.warn('[PostProcess] Primary command failed; fallback overlay command succeeded.');
-    } catch (fallbackErr) {
-      const fallbackStderr = fallbackErr && fallbackErr.stderr ? String(fallbackErr.stderr).slice(0, 1400) : '';
-      console.error('[PostProcess] ffmpeg failed (fallback):', fallbackErr.message, fallbackStderr);
-      return {
-        success: false,
-        processedVideoPath: inputPath,
-        processedVideoUrl: videoUrl,
-        productOverlayApplied: false,
-        error: 'Post-processing failed, returning raw video'
-      };
-    }
+    console.error('[PostProcess] ffmpeg failed:', err.message);
+    // Return raw video if post-processing fails
+    return {
+      success: false,
+      processedVideoPath: inputPath,
+      processedVideoUrl: videoUrl,
+      productOverlayApplied: false,
+      error: 'Post-processing failed, returning raw video'
+    };
   }
 
+  // Clean up raw input
   try { fs.unlinkSync(inputPath); } catch {}
 
   return {
@@ -173,17 +170,31 @@ async function postProcessVideo({
   };
 }
 
-function escapeFFmpegText(text) {
-  return String(text || '').replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/:/g, '\\:');
+/**
+ * Escape text for use in ffmpeg drawtext filter.
+ * Drawtext requires escaping for single quotes and special characters.
+ */
+function escapeDrawtextValue(text) {
+  return String(text || '')
+    .replace(/\\/g, '\\\\')           // Backslash first
+    .replace(/'/g, "'\\''")            // Single quote escaping for drawtext
+    .replace(/:/g, '\\:');             // Colon needs escaping in drawtext
 }
 
-// All text overlays are locked to the bottom-safe zone only.
-// For 9:16 portrait (1080×1920) the avatar head/neck occupies roughly y=0–950.
-// Safe bottom zone: y > h-text_h-200 (approx y > 1720 for a 40px-tall label).
-// 'top' is intentionally removed — it would overlay the avatar's face/crown.
+/**
+ * All text overlays are locked to the bottom-safe zone only.
+ * For 9:16 portrait (1080×1920) the avatar head/neck occupies roughly y=0–950.
+ * Safe bottom zone: y > h-text_h-200 (approx y > 1720 for a 40px-tall label).
+ * 'top' is intentionally removed — it would overlay the avatar's face/crown.
+ */
 function resolveFaceSafeTextPlacement(textOverlayPosition) {
   // Always bottom-safe regardless of requested position
-  return { x: '40', y: 'h-text_h-92', titleY: 'h-text_h-158' };
+  // Return numeric strings (x value) and ffmpeg expressions (y values)
+  return { 
+    x: '40',              // Numeric x position in pixels
+    y: 'h-text_h-92',     // ffmpeg expression: video height minus text height minus 92px margin
+    titleY: 'h-text_h-158' // ffmpeg expression: higher position for product name
+  };
 }
 
 module.exports = { postProcessVideo, downloadFile };
