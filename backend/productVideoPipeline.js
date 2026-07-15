@@ -195,6 +195,7 @@ function buildProductVideoQuality(record = {}) {
   if (evidence.completed && !evidence.avatarPerformance) score = Math.min(score, 86);
 
   // Passthrough and degraded outcomes are loud and truthful: hard cap below A range.
+  // Score 82 = B+ ceiling (A range starts at 84+, A+ requires all evidence true).
   const isPassthrough = Boolean(workflowRecord.cinematicPassthrough);
   const isDegraded = Boolean(workflowRecord.cinematicFallback) && !workflowRecord.useCinematicVideoAsBase;
   if (isPassthrough || isDegraded) score = Math.min(score, 82);

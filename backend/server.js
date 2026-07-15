@@ -64,6 +64,8 @@ const {
   isTransientAdvanceError,
   ensureEliteWorkflow
 } = require('./productVideoPipeline');
+const { assembleCommercialBase } = require('../utils/videoAssembler');
+const { resolveTrackSources, summarizeAssembly } = require('./commercialAssembler');
 
 // EVICS Sacred Intelligence Governance Engine � centralized AI operating standard.
 const governance = require('./sacredIntelligenceGovernance');
@@ -9091,8 +9093,6 @@ async function archiveAffiliateProductRecord(record) {
 }
 
 async function assembleAffiliateProductRecord(record) {
-  const { assembleCommercialBase } = require('../utils/videoAssembler');
-  const { resolveTrackSources } = require('./commercialAssembler');
   const { heroUrl, presenterUrl } = resolveTrackSources(record);
   return assembleCommercialBase({
     videoJobId: record.videoJobId,
@@ -9117,7 +9117,6 @@ function decorateProductVideoRecord(record) {
   const baseRecord = record || {};
   const eliteRenderWorkflow = ensureEliteWorkflow(baseRecord);
   const quality = buildProductVideoQuality(baseRecord);
-  const { summarizeAssembly } = require('./commercialAssembler');
   const assemblySummary = summarizeAssembly(baseRecord);
   return {
     ...baseRecord,

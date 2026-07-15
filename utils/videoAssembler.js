@@ -66,18 +66,19 @@ async function assembleCommercialBase({ videoJobId, heroUrl, presenterUrl }) {
     try {
       await downloadFile(heroUrl, heroPath);
 
-      // Two-shot assembly:
-      //   [0] hero clip: rescaled to match presenter dimensions, audio stripped (muted cold-open)
-      //   [1] presenter clip: full audio, voiced main segment
-      // concat filter joins them as a single output stream
-      const concatListPath = path.join(MEDIA_CACHE_DIR, `${videoJobId}_concat.txt`);
-      fs.writeFileSync(concatListPath, `file '${heroPath}'\nfile '${presenterPath}'\n`);
-
+      // Two-shot assembly via filter_complex concat:
+      //   [0:v] hero clip — video only, naturally muted (cold-open)
+      //   [1:v][1:a] presenter clip — full video + audio (voiced main segment)
+      // The concat filter joins both video streams; audio comes from the presenter only,
+      // so the hero segment plays silently before the presenter segment begins.
+      // If dimensions differ between clips, FFmpeg will fail and we degrade gracefully.
       const ffmpegArgs = [
         '-y',
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', concatListPath,
+        '-i', heroPath,
+        '-i', presenterPath,
+        '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[outv]',
+        '-map', '[outv]',
+        '-map', '1:a',
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '21',
@@ -90,7 +91,6 @@ async function assembleCommercialBase({ videoJobId, heroUrl, presenterUrl }) {
       execFileSync('ffmpeg', ffmpegArgs, { timeout: 180000, stdio: 'pipe' });
 
       // Clean up temp files
-      try { fs.unlinkSync(concatListPath); } catch {}
       try { fs.unlinkSync(heroPath); } catch {}
       try { fs.unlinkSync(presenterPath); } catch {}
 
