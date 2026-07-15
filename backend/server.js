@@ -61,7 +61,8 @@ const {
   normalizeAffiliateProductVideoRequest,
   buildProductVideoQuality,
   advanceProductVideoJob,
-  isTransientAdvanceError
+  isTransientAdvanceError,
+  ensureEliteWorkflow
 } = require('./productVideoPipeline');
 
 // EVICS Sacred Intelligence Governance Engine � centralized AI operating standard.
@@ -9099,9 +9100,15 @@ async function advanceAffiliateProductVideoRecord(record) {
 }
 
 function decorateProductVideoRecord(record) {
-  const quality = buildProductVideoQuality(record || {});
+  const baseRecord = record || {};
+  const eliteRenderWorkflow = ensureEliteWorkflow(baseRecord);
+  const quality = buildProductVideoQuality(baseRecord);
   return {
-    ...(record || {}),
+    ...baseRecord,
+    eliteRenderWorkflow,
+    providerRoute: eliteRenderWorkflow.providerRoute || null,
+    apiCapabilities: eliteRenderWorkflow.apiCapabilities || null,
+    jsonRenderLogic: eliteRenderWorkflow.jsonRenderLogic || null,
     qualityScore: quality.score,
     qualityGrade: quality.grade,
     qualityEvidence: quality.evidence,
@@ -9355,10 +9362,8 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
         };
       } else {
         const bgUserOverride = String(backgroundMode || '').toLowerCase();
-        const mode = productData.productBgActuallyRemoved
-          ? 'product'
-          : (bgUserOverride === 'color' ? 'color' : 'lifestyle');
-        resolvedBackground = selectBackground(productObj, productData.productBgActuallyRemoved ? productData.processedProductImageUrl : null, mode);
+        const mode = bgUserOverride === 'color' ? 'color' : 'lifestyle';
+        resolvedBackground = selectBackground(productObj, null, mode);
       }
       heygenBackground = toHeyGenBackground(resolvedBackground);
     }
@@ -9533,6 +9538,11 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       cinematicIntensity: Math.max(1, Math.min(3, parseInt(cinematicIntensity, 10) || 2)),
       cinematicLayerStatus: getCinematicLayerStatus(),
       background: resolvedBackground,
+      eliteRenderWorkflow: responseRecord.eliteRenderWorkflow,
+      providerRoute: responseRecord.providerRoute,
+      apiCapabilities: responseRecord.apiCapabilities,
+      jsonRenderLogic: responseRecord.jsonRenderLogic,
+      eliteReady: responseRecord.eliteReady,
       qualityScore: responseRecord.qualityScore,
       qualityGrade: responseRecord.qualityGrade,
       qualityEvidence: responseRecord.qualityEvidence,
