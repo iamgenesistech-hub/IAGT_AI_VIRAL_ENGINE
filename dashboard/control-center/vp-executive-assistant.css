@@ -1,0 +1,240 @@
+/* VP Executive Assistant visual + interaction enhancement layer */
+
+.vp-launcher-btn.vp-gold-emblem {
+  min-height: 58px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(247, 212, 122, 0.72);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 235, 160, 0.34), transparent 50%),
+    linear-gradient(145deg, #2b1b07 0%, #5a3f11 45%, #b98928 80%, #f4d688 100%);
+  color: #170d02;
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(244, 214, 136, 0.28),
+    inset 0 0 0 1px rgba(255, 242, 194, 0.35);
+  cursor: grab;
+  user-select: none;
+}
+
+.vp-launcher-btn.vp-gold-emblem:active {
+  cursor: grabbing;
+}
+
+.vp-launcher-copy {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  line-height: 1.05;
+}
+
+.vp-launcher-copy strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.vp-launcher-copy small {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
+.vp-emblem-starburst {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: conic-gradient(
+    from 0deg,
+    #ffefb7 0deg,
+    #d39a2c 40deg,
+    #f7dd8a 78deg,
+    #be7f1a 120deg,
+    #ffefb7 160deg,
+    #cc8b23 200deg,
+    #f8d471 240deg,
+    #a46a15 280deg,
+    #ffefb7 320deg,
+    #d39a2c 360deg
+  );
+  clip-path: polygon(
+    50% 0%, 57% 18%, 74% 6%, 70% 24%, 88% 18%, 78% 35%, 96% 38%,
+    82% 50%, 96% 62%, 78% 65%, 88% 82%, 70% 76%, 74% 94%, 57% 82%,
+    50% 100%, 43% 82%, 26% 94%, 30% 76%, 12% 82%, 22% 65%, 4% 62%,
+    18% 50%, 4% 38%, 22% 35%, 12% 18%, 30% 24%, 26% 6%, 43% 18%
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 241, 198, 0.55),
+    0 0 10px rgba(244, 214, 136, 0.7);
+}
+
+.vp-emblem-pyramid {
+  position: relative;
+  width: 26px;
+  height: 22px;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background: linear-gradient(160deg, #fff2c1 0%, #e3b254 45%, #8c5b15 100%);
+  display: grid;
+  place-items: center;
+  padding-top: 2px;
+}
+
+.vp-emblem-eye {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 12, 2, 0.8);
+  background: radial-gradient(circle at 55% 45%, #fef7dc 0%, #ebcc7b 48%, #8a5b14 100%);
+}
+
+.vp-emblem-eye::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #120b02;
+  top: 1px;
+  left: 3px;
+}
+
+.vp-emblem-letters {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffdc8c;
+  -webkit-text-stroke: 0.45px #150d03;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.35);
+}
+
+.vp-assistant-shell.vp-executive-shell {
+  border: 1px solid rgba(247, 212, 122, 0.42);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(247, 212, 122, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(12, 9, 4, 0.97), rgba(17, 12, 6, 0.98));
+  box-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.62),
+    0 0 22px rgba(247, 212, 122, 0.14);
+}
+
+.vp-assistant-shell.vp-executive-shell .vp-assistant-header {
+  background: linear-gradient(135deg, rgba(247, 212, 122, 0.14), rgba(131, 86, 22, 0.14));
+  border-bottom-color: rgba(247, 212, 122, 0.24);
+}
+
+.vp-assistant-shell.vp-executive-shell .vp-assistant-badge {
+  background: rgba(247, 212, 122, 0.14);
+  color: #f7d47a;
+  border: 1px solid rgba(247, 212, 122, 0.22);
+}
+
+.vp-assistant-shell.vp-executive-shell .vp-assistant-header,
+.vp-assistant-shell.vp-executive-shell .vp-launcher-btn {
+  touch-action: none;
+}
+
+.vp-mode-panel {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(247, 212, 122, 0.24);
+  border-radius: 12px;
+  background: rgba(247, 212, 122, 0.05);
+}
+
+.vp-mode-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #d8bf84;
+}
+
+.vp-mode-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vp-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(131, 98, 39, 0.55);
+  background: rgba(0, 0, 0, 0.28);
+  color: #d2be91;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.vp-mode-light {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #61502b;
+  box-shadow: 0 0 0 4px rgba(97, 80, 43, 0.2);
+}
+
+.vp-mode-btn.is-active {
+  border-color: rgba(247, 212, 122, 0.7);
+  color: #0f0a03;
+  background: linear-gradient(135deg, #f7d47a 0%, #cc922f 80%);
+}
+
+.vp-mode-btn[data-vp-mode="on"].is-active .vp-mode-light {
+  background: #00cf78;
+  box-shadow: 0 0 0 4px rgba(0, 207, 120, 0.24);
+}
+
+.vp-mode-btn[data-vp-mode="responsive"].is-active .vp-mode-light {
+  background: #00c7f5;
+  box-shadow: 0 0 0 4px rgba(0, 199, 245, 0.24);
+}
+
+.vp-mode-btn[data-vp-mode="off"].is-active .vp-mode-light {
+  background: #ff5a68;
+  box-shadow: 0 0 0 4px rgba(255, 90, 104, 0.24);
+}
+
+.vp-mode-status {
+  color: #d4c199;
+  font-size: 12px;
+}
+
+.vp-assistant-shell[data-vp-mode="off"] .vp-assistant-input-wrap,
+.vp-assistant-shell[data-vp-mode="off"] .vp-assistant-transcript {
+  opacity: 0.62;
+}
+
+.vp-assistant-shell[data-vp-mode="off"] .vp-assistant-mission-details {
+  color: #cdb38a;
+}
+
+@media (max-width: 900px) {
+  .vp-assistant-shell.vp-executive-shell {
+    width: min(96vw, 420px);
+    max-height: 76vh;
+  }
+
+  .vp-launcher-btn.vp-gold-emblem {
+    min-height: 54px;
+    padding-right: 11px;
+  }
+}
