@@ -9,21 +9,20 @@
  *     driven via descriptive prompt text (no structured camera params).
  *     API: https://api.aimlapi.com/v2/video/generations
  *
- *   Pass B — Kling AI (video-to-video with structured camera control):
- *     Takes the completed HeyGen avatar video and applies real camera
- *     movement (zoom_in, pan_left, etc.) via `advanced_camera_control`
- *     API params. Kling v2 exposes movement_type + movement_value natively.
- *     API: https://api.klingai.com/v1/videos/video2video
+ *   Pass B — Kling Omni video (product-first image-to-video):
+ *     Takes the processed product mockup as first_frame and generates a
+ *     premium product-first cinematic clip through the Omni endpoint.
+ *     API: https://api-singapore.klingai.com/v1/videos/omni-video
  *
  * Provider priority:
  *   1. AIMLAPI_KEY set  → Seedance (Pass A)  [best cinematic product B-roll]
- *   2. KLING_API_KEY set → Kling   (Pass B)  [best structured camera on avatar video]
+ *   2. KLING_API_KEY set → Kling   (Pass B)  [best product-first cinematic generation]
  *   3. Both set         → Seedance preferred  (Pass A)
  *   4. Neither set      → passthrough (HeyGen URL returned untouched)
  *
  * Required env vars:
  *   AIMLAPI_KEY        — AIML API key for Seedance (get at aimlapi.com)
- *   KLING_API_KEY      — Kling AI key (fallback / structured camera control)
+ *   KLING_API_KEY      — Kling API key (Omni product-first cinematic generation)
  *   CINEMATIC_ENABLED  — set to 'false' to disable globally (default: true)
  *
  * Deprecated (ignored):
@@ -268,11 +267,11 @@ async function pollSeedanceJob(jobId, { timeoutMs = DEFAULT_POLL_TIMEOUT_MS, int
   throw err;
 }
 
-// ─── KLING AI (v2v with structured camera control) ───────────────────────────
-// Kling exposes `advanced_camera_control.movement_type` + `movement_value`
-// as proper API fields — the only provider with true structured camera params.
-// Kling v2 model: kling-v2-master
-// Endpoint: POST /v1/videos/video2video  Poll: GET /v1/videos/video2video/{task_id}
+// ─── KLING AI Omni video (product-first image-to-video) ───────────────────────
+// Endpoint: POST /v1/videos/omni-video
+// Poll:     GET  /v1/videos/omni-video/{task_id}
+// EVICS uses the real processed product mockup as image_list[0] first_frame so
+// the cinematic pass stays product-first and deterministic.
 
 async function klingFetch(path, options = {}) {
   const url = KLING_BASE_URL + path;
@@ -297,6 +296,7 @@ async function klingFetch(path, options = {}) {
   const text = await response.text().catch(() => '');
   let payload;
   try { payload = JSON.parse(text); } catch { payload = { raw: text.slice(0, 800) }; }
+
   if (!response.ok) {
     const detail = payload?.message
       || payload?.error?.message
@@ -309,66 +309,133 @@ async function klingFetch(path, options = {}) {
     err.payload = payload;
     throw err;
   }
+
+  if (payload && payload.code !== undefined && Number(payload.code) !== 0) {
+    const detail = payload.message || payload.error?.message || payload.error || `Kling API code ${payload.code}`;
+    const err = new Error(`Kling API code ${payload.code}: ${String(detail).slice(0, 500)}`);
+    err.statusCode = response.status;
+    err.payload = payload;
+    throw err;
+  }
+
   return payload;
 }
 
-async function startKlingJob({ videoUrl, cameraMoves = [], intensity = 2, motionPrompt = '', aspectRatio = '9:16' }) {
+function resolveKlingModelName() {
+  return String(process.env.KLING_MODEL_NAME || 'kling-v3-omni').trim() || 'kling-v3-omni';
+}
+
+function clampKlingDuration(value, modelName = 'kling-v3-omni') {
+  const parsed = Math.round(Number(value) || 10);
+  const maxDuration = String(modelName || '').trim() === 'kling-video-o1' ? 10 : 15;
+  return Math.max(3, Math.min(maxDuration, parsed));
+}
+
+function sanitizeExternalTaskId(value) {
+  const clean = String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+  return clean || ('evics_' + Date.now());
+}
+
+function findKlingTask(payload = {}) {
+  if (Array.isArray(payload?.data)) return payload.data[0] || null;
+  if (payload?.data && typeof payload.data === 'object') return payload.data;
+  return payload && typeof payload === 'object' ? payload : null;
+}
+
+function findKlingVideoOutput(task = {}) {
+  const videos = Array.isArray(task?.task_result?.videos) ? task.task_result.videos : [];
+  return videos[0] || null;
+}
+
+async function startKlingJob({ videoUrl, productImageUrl = null, cameraMoves = [], intensity = 2, motionPrompt = '', aspectRatio = '9:16', jobId = null } = {}) {
+  const firstFrameUrl = String(productImageUrl || '').trim();
+  if (!firstFrameUrl) {
+    throw new Error('Kling Omni video requires productImageUrl as first_frame.');
+  }
+
+  const modelName = resolveKlingModelName();
   const motionStrength = INTENSITY_TO_STRENGTH[Math.max(1, Math.min(3, Number(intensity) || 2))] || 0.65;
 
-  // Kling supports structured camera control — map EVICS names to Kling movement_type
-  const klingMoves = (cameraMoves || [])
-    .map(m => CAMERA_MOVE_MAP[String(m).toLowerCase()])
+  const movePrompts = (cameraMoves || [])
+    .map((m) => CAMERA_MOVE_MAP[String(m).toLowerCase()])
     .filter(Boolean)
-    .map(entry => entry.kling)
+    .map((entry) => entry.prompt)
     .filter(Boolean);
 
-  const primaryMove = klingMoves[0] || 'zoom_in';
-
-  const prompt = [
+  const shotDuration = clampKlingDuration(process.env.KLING_DURATION_SECONDS || 10, modelName);
+  const promptText = [
     motionPrompt,
-    'Product-first commercial, natural presenter body movement,',
-    'product mockup stays prominent, restrained cinematic grade, elite social media quality.'
-  ].filter(Boolean).join(' ').trim();
+    movePrompts.length ? `Camera movement: ${movePrompts.join(', then ')}.` : 'Smooth premium product-commercial camera movement.',
+    motionStrength >= 0.9 ? 'Bold luxury motion, rich lighting, high depth, premium commercial scene.' : 'Clean luxury motion, rich lighting, high depth, premium commercial scene.',
+    'The product mockup is the hero object, large, sharp, readable, and centered in the action.',
+    'No text overlays, no UI, no watermarks, no extra labels, no distorted packaging.'
+  ].filter(Boolean).join(' ').slice(0, 2500);
 
   const body = {
-    model_name: 'kling-v2-master',
-    video_url: videoUrl,
-    prompt,
-    motion_strength: motionStrength,
-    aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
-    duration: 5,
-    // Structured camera control — Kling v2 native field
-    advanced_camera_control: {
-      movement_type: primaryMove,
-      movement_value: Math.round(motionStrength * 10) // scale 0–10
-    }
+    model_name: modelName,
+    prompt: promptText,
+    image_list: [
+      {
+        image_url: firstFrameUrl,
+        type: 'first_frame'
+      }
+    ],
+    mode: String(process.env.KLING_MODE || 'pro').trim() || 'pro',
+    sound: 'off',
+    duration: String(shotDuration),
+    watermark_info: { enabled: false },
+    external_task_id: sanitizeExternalTaskId(jobId || ('evics_kling_' + Date.now()))
   };
 
-  console.log(`[Kling] Submitting v2v job — camera: ${primaryMove}, strength: ${motionStrength}`);
-  const response = await klingFetch('/v1/videos/video2video', {
+  if (process.env.KLING_CALLBACK_URL) {
+    body.callback_url = String(process.env.KLING_CALLBACK_URL).trim();
+  }
+
+  console.log(`[Kling] Submitting Omni video job — model: ${modelName}, duration: ${shotDuration}s, first_frame: ${firstFrameUrl.substring(0, 80)}...`);
+  const response = await klingFetch('/v1/videos/omni-video', {
     method: 'POST',
     body: JSON.stringify(body)
   });
 
-  const jobId = response?.data?.task_id || response?.task_id || null;
-  if (!jobId) {
-    const err = new Error('Kling accepted the request but did not return a task_id.');
+  const task = findKlingTask(response);
+  const taskId = task?.task_id || response?.data?.task_id || response?.task_id || null;
+  if (!taskId) {
+    const err = new Error('Kling accepted the request but did not return data.task_id.');
     err.payload = response;
     throw err;
   }
 
-  return { job_id: jobId, status: 'processing', provider: 'kling' };
+  return {
+    job_id: taskId,
+    status: task?.task_status || task?.status || 'submitted',
+    provider: 'kling',
+    external_task_id: body.external_task_id,
+    model: modelName
+  };
 }
 
 async function getKlingJobStatus(jobId) {
-  const response = await klingFetch(`/v1/videos/video2video/${encodeURIComponent(jobId)}`, { method: 'GET' });
-  const data = response?.data || response;
+  const response = await klingFetch(`/v1/videos/omni-video/${encodeURIComponent(jobId)}`, { method: 'GET' });
+  const data = findKlingTask(response);
+  if (!data || (!data.task_id && !data.task_status && !data.status)) {
+    const err = new Error('Kling task query did not return the requested task.');
+    err.payload = response;
+    throw err;
+  }
+
   const status = String(data?.task_status || data?.status || 'processing').toLowerCase();
-  const videoUrl = data?.task_result?.videos?.[0]?.url || data?.video_url || null;
+  const videoOutput = findKlingVideoOutput(data);
+  const videoUrl = videoOutput?.url || null;
   const normalizedStatus =
-    (status === 'succeed' || status === 'completed') ? 'completed' :
+    (status === 'succeed' || status === 'succeeded' || status === 'completed') ? 'completed' :
     (status === 'failed') ? 'failed' : 'processing';
-  return { status: normalizedStatus, video_url: videoUrl, raw: response };
+
+  return {
+    status: normalizedStatus,
+    video_url: videoUrl,
+    message: data?.task_status_msg || data?.message || null,
+    raw: response
+  };
 }
 
 async function pollKlingJob(jobId, { timeoutMs = DEFAULT_POLL_TIMEOUT_MS, intervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
@@ -386,7 +453,6 @@ async function pollKlingJob(jobId, { timeoutMs = DEFAULT_POLL_TIMEOUT_MS, interv
   err.lastStatus = last;
   throw err;
 }
-
 // ─── PUBLIC API ───────────────────────────────────────────────────────────────
 
 /**

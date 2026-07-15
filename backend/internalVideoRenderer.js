@@ -65,7 +65,7 @@ function sanitizeSpokenDialogue(script) {
     let next = String(line || '').trim();
     if (!next) continue;
 
-    if (/^(scene|camera|visual|b-?roll|sfx|music|audio|shot|on-?screen(?:\s+text)?|lower\s*third|caption|super|graphic|transition|cut\s+to|fade\s+in|fade\s+out|timestamp)\b/i.test(next)) {
+    if (/^\s*(?:[-*•]+\s*)?(scene|camera|visual|b-?roll|sfx|music|audio|shot|on-?screen(?:\s+text)?|lower\s*third|caption|super|graphic|transition|cut\s+to|fade\s+in|fade\s+out|timestamp|director|producer|editor|agent|stage|action|gesture|motion|cinematic|product\s+reveal|mockup|cta)\b\s*[:\-]?/i.test(next)) {
       continue;
     }
     if (/^\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[-–—])?/i.test(next)) {
@@ -73,15 +73,20 @@ function sanitizeSpokenDialogue(script) {
     }
 
     next = next
-      .replace(/^\s*(narrator|host|speaker|avatar|voice(?:over)?|assistant|customer|affiliate)\s*:\s*/i, '')
-      .replace(/\[[^\]]*\]/g, ' ')
-      .replace(/\((?:[^)(]*?(?:camera|shot|scene|visual|b-?roll|sfx|music|caption|text|graphic|direction|pause|beat|smile|look|hold|show|display|cut|zoom|pan|tilt|dolly|fade|transition|instruction)[^)(]*)\)/gi, ' ')
-      .replace(/\b(?:camera|scene|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic|direction)\s*:\s*.*$/gi, ' ')
+      .replace(/^\s*(narrator|host|speaker|avatar|voice(?:over)?|assistant|customer|affiliate|vo|voiceover|dialogue|spoken\s+dialogue)\s*:\s*/i, '')
+      .replace(/\[(?:[^\]]*?(?:camera|shot|scene|visual|b-?roll|sfx|music|caption|text|graphic|direction|pause|beat|smile|look|hold|show|display|cut|zoom|pan|tilt|dolly|fade|transition|instruction|agent|director|overlay|mockup|product\s+reveal|cta)[^\]]*)\]/gi, ' ')
+      .replace(/\((?:[^)(]*?(?:camera|shot|scene|visual|b-?roll|sfx|music|caption|text|graphic|direction|pause|beat|smile|look|hold|show|display|cut|zoom|pan|tilt|dolly|fade|transition|instruction|agent|director|overlay|mockup|product\s+reveal|cta)[^)(]*)\)/gi, ' ')
+      .replace(/\b(?:scene|camera|shot|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic|director|producer|editor|agent|stage\s+direction|visual\s+direction|cinematic\s+direction)\s*:\s*.*$/gi, ' ')
+      .replace(/\b(?:cut\s+to|transition\s+to|zoom\s+in|zoom\s+out|pan\s+to|dolly\s+in|tilt\s+up|fade\s+in|fade\s+out)\b[^.!?]*(?:[.!?]|$)/gi, ' ')
+      .replace(/\b(?:show|display|place|position|overlay|insert|reveal)\s+(?:the\s+)?(?:product|mockup|logo|cta|caption|text|link|background|scene)\b[^.!?]*(?:[.!?]|$)/gi, ' ')
+      .replace(/\b(?:product\s+reveal|mockup\s+reveal|hero\s+shot|lifestyle\s+scene|cinematic\s+scene|visual\s+proof|on\s+screen|on-screen)\b[^.!?]*(?:[.!?]|$)/gi, ' ')
+      .replace(/\b(?:tell\s+the\s+agent|directions?\s+to\s+the\s+agent|instructions?\s+for\s+the\s+agent|for\s+the\s+avatar|avatar\s+should|the\s+avatar\s+should)\b[^.!?]*(?:[.!?]|$)/gi, ' ')
+      .replace(/\b(?:cta|call\s+to\s+action)\s*[:\-][^.!?]*(?:[.!?]|$)/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 
     if (!next) continue;
-    if (/^(scene|camera|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic)\b/i.test(next)) {
+    if (/^(scene|camera|visual|b-?roll|sfx|music|on-?screen(?:\s+text)?|caption|graphic|director|agent|stage|cinematic|product\s+reveal|mockup|cta)\b/i.test(next)) {
       continue;
     }
     spoken.push(next);
@@ -93,7 +98,25 @@ function sanitizeSpokenDialogue(script) {
     error.code = 'SCRIPT_DIALOGUE_EMPTY';
     throw error;
   }
+  if (hasUnsafeSpokenDirection(sanitized)) {
+    const error = new Error('Spoken dialogue still contains production, camera, overlay, or agent directions after sanitization.');
+    error.code = 'SCRIPT_DIALOGUE_UNSAFE';
+    throw error;
+  }
   return sanitized;
+}
+
+function hasUnsafeSpokenDirection(script) {
+  const text = String(script || '').toLowerCase();
+  if (!text.trim()) return false;
+  return [
+    /\b(scene|camera|shot|b-roll|broll|overlay|on-screen|onscreen|director|producer|editor|agent|stage direction|visual direction|cinematic direction)\b/,
+    /\b(cut to|transition to|zoom in|zoom out|pan to|dolly in|tilt up|fade in|fade out)\b/,
+    /\b(show|display|place|position|overlay|insert|reveal)\s+(the\s+)?(product|mockup|logo|cta|caption|text|link|background|scene)\b/,
+    /\b(product reveal|mockup reveal|hero shot|lifestyle scene|cinematic scene|visual proof|on screen|on-screen)\b/,
+    /\b(tell the agent|direction to the agent|directions to the agent|instructions? for the agent|for the avatar|avatar should|the avatar should)\b/,
+    /\b(cta|call to action)\s*[:\-]/
+  ].some((pattern) => pattern.test(text));
 }
 
 function createIdempotencyKey({ script, avatar_id, voice_id, config = {} }) {

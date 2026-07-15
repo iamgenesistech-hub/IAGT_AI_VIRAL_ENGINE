@@ -169,14 +169,20 @@ function upgradeScriptForAPlus(script, context = {}) {
     : 'Tap the link to finish your order today.';
 
   const coreBenefit = clean.length > 20
-    ? clean.replace(/\[(.*?)\]/g, '').split(/[.!?]/).map((part) => part.trim()).filter(Boolean)[0]
+    ? clean
+      .replace(/\[(.*?)\]/g, '')
+      .split(/[.!?]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part) => !/\b(scene|camera|shot|visual|b-?roll|overlay|on-?screen|product reveal|mockup reveal|hero shot|director|agent|avatar should)\b/i.test(part))[0]
     : `this simple daily ritual can make your routine feel cleaner and more consistent`;
+  const spokenBenefit = coreBenefit || `this simple daily ritual can make your routine feel cleaner and more consistent`;
 
   return [
     `Stop scrolling -- if you are tired of guessing which wellness upgrade is actually worth your time, ${companyLabel}'s ${productName} is the one to watch.`,
-    `${coreBenefit.charAt(0).toUpperCase()}${coreBenefit.slice(1)}.`,
-    'Here is the proof: it turns a complicated routine into one clean, premium, easy-to-repeat moment with the real product mockup on screen.',
-    `The visual is simple -- product reveal, confident presenter, company label, fast pacing, and a clear reason to act before attention drops.`,
+    `${spokenBenefit.charAt(0).toUpperCase()}${spokenBenefit.slice(1)}.`,
+    `You get a clean, premium daily moment built around ${productName}, without the guesswork or clutter.`,
+    'If you want a simple upgrade that feels intentional and easy to repeat, this is the one I would start with.',
     cta
   ].join(' ');
 }
@@ -191,7 +197,7 @@ function buildAPlusVideoAgentPrompt(prompt, context = {}) {
   return [
     `Create an A+ portrait product video for ${platform}, about ${duration}, for ${companyLabel}'s ${productName}.`,
     'Use a natural direct-to-camera story, not a rigid timestamped scene list. The presenter should sound confident, conversational, and premium -- like a creator sharing a product they genuinely believe belongs in a daily routine.',
-    'Open with a bold, scroll-stopping statement. Flow into a simple product benefit, a clean product reveal, the actual primary product mockup, and a direct shop-today call to action. Avoid medical claims, guarantees, cure/treat language, military-owned/operated claims, and clutter.',
+    'Open with a bold, scroll-stopping statement. Flow into a simple product benefit, the actual primary product mockup, and a direct shop-today call to action. Avoid medical claims, guarantees, cure/treat language, military-owned/operated claims, and clutter.',
     'The company label must be visible in the frame throughout the render. Text overlays must appear ONLY below the avatar\'s neck (bottom 20% of frame — below y=1530 in a 1080×1920 portrait video). Text must NEVER appear across the face, head, or neck of the avatar. No text in the upper 80% of the frame.',
     'Let Video Agent handle production choices, but keep the feel high-contrast, polished, premium, caption-friendly, and optimized for TikTok/Reels/Shorts.',
     productPageUrl ? `Destination: ${productPageUrl}` : '',

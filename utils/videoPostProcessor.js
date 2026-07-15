@@ -94,6 +94,7 @@ async function postProcessVideo({
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
   const pedestal = 'drawbox=x=W-650:y=H-760:w=610:h=610:color=0x050505@0.34:t=fill,drawbox=x=W-650:y=H-760:w=610:h=610:color=0xf4c96a@0.20:t=3';
   const productOverlay = 'overlay=x=W-w-64:y=H-h-250:format=auto';
+  let productOverlayApplied = false;
 
   if (productImageUrl) {
     // Download product image
@@ -103,8 +104,15 @@ async function postProcessVideo({
       await downloadFile(productImageUrl, productPath);
       inputs.push('-i', productPath);
       filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
-    } catch {
-      filterComplex = `[0:v]${gradeAndVignette}[graded];[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+      productOverlayApplied = true;
+    } catch (err) {
+      return {
+        success: false,
+        processedVideoPath: inputPath,
+        processedVideoUrl: videoUrl,
+        productOverlayApplied: false,
+        error: `Product mockup download failed before post-processing: ${err.message}`
+      };
     }
   } else {
     filterComplex = `[0:v]${gradeAndVignette}[graded];[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
@@ -124,7 +132,6 @@ async function postProcessVideo({
     execSync(cmd, { timeout: 120000, stdio: 'pipe' });
   } catch (err) {
     console.error('[PostProcess] ffmpeg failed:', err.message);
-    // Return raw video if post-processing fails
     return {
       success: false,
       processedVideoPath: inputPath,
@@ -134,19 +141,18 @@ async function postProcessVideo({
     };
   }
 
-  // Clean up raw input
   try { fs.unlinkSync(inputPath); } catch {}
 
   return {
     success: true,
     processedVideoPath: outputPath,
     processedVideoUrl: `/processed-videos/${videoId}_final.mp4`,
-    productOverlayApplied: Boolean(productImageUrl)
+    productOverlayApplied
   };
 }
 
 function escapeFFmpegText(text) {
-  return String(text || '').replace(/'/g, "'\\''").replace(/:/g, '\\:').replace(/\\/g, '\\\\');
+  return String(text || '').replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/:/g, '\\:');
 }
 
 // All text overlays are locked to the bottom-safe zone only.
