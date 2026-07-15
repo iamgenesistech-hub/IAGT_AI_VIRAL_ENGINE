@@ -12,7 +12,9 @@ const {
   planCommercialTimeline,
   resolveTrackSources,
   isMultiTrackReady,
-  summarizeAssembly
+  summarizeAssembly,
+  PASSTHROUGH_REASON,
+  FALLBACK_REASON
 } = require('./commercialAssembler');
 
 const STAGE_LOCK_MS = 4 * 60 * 1000;
@@ -175,6 +177,9 @@ function buildProductVideoQuality(record = {}) {
     productOverlayApplied: 7,
     productHeroShot: 8,
     productLabelReadable: 10,
+    // motionBackground, cameraMovement, finalCinematicComposition are gated by hasTrueCinematic,
+    // so their weights are reduced vs their old values to avoid inflating non-cinematic scores
+    // when the evidence flag is always false for passthrough/degraded jobs.
     motionBackground: 8,
     avatarPerformance: 8,
     cameraMovement: 5,
@@ -335,9 +340,9 @@ async function advanceProductVideoJob(record, deps = {}) {
       if (!next.cinematicPassthrough && !next.cinematicFallback) {
         next.passthroughReason = null;
       } else if (next.cinematicPassthrough) {
-        next.passthroughReason = 'Cinematic stage used passthrough — no real cinematic clip generated.';
+        next.passthroughReason = PASSTHROUGH_REASON;
       } else if (next.cinematicFallback && !next.useCinematicVideoAsBase) {
-        next.passthroughReason = 'Cinematic stage fell back to HeyGen video — real cinematic clip discarded.';
+        next.passthroughReason = FALLBACK_REASON;
       }
       try {
         const assembled = await deps.assemble(next);

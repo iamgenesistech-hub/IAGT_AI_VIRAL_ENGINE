@@ -12,6 +12,10 @@
  * All functions are pure: no I/O, no side effects, no mutation of the input record.
  */
 
+// Single source of truth for passthrough/fallback reason messages surfaced to consumers.
+const PASSTHROUGH_REASON = 'Cinematic stage used passthrough — no real cinematic clip generated.';
+const FALLBACK_REASON = 'Cinematic stage fell back to HeyGen video — real cinematic clip discarded.';
+
 /**
  * Resolve the hero (cinematic) and presenter (HeyGen) track URLs from a job record.
  *
@@ -108,10 +112,10 @@ function summarizeAssembly(record = {}) {
 
   let passthroughReason = record.passthroughReason || null;
   if (!passthroughReason && !assembled && record.cinematicPassthrough) {
-    passthroughReason = 'Cinematic stage used passthrough — no real cinematic clip was generated.';
+    passthroughReason = PASSTHROUGH_REASON;
   }
   if (!passthroughReason && !assembled && record.cinematicFallback && !record.useCinematicVideoAsBase) {
-    passthroughReason = 'Cinematic stage fell back to HeyGen video — real cinematic clip discarded.';
+    passthroughReason = FALLBACK_REASON;
   }
 
   return {
@@ -126,6 +130,8 @@ function summarizeAssembly(record = {}) {
 }
 
 module.exports = {
+  PASSTHROUGH_REASON,
+  FALLBACK_REASON,
   planCommercialTimeline,
   resolveTrackSources,
   isMultiTrackReady,

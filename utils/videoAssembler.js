@@ -103,14 +103,14 @@ async function assembleCommercialBase({ videoJobId, heroUrl, presenterUrl }) {
         error: null
       };
     } catch (err) {
-      // Hero download or ffmpeg failed — degrade gracefully to presenter-only
+      // Hero download or FFmpeg multi-track concat failed — degrade gracefully to presenter-only
       const stderr = err && err.stderr ? err.stderr.toString().slice(0, 500) : '';
-      console.warn(`[VideoAssembler] Multi-track assembly failed for ${videoJobId}, degrading to presenter-only. ${stderr || err.message}`);
+      console.warn(`[VideoAssembler] Multi-track FFmpeg concat failed for ${videoJobId}, degrading to presenter-only. ${stderr || err.message}`);
       try { fs.unlinkSync(path.join(MEDIA_CACHE_DIR, `${videoJobId}_hero.mp4`)); } catch {}
     }
   }
 
-  // Presenter-only path: copy (or re-encode to normalize) the presenter track
+  // Presenter-only path: re-encode the presenter track to a normalized output
   try {
     const ffmpegArgs = [
       '-y',
@@ -143,7 +143,7 @@ async function assembleCommercialBase({ videoJobId, heroUrl, presenterUrl }) {
       assembledVideoUrl: null,
       assemblyMode: 'presenter-only',
       shotsRendered: 0,
-      error: `Assembly failed: ${stderr || err.message}`
+      error: `Presenter-only assembly failed: ${stderr || err.message}`
     };
   }
 }
