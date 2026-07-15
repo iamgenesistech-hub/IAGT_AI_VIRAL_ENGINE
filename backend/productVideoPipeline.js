@@ -4,6 +4,10 @@ const {
   buildEliteCommercialBlueprint,
   evaluateEliteCommercialEvidence
 } = require('./eliteCommercialBlueprint');
+const {
+  buildEliteRenderWorkflow,
+  evaluateWorkflowReadiness
+} = require('./eliteRenderOrchestrator');
 
 const STAGE_LOCK_MS = 4 * 60 * 1000;
 
@@ -42,7 +46,7 @@ function normalizeBenefits(value) {
 
 function normalizeAffiliateProductVideoRequest(body = {}) {
   const payload = body && typeof body === 'object' ? body : {};
-  const product = payload.product && typeof payload.product === 'object' ? payload.product : {};
+  const product = payload.product && typeof payload === 'object' && payload.product && typeof payload.product === 'object' ? payload.product : {};
   const cinematicDirective = payload.cinematicDirective && typeof payload.cinematicDirective === 'object'
     ? payload.cinematicDirective
     : {};
@@ -118,14 +122,24 @@ function normalizeAffiliateProductVideoRequest(body = {}) {
   };
 }
 
+function ensureEliteWorkflow(record = {}) {
+  return record.eliteRenderWorkflow || buildEliteRenderWorkflow(record);
+}
+
 function buildProductVideoQuality(record = {}) {
-  const status = String(record.status || '').trim().toLowerCase();
-  const eliteCommercial = evaluateEliteCommercialEvidence(record);
+  const workflowRecord = {
+    ...record,
+    eliteRenderWorkflow: ensureEliteWorkflow(record)
+  };
+  const status = String(workflowRecord.status || '').trim().toLowerCase();
+  const eliteCommercial = evaluateEliteCommercialEvidence(workflowRecord);
+  const workflowReadiness = evaluateWorkflowReadiness(workflowRecord);
   const evidence = {
-    verifiedProductMatch: Boolean(record.productResolved && record.productResolved.matchType),
-    nonPassthroughBgRemoval: Boolean(record.productBgActuallyRemoved),
-    pureSpokenDialogue: Boolean(record.pureSpokenDialogue),
-    productOverlayApplied: Boolean(record.productOverlayApplied),
+    verifiedProductMatch: Boolean(workflowRecord.productResolved && workflowRecord.productResolved.matchType),
+    nonPassthroughBgRemoval: Boolean(workflowRecord.productBgActuallyRemoved),
+    pureSpokenDialogue: Boolean(workflowRecord.pureSpokenDialogue),
+    preRenderWorkflowReady: workflowReadiness.preRenderReady,
+    productOverlayApplied: Boolean(workflowRecord.productOverlayApplied),
     productHeroShot: eliteCommercial.evidence.productHeroShot,
     productLabelReadable: eliteCommercial.evidence.productLabelReadable,
     motionBackground: eliteCommercial.evidence.motionBackground,
@@ -133,16 +147,17 @@ function buildProductVideoQuality(record = {}) {
     cameraMovement: eliteCommercial.evidence.cameraMovement,
     finalCinematicComposition: eliteCommercial.evidence.cinematicFinalComposition,
     clearCta: eliteCommercial.evidence.clearCta,
-    postProcessed: Boolean(record.postProcessed),
-    finalPersistentAsset: Boolean(record.gcsVideoUrl),
-    completed: status === 'completed' && Boolean(record.videoUrl)
+    postProcessed: Boolean(workflowRecord.postProcessed),
+    finalPersistentAsset: Boolean(workflowRecord.gcsVideoUrl),
+    completed: status === 'completed' && Boolean(workflowRecord.videoUrl)
   };
 
   const weights = {
-    verifiedProductMatch: 10,
-    nonPassthroughBgRemoval: 8,
-    pureSpokenDialogue: 7,
-    productOverlayApplied: 8,
+    verifiedProductMatch: 8,
+    nonPassthroughBgRemoval: 7,
+    pureSpokenDialogue: 6,
+    preRenderWorkflowReady: 7,
+    productOverlayApplied: 7,
     productHeroShot: 8,
     productLabelReadable: 10,
     motionBackground: 10,
@@ -152,7 +167,7 @@ function buildProductVideoQuality(record = {}) {
     clearCta: 4,
     postProcessed: 4,
     finalPersistentAsset: 4,
-    completed: 2
+    completed: 0
   };
 
   let score = Object.entries(weights).reduce((total, [key, weight]) => total + (evidence[key] ? weight : 0), 0);
@@ -163,13 +178,14 @@ function buildProductVideoQuality(record = {}) {
   if (evidence.completed && !evidence.productLabelReadable) score = Math.min(score, 82);
   if (evidence.completed && !evidence.avatarPerformance) score = Math.min(score, 86);
 
-  const aPlus = Object.values(evidence).every(Boolean) && eliteCommercial.ready;
+  const aPlus = Object.values(evidence).every(Boolean) && eliteCommercial.ready && workflowReadiness.preRenderReady;
   return {
     score: aPlus ? 100 : Math.max(0, Math.min(99, score)),
     grade: aPlus ? 'A+' : (score >= 92 ? 'A' : score >= 84 ? 'B+' : score >= 76 ? 'B' : score >= 68 ? 'C+' : 'C'),
     aPlus,
     evidence,
-    eliteCommercial
+    eliteCommercial,
+    eliteWorkflow: workflowReadiness
   };
 }
 
@@ -200,7 +216,10 @@ function resolvePostProcessSourceVideo(record = {}) {
 
 async function advanceProductVideoJob(record, deps = {}) {
   if (!record || typeof record !== 'object') return record;
-  const next = { ...record };
+  const next = {
+    ...record,
+    eliteRenderWorkflow: ensureEliteWorkflow(record)
+  };
   const nowIso = typeof deps.now === 'function' ? deps.now() : new Date().toISOString();
 
   if (!next.eliteCommercialBlueprint) {
@@ -341,5 +360,6 @@ module.exports = {
   normalizeAffiliateProductVideoRequest,
   buildProductVideoQuality,
   advanceProductVideoJob,
-  isTransientAdvanceError
+  isTransientAdvanceError,
+  ensureEliteWorkflow
 };
