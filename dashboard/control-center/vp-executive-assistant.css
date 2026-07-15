@@ -1,143 +1,222 @@
 /* VP Executive Assistant visual + interaction enhancement layer */
 
+.vp-assistant-launcher {
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.58));
+}
+
 .vp-launcher-btn.vp-gold-emblem {
-  min-height: 58px;
-  padding: 8px 14px 8px 10px;
-  border-radius: 18px;
-  border: 1px solid rgba(247, 212, 122, 0.72);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  min-width: 96px;
+  min-height: 96px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 230, 156, 0.72);
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 235, 160, 0.34), transparent 50%),
-    linear-gradient(145deg, #2b1b07 0%, #5a3f11 45%, #b98928 80%, #f4d688 100%);
-  color: #170d02;
+    radial-gradient(circle at 32% 24%, rgba(255, 244, 199, 0.98) 0%, rgba(244, 204, 108, 0.88) 16%, transparent 28%),
+    radial-gradient(circle at 50% 55%, #16100a 0%, #090705 48%, #000 100%);
+  color: #f8d87b;
   box-shadow:
-    0 14px 38px rgba(0, 0, 0, 0.45),
-    0 0 24px rgba(244, 214, 136, 0.28),
-    inset 0 0 0 1px rgba(255, 242, 194, 0.35);
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    0 0 0 5px rgba(108, 70, 18, 0.48),
+    0 0 0 8px rgba(255, 220, 122, 0.12),
+    0 18px 42px rgba(0, 0, 0, 0.65),
+    0 0 34px rgba(239, 190, 83, 0.28),
+    inset 0 0 0 2px rgba(255, 232, 160, 0.35),
+    inset 0 -18px 26px rgba(0, 0, 0, 0.5);
   cursor: grab;
+  overflow: visible;
   user-select: none;
+  touch-action: none;
+}
+
+.vp-launcher-btn.vp-gold-emblem::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  z-index: -2;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 235, 154, 0.18) 0deg,
+    rgba(245, 183, 56, 0.78) 9deg,
+    rgba(255, 235, 154, 0.12) 18deg,
+    transparent 25deg,
+    transparent 36deg,
+    rgba(255, 216, 117, 0.62) 45deg,
+    transparent 54deg,
+    transparent 72deg,
+    rgba(255, 235, 154, 0.18) 81deg,
+    rgba(245, 183, 56, 0.78) 90deg,
+    rgba(255, 235, 154, 0.12) 99deg,
+    transparent 108deg,
+    transparent 126deg,
+    rgba(255, 216, 117, 0.62) 135deg,
+    transparent 144deg,
+    transparent 162deg,
+    rgba(255, 235, 154, 0.18) 171deg,
+    rgba(245, 183, 56, 0.78) 180deg,
+    rgba(255, 235, 154, 0.12) 189deg,
+    transparent 198deg,
+    transparent 216deg,
+    rgba(255, 216, 117, 0.62) 225deg,
+    transparent 234deg,
+    transparent 252deg,
+    rgba(255, 235, 154, 0.18) 261deg,
+    rgba(245, 183, 56, 0.78) 270deg,
+    rgba(255, 235, 154, 0.12) 279deg,
+    transparent 288deg,
+    transparent 306deg,
+    rgba(255, 216, 117, 0.62) 315deg,
+    transparent 324deg,
+    transparent 360deg
+  );
+  clip-path: polygon(
+    50% 0%, 55% 32%, 70% 5%, 66% 36%, 88% 13%, 74% 42%, 100% 38%,
+    77% 53%, 99% 66%, 70% 64%, 84% 91%, 61% 70%, 50% 100%, 39% 70%,
+    16% 91%, 30% 64%, 1% 66%, 23% 53%, 0% 38%, 26% 42%, 12% 13%,
+    34% 36%, 30% 5%, 45% 32%
+  );
+  opacity: 0.95;
+}
+
+.vp-launcher-btn.vp-gold-emblem::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 228, 148, 0.55);
+  box-shadow:
+    inset 0 0 18px rgba(255, 214, 112, 0.18),
+    0 0 18px rgba(255, 214, 112, 0.16);
+  pointer-events: none;
 }
 
 .vp-launcher-btn.vp-gold-emblem:active {
   cursor: grabbing;
+  transform: scale(0.985);
 }
 
 .vp-launcher-copy {
-  display: grid;
-  gap: 2px;
-  text-align: left;
-  line-height: 1.05;
-}
-
-.vp-launcher-copy strong {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-}
-
-.vp-launcher-copy small {
-  font-size: 10px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  opacity: 0.88;
+  display: none;
 }
 
 .vp-emblem-starburst {
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 76px;
+  height: 76px;
   flex-shrink: 0;
-  background: conic-gradient(
-    from 0deg,
-    #ffefb7 0deg,
-    #d39a2c 40deg,
-    #f7dd8a 78deg,
-    #be7f1a 120deg,
-    #ffefb7 160deg,
-    #cc8b23 200deg,
-    #f8d471 240deg,
-    #a46a15 280deg,
-    #ffefb7 320deg,
-    #d39a2c 360deg
-  );
-  clip-path: polygon(
-    50% 0%, 57% 18%, 74% 6%, 70% 24%, 88% 18%, 78% 35%, 96% 38%,
-    82% 50%, 96% 62%, 78% 65%, 88% 82%, 70% 76%, 74% 94%, 57% 82%,
-    50% 100%, 43% 82%, 26% 94%, 30% 76%, 12% 82%, 22% 65%, 4% 62%,
-    18% 50%, 4% 38%, 22% 35%, 12% 18%, 30% 24%, 26% 6%, 43% 18%
-  );
+  border-radius: 50%;
+  background:
+    linear-gradient(145deg, rgba(255, 241, 187, 0.25), rgba(157, 98, 20, 0.08)),
+    radial-gradient(circle at 50% 52%, rgba(255, 213, 104, 0.24) 0%, transparent 58%);
+  clip-path: none;
   box-shadow:
-    0 0 0 1px rgba(255, 241, 198, 0.55),
-    0 0 10px rgba(244, 214, 136, 0.7);
+    inset 0 0 0 1px rgba(255, 238, 180, 0.28),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.42);
 }
 
 .vp-emblem-pyramid {
   position: relative;
-  width: 26px;
-  height: 22px;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  background: linear-gradient(160deg, #fff2c1 0%, #e3b254 45%, #8c5b15 100%);
+  width: 56px;
+  height: 48px;
+  clip-path: polygon(50% 0%, 3% 100%, 97% 100%);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.32) 0 1px, transparent 1px 100%),
+    linear-gradient(157deg, #fff1b9 0%, #f1c45a 38%, #b97920 68%, #4d2b08 100%);
   display: grid;
   place-items: center;
-  padding-top: 2px;
+  filter:
+    drop-shadow(0 0 1px #050301)
+    drop-shadow(0 0 5px rgba(255, 215, 106, 0.36));
+}
+
+.vp-emblem-pyramid::before {
+  content: "";
+  position: absolute;
+  inset: 4px 12px 9px;
+  border-left: 1px solid rgba(25, 14, 2, 0.38);
+  border-right: 1px solid rgba(255, 241, 190, 0.35);
+  transform: skewX(-16deg);
+  pointer-events: none;
 }
 
 .vp-emblem-eye {
   position: absolute;
-  top: 6px;
+  top: 13px;
   left: 50%;
   transform: translateX(-50%);
-  width: 10px;
-  height: 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(20, 12, 2, 0.8);
-  background: radial-gradient(circle at 55% 45%, #fef7dc 0%, #ebcc7b 48%, #8a5b14 100%);
+  width: 24px;
+  height: 13px;
+  border-radius: 999px / 62%;
+  border: 1.4px solid rgba(16, 9, 1, 0.92);
+  background:
+    radial-gradient(circle at 50% 50%, #0d0700 0 17%, #f8df93 18% 36%, #fff7cf 37% 49%, #946019 50% 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 235, 170, 0.22),
+    0 0 8px rgba(255, 226, 145, 0.55);
 }
 
+.vp-emblem-eye::before,
 .vp-emblem-eye::after {
   content: "";
   position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #120b02;
-  top: 1px;
-  left: 3px;
+  left: 50%;
+  width: 1px;
+  height: 7px;
+  background: rgba(20, 11, 1, 0.75);
+  transform: translateX(-50%);
 }
+
+.vp-emblem-eye::before { top: -8px; }
+.vp-emblem-eye::after { bottom: -8px; }
 
 .vp-emblem-letters {
   position: absolute;
-  bottom: 2px;
+  bottom: 7px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
   line-height: 1;
   font-weight: 900;
   letter-spacing: 0.04em;
-  color: #ffdc8c;
-  -webkit-text-stroke: 0.45px #150d03;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.35);
+  color: #ffdc7d;
+  -webkit-text-stroke: 1px #080401;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 8px rgba(255, 221, 128, 0.65),
+    0 0 16px rgba(166, 98, 18, 0.48);
 }
 
 .vp-assistant-shell.vp-executive-shell {
-  border: 1px solid rgba(247, 212, 122, 0.42);
+  border: 1px solid rgba(249, 213, 125, 0.38);
   background:
-    radial-gradient(circle at 12% 0%, rgba(247, 212, 122, 0.14), transparent 42%),
-    linear-gradient(180deg, rgba(12, 9, 4, 0.97), rgba(17, 12, 6, 0.98));
+    radial-gradient(circle at 10% -4%, rgba(249, 213, 125, 0.16), transparent 40%),
+    radial-gradient(circle at 92% 12%, rgba(151, 93, 19, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(13, 10, 8, 0.98), rgba(6, 5, 5, 0.99));
   box-shadow:
-    0 28px 72px rgba(0, 0, 0, 0.62),
-    0 0 22px rgba(247, 212, 122, 0.14);
+    0 30px 80px rgba(0, 0, 0, 0.68),
+    0 0 0 1px rgba(0, 0, 0, 0.72),
+    0 0 36px rgba(249, 213, 125, 0.14);
 }
 
 .vp-assistant-shell.vp-executive-shell .vp-assistant-header {
-  background: linear-gradient(135deg, rgba(247, 212, 122, 0.14), rgba(131, 86, 22, 0.14));
-  border-bottom-color: rgba(247, 212, 122, 0.24);
+  background:
+    linear-gradient(135deg, rgba(255, 220, 128, 0.16), rgba(65, 39, 9, 0.26)),
+    rgba(0, 0, 0, 0.16);
+  border-bottom-color: rgba(249, 213, 125, 0.23);
 }
 
 .vp-assistant-shell.vp-executive-shell .vp-assistant-badge {
-  background: rgba(247, 212, 122, 0.14);
-  color: #f7d47a;
-  border: 1px solid rgba(247, 212, 122, 0.22);
+  background: rgba(249, 213, 125, 0.13);
+  color: #f9d57d;
+  border: 1px solid rgba(249, 213, 125, 0.28);
+  box-shadow: inset 0 0 18px rgba(249, 213, 125, 0.07);
 }
 
 .vp-assistant-shell.vp-executive-shell .vp-assistant-header,
@@ -149,9 +228,9 @@
   display: grid;
   gap: 9px;
   padding: 10px;
-  border: 1px solid rgba(247, 212, 122, 0.24);
-  border-radius: 12px;
-  background: rgba(247, 212, 122, 0.05);
+  border: 1px solid rgba(249, 213, 125, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(249, 213, 125, 0.07), rgba(0, 0, 0, 0.2));
 }
 
 .vp-mode-title {
@@ -193,9 +272,9 @@
 }
 
 .vp-mode-btn.is-active {
-  border-color: rgba(247, 212, 122, 0.7);
+  border-color: rgba(249, 213, 125, 0.72);
   color: #0f0a03;
-  background: linear-gradient(135deg, #f7d47a 0%, #cc922f 80%);
+  background: linear-gradient(135deg, #ffe391 0%, #c88927 84%);
 }
 
 .vp-mode-btn[data-vp-mode="on"].is-active .vp-mode-light {
@@ -234,7 +313,19 @@
   }
 
   .vp-launcher-btn.vp-gold-emblem {
-    min-height: 54px;
-    padding-right: 11px;
+    width: 82px;
+    height: 82px;
+    min-width: 82px;
+    min-height: 82px;
+  }
+
+  .vp-emblem-starburst {
+    width: 66px;
+    height: 66px;
+  }
+
+  .vp-emblem-pyramid {
+    width: 48px;
+    height: 42px;
   }
 }
