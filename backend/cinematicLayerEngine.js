@@ -568,6 +568,7 @@ function getCinematicLayerStatus() {
     seedanceConfigured: Boolean(getAimlApiKey()),
     klingConfigured:    Boolean(getKlingKey() || (getKlingLegacyAccessKey() && getKlingLegacySecretKey())),
     aimlApiBaseUrl:     AIMLAPI_BASE_URL,
+    klingApiBaseUrl:    KLING_BASE_URL,
     requiredEnvVars: {
       AIMLAPI_KEY:       getAimlApiKey() ? 'set' : 'missing',
       KLING_API_KEY:     getKlingKey()   ? 'set' : 'missing',
@@ -577,7 +578,7 @@ function getCinematicLayerStatus() {
     },
     notes: {
       seedance: 'Seedance via AIML API (aimlapi.com). Model: bytedance/seedance-2-0-fast (I2V). Requires productImageUrl per render.',
-      kling:    'Kling AI v2 (klingai.com). True video-to-video with structured camera control on avatar video.',
+      kling:    'Kling Omni via /v1/videos/omni-video. Uses the product mockup as image_list[0] first_frame and polls /v1/videos/omni-video/{task_id}.',
       legacy:   'SEEDANCE_API_KEY is accepted as alias for AIMLAPI_KEY for backward compatibility.'
     }
   };
