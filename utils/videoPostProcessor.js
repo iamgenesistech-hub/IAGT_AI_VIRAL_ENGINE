@@ -131,14 +131,36 @@ async function postProcessVideo({
   try {
     execSync(cmd, { timeout: 120000, stdio: 'pipe' });
   } catch (err) {
-    console.error('[PostProcess] ffmpeg failed:', err.message);
-    return {
-      success: false,
-      processedVideoPath: inputPath,
-      processedVideoUrl: videoUrl,
-      productOverlayApplied: false,
-      error: 'Post-processing failed, returning raw video'
-    };
+    const stderr = err && err.stderr ? String(err.stderr).slice(0, 1400) : '';
+    console.error('[PostProcess] ffmpeg failed (primary):', err.message, stderr);
+
+    const fallbackFilter = productOverlayApplied
+      ? `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[out]`
+      : `[0:v]${gradeAndVignette}[out]`;
+
+    const fallbackCmd = [
+      'ffmpeg', '-y',
+      ...inputs,
+      '-filter_complex', fallbackFilter,
+      '-map', '[out]', '-map', '0:a?',
+      '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
+      outputPath
+    ].map(s => `\"${s}\"`).join(' ');
+
+    try {
+      execSync(fallbackCmd, { timeout: 120000, stdio: 'pipe' });
+      console.warn('[PostProcess] Primary command failed; fallback overlay command succeeded.');
+    } catch (fallbackErr) {
+      const fallbackStderr = fallbackErr && fallbackErr.stderr ? String(fallbackErr.stderr).slice(0, 1400) : '';
+      console.error('[PostProcess] ffmpeg failed (fallback):', fallbackErr.message, fallbackStderr);
+      return {
+        success: false,
+        processedVideoPath: inputPath,
+        processedVideoUrl: videoUrl,
+        productOverlayApplied: false,
+        error: 'Post-processing failed, returning raw video'
+      };
+    }
   }
 
   try { fs.unlinkSync(inputPath); } catch {}
