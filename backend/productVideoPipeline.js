@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+  buildEliteCommercialBlueprint,
+  evaluateEliteCommercialEvidence
+} = require('./eliteCommercialBlueprint');
+
 const STAGE_LOCK_MS = 4 * 60 * 1000;
 
 function pickFirstString(...values) {
@@ -115,37 +120,56 @@ function normalizeAffiliateProductVideoRequest(body = {}) {
 
 function buildProductVideoQuality(record = {}) {
   const status = String(record.status || '').trim().toLowerCase();
+  const eliteCommercial = evaluateEliteCommercialEvidence(record);
   const evidence = {
     verifiedProductMatch: Boolean(record.productResolved && record.productResolved.matchType),
     nonPassthroughBgRemoval: Boolean(record.productBgActuallyRemoved),
     pureSpokenDialogue: Boolean(record.pureSpokenDialogue),
     productOverlayApplied: Boolean(record.productOverlayApplied),
-    finalPersistentAsset: Boolean(record.gcsVideoUrl),
-    cinematicEvidence: Boolean(
-      record.postProcessed
-      && (record.cinematicVideoUrl || record.cinematicProvider || record.cinematicPassthrough || record.cinematicFallback)
-    ),
+    productHeroShot: eliteCommercial.evidence.productHeroShot,
+    productLabelReadable: eliteCommercial.evidence.productLabelReadable,
+    motionBackground: eliteCommercial.evidence.motionBackground,
+    avatarPerformance: eliteCommercial.evidence.avatarPerformance,
+    cameraMovement: eliteCommercial.evidence.cameraMovement,
+    finalCinematicComposition: eliteCommercial.evidence.cinematicFinalComposition,
+    clearCta: eliteCommercial.evidence.clearCta,
     postProcessed: Boolean(record.postProcessed),
+    finalPersistentAsset: Boolean(record.gcsVideoUrl),
     completed: status === 'completed' && Boolean(record.videoUrl)
   };
 
-  let score = 32;
-  if (evidence.verifiedProductMatch) score += 16;
-  if (evidence.nonPassthroughBgRemoval) score += 14;
-  if (evidence.pureSpokenDialogue) score += 10;
-  if (evidence.cinematicEvidence) score += 10;
-  if (evidence.productOverlayApplied) score += 8;
-  if (evidence.postProcessed) score += 5;
-  if (evidence.finalPersistentAsset) score += 5;
-  if (evidence.completed) score += 0;
-  if (!evidence.completed) score = Math.min(score, 89);
+  const weights = {
+    verifiedProductMatch: 10,
+    nonPassthroughBgRemoval: 8,
+    pureSpokenDialogue: 7,
+    productOverlayApplied: 8,
+    productHeroShot: 8,
+    productLabelReadable: 10,
+    motionBackground: 10,
+    avatarPerformance: 8,
+    cameraMovement: 7,
+    finalCinematicComposition: 10,
+    clearCta: 4,
+    postProcessed: 4,
+    finalPersistentAsset: 4,
+    completed: 2
+  };
 
-  const aPlus = Object.values(evidence).every(Boolean);
+  let score = Object.entries(weights).reduce((total, [key, weight]) => total + (evidence[key] ? weight : 0), 0);
+
+  if (!evidence.completed) score = Math.min(score, 72);
+  if (evidence.completed && !evidence.finalCinematicComposition) score = Math.min(score, 84);
+  if (evidence.completed && (!evidence.motionBackground || !evidence.cameraMovement)) score = Math.min(score, 82);
+  if (evidence.completed && !evidence.productLabelReadable) score = Math.min(score, 82);
+  if (evidence.completed && !evidence.avatarPerformance) score = Math.min(score, 86);
+
+  const aPlus = Object.values(evidence).every(Boolean) && eliteCommercial.ready;
   return {
     score: aPlus ? 100 : Math.max(0, Math.min(99, score)),
     grade: aPlus ? 'A+' : (score >= 92 ? 'A' : score >= 84 ? 'B+' : score >= 76 ? 'B' : score >= 68 ? 'C+' : 'C'),
     aPlus,
-    evidence
+    evidence,
+    eliteCommercial
   };
 }
 
@@ -178,6 +202,10 @@ async function advanceProductVideoJob(record, deps = {}) {
   if (!record || typeof record !== 'object') return record;
   const next = { ...record };
   const nowIso = typeof deps.now === 'function' ? deps.now() : new Date().toISOString();
+
+  if (!next.eliteCommercialBlueprint) {
+    next.eliteCommercialBlueprint = buildEliteCommercialBlueprint(next);
+  }
 
   if (next.status === 'failed') {
     return { ...next, quality: buildProductVideoQuality(next) };
@@ -275,6 +303,10 @@ async function advanceProductVideoJob(record, deps = {}) {
       }
       next.postProcessed = Boolean(processed && processed.success);
       next.productOverlayApplied = Boolean(processed && processed.productOverlayApplied);
+      next.productLabelReadable = Boolean(processed && processed.productLabelReadable);
+      next.productHeroShotApplied = Boolean(processed && processed.productHeroShotApplied);
+      next.foregroundProductPresentation = Boolean(processed && processed.productOverlayApplied);
+      next.ctaTextApplied = Boolean(processed && processed.ctaTextApplied);
       next.videoUrl = processed?.processedVideoUrl || sourceVideoUrl;
       next.processedVideoPath = processed?.processedVideoPath || null;
       next.finalSourceVideoUrl = sourceVideoUrl;
