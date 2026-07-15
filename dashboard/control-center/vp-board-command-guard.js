@@ -326,6 +326,7 @@
     };
 
     guarded.__vpBoardGuardWrapped = true;
+    guarded.__vpExecutiveWrapped = true;
     try { sendVpAssistantMessage = guarded; } catch (e) { /* lexical binding may be locked */ }
     globalThis.sendVpAssistantMessage = guarded;
   }
