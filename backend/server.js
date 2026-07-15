@@ -9509,6 +9509,7 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
     });
 
     const responseRecord = decorateProductVideoRecord(record);
+    upsertProductVideoRecord(responseRecord);
     res.json({
       success: true,
       videoJobId,
@@ -9590,6 +9591,7 @@ app.get('/api/affiliate/product-video/status/:videoJobId', async (req, res) => {
     }
   }
   record = decorateProductVideoRecord(ensureVideoMetadata(record));
+  upsertProductVideoRecord(record);
   res.json({
     success: true,
     ...record
@@ -9670,7 +9672,7 @@ app.get('/api/affiliate/product-videos', (req, res) => {
   noStore(res);
   const affiliateCode = normalizeAffiliateCode(req.query.affiliateCode || '');
   if (!affiliateCode) return res.json({ success: true, videos: [], count: 0 });
-  const videos = getProductVideosByAffiliate(affiliateCode).map(ensureVideoMetadata);
+  const videos = getProductVideosByAffiliate(affiliateCode).map((r) => decorateProductVideoRecord(ensureVideoMetadata(r)));
   res.json({ success: true, videos, count: videos.length });
 });
 
@@ -10004,7 +10006,7 @@ function ensureVideoMetadata(record) {
       upsertProductVideoRecord(record);
     }
   }
-  return decorateProductVideoRecord(record);
+  return record;
 }
 
 function normalizePhoneRenderFeedItem(item) {
@@ -10048,6 +10050,15 @@ function normalizePhoneRenderFeedItem(item) {
   if (typeof background === 'string') {
     try { background = JSON.parse(background); } catch { background = null; }
   }
+  const {
+    eliteRenderWorkflow,
+    providerRoute,
+    apiCapabilities,
+    jsonRenderLogic,
+    qualityScore,
+    qualityGrade,
+    eliteReady
+  } = decorateProductVideoRecord(item);
   return {
     ...item,
     id: renderId || null,
@@ -10071,7 +10082,14 @@ function normalizePhoneRenderFeedItem(item) {
     background,
     created_at: item.created_at || item.createdAt || null,
     createdAt: item.createdAt || item.created_at || null,
-    title: item.title || item.productTitle || item.product_name || item.product || item.name || renderId || 'Untitled'
+    title: item.title || item.productTitle || item.product_name || item.product || item.name || renderId || 'Untitled',
+    eliteRenderWorkflow,
+    providerRoute,
+    apiCapabilities,
+    jsonRenderLogic,
+    qualityScore,
+    qualityGrade,
+    eliteReady
   };
 }
 
