@@ -1,7 +1,7 @@
 'use strict';
 
 const { buildEliteCommercialBlueprint, evaluateEliteCommercialEvidence } = require('./eliteCommercialBlueprint');
-const { buildToolRoutingPlan } = require('./eliteApiCapabilityRegistry');
+const { buildToolRoutingPlan, CONFIRMED_ELITE_STACK } = require('./eliteApiCapabilityRegistry');
 const { buildJsonRenderLogic } = require('./eliteRenderJsonLogic');
 
 function normalizeText(value) {
@@ -44,7 +44,7 @@ function pickHookAngle(context = {}) {
   return titleCase(strongestBenefit);
 }
 
-function buildAgentWorkflow(context = {}) {
+function buildAgentWorkflow(_context = {}) {
   return [
     {
       id: 'product-intelligence-agent',
@@ -56,7 +56,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'viral-strategy-agent',
-      toolSurface: 'Apify + TikTok/Instagram connectors + OpenAI + algorithm optimization engine',
+      toolSurface: 'Apify + OpenAI + algorithm optimization engine',
       objective: 'Choose platform, hook angle, keywords, caption package, and short-form pacing before script generation.',
       requiredInputs: ['product category', 'platform', 'benefits'],
       requiredOutputs: ['hookAngle', 'platformOptimization', 'searchKeywords', 'viralScoreTarget'],
@@ -72,7 +72,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'cinematic-director-agent',
-      toolSurface: 'elite commercial blueprint + JSON render logic + cinematic layer engine',
+      toolSurface: 'elite commercial blueprint + JSON render logic + provider router',
       objective: 'Convert product strategy into a shot-by-shot commercial with moving background, camera motion, product hero shot, and label close-up.',
       requiredInputs: ['hookAngle', 'product mockup', 'platform'],
       requiredOutputs: ['shotPlan', 'cameraMoves', 'cinematicDirective'],
@@ -88,7 +88,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'motion-generation-agent',
-      toolSurface: 'Kling + Seedance/AIMLAPI + Runway + Gemini/Veo',
+      toolSurface: 'Kling + Runway + Seedance/AIMLAPI + Gemini/Veo',
       objective: 'Generate cinematic b-roll, moving environment, product hero label shot, and benefit proof clips.',
       requiredInputs: ['product mockup', 'cinematicDirective', 'cameraMoves'],
       requiredOutputs: ['motionBackground', 'productHeroClip', 'labelCloseupClip'],
@@ -96,7 +96,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'editor-assembly-agent',
-      toolSurface: 'FFmpeg post processor + media output routes + GCS persistence',
+      toolSurface: 'FFmpeg + GCS persistence + media output routes',
       objective: 'Assemble final commercial sequence, foreground product presentation, CTA, color grade, and persistent final asset.',
       requiredInputs: ['avatar clip', 'motion clips', 'product mockup', 'CTA'],
       requiredOutputs: ['postProcessed', 'productLabelReadable', 'gcsVideoUrl'],
@@ -104,7 +104,7 @@ function buildAgentWorkflow(context = {}) {
     },
     {
       id: 'elite-quality-gate-agent',
-      toolSurface: 'elite evidence evaluator + render quality validator + Gemini/OpenAI vision when available',
+      toolSurface: 'elite evidence evaluator + render quality validator + OpenAI/Gemini vision when available',
       objective: 'Fail or hold the render unless every Elite A+ evidence gate is true.',
       requiredInputs: ['final record', 'media URLs', 'quality evidence'],
       requiredOutputs: ['eliteReady', 'blockers', 'publishApproval'],
@@ -123,7 +123,7 @@ function buildShotPlan(context = {}) {
     {
       id: 'hook-motion-open',
       seconds: '0-3',
-      provider: 'kling-or-seedance',
+      provider: 'kling-or-runway',
       visual: `Moving ${category} lifestyle opener with premium lighting and a slow camera push-in.`,
       purpose: 'Stop the scroll immediately with real motion, not a still background.',
       audio: `Hook: ${hookAngle}.`,
@@ -141,7 +141,7 @@ function buildShotPlan(context = {}) {
     {
       id: 'label-closeup',
       seconds: '9-13',
-      provider: 'kling-or-seedance-product-i2v',
+      provider: 'kling-or-runway-product-i2v',
       visual: `${title} fills the frame with a readable label, premium turntable/zoom, shallow depth of field, and clean highlight reflections.`,
       purpose: 'Make the product and label unmistakable.',
       audio: 'Name the product once while the label is visible.',
@@ -150,7 +150,7 @@ function buildShotPlan(context = {}) {
     {
       id: 'benefit-proof-motion',
       seconds: '13-18',
-      provider: 'kling-or-seedance',
+      provider: 'runway-or-kling',
       visual: 'Moving benefit b-roll that matches the category and product use case; include camera pan/orbit, not a static stock image.',
       purpose: 'Show the benefit visually and make the scene feel like a commercial.',
       audio: 'Explain one clear benefit without medical or exaggerated claims.',
@@ -168,7 +168,7 @@ function buildShotPlan(context = {}) {
     {
       id: 'cta-end-card',
       seconds: '22-26',
-      provider: 'ffmpeg-editor',
+      provider: 'canva-plus-ffmpeg',
       visual: `Clean CTA card with ${title}, brand, and ${productPageUrl}.`,
       purpose: 'Make the next action obvious and publish-ready.',
       audio: 'Direct CTA: shop now / link in bio.',
@@ -186,6 +186,7 @@ function buildCinematicDirective(context = {}) {
       `Create an elite cinematic commercial for ${title}.`,
       `Category: ${category}. Hook angle: ${hookAngle}.`,
       'Use moving environments, visible camera motion, premium lighting, product hero close-ups, readable label shots, and a polished CTA ending.',
+      'Default provider stack: Kling for product hero motion, Runway for cinematic lifestyle motion, HeyGen for presenter performance, FFmpeg for final assembly, Canva for CTA/end cards, remove.bg for product prep.',
       'Do not use the product mockup as the avatar background. The product must appear as a deliberate hero shot or foreground sales object.',
       'A static talking-head scene is fallback only and must not be considered Elite A+.'
     ].join(' '),
@@ -226,23 +227,46 @@ function compactRoute(route = {}) {
     id: capability.id,
     label: capability.label,
     configured: capability.configured,
-    strengths: capability.strengths
+    preferredReady: capability.preferredReady,
+    strengths: capability.strengths,
+    presentSecretNames: capability.presentSecretNames
   } : null]));
+}
+
+function buildConfirmedDefaultStack(route = {}) {
+  return CONFIRMED_ELITE_STACK.map((id) => {
+    const capability = Object.values(route).find((entry) => entry && entry.id === id) || null;
+    return {
+      id,
+      active: Boolean(capability),
+      stageConsumer: capability ? Object.keys(route).filter((stage) => route[stage] && route[stage].id === id) : [],
+      capability: capability ? {
+        id: capability.id,
+        label: capability.label,
+        configured: capability.configured,
+        preferredReady: capability.preferredReady,
+        presentSecretNames: capability.presentSecretNames
+      } : null
+    };
+  });
 }
 
 function buildProviderRoute(context = {}, routingPlan = null) {
   const plan = routingPlan || buildToolRoutingPlan();
   const route = compactRoute(plan.route);
-  const cinematicEngine = normalizeText(context.cinematicEngine || route.productMotion?.id || 'kling-omni').toLowerCase();
+  const cinematicEngine = normalizeText(context.cinematicEngine || route.productMotion?.id || 'kling').toLowerCase();
   return {
-    strategy: 'json-driven-shot-based-commercial-assembly',
+    strategy: 'json-driven-confirmed-stack-commercial-assembly',
+    confirmedDefaultStack: buildConfirmedDefaultStack(plan.route),
+    productIntelligence: route.productIntelligence || null,
+    state: route.state || null,
+    reasoning: route.reasoning || null,
+    trendIntelligence: route.trendIntelligence || null,
+    assetPrep: route.assetPrep || null,
+    design: route.design || null,
     primaryMotionProvider: route.productMotion || null,
     fallbackMotionProvider: route.lifestyleMotion || null,
     avatarProvider: route.presenter || null,
-    productIntelligence: route.productIntelligence || null,
-    reasoning: route.reasoning || null,
-    assetPrep: route.assetPrep || null,
-    design: route.design || null,
     visualQa: route.visualQa || null,
     editor: route.editor || null,
     persistence: route.persistence || null,
@@ -250,7 +274,7 @@ function buildProviderRoute(context = {}, routingPlan = null) {
     publishing: route.publishing || null,
     billing: route.billing || null,
     selectedEngineHint: cinematicEngine,
-    note: 'Provider selection is based on configured API secret names/environment signals. HeyGen is the presenter layer; motion providers and editor assembly create cinematic evidence.'
+    note: 'Provider selection now prefers the confirmed stack from cloud secrets: Shopify -> Supabase -> OpenAI -> remove.bg -> Canva -> Kling -> Runway -> HeyGen -> FFmpeg -> GCS.'
   };
 }
 
@@ -270,8 +294,8 @@ function buildEliteRenderWorkflow(context = {}, options = {}) {
     shotPlan: buildShotPlan(enrichedContext),
     cameraMoves: cinematicDirective.cameraMoves
   }, routingPlan);
-  const workflow = {
-    version: 'elite-render-workflow-v2',
+  return {
+    version: 'elite-render-workflow-v3',
     renderStandard: 'Elite A+ cinematic commercial',
     mission: 'Use every EVICS intelligence, creative, render, post-process, persistence, and quality tool in sequence before and after rendering.',
     product: {
@@ -291,7 +315,6 @@ function buildEliteRenderWorkflow(context = {}, options = {}) {
     eliteCommercialBlueprint: buildEliteCommercialBlueprint(enrichedContext),
     successDefinition: 'Final video must contain cinematic motion, avatar performance evidence, readable product label close-up, foreground product presentation, CTA, and persistent final media URL.'
   };
-  return workflow;
 }
 
 function evaluateWorkflowReadiness(record = {}) {
