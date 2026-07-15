@@ -2,7 +2,7 @@
  * videoPostProcessor.js — EVICS Video Post-Processing Engine
  *
  * After HeyGen renders the base avatar video, this adds:
- *   1. Product mockup overlay (bottom-right corner)
+ *   1. Prominent foreground product mockup presentation
  *   2. CTA text overlay ("Shop Now — iamgenesistech.com")
  *   3. Affiliate link watermark
  *
@@ -71,7 +71,6 @@ async function postProcessVideo({
   await downloadFile(videoUrl, inputPath);
 
   // Build ffmpeg filter chain
-  const filters = [];
   const inputs = ['-i', inputPath];
   let filterComplex = '';
 
@@ -86,10 +85,15 @@ async function postProcessVideo({
     ? specialEffects.map((effect) => String(effect || '').trim().toLowerCase())
     : [];
   const withProductEntranceFade = normalizedEffects.includes('product-entrance-fade');
+
+  // The product must be a sales object in the scene, not a tiny hidden watermark.
+  // Keep it in the foreground, large enough to read, and below the avatar face zone.
   const productLayerFilter = withProductEntranceFade
-    ? '[1:v]scale=360:-1,format=rgba,fade=t=in:st=0:d=0.75:alpha=1,colorchannelmixer=aa=0.98[prod]'
-    : '[1:v]scale=360:-1,format=rgba,colorchannelmixer=aa=0.98[prod]';
-  const gradeAndVignette = 'eq=contrast=1.05:saturation=1.08:brightness=-0.015,vignette=PI/5';
+    ? '[1:v]scale=560:-1,format=rgba,fade=t=in:st=0:d=0.55:alpha=1,colorchannelmixer=aa=0.99[prod]'
+    : '[1:v]scale=560:-1,format=rgba,colorchannelmixer=aa=0.99[prod]';
+  const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
+  const pedestal = 'drawbox=x=W-650:y=H-760:w=610:h=610:color=0x050505@0.34:t=fill,drawbox=x=W-650:y=H-760:w=610:h=610:color=0xf4c96a@0.20:t=3';
+  const productOverlay = 'overlay=x=W-w-64:y=H-h-250:format=auto';
 
   if (productImageUrl) {
     // Download product image
@@ -98,7 +102,7 @@ async function postProcessVideo({
     try {
       await downloadFile(productImageUrl, productPath);
       inputs.push('-i', productPath);
-      filterComplex = `[0:v]${gradeAndVignette}[graded];${productLayerFilter};[graded][prod]overlay=W-w-48:H-h-520:format=auto[withprod];[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+      filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     } catch {
       filterComplex = `[0:v]${gradeAndVignette}[graded];[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
     }
@@ -111,8 +115,8 @@ async function postProcessVideo({
     'ffmpeg', '-y',
     ...inputs,
     '-filter_complex', filterComplex,
-    '-map', '[out]', '-map', '0:a',
-    '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-map', '[out]', '-map', '0:a?',
+    '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
     outputPath
   ].map(s => `"${s}"`).join(' ');
 
@@ -142,7 +146,7 @@ async function postProcessVideo({
 }
 
 function escapeFFmpegText(text) {
-  return text.replace(/'/g, "'\\''").replace(/:/g, '\\:').replace(/\\/g, '\\\\');
+  return String(text || '').replace(/'/g, "'\\''").replace(/:/g, '\\:').replace(/\\/g, '\\\\');
 }
 
 // All text overlays are locked to the bottom-safe zone only.
