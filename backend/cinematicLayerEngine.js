@@ -119,7 +119,7 @@ function getKlingAuthHeaders() {
   const secretKey = getKlingLegacySecretKey();
   if (accessKey && secretKey) {
     const now = Math.floor(Date.now() / 1000);
-    const token = createJwtToken({ alg: 'HS256', typ: 'JWT' }, { iss: accessKey, exp: now + 300, iat: now }, secretKey);
+    const token = createJwtToken({ alg: 'HS256', typ: 'JWT' }, { iss: accessKey, exp: now + 1800, nbf: now - 5, iat: now }, secretKey);
     return { Authorization: 'Bearer ' + token };
   }
   const apiKey = getKlingKey();
