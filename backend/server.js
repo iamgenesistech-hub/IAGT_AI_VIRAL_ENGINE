@@ -8985,12 +8985,23 @@ async function startAffiliateProductCinematic(record) {
     return { provider: 'seedance', jobId: job.job_id, pending: true, useAsFinalBase: false };
   }
   if (provider === 'kling') {
+    const klingFirstFrameUrl = record.processedProductImageUrl || record.productImageUrl || null;
+    if (!klingFirstFrameUrl) {
+      return {
+        provider: 'passthrough',
+        passthrough: true,
+        fallback: true,
+        error: 'Kling Omni requires a product mockup first_frame. Using deterministic post-processing instead.'
+      };
+    }
     const job = await startKlingJob({
       videoUrl: record.heygenVideoUrl,
+      productImageUrl: klingFirstFrameUrl,
       cameraMoves: record.cameraMoves || ['zoom-in', 'pan-right'],
       intensity: record.cinematicIntensity || 2,
       motionPrompt,
-      aspectRatio: record.platform === 'facebook' ? '16:9' : '9:16'
+      aspectRatio: record.platform === 'facebook' ? '16:9' : '9:16',
+      jobId: record.videoJobId
     });
     return { provider: 'kling', jobId: job.job_id, pending: true, useAsFinalBase: false };
   }
