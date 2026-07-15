@@ -9022,28 +9022,30 @@ async function getAffiliateProductCinematicStatus(record) {
   }
   if (record.cinematicProvider === 'seedance') {
     const status = await getSeedanceJobStatus(record.cinematicJobId);
-    const preservedFullAd = status.status === 'completed';
+    const succeeded = status.status === 'completed' && Boolean(status.video_url);
+    const failed = status.status === 'failed';
     return {
       status: status.status,
       provider: 'seedance',
       videoUrl: status.video_url || null,
       passthrough: false,
-      fallback: preservedFullAd || status.status === 'failed',
-      error: status.status === 'failed' ? 'Seedance job failed.' : (preservedFullAd ? 'Seedance clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
-      useAsFinalBase: false
+      fallback: failed,
+      error: failed ? 'Seedance job failed.' : null,
+      useAsFinalBase: succeeded
     };
   }
   if (record.cinematicProvider === 'kling') {
     const status = await getKlingJobStatus(record.cinematicJobId);
-    const preservedFullAd = status.status === 'completed';
+    const succeeded = status.status === 'completed' && Boolean(status.video_url);
+    const failed = status.status === 'failed';
     return {
       status: status.status,
       provider: 'kling',
       videoUrl: status.video_url || null,
       passthrough: false,
-      fallback: preservedFullAd || status.status === 'failed',
-      error: status.status === 'failed' ? 'Kling job failed.' : (preservedFullAd ? 'Kling clip archived as cinematic evidence; full avatar video preserved for final delivery.' : null),
-      useAsFinalBase: false
+      fallback: failed,
+      error: failed ? 'Kling job failed.' : null,
+      useAsFinalBase: succeeded
     };
   }
   return {
@@ -9088,11 +9090,23 @@ async function archiveAffiliateProductRecord(record) {
   return null;
 }
 
+async function assembleAffiliateProductRecord(record) {
+  const { assembleCommercialBase } = require('../utils/videoAssembler');
+  const { resolveTrackSources } = require('./commercialAssembler');
+  const { heroUrl, presenterUrl } = resolveTrackSources(record);
+  return assembleCommercialBase({
+    videoJobId: record.videoJobId,
+    heroUrl,
+    presenterUrl
+  });
+}
+
 async function advanceAffiliateProductVideoRecord(record) {
   const updated = await advanceProductVideoJob(record, {
     getHeyGenVideoStatus,
     startCinematic: startAffiliateProductCinematic,
     getCinematicStatus: getAffiliateProductCinematicStatus,
+    assemble: assembleAffiliateProductRecord,
     postProcess: postProcessAffiliateProductRecord,
     archiveFinal: archiveAffiliateProductRecord
   });
@@ -9103,6 +9117,8 @@ function decorateProductVideoRecord(record) {
   const baseRecord = record || {};
   const eliteRenderWorkflow = ensureEliteWorkflow(baseRecord);
   const quality = buildProductVideoQuality(baseRecord);
+  const { summarizeAssembly } = require('./commercialAssembler');
+  const assemblySummary = summarizeAssembly(baseRecord);
   return {
     ...baseRecord,
     eliteRenderWorkflow,
@@ -9112,7 +9128,10 @@ function decorateProductVideoRecord(record) {
     qualityScore: quality.score,
     qualityGrade: quality.grade,
     qualityEvidence: quality.evidence,
-    eliteReady: quality.aPlus
+    eliteReady: quality.aPlus,
+    isPassthrough: quality.isPassthrough,
+    isDegraded: quality.isDegraded,
+    assemblySummary
   };
 }
 
@@ -9491,6 +9510,13 @@ app.post('/api/affiliate/product-video/generate', async (req, res) => {
       cinematicFallback: false,
       cinematicError: null,
       cinematicJobId: null,
+      commercialAssembled: false,
+      assemblyMode: null,
+      assembledVideoUrl: null,
+      assembledVideoPath: null,
+      shotsRendered: 0,
+      degradedReasons: [],
+      passthroughReason: null,
       gcsVideoUrl: null,
       videoUrl: null,
       thumbnailUrl: null,

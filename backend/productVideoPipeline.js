@@ -8,6 +8,12 @@ const {
   buildEliteRenderWorkflow,
   evaluateWorkflowReadiness
 } = require('./eliteRenderOrchestrator');
+const {
+  planCommercialTimeline,
+  resolveTrackSources,
+  isMultiTrackReady,
+  summarizeAssembly
+} = require('./commercialAssembler');
 
 const STAGE_LOCK_MS = 4 * 60 * 1000;
 
@@ -134,18 +140,27 @@ function buildProductVideoQuality(record = {}) {
   const status = String(workflowRecord.status || '').trim().toLowerCase();
   const eliteCommercial = evaluateEliteCommercialEvidence(workflowRecord);
   const workflowReadiness = evaluateWorkflowReadiness(workflowRecord);
+
+  // Passthrough and fallback states are not real cinematic evidence.
+  // Only count cinematic composition when a real cinematic provider succeeded
+  // and the clip was used as the final base (useCinematicVideoAsBase === true).
+  const hasTrueCinematic = Boolean(workflowRecord.useCinematicVideoAsBase) &&
+    !workflowRecord.cinematicPassthrough &&
+    !workflowRecord.cinematicFallback;
+
   const evidence = {
     verifiedProductMatch: Boolean(workflowRecord.productResolved && workflowRecord.productResolved.matchType),
     nonPassthroughBgRemoval: Boolean(workflowRecord.productBgActuallyRemoved),
     pureSpokenDialogue: Boolean(workflowRecord.pureSpokenDialogue),
     preRenderWorkflowReady: workflowReadiness.preRenderReady,
     productOverlayApplied: Boolean(workflowRecord.productOverlayApplied),
-    productHeroShot: eliteCommercial.evidence.productHeroShot,
+    productHeroShot: hasTrueCinematic && eliteCommercial.evidence.productHeroShot,
     productLabelReadable: eliteCommercial.evidence.productLabelReadable,
-    motionBackground: eliteCommercial.evidence.motionBackground,
+    motionBackground: hasTrueCinematic && eliteCommercial.evidence.motionBackground,
     avatarPerformance: eliteCommercial.evidence.avatarPerformance,
-    cameraMovement: eliteCommercial.evidence.cameraMovement,
-    finalCinematicComposition: eliteCommercial.evidence.cinematicFinalComposition,
+    cameraMovement: hasTrueCinematic && eliteCommercial.evidence.cameraMovement,
+    finalCinematicComposition: hasTrueCinematic && eliteCommercial.evidence.cinematicFinalComposition,
+    commercialAssembled: Boolean(workflowRecord.commercialAssembled),
     clearCta: eliteCommercial.evidence.clearCta,
     postProcessed: Boolean(workflowRecord.postProcessed),
     finalPersistentAsset: Boolean(workflowRecord.gcsVideoUrl),
@@ -160,10 +175,11 @@ function buildProductVideoQuality(record = {}) {
     productOverlayApplied: 7,
     productHeroShot: 8,
     productLabelReadable: 10,
-    motionBackground: 10,
+    motionBackground: 8,
     avatarPerformance: 8,
-    cameraMovement: 7,
-    finalCinematicComposition: 10,
+    cameraMovement: 5,
+    finalCinematicComposition: 8,
+    commercialAssembled: 4,
     clearCta: 4,
     postProcessed: 4,
     finalPersistentAsset: 4,
@@ -178,14 +194,21 @@ function buildProductVideoQuality(record = {}) {
   if (evidence.completed && !evidence.productLabelReadable) score = Math.min(score, 82);
   if (evidence.completed && !evidence.avatarPerformance) score = Math.min(score, 86);
 
-  const aPlus = Object.values(evidence).every(Boolean) && eliteCommercial.ready && workflowReadiness.preRenderReady;
+  // Passthrough and degraded outcomes are loud and truthful: hard cap below A range.
+  const isPassthrough = Boolean(workflowRecord.cinematicPassthrough);
+  const isDegraded = Boolean(workflowRecord.cinematicFallback) && !workflowRecord.useCinematicVideoAsBase;
+  if (isPassthrough || isDegraded) score = Math.min(score, 82);
+
+  const aPlus = Object.values(evidence).every(Boolean) && eliteCommercial.ready && workflowReadiness.preRenderReady && !isPassthrough && !isDegraded;
   return {
     score: aPlus ? 100 : Math.max(0, Math.min(99, score)),
     grade: aPlus ? 'A+' : (score >= 92 ? 'A' : score >= 84 ? 'B+' : score >= 76 ? 'B' : score >= 68 ? 'C+' : 'C'),
     aPlus,
     evidence,
     eliteCommercial,
-    eliteWorkflow: workflowReadiness
+    eliteWorkflow: workflowReadiness,
+    isPassthrough,
+    isDegraded
   };
 }
 
@@ -208,6 +231,9 @@ function shouldRestartLock(startedAt, lockMs = STAGE_LOCK_MS) {
 }
 
 function resolvePostProcessSourceVideo(record = {}) {
+  if (record.commercialAssembled && record.assembledVideoPath) {
+    return record.assembledVideoUrl || record.assembledVideoPath;
+  }
   if (record.useCinematicVideoAsBase && record.cinematicVideoUrl) {
     return record.cinematicVideoUrl;
   }
@@ -266,7 +292,7 @@ async function advanceProductVideoJob(record, deps = {}) {
       }
 
       if (next.status !== 'cinematic') {
-        next.status = 'postprocessing';
+        next.status = typeof deps.assemble === 'function' ? 'assembling' : 'postprocessing';
       }
     } else if (heygen && heygen.status === 'failed') {
       next.status = 'failed';
@@ -280,7 +306,7 @@ async function advanceProductVideoJob(record, deps = {}) {
 
   if (next.status === 'cinematic') {
     if (!next.cinematicJobId) {
-      next.status = 'postprocessing';
+      next.status = typeof deps.assemble === 'function' ? 'assembling' : 'postprocessing';
     } else {
       const cinematic = await deps.getCinematicStatus(next);
       next.cinematicProvider = cinematic.provider || next.cinematicProvider || 'passthrough';
@@ -293,8 +319,45 @@ async function advanceProductVideoJob(record, deps = {}) {
       }
       if (cinematic.videoUrl) next.cinematicVideoUrl = cinematic.videoUrl;
       next.useCinematicVideoAsBase = Boolean(cinematic.useAsFinalBase);
-      next.status = 'postprocessing';
+      next.status = typeof deps.assemble === 'function' ? 'assembling' : 'postprocessing';
     }
+  }
+
+  if (next.status === 'assembling') {
+    if (!next.commercialAssembled) {
+      if (!shouldRestartLock(next.assembleStartedAt)) {
+        return { ...next, quality: buildProductVideoQuality(next) };
+      }
+      next.assembleStartedAt = nowIso;
+      const plan = planCommercialTimeline(next);
+      next.degradedReasons = plan.degradedReasons;
+      if (!next.cinematicPassthrough && !next.cinematicFallback) {
+        next.passthroughReason = null;
+      } else if (next.cinematicPassthrough) {
+        next.passthroughReason = 'Cinematic stage used passthrough — no real cinematic clip generated.';
+      } else if (next.cinematicFallback && !next.useCinematicVideoAsBase) {
+        next.passthroughReason = 'Cinematic stage fell back to HeyGen video — real cinematic clip discarded.';
+      }
+      try {
+        const assembled = await deps.assemble(next);
+        next.commercialAssembled = Boolean(assembled && assembled.success);
+        next.assemblyMode = assembled?.assemblyMode || plan.mode;
+        next.assembledVideoUrl = assembled?.assembledVideoUrl || null;
+        next.assembledVideoPath = assembled?.assembledVideoPath || null;
+        next.shotsRendered = assembled?.shotsRendered || 0;
+        if (!next.commercialAssembled) {
+          next.degradedReasons = [
+            ...next.degradedReasons,
+            assembled?.error || 'Commercial assembly failed.'
+          ];
+        }
+      } catch (assembleErr) {
+        next.commercialAssembled = false;
+        next.assemblyMode = plan.mode;
+        next.degradedReasons = [...(next.degradedReasons || []), assembleErr.message];
+      }
+    }
+    next.status = 'postprocessing';
   }
 
   if (next.status === 'postprocessing') {
@@ -361,5 +424,9 @@ module.exports = {
   buildProductVideoQuality,
   advanceProductVideoJob,
   isTransientAdvanceError,
-  ensureEliteWorkflow
+  ensureEliteWorkflow,
+  planCommercialTimeline,
+  resolveTrackSources,
+  isMultiTrackReady,
+  summarizeAssembly
 };
