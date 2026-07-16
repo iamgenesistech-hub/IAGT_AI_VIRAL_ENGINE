@@ -4,16 +4,91 @@ const path = require('path');
 const supabase = require('./SupabaseConnector');
 
 const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE || process.env.SHOPIFY_SHOP || 'iamgenesistech.myshopify.com';
-const SHOPIFY_TOKEN  = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN;
-const SHOPIFY_API    = '2026-04';
+const SHOPIFY_API = process.env.SHOPIFY_API_VERSION || process.env.EVICS_SHOPIFY_API_VERSION || '2026-07';
+const SHOPIFY_STATIC_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN || null;
+
+const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET || '';
+
+const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
+const DEFAULT_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+let oauthTokenCache = {
+  token: null,
+  expiresAtMs: 0,
+  source: null,
+};
 
 // Local product cache — always populated by sync script or storefront fallback
 const PRODUCT_CACHE_PATH = path.join(__dirname, '../data/shopify_products_cache.json');
 
-function shopifyHeaders() {
+function hasOauthClientCredentials() {
+  return Boolean(SHOPIFY_DOMAIN && SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET);
+}
+
+function getCachedOauthToken() {
+  if (!oauthTokenCache.token) return null;
+  if (Date.now() >= oauthTokenCache.expiresAtMs - TOKEN_EXPIRY_SKEW_MS) return null;
+  return oauthTokenCache.token;
+}
+
+async function mintOauthAdminAccessToken() {
+  if (!hasOauthClientCredentials()) {
+    return null;
+  }
+
+  const url = `https://${SHOPIFY_DOMAIN}/admin/oauth/access_token`;
+  const payload = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: SHOPIFY_CLIENT_ID,
+    client_secret: SHOPIFY_CLIENT_SECRET,
+  }).toString();
+
+  const response = await axios.post(url, payload, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 12000,
+  });
+
+  const accessToken = response?.data?.access_token;
+  if (!accessToken || typeof accessToken !== 'string') {
+    throw new Error('Shopify OAuth token exchange did not return an access_token.');
+  }
+
+  const expiresInSec = Number(response?.data?.expires_in);
+  const ttlMs = Number.isFinite(expiresInSec) && expiresInSec > 0
+    ? expiresInSec * 1000
+    : DEFAULT_TOKEN_TTL_MS;
+
+  oauthTokenCache = {
+    token: accessToken,
+    expiresAtMs: Date.now() + ttlMs,
+    source: 'oauth_client_credentials',
+  };
+
+  return accessToken;
+}
+
+async function resolveShopifyAdminToken({ forceRefresh = false } = {}) {
+  if (hasOauthClientCredentials()) {
+    if (!forceRefresh) {
+      const cached = getCachedOauthToken();
+      if (cached) return cached;
+    }
+    const minted = await mintOauthAdminAccessToken();
+    if (minted) return minted;
+  }
+
+  if (SHOPIFY_STATIC_TOKEN) {
+    return SHOPIFY_STATIC_TOKEN;
+  }
+
+  return null;
+}
+
+function shopifyHeaders(token) {
   return {
-    'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-    'Content-Type': 'application/json'
+    'X-Shopify-Access-Token': token,
+    'Content-Type': 'application/json',
   };
 }
 
@@ -40,7 +115,7 @@ function normalizeProduct(p) {
     productUrl: p.productUrl || `https://iamgenesistech.com/products/${p.handle}`,
     affiliateLink: p.affiliateLink || `https://iamgenesistech.com/products/${p.handle}`,
     source: 'shopify',
-    synced_at: new Date().toISOString()
+    synced_at: new Date().toISOString(),
   };
 }
 
@@ -53,7 +128,7 @@ function normalizeCollection(c) {
     body_html: c.body_html || '',
     image: (c.image && c.image.src) || null,
     sort_order: c.sort_order || 'best-selling',
-    synced_at: new Date().toISOString()
+    synced_at: new Date().toISOString(),
   };
 }
 
@@ -61,7 +136,7 @@ function normalizeCollection(c) {
 function loadLocalCache() {
   try {
     if (fs.existsSync(PRODUCT_CACHE_PATH)) {
-      let raw = fs.readFileSync(PRODUCT_CACHE_PATH, 'utf8').replace(/^\uFEFF/, ''); // strip BOM
+      const raw = fs.readFileSync(PRODUCT_CACHE_PATH, 'utf8').replace(/^\uFEFF/, '');
       const parsed = JSON.parse(raw);
       const products = parsed.products || parsed;
       if (Array.isArray(products) && products.length > 0) {
@@ -83,9 +158,7 @@ async function refreshLocalCacheFromStorefront() {
     const products = (response.data.products || []).map(normalizeProduct);
     if (products.length > 0) {
       const payload = JSON.stringify({ synced_at: new Date().toISOString(), total: products.length, store_domain: SHOPIFY_DOMAIN, products }, null, 2);
-      // Write without BOM
-      const encoder = require('buffer').Buffer.from(payload, 'utf8');
-      fs.writeFileSync(PRODUCT_CACHE_PATH, encoder);
+      fs.writeFileSync(PRODUCT_CACHE_PATH, Buffer.from(payload, 'utf8'));
       console.log(`[shopifyLiveConnector] Refreshed local cache: ${products.length} products`);
       return products;
     }
@@ -95,10 +168,26 @@ async function refreshLocalCacheFromStorefront() {
   return null;
 }
 
-async function fetchFromShopifyApi(path) {
-  const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_API}${path}`;
-  const response = await axios.get(url, { headers: shopifyHeaders(), timeout: 12000 });
-  return response.data;
+async function fetchFromShopifyApi(apiPath) {
+  const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_API}${apiPath}`;
+  const token = await resolveShopifyAdminToken();
+  if (!token) {
+    throw new Error('Shopify credentials are not configured (no static token or OAuth client credentials).');
+  }
+
+  try {
+    const response = await axios.get(url, { headers: shopifyHeaders(token), timeout: 12000 });
+    return response.data;
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status === 401 && hasOauthClientCredentials()) {
+      const refreshedToken = await resolveShopifyAdminToken({ forceRefresh: true });
+      if (!refreshedToken) throw error;
+      const retry = await axios.get(url, { headers: shopifyHeaders(refreshedToken), timeout: 12000 });
+      return retry.data;
+    }
+    throw error;
+  }
 }
 
 async function cacheProductsToSupabase(products) {
@@ -126,16 +215,14 @@ async function cacheCollectionsToSupabase(collections) {
 }
 
 async function fetchShopifyProducts() {
-  // 1. Try live Shopify Admin API (requires valid admin token)
-  if (SHOPIFY_DOMAIN && SHOPIFY_TOKEN) {
+  if (SHOPIFY_DOMAIN) {
     try {
       const data = await fetchFromShopifyApi('/products.json?limit=250&status=active');
       const products = (data.products || []).map(normalizeProduct);
       if (products.length > 0) {
         cacheProductsToSupabase(products).catch(() => {});
-        // Also refresh local file cache
         const payload = { synced_at: new Date().toISOString(), total: products.length, store_domain: SHOPIFY_DOMAIN, products };
-        try { fs.writeFileSync(PRODUCT_CACHE_PATH, JSON.stringify(payload, null, 2)); } catch {}
+        try { fs.writeFileSync(PRODUCT_CACHE_PATH, JSON.stringify(payload, null, 2)); } catch (e) {}
         return products;
       }
     } catch (error) {
@@ -143,23 +230,20 @@ async function fetchShopifyProducts() {
     }
   }
 
-  // 2. Try public Storefront API (no token required — works even if admin token is revoked)
   const storefrontProducts = await refreshLocalCacheFromStorefront();
   if (storefrontProducts && storefrontProducts.length > 0) {
     cacheProductsToSupabase(storefrontProducts).catch(() => {});
     return storefrontProducts;
   }
 
-  // 3. Try Supabase cache
   try {
     const { data, error } = await supabase
       .from('shopify_products')
       .select('*')
       .order('synced_at', { ascending: false });
     if (!error && data && data.length > 0) return data;
-  } catch {}
+  } catch (e) {}
 
-  // 4. Always-available local file cache
   const cached = loadLocalCache();
   if (cached) return cached;
 
@@ -168,7 +252,7 @@ async function fetchShopifyProducts() {
 }
 
 async function fetchShopifyCollections() {
-  if (SHOPIFY_DOMAIN && SHOPIFY_TOKEN) {
+  if (SHOPIFY_DOMAIN) {
     try {
       const data = await fetchFromShopifyApi('/custom_collections.json?limit=250');
       const collections = (data.custom_collections || []).map(normalizeCollection);
@@ -195,14 +279,14 @@ async function fetchShopifyCollections() {
 }
 
 async function fetchShopifyOrders({ limit = 50, status = 'any', sinceId = null } = {}) {
-  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
-    console.warn('[shopifyLiveConnector] fetchShopifyOrders: Shopify credentials not set.');
+  if (!SHOPIFY_DOMAIN) {
+    console.warn('[shopifyLiveConnector] fetchShopifyOrders: Shopify store domain is not set.');
     return [];
   }
   try {
-    let path = `/orders.json?limit=${limit}&status=${status}`;
-    if (sinceId) path += `&since_id=${sinceId}`;
-    const data = await fetchFromShopifyApi(path);
+    let apiPath = `/orders.json?limit=${limit}&status=${status}`;
+    if (sinceId) apiPath += `&since_id=${sinceId}`;
+    const data = await fetchFromShopifyApi(apiPath);
     return data.orders || [];
   } catch (error) {
     console.error('[shopifyLiveConnector] fetchShopifyOrders failed:', error.message);
@@ -213,54 +297,5 @@ async function fetchShopifyOrders({ limit = 50, status = 'any', sinceId = null }
 module.exports = {
   fetchShopifyProducts,
   fetchShopifyCollections,
-  fetchShopifyOrders
+  fetchShopifyOrders,
 };
-
-function shopifyHeaders() {
-  return {
-    'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-    'Content-Type': 'application/json'
-  };
-}
-
-function normalizeProduct(p) {
-  const firstVariant = (p.variants && p.variants[0]) || {};
-  return {
-    id: String(p.id),
-    shopify_id: String(p.id),
-    title: p.title || 'Unnamed Product',
-    name: p.title || 'Unnamed Product',
-    handle: p.handle || '',
-    status: p.status || 'active',
-    product_type: p.product_type || 'General',
-    category: p.product_type || 'General',
-    price: firstVariant.price || '0.00',
-    sku: firstVariant.sku || p.handle || '',
-    inventory_quantity: firstVariant.inventory_quantity || 0,
-    image: (p.image && p.image.src) || (p.images && p.images[0] && p.images[0].src) || null,
-    tags: typeof p.tags === 'string' ? p.tags.split(', ').filter(Boolean) : (p.tags || []),
-    vendor: p.vendor || '',
-    body_html: p.body_html || '',
-    variants_count: (p.variants || []).length,
-    synced_at: new Date().toISOString()
-  };
-}
-
-function normalizeCollection(c) {
-  return {
-    id: String(c.id),
-    shopify_id: String(c.id),
-    title: c.title || 'Unnamed Collection',
-    handle: c.handle || '',
-    body_html: c.body_html || '',
-    image: (c.image && c.image.src) || null,
-    sort_order: c.sort_order || 'best-selling',
-    synced_at: new Date().toISOString()
-  };
-}
-
-async function fetchFromShopifyApi(path) {
-  const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_API}${path}`;
-  const response = await axios.get(url, { headers: shopifyHeaders(), timeout: 12000 });
-  return response.data;
-}
