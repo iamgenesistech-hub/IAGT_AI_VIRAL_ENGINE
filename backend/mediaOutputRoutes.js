@@ -113,6 +113,90 @@ function renderRouteStatus(action) {
   return action === 'renderAllEnabledPresets' ? 'queued' : 'rendering';
 }
 
+function parsePositiveInt(value, fallback, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  const rounded = Math.floor(parsed);
+  return Number.isFinite(max) ? Math.min(rounded, max) : rounded;
+}
+
+function normalizeGalleryStatus(value) {
+  const approvedStatuses = ['approved', 'published', 'live'];
+  const rerenderStatuses = ['needs_rerender', 'rerender', 'requeue', 'requeued', 'retry', 'retrying', 'rejected'];
+  const discardedStatuses = ['discarded', 'archived', 'archive'];
+  const status = String(value || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (!status) return 'pending';
+  if (approvedStatuses.includes(status)) return 'approved';
+  if (rerenderStatuses.includes(status)) return 'needs_rerender';
+  if (discardedStatuses.includes(status)) return 'discarded';
+  return 'pending';
+}
+
+function summarizeMediaGallery(items = []) {
+  const byStatus = {};
+  const byProvider = {};
+  const byMediaType = {};
+
+  for (const item of items) {
+    const status = normalizeGalleryStatus(item.status);
+    const provider = String(item.sourceProvider || 'Unknown');
+    const mediaType = String(item.mediaType || 'video');
+    byStatus[status] = (byStatus[status] || 0) + 1;
+    byProvider[provider] = (byProvider[provider] || 0) + 1;
+    byMediaType[mediaType] = (byMediaType[mediaType] || 0) + 1;
+  }
+
+  return {
+    total: items.length,
+    approved: byStatus.approved || 0,
+    pending: byStatus.pending || 0,
+    rerender: byStatus.needs_rerender || 0,
+    discarded: byStatus.discarded || 0,
+    byStatus,
+    byProvider,
+    byMediaType
+  };
+}
+
+function applyMediaGalleryFilters(items = [], query = {}) {
+  const statusCriteria = String(query.status || 'all').toLowerCase();
+  const mediaTypeCriteria = String(query.mediaType || query.type || 'all').toLowerCase();
+  const providerCriteria = String(query.provider || 'all').toLowerCase();
+  const searchQuery = String(query.q || query.search || '').trim().toLowerCase();
+
+  const filteredItems = items.filter((item) => {
+    const normalizedStatus = normalizeGalleryStatus(item.status);
+    if (statusCriteria !== 'all' && normalizedStatus !== statusCriteria) return false;
+    const normalizedType = String(item.mediaType || '').toLowerCase();
+    if (mediaTypeCriteria !== 'all' && normalizedType !== mediaTypeCriteria) return false;
+    const normalizedProvider = String(item.sourceProvider || '').toLowerCase();
+    if (providerCriteria !== 'all' && normalizedProvider !== providerCriteria) return false;
+    if (!searchQuery) return true;
+    const haystack = [
+      item.id,
+      item.title,
+      item.sourceProvider,
+      item.providerPackage,
+      item.status,
+      ...(Array.isArray(item.tags) ? item.tags : [])
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(searchQuery);
+  });
+
+  return {
+    filteredItems,
+    filters: {
+      status: statusCriteria,
+      mediaType: mediaTypeCriteria,
+      provider: providerCriteria,
+      search: searchQuery
+    }
+  };
+}
+
 function registerMediaOutputRoutes(app, SupabaseConnector) {
   async function fetchMediaOutputById(id) {
     // Try Supabase first
@@ -230,59 +314,106 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
     }
   }
 
+  async function listMediaOutputItems(limit = 300) {
+    let supabaseRows = [];
+    try {
+      const { data, error } = await SupabaseConnector
+        .from('evics_renders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      supabaseRows = data || [];
+    } catch (supErr) {
+      console.warn('Supabase list fetch failed:', supErr && supErr.message ? supErr.message : String(supErr));
+    }
+
+    let localRows = [];
+    try {
+      const localPath = path.join(__dirname, '..', 'generated', 'local_evics_renders.json');
+      if (fs.existsSync(localPath)) {
+        localRows = JSON.parse(fs.readFileSync(localPath, 'utf8') || '[]') || [];
+      }
+    } catch (localErr) {
+      console.warn('Local fallback read failed:', localErr && localErr.message ? localErr.message : String(localErr));
+    }
+
+    const normalizedLocal = (localRows || []).map(normalizeMediaOutput);
+    const normalizedSupabase = (supabaseRows || []).map(normalizeMediaOutput);
+    const mergedMap = new Map();
+    for (const item of normalizedLocal) {
+      if (item && item.id) mergedMap.set(String(item.id), item);
+    }
+    for (const item of normalizedSupabase) {
+      if (item && item.id) mergedMap.set(String(item.id), item);
+    }
+
+    return Array.from(mergedMap.values())
+      .map((item) => ({ item, ts: item && item.createdAt ? Date.parse(item.createdAt) || 0 : 0 }))
+      .sort((a, b) => b.ts - a.ts || String(b.item.id).localeCompare(String(a.item.id)))
+      .map(({ item }) => item);
+  }
+
   app.get('/api/media-output/outputs', async (_req, res) => {
     try {
-      // Attempt to fetch from Supabase; if it fails, continue and merge with local fallback
-      let supabaseRows = [];
-      try {
-        const { data, error } = await SupabaseConnector
-          .from('evics_renders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(150);
-        if (error) throw new Error(error.message);
-        supabaseRows = data || [];
-      } catch (supErr) {
-        console.warn('Supabase list fetch failed:', supErr && supErr.message ? supErr.message : String(supErr));
-      }
-
-      // Read local fallback file if present
-      let localRows = [];
-      try {
-        const localPath = path.join(__dirname, '..', 'generated', 'local_evics_renders.json');
-        if (fs.existsSync(localPath)) {
-          localRows = JSON.parse(fs.readFileSync(localPath, 'utf8') || '[]') || [];
-        }
-      } catch (localErr) {
-        console.warn('Local fallback read failed:', localErr && localErr.message ? localErr.message : String(localErr));
-      }
-
-      // Normalize and merge results; prefer Supabase entries when duplicates exist
-      const normalizedLocal = (localRows || []).map(normalizeMediaOutput);
-      const normalizedSupabase = (supabaseRows || []).map(normalizeMediaOutput);
-
-      const mergedMap = new Map();
-      // Add local first, then supabase will overwrite duplicates (preferring supabase truth when available)
-      for (const it of normalizedLocal) {
-        if (it && it.id) mergedMap.set(String(it.id), it);
-      }
-      for (const it of normalizedSupabase) {
-        if (it && it.id) mergedMap.set(String(it.id), it);
-      }
-
-      let items = Array.from(mergedMap.values());
-      // Sort by createdAt (descending), fallback to id ordering if missing
-      items.sort((a, b) => {
-        const ta = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const tb = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return tb - ta || String(b.id).localeCompare(String(a.id));
-      });
-
-      // Limit to 150
-      items = items.slice(0, 150);
-
+      const items = (await listMediaOutputItems(300)).slice(0, 150);
       noStore(res);
       res.json({ success: true, items, count: items.length });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/media/gallery', async (req, res) => {
+    try {
+      const items = await listMediaOutputItems(500);
+      const { filteredItems, filters } = applyMediaGalleryFilters(items, req.query || {});
+      const limit = parsePositiveInt(req.query.limit, 50, 200);
+      const requestedPage = parsePositiveInt(req.query.page, 1, 100000);
+      const totalItems = filteredItems.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+      const page = Math.min(requestedPage, totalPages);
+      const offset = (page - 1) * limit;
+      const pageItems = filteredItems.slice(offset, offset + limit);
+      const summary = summarizeMediaGallery(filteredItems);
+      const overallSummary = summarizeMediaGallery(items);
+
+      noStore(res);
+      res.json({
+        success: true,
+        items: pageItems,
+        videos: pageItems,
+        pagination: {
+          page,
+          limit,
+          totalItems,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        },
+        filters,
+        summary,
+        overallSummary
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/media/stats', async (req, res) => {
+    try {
+      const items = await listMediaOutputItems(500);
+      const { filteredItems, filters } = applyMediaGalleryFilters(items, req.query || {});
+      const stats = summarizeMediaGallery(filteredItems);
+      const overallSummary = summarizeMediaGallery(items);
+      noStore(res);
+      res.json({
+        success: true,
+        stats,
+        summary: stats,
+        overallSummary,
+        filters
+      });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message || String(e) });
     }
@@ -459,5 +590,7 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
 
 module.exports = {
   registerMediaOutputRoutes,
-  normalizeMediaOutput
+  normalizeMediaOutput,
+  summarizeMediaGallery,
+  applyMediaGalleryFilters
 };
