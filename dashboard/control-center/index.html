@@ -142,13 +142,28 @@
           if (checkAppMounted()) clearInterval(mountCheck);
         }, 100);
 
-        // Safety timeout: if nothing renders in 8 seconds, show fallback message
+        // Safety timeout: show fallback message but KEEP polling -- app.js is 438 KB and may still be downloading/parsing
         setTimeout(function () {
-          clearInterval(mountCheck);
           if (!checkAppMounted()) {
             if (bootStatus) bootStatus.textContent = 'Workspace still loading — check network or try a hard refresh (Ctrl+Shift+R).';
+            if (splash && !document.getElementById('evics-reload-btn')) {
+              var reloadBtn = document.createElement('button');
+              reloadBtn.id = 'evics-reload-btn';
+              reloadBtn.textContent = 'Reload Workspace';
+              reloadBtn.style.cssText = 'margin-top:12px;padding:8px 22px;background:#00c7f5;color:#070b11;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;letter-spacing:.03em';
+              reloadBtn.onclick = function () { window.location.reload(true); };
+              splash.appendChild(reloadBtn);
+            }
           }
         }, 8000);
+
+        // Hard stop after 30 seconds -- if still nothing, show fatal error and stop polling
+        setTimeout(function () {
+          if (!checkAppMounted()) {
+            clearInterval(mountCheck);
+            if (bootStatus) bootStatus.textContent = 'Workspace failed to load. Click Reload to try again.';
+          }
+        }, 30000);
 
         function refreshExecutiveMonitors() {
           try {
