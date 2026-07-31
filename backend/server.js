@@ -1,9 +1,9 @@
-// backend/server.js
-const path = require('path');
+﻿const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 
 const express = require('express');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = rateLimit;
 const multer = require('multer');
@@ -232,6 +232,9 @@ async function generateSignedUrl(gcsPath, token) {
 }
 
 let errorCount = 0;
+
+// Gzip compression for all responses (critical for 438 KB app.js - reduces to ~75 KB on the wire)
+app.use(compression());
 
 // -- Request logger --
 app.use((req, res, next) => {
