@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = rateLimit;
 const multer = require('multer');
 const SupabaseConnector = require('../utils/SupabaseConnector');
-const { fetchShopifyProducts, fetchShopifyCollections, fetchShopifyOrders } = require('../utils/shopifyLiveConnector');
+const { fetchShopifyProducts, fetchShopifyCollections, fetchShopifyOrders, checkShopifyHealth } = require('../utils/shopifyLiveConnector');
 const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
@@ -2295,10 +2295,13 @@ app.get('/health', (_req, res) => {
 app.get('/status', async (_req, res) => {
   noStore(res);
   const uptimeSec = Math.round(process.uptime());
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE || process.env.SHOPIFY_SHOP || '';
+  const hasShopifyOauth = Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.SHOPIFY_CLIENT_SECRET);
+  const hasShopifyStaticToken = Boolean(process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN);
 
   const keys = {
     supabase:  Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)),
-    shopify:   Boolean((process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE) && (process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN)),
+    shopify:   Boolean(shopifyDomain && (hasShopifyStaticToken || hasShopifyOauth)),
     openai:    Boolean(process.env.OPENAI_API_KEY),
     heygen:    Boolean(process.env.HEYGEN_API_KEY),
     runway:    Boolean(process.env.RUNWAY_API_KEY),
@@ -2326,13 +2329,9 @@ app.get('/status', async (_req, res) => {
     })(),
     // Shopify
     (async () => {
-      if (!keys.shopify) return { service: 'shopify', status: 'no_key', pingMs: null };
-      const t0 = Date.now();
+      if (!shopifyDomain) return { service: 'shopify', status: 'no_key', pingMs: null };
       try {
-        const domain = process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE;
-        const token  = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ACCESS_TOKEN;
-        const r = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, { headers: { 'X-Shopify-Access-Token': token } });
-        return { service: 'shopify', status: r.ok ? 'ok' : 'error', httpStatus: r.status, pingMs: Date.now() - t0 };
+        return await checkShopifyHealth();
       } catch (e) { return { service: 'shopify', status: 'error', error: e.message, pingMs: null }; }
     })(),
     // HeyGen
