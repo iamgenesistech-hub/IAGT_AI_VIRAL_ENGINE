@@ -48,12 +48,12 @@ async function test(name, fn) {
   try {
     await fn();
     passed += 1;
-    console.log(`  ✅ ${name}`);
+    console.log(`  PASS: ${name}`);
   } catch (error) {
     failed += 1;
     failures.push({ name, message: error.message });
-    console.log(`  ❌ ${name}`);
-    console.log(`     → ${error.message}`);
+    console.log(`  FAIL: ${name}`);
+    console.log(`     -> ${error.message}`);
   }
 }
 
@@ -156,7 +156,7 @@ async function run() {
 
   if (failed > 0) {
     console.log('FAILURES:');
-    failures.forEach((failure) => console.log(`  • ${failure.name}: ${failure.message}`));
+    failures.forEach((failure) => console.log(`  - ${failure.name}: ${failure.message}`));
     process.exit(1);
   }
 }
