@@ -7,7 +7,7 @@
   var pulse = document.getElementById("evicsPulse");
 
   var state = {
-    section: "overview",
+    section: "viral-intelligence",
     loading: true,
     lastSync: null,
     products: [],
@@ -19,16 +19,40 @@
   };
 
   var sections = [
-    { id: "overview", label: "Overview", desc: "Live command summary" },
-    { id: "products", label: "Products", desc: "Shopify catalog" },
-    { id: "viral", label: "Viral Intelligence", desc: "Viral video memory" },
-    { id: "creatives", label: "Creatives", desc: "Generated assets" },
-    { id: "renders", label: "Renders", desc: "Media output queue" },
-    { id: "health", label: "System Health", desc: "API status" }
+    { id: "viral-intelligence", label: "Viral Intelligence", desc: "Trend scanning, hook discovery, viral pattern analysis" },
+    { id: "ai-reconstruction", label: "AI Reconstruction", desc: "AI-powered creative reconstruction from viral ads" },
+    { id: "video-generation", label: "Video Generation", desc: "Video rendering via HeyGen, Runway, and Kling" },
+    { id: "media-output", label: "Media Output", desc: "Playback, render routing, QA instructions, and approvals" },
+    { id: "distribution", label: "Distribution", desc: "Publishing queue and channel management" },
+    { id: "analytics", label: "Analytics", desc: "Performance metrics and learning loop" },
+    { id: "executive-workspace", label: "Executive Workspace", desc: "Executive controls, agent orchestration, and gated API access" }
   ];
+  var sectionMap = sections.reduce(function (map, section) { map[section.id] = true; return map; }, {});
 
   function setBootStatus(text) { if (statusEl) statusEl.textContent = text; }
   function hideSplash() { if (splash) splash.style.display = "none"; }
+  function resolveSection(rawValue) {
+    var value = String(rawValue || "").toLowerCase().trim();
+    return sectionMap[value] ? value : sections[0].id;
+  }
+  function getInitialSection() {
+    var hash = (window.location.hash || "").replace(/^#/, "");
+    if (sectionMap[String(hash).toLowerCase()]) return String(hash).toLowerCase();
+    if (hash.indexOf("section=") === 0) {
+      var fromHashQuery = new URLSearchParams(hash).get("section");
+      if (sectionMap[String(fromHashQuery).toLowerCase()]) return String(fromHashQuery).toLowerCase();
+    }
+    var params = new URLSearchParams(window.location.search || "");
+    var fromQuery = params.get("section");
+    if (sectionMap[String(fromQuery).toLowerCase()]) return String(fromQuery).toLowerCase();
+    return sections[0].id;
+  }
+  function writeSectionToLocation(sectionId) {
+    var url = new URL(window.location.href);
+    url.searchParams.set("section", sectionId);
+    url.hash = sectionId;
+    window.history.replaceState(null, "", url.toString());
+  }
 
   function escapeHtml(value) {
     return String(value == null ? "" : value)
@@ -128,34 +152,31 @@
   function renderShell(content) {
     var active = sections.filter(function (section) { return section.id === state.section; })[0] || sections[0];
     return "<aside class=\"sidebar\">" +
-      "<div class=\"brand\"><div class=\"brand-mark\">EVICS</div><div><strong>I AM GENESIS TECH</strong><span>LIVE COMMAND WORKSPACE</span></div></div>" +
+    "<div class=\"brand\"><div class=\"brand-mark\">EVICS</div><div><strong>I AM GENESIS TECH</strong><span>ELITE VIRAL INTELLIGENCE COMMAND WORKSPACE</span></div></div>" +
       "<nav>" + sections.map(function (section) {
         return "<button data-safe-section=\"" + section.id + "\" class=\"" + (section.id === state.section ? "active" : "") + "\"><div><strong>" + escapeHtml(section.label) + "</strong><small>" + escapeHtml(section.desc) + "</small></div></button>";
       }).join("") + "</nav>" +
       "<div class=\"automation-card\"><span>Workspace posture</span><strong>Live intelligence stack</strong><div class=\"pulse-row\"><i></i><span>Shopify + EVICS APIs active</span></div></div>" +
       "</aside>" +
-      "<main><div class=\"topbar\"><div class=\"workspace-hero\"><p class=\"workspace-eyebrow\">SAFE LIVE WORKSPACE</p><h1>" + escapeHtml(active.label) + "</h1><p>" + escapeHtml(active.desc) + "</p></div>" +
-      "<div class=\"top-actions\"><div class=\"safe-toolbar\"><button class=\"ghost\" id=\"safe-refresh\">Refresh Live Data</button><button class=\"ghost\" id=\"safe-legacy\">Open Legacy Workspace</button></div>" +
+      "<main><div class=\"topbar\"><div class=\"workspace-hero\"><p class=\"workspace-eyebrow\">EVICS COMMAND WORKSPACE</p><h1>" + escapeHtml(active.label) + "</h1><p>" + escapeHtml(active.desc) + "</p></div>" +
+      "<div class=\"top-actions\"><div class=\"safe-toolbar\"><button class=\"ghost\" id=\"safe-refresh\">Refresh Live Data</button><button class=\"ghost\" id=\"safe-legacy\">Legacy Monolith JS (Dev Only)</button></div>" +
       "<div class=\"sync-status connected\"><b>Live sync</b><span>" + escapeHtml(syncMessage()) + "</span></div></div></div>" +
       renderErrors() + content + "</main>";
   }
 
-  function renderOverview() {
-    var connected = state.status && state.status.connected_integrations;
-    var total = state.status && state.status.total_integrations;
+  function renderViralIntelligence() {
+    var topVelocity = state.viral.reduce(function (max, video) {
+      var velocity = Number(video && video.velocity || 0);
+      return velocity > max ? velocity : max;
+    }, 0);
     var productsActive = state.products.filter(function (p) { return String(p.status || "").toLowerCase() === "active"; }).length;
-    var completeRenders = state.renders.filter(function (r) { return String(r.status || r.render_status || "").toLowerCase() === "complete"; }).length;
-
     return renderShell(
       "<section class=\"metrics-grid shell-metrics\">" +
-        metric("Source", "Live", "Shopify + EVICS APIs") +
-        metric("Products", formatNumber(state.products.length), productsActive + " active") +
-        metric("Viral videos", formatNumber(state.viral.length), "live gallery entries") +
-        metric("Creatives", formatNumber(state.creatives.length), "generated assets") +
-        metric("Renders", formatNumber(state.renders.length), completeRenders + " complete") +
-        metric("Integrations", connected != null ? connected + "/" + total : "Checking", state.status ? state.status.status : "loading") +
+        metric("Viral entries", formatNumber(state.viral.length), "live gallery signals") +
+        metric("Top velocity", formatNumber(topVelocity), "best-performing trend") +
+        metric("Shopify products", formatNumber(state.products.length), productsActive + " active catalog items") +
       "</section>" +
-      "<div class=\"section-content\"><div class=\"safe-grid\">" + renderProductsPreview() + renderViralPreview() + renderCreativePreview() + renderHealthPreview() + "</div></div>"
+      "<div class=\"section-content\"><div class=\"safe-grid\">" + renderViralPreview() + renderProductsPreview() + "</div></div>"
     );
   }
 
@@ -222,23 +243,37 @@
     }).join("") + "</div>";
   }
 
-  function renderProducts() {
-    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Shopify Catalog</h2><span>" + state.products.length + " products</span></div><div class=\"safe-grid\">" + state.products.slice(0, 60).map(productCard).join("") + "</div></section></div>");
+  function renderAiReconstruction() {
+    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>AI Reconstruction Queue</h2><span>" + state.creatives.length + " assets</span></div>" + renderCreativeTable(state.creatives.slice(0, 120)) + "</section></div>");
   }
 
-  function renderViral() {
-    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Viral Gallery</h2><span>" + state.viral.length + " videos</span></div><div class=\"safe-grid\">" + state.viral.slice(0, 60).map(viralCard).join("") + "</div></section></div>");
+  function renderVideoGeneration() {
+    var completeRenders = state.renders.filter(function (render) { return String(render.status || render.render_status || "").toLowerCase() === "complete"; }).length;
+    return renderShell(
+      "<div class=\"section-content\"><section class=\"metrics-grid shell-metrics\">" +
+        metric("Render jobs", formatNumber(state.renders.length), "live generation queue") +
+        metric("Completed", formatNumber(completeRenders), "ready for output routing") +
+        metric("Creative inputs", formatNumber(state.creatives.length), "available reconstruction assets") +
+      "</section><section class=\"panel\"><div class=\"panel-head compact\"><h2>Video Generation Jobs</h2><span>live</span></div>" +
+      "<p><a href=\"/viral-media\" target=\"_self\">Open Viral Media Render Queue</a></p>" +
+      renderRenderTable(state.renders.slice(0, 120)) + "</section></div>"
+    );
   }
 
-  function renderCreatives() {
-    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Generated Creatives</h2><span>" + state.creatives.length + " assets</span></div>" + renderCreativeTable(state.creatives.slice(0, 100)) + "</section></div>");
+  function renderMediaOutput() {
+    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Media Output Routing</h2><span>" + state.renders.length + " render jobs</span></div><p><a href=\"/viral-media?section=media-output\" target=\"_self\">Open Viral Media \u2192 Media Output</a></p>" + renderRenderTable(state.renders.slice(0, 120)) + "</section></div>");
   }
 
-  function renderRenders() {
-    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Media Renders</h2><span>" + state.renders.length + " jobs</span></div>" + renderRenderTable(state.renders.slice(0, 100)) + "</section></div>");
+  function renderDistribution() {
+    var status = state.status || {};
+    return renderShell("<div class=\"section-content\"><section class=\"metrics-grid shell-metrics\">" +
+      metric("Publishing queue", "Live status only", "distribution API unavailable in safe shell") +
+      metric("Render-ready assets", formatNumber(state.renders.length), "source for channel pushes") +
+      metric("Connected integrations", escapeHtml(status.connected_integrations != null ? status.connected_integrations : "?") + "/" + escapeHtml(status.total_integrations != null ? status.total_integrations : "?"), "channel readiness signal") +
+      "</section><section class=\"panel\"><div class=\"panel-head compact\"><h2>Channel Readiness</h2><span>live</span></div><p>Distribution controls remain gated to avoid unsafe mutations in this stable shell.</p>" + renderIntegrationBadges(status.integrations) + "</section></div>");
   }
 
-  function renderHealth() {
+  function renderAnalytics() {
     var status = state.status || {};
     var services = status.services || {};
     return renderShell("<div class=\"section-content\"><section class=\"metrics-grid shell-metrics\">" +
@@ -250,24 +285,36 @@
       "<section class=\"panel\"><div class=\"panel-head compact\"><h2>Service Checks</h2><span>live</span></div><pre style=\"white-space:pre-wrap;color:var(--text-sub);\">" + escapeHtml(JSON.stringify(services, null, 2)) + "</pre></section></div>");
   }
 
+  function renderExecutiveWorkspace() {
+    return renderShell("<div class=\"section-content\"><section class=\"panel\"><div class=\"panel-head compact\"><h2>Executive Launchpad</h2><span>cross-workspace</span></div><div class=\"safe-grid\">" +
+      "<article class=\"safe-card\"><h3>Viral Media</h3><p>Creative review and media output control.</p><small><a href=\"/viral-media\" target=\"_self\">Open Viral Media Workspace</a></small></article>" +
+      "<article class=\"safe-card\"><h3>Affiliate Hub</h3><p>Partner operations and campaign readiness.</p><small><a href=\"/affiliate\" target=\"_self\">Open Affiliate Hub</a></small></article>" +
+      "<article class=\"safe-card\"><h3>Phone App</h3><p>Mobile execution and notifications.</p><small><a href=\"/phone-app\" target=\"_self\">Open Phone App</a></small></article>" +
+      "<article class=\"safe-card\"><h3>AdminHub</h3><p>Affiliate administration and governance.</p><small><a href=\"/admin-hub\" target=\"_self\">Open AdminHub</a></small></article>" +
+      "<article class=\"safe-card\"><h3>SEO Grader</h3><p>Discoverability scoring and optimization.</p><small><a href=\"/discoverability\" target=\"_self\">Open SEO Grader</a></small></article>" +
+      "</div></section></div>");
+  }
+
   function render() {
     if (!app) return;
     if (state.loading && !state.lastSync) {
-      app.innerHTML = renderShell("<section class=\"metrics-grid shell-metrics\">" + metric("Status", "Loading", "Fetching live APIs") + metric("Mode", "Safe Live Shell", "monolith bypassed") + metric("Source", "Shopify + EVICS", "not demo mode") + "</section>");
+      app.innerHTML = renderShell("<section class=\"metrics-grid shell-metrics\">" + metric("Status", "Loading", "Fetching live APIs") + metric("Mode", "Stable EVICS Shell", "monolith bypassed") + metric("Source", "Shopify + EVICS", "live data mode") + "</section>");
       return;
     }
-    if (state.section === "products") app.innerHTML = renderProducts();
-    else if (state.section === "viral") app.innerHTML = renderViral();
-    else if (state.section === "creatives") app.innerHTML = renderCreatives();
-    else if (state.section === "renders") app.innerHTML = renderRenders();
-    else if (state.section === "health") app.innerHTML = renderHealth();
-    else app.innerHTML = renderOverview();
+    if (state.section === "ai-reconstruction") app.innerHTML = renderAiReconstruction();
+    else if (state.section === "video-generation") app.innerHTML = renderVideoGeneration();
+    else if (state.section === "media-output") app.innerHTML = renderMediaOutput();
+    else if (state.section === "distribution") app.innerHTML = renderDistribution();
+    else if (state.section === "analytics") app.innerHTML = renderAnalytics();
+    else if (state.section === "executive-workspace") app.innerHTML = renderExecutiveWorkspace();
+    else app.innerHTML = renderViralIntelligence();
   }
 
   document.addEventListener("click", function (event) {
     var sectionButton = event.target.closest("[data-safe-section]");
     if (sectionButton) {
-      state.section = sectionButton.getAttribute("data-safe-section") || "overview";
+      state.section = resolveSection(sectionButton.getAttribute("data-safe-section"));
+      writeSectionToLocation(state.section);
       render();
       return;
     }
@@ -276,12 +323,19 @@
       return;
     }
     if (event.target.closest("#safe-legacy")) {
-      var confirmed = window.confirm("The legacy workspace currently freezes this tab. Open app.js anyway in a new tab?");
+      var confirmed = window.confirm("Developer-only legacy monolith JavaScript view. It may freeze the tab. Continue?");
       if (confirmed) window.open("/app.js", "_blank", "noopener");
     }
   });
 
-  setBootStatus("Mounting safe live workspace...");
+  window.addEventListener("hashchange", function () {
+    state.section = getInitialSection();
+    render();
+  });
+
+  state.section = getInitialSection();
+  writeSectionToLocation(state.section);
+  setBootStatus("Mounting EVICS workspace shell...");
   render();
   hideSplash();
   loadAll();
