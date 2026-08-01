@@ -1,125 +1,102 @@
 /**
- * EVICS Workspace Boot Fix
- * Loaded AFTER app.js — patches render to eliminate performance bottleneck
- * and prevent page from appearing stuck during boot.
- *
- * Root cause: The render wrapper calls __evicsOriginalRender() on every render,
- * which builds a full HTML template (~390KB of string concatenation) that is
- * NEVER USED. Its only purpose is to register window.__evicsRenderers on the
- * first call. After that, subsequent calls just waste CPU and block the main
- * thread, making the page appear unresponsive.
+ * EVICS Workspace Boot Fix + Live Diagnostics
+ * Shows visible on-screen diagnostics when the workspace fails to render.
  */
 (function () {
   "use strict";
 
-  // By the time this script loads, app.js has already:
-  // 1. Defined the render wrapper (which calls __evicsOriginalRender)
-  // 2. Called boot() which called render() once (registering __evicsRenderers)
-  // So window.__evicsRenderers is already populated.
+  var diag = [];
+  function log(msg) { diag.push("[" + new Date().toISOString().slice(11,19) + "] " + msg); }
 
-  if (typeof render !== "function" || typeof renderWorkspaceShell !== "function") {
-    console.warn("[EVICS boot-fix] render or renderWorkspaceShell not found — skipping patch.");
-    return;
-  }
+  log("workspace-boot-fix.js loaded");
+  log("render type: " + typeof render);
+  log("renderWorkspaceShell type: " + typeof renderWorkspaceShell);
+  log("bindEvents type: " + typeof bindEvents);
+  log("window.__evicsRenderers: " + (window.__evicsRenderers ? Object.keys(window.__evicsRenderers).length + " renderers" : "NOT SET"));
+  log("state.dataSource: " + (typeof state !== "undefined" ? state.dataSource : "state undefined"));
+  log("state.syncLevel: " + (typeof state !== "undefined" ? state.syncLevel : "state undefined"));
+  log("state.currentSection: " + (typeof state !== "undefined" ? state.currentSection : "state undefined"));
 
-  if (typeof bindEvents !== "function") {
-    console.warn("[EVICS boot-fix] bindEvents not found — skipping patch.");
-    return;
-  }
+  // Check if the first render already succeeded
+  var app = document.getElementById("app");
+  log("app element: " + (app ? "found, children=" + app.children.length + ", innerHTML length=" + app.innerHTML.length : "NOT FOUND"));
 
-  // Debounce: coalesce rapid render() calls into a single rAF pass
-  var pendingRender = false;
-  var immediateRenderCount = 0;
-  var lastRenderTime = 0;
-  var DEBOUNCE_MS = 16; // one frame
+  // If app is empty after app.js, the initial render FAILED
+  if (app && app.innerHTML.length < 100) {
+    log("PROBLEM: app is empty - initial render failed");
 
-  function doRender() {
-    pendingRender = false;
-    immediateRenderCount = 0;
-    var result = "";
-    try {
-      // Ensure renderers are registered (only needed if somehow cleared)
-      if (!window.__evicsRenderers && typeof window.__evicsOriginalRenderRef === "function") {
-        window.__evicsOriginalRenderRef();
-      }
-      result = renderWorkspaceShell();
-      var app = document.getElementById("app");
-      if (app && typeof result === "string" && result.length > 0) {
-        app.innerHTML = result;
-        if (typeof registerExecControls === "function") registerExecControls(app);
-        if (typeof bindExecControlLiveStates === "function") bindExecControlLiveStates(app);
-        var splash = document.getElementById("evics-boot-splash");
-        if (splash) splash.style.display = "none";
-      }
-    } catch (err) {
-      console.error("[EVICS] Render error:", err);
-      // Attempt to show something even on error
-      var fallbackApp = document.getElementById("app");
-      if (fallbackApp && fallbackApp.innerHTML.length === 0) {
-        fallbackApp.innerHTML = '<div style="padding:40px;color:#eff5fb"><h2>Workspace render error</h2><p>Please reload the page (Ctrl+Shift+R).</p></div>';
-      }
+    // Try to figure out why
+    if (!window.__evicsRenderers) {
+      log("ROOT CAUSE: __evicsRenderers not registered - __evicsOriginalRender() must have thrown");
     }
+
+    // Try a manual render
+    log("Attempting manual renderWorkspaceShell()...");
     try {
-      bindEvents();
+      if (typeof renderWorkspaceShell === "function") {
+        var result = renderWorkspaceShell();
+        log("renderWorkspaceShell returned: " + (typeof result) + ", length=" + (result ? result.length : 0));
+        if (result && result.length > 100) {
+          app.innerHTML = result;
+          log("Set app.innerHTML successfully");
+          try { if (typeof bindEvents === "function") bindEvents(); log("bindEvents() OK"); } catch (e) { log("bindEvents error: " + e.message); }
+          var splash = document.getElementById("evics-boot-splash");
+          if (splash) splash.style.display = "none";
+        }
+      }
     } catch (e) {
-      console.error("[EVICS] bindEvents error:", e);
+      log("renderWorkspaceShell THREW: " + e.message);
     }
-    // Media output center binding
-    try {
-      if (
-        (state.currentSection === "media-output" ||
-          state.currentSection === "video-generation" ||
-          state.currentSection === "executive-workspace") &&
-        typeof window.bindMediaOutputCenter === "function"
-      ) {
-        window.bindMediaOutputCenter();
-      }
-    } catch (e) { /* non-fatal */ }
-    lastRenderTime = Date.now();
   }
 
-  // Save reference to original render for emergency re-registration
-  if (typeof window.__evicsOriginalRenderRef === "undefined") {
-    // The current render variable holds our wrapper; reach through closure if possible
-    // We stored the original in __evicsOriginalRender (lexical) — expose it
-    try {
-      // Trigger one render to ensure renderers are set, then patch
-      if (!window.__evicsRenderers) {
-        render();
-      }
-    } catch (e) { /* already registered or will be */ }
-  }
-
-  // Replace render with optimized version
-  render = function optimizedRender() {
-    var now = Date.now();
-    var elapsed = now - lastRenderTime;
-
-    // Allow immediate render if enough time has passed
-    if (elapsed >= DEBOUNCE_MS || immediateRenderCount === 0) {
-      immediateRenderCount++;
-      doRender();
-      return;
-    }
-
-    // Otherwise debounce via rAF
-    if (!pendingRender) {
-      pendingRender = true;
-      requestAnimationFrame(doRender);
-    }
-  };
-
-  // Force one immediate render to ensure the current state is displayed
-  // (boot() may have already set state.dataSource = "Shopify + Supabase")
+  // If still broken after 2s, show diagnostics panel
   setTimeout(function () {
-    try {
-      immediateRenderCount = 0;
-      lastRenderTime = 0;
-      doRender();
-    } catch (e) {
-      console.error("[EVICS boot-fix] Post-patch render failed:", e);
-    }
-  }, 100);
+    var appEl = document.getElementById("app");
+    var hasContent = appEl && appEl.innerHTML.length > 200;
 
-  console.info("[EVICS boot-fix] Render optimized — skipping redundant __evicsOriginalRender calls.");
+    if (!hasContent) {
+      log("TIMEOUT: app still empty after 2s");
+      log("Boot errors: " + JSON.stringify(window.__evicsBootErrors || []));
+
+      // Show diagnostic panel
+      var panel = document.createElement("div");
+      panel.id = "evics-diag";
+      panel.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#0f0;font-family:monospace;font-size:11px;padding:12px;max-height:60vh;overflow:auto;border-bottom:2px solid #f00;";
+      panel.innerHTML = "<h3 style='color:#ff5a68;margin:0 0 8px'>EVICS Boot Diagnostic</h3><pre>" + diag.join("\\n") + "</pre>";
+      document.body.insertBefore(panel, document.body.firstChild);
+      var splash2 = document.getElementById("evics-boot-splash");
+      if (splash2) splash2.style.display = "none";
+    } else if (typeof state !== "undefined" && state.dataSource === "Demo") {
+      // Rendered but still demo mode
+      log("Rendered but still Demo mode after 2s");
+      // Try forcing hydration
+      if (typeof hydrateFromServerApi === "function") {
+        hydrateFromServerApi().then(function () {
+          log("Forced hydration done. dataSource=" + state.dataSource);
+          if (typeof render === "function") render();
+        }).catch(function (e) { log("Forced hydration failed: " + e.message); });
+      }
+    }
+  }, 2000);
+
+  // 6s check — show status banner
+  setTimeout(function () {
+    if (typeof state === "undefined") return;
+    var appEl = document.getElementById("app");
+    var rendered = appEl && appEl.innerHTML.length > 200;
+
+    // Always show a status bar so user knows what mode we're in
+    var banner = document.createElement("div");
+    banner.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#070b11;color:#90a4bb;font-family:monospace;font-size:11px;padding:6px 12px;border-top:1px solid #333;display:flex;gap:16px;";
+    banner.innerHTML = "<span>Source: <b style='color:" + (state.dataSource === "Demo" ? "#ff5a68" : "#0f0") + "'>" + state.dataSource + "</b></span>" +
+      "<span>Sync: <b>" + state.syncLevel + "</b></span>" +
+      "<span>Section: <b>" + state.currentSection + "</b></span>" +
+      "<span>Rendered: <b>" + (rendered ? "YES" : "NO") + "</b></span>" +
+      "<span>Renderers: <b>" + (window.__evicsRenderers ? Object.keys(window.__evicsRenderers).length : 0) + "</b></span>" +
+      "<span>Products: <b>" + (typeof products !== "undefined" ? products.length : "?") + "</b></span>" +
+      "<span>Viral: <b>" + (state.viralVideos ? state.viralVideos.length : 0) + "</b></span>";
+    document.body.appendChild(banner);
+  }, 6000);
+
+  console.info("[EVICS boot-fix] Diagnostic version active.");
 })();
