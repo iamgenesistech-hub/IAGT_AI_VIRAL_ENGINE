@@ -3030,6 +3030,53 @@ app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
   }
 });
 
+
+// GET /api/admin/async-job-errors — error feed across avatar and product-video jobs
+// Returns records that have an error field or a failed/error status, newest first.
+// No inner try/catch: unexpected throws surface as 500 via the global error handler.
+app.get('/api/admin/async-job-errors', requireAdminAccess, (req, res) => {
+  const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 25));
+
+  const avatarRequests = getAvatarRequests();
+  const avatarErrors = avatarRequests
+    .filter((r) => {
+      const hasError = r.error || (r.avatar && r.avatar.error);
+      const hasFailedStatus = /failed|error/i.test(String(r.status || ''));
+      return hasError || hasFailedStatus;
+    })
+    .map((r) => ({
+      jobType: 'avatar',
+      affiliateCode: r.affiliateCode || affiliateRecordCode(r) || null,
+      requestId: r.requestId || null,
+      videoJobId: null,
+      status: r.status || null,
+      error: r.error || (r.avatar && r.avatar.error) || null,
+      updatedAt: r.updatedAt || r.completedAt || r.createdAt || null,
+    }));
+
+  const videoErrors = Array.from(PRODUCT_VIDEO_RECORDS.values())
+    .filter((r) => {
+      const hasError = r.error || r.lastError || r.lastAdvanceError || r.failureReason || r.errorMessage;
+      const hasFailedStatus = /failed|error/i.test(String(r.status || ''));
+      return hasError || hasFailedStatus;
+    })
+    .map((r) => ({
+      jobType: 'product_video',
+      affiliateCode: r.affiliateCode || null,
+      requestId: r.requestId || null,
+      videoJobId: r.videoJobId || null,
+      status: r.status || null,
+      error: r.error || r.lastError || r.lastAdvanceError || r.failureReason || r.errorMessage || null,
+      updatedAt: r.updatedAt || r.completedAt || r.createdAt || null,
+    }));
+
+  const errors = [...avatarErrors, ...videoErrors]
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+    .slice(0, limit);
+
+  res.json({ success: true, errors, count: errors.length });
+});
+
 console.log('? [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====

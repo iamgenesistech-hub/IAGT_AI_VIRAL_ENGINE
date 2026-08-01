@@ -45,9 +45,13 @@
   }
 
   async function apiJson(url, options) {
+    const adminKeyEl = document.getElementById('adminVideoMgmtKey');
+    const adminKey = adminKeyEl ? adminKeyEl.value.trim() : '';
+    const baseHeaders = { Accept: 'application/json', 'Content-Type': 'application/json' };
+    if (adminKey) baseHeaders['x-admin-key'] = adminKey;
     const response = await fetch(url, {
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      ...options
+      ...options,
+      headers: { ...baseHeaders, ...(options && options.headers) }
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success === false) {
