@@ -1,46 +1,51 @@
 /**
  * EVICS Workspace Boot Fix
- * Safety net: if the initial render fails, attempts recovery.
+ * Runs after app.js. If render failed, attempts recovery.
+ * Also forces live data hydration if stuck in demo mode.
  */
-(function () {
+(function() {
   "use strict";
 
-  var app = document.getElementById("app");
-  if (!app) return;
+  // Wait for app.js to finish executing (it loads async now)
+  var checkInterval = setInterval(function() {
+    if (typeof render !== 'function' || typeof state === 'undefined') return;
+    clearInterval(checkInterval);
 
-  // If app already has content, workspace rendered successfully
-  if (app.children.length > 0) {
-    // Check if still demo mode and force hydration
-    if (typeof state !== "undefined" && state.dataSource === "Demo" && typeof hydrateFromServerApi === "function") {
-      setTimeout(function() {
-        hydrateFromServerApi().then(function() {
-          if (typeof render === "function") render();
-        }).catch(function() {});
-      }, 2000);
+    var app = document.getElementById('app');
+    if (!app) return;
+
+    // If workspace already rendered, just ensure live data
+    if (app.children.length > 0) {
+      if (state.dataSource === 'Demo' && typeof hydrateFromServerApi === 'function') {
+        setTimeout(function() {
+          hydrateFromServerApi().then(function() { render(); }).catch(function(){});
+        }, 2000);
+      }
+      return;
     }
-    return;
-  }
 
-  // App is empty after app.js - render failed silently
-  // Try recovery in 3 seconds
-  setTimeout(function() {
-    if (app.children.length > 0) return;
+    // Workspace empty: attempt recovery after 3s
+    setTimeout(function() {
+      if (app.children.length > 0) return;
 
-    if (window.__evicsRenderers && typeof renderWorkspaceShell === "function") {
-      try {
-        var html = renderWorkspaceShell();
-        if (html && html.length > 100) {
-          app.innerHTML = html;
-          try { if (typeof bindEvents === "function") bindEvents(); } catch(e) {}
-          var splash = document.getElementById("evics-boot-splash");
-          if (splash) splash.style.display = "none";
-          return;
-        }
-      } catch(e) {
-        if (typeof window.__showEvicsError === "function") {
-          window.__showEvicsError("Boot-fix recovery: " + e.message);
+      if (window.__evicsRenderers && typeof renderWorkspaceShell === 'function') {
+        try {
+          var html = renderWorkspaceShell();
+          if (html && html.length > 100) {
+            app.innerHTML = html;
+            try { bindEvents(); } catch(e) {}
+            var splash = document.getElementById('evics-boot-splash');
+            if (splash) splash.style.display = 'none';
+            // Also hydrate
+            if (state.dataSource === 'Demo' && typeof hydrateFromServerApi === 'function') {
+              hydrateFromServerApi().then(function() { render(); }).catch(function(){});
+            }
+            return;
+          }
+        } catch(e) {
+          if (typeof window.__showEvicsError === 'function') window.__showEvicsError('Boot-fix: ' + e.message);
         }
       }
-    }
-  }, 3000);
+    }, 3000);
+  }, 200);
 })();

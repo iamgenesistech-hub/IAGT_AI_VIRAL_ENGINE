@@ -6,8 +6,8 @@
     <title>EVICS Executive Command Workspace</title>
     <meta name="description" content="EVICS executive command workspace with live operational monitors." />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="media-output.css" />
-    <link rel="stylesheet" href="vp-executive-assistant.css" />
+    <link rel="stylesheet" href="media-output.css" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="vp-executive-assistant.css" media="print" onload="this.media='all'" />
     <style>
       #evics-boot-splash {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -46,7 +46,7 @@
         <a href="/admin-hub">Affiliate AdminHub</a>
         <a href="/discoverability">SEO Grader</a>
       </nav>
-      <div class="exec-shell-pulse" id="evicsPulse">Initializing live monitors…</div>
+      <div class="exec-shell-pulse" id="evicsPulse">Initializing live monitors&hellip;</div>
     </header>
 
     <main class="exec-shell-main">
@@ -55,87 +55,81 @@
         <div class="splash-title">I AM GENESIS TECH</div>
         <div class="splash-sub">Elite Viral Intelligence Control System</div>
         <div class="splash-spinner"></div>
-        <div class="splash-sub" id="evics-boot-status">Loading workspace…</div>
+        <div class="splash-sub" id="evics-boot-status">Loading workspace&hellip;</div>
       </div>
       <div id="app"></div>
     </main>
 
-    <!--
-      Boot Controller: runs BEFORE app.js.
-      Defers boot() so the splash screen paints first.
-      Intercepts console.error to show EVICS errors on screen.
-    -->
+    <!-- Error display utility -->
     <script>
-    (function() {
-      var __bootFunc = null;
-      var __bootIntercepted = false;
-
-      try {
-        Object.defineProperty(window, 'boot', {
-          configurable: true,
-          enumerable: true,
-          get: function() {
-            if (__bootFunc && !__bootIntercepted) {
-              __bootIntercepted = true;
-              var realBoot = __bootFunc;
-              return function deferredBoot() {
-                var s = document.getElementById('evics-boot-status');
-                if (s) s.textContent = 'Initializing workspace\u2026';
-                setTimeout(function() {
-                  try { realBoot(); } catch(e) { window.__showEvicsError('boot() error: ' + e.message); }
-                }, 50);
-              };
-            }
-            return __bootFunc;
-          },
-          set: function(fn) { __bootFunc = fn; }
-        });
-      } catch(e) { /* defineProperty not supported, boot runs normally */ }
-
-      var origError = console.error;
-      console.error = function() {
-        origError.apply(console, arguments);
-        var msg = Array.prototype.join.call(arguments, ' ');
-        if (msg.indexOf('[EVICS]') >= 0 || msg.indexOf('Render error') >= 0 || msg.indexOf('boot() error') >= 0) {
-          window.__showEvicsError(msg);
-        }
-      };
-
-      window.__showEvicsError = function(msg) {
-        var panel = document.getElementById('evics-error-panel');
-        if (!panel) {
-          panel = document.createElement('div');
-          panel.id = 'evics-error-panel';
-          panel.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#1a1a2e;color:#ff5a68;font:12px/1.6 monospace;padding:16px;max-height:50vh;overflow:auto;border-bottom:3px solid #ff5a68;';
-          var h = document.createElement('h3');
-          h.textContent = 'EVICS Error';
-          h.style.cssText = 'color:#ff5a68;margin:0 0 8px;font-size:14px;';
-          panel.appendChild(h);
-          document.body.insertBefore(panel, document.body.firstChild);
-          var splash = document.getElementById('evics-boot-splash');
-          if (splash) splash.style.display = 'none';
-        }
-        var line = document.createElement('div');
-        line.textContent = String(msg);
-        line.style.cssText = 'margin-bottom:4px;word-break:break-all;';
-        panel.appendChild(line);
-      };
-
-      window.onerror = function(msg, src, line) {
-        window.__showEvicsError('Uncaught: ' + msg + ' at ' + (src||'?') + ':' + line);
-      };
-    })();
+    window.__showEvicsError = function(msg) {
+      var panel = document.getElementById('evics-error-panel');
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'evics-error-panel';
+        panel.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#1a1a2e;color:#ff5a68;font:12px/1.6 monospace;padding:16px;max-height:50vh;overflow:auto;border-bottom:3px solid #ff5a68;';
+        panel.innerHTML = '<h3 style="color:#ff5a68;margin:0 0 8px;font-size:14px;">EVICS Error</h3>';
+        document.body.insertBefore(panel, document.body.firstChild);
+        var splash = document.getElementById('evics-boot-splash');
+        if (splash) splash.style.display = 'none';
+      }
+      var line = document.createElement('div');
+      line.textContent = String(msg);
+      line.style.cssText = 'margin-bottom:4px;word-break:break-all;';
+      panel.appendChild(line);
+    };
+    window.onerror = function(msg, src, line) {
+      window.__showEvicsError('Error: ' + msg + ' at ' + (src||'?').split('/').pop() + ':' + line);
+    };
+    // Intercept console.error so render wrapper errors become visible
+    var __origConsoleError = console.error;
+    console.error = function() {
+      __origConsoleError.apply(console, arguments);
+      var msg = Array.prototype.join.call(arguments, ' ');
+      if (msg.indexOf('[EVICS]') >= 0) window.__showEvicsError(msg);
+    };
     </script>
 
+    <!-- Prerequisite scripts (small, must run before app.js) -->
     <script src="config.js"></script>
     <script src="supabase.js"></script>
     <script src="media-output.js"></script>
     <script src="workspace-boot-shims.js"></script>
-    <script src="app.js"></script>
-    <script src="workspace-boot-fix.js"></script>
-    <script src="vp-executive-assistant.js"></script>
-    <script src="vp-board-command-guard.js"></script>
 
+    <!-- App loader: fetches app.js, patches boot() to be deferred, then executes -->
+    <script>
+    (function() {
+      var status = document.getElementById('evics-boot-status');
+      if (status) status.textContent = 'Downloading workspace\u2026';
+
+      fetch('app.js')
+        .then(function(r) {
+          if (!r.ok) throw new Error('app.js returned ' + r.status);
+          return r.text();
+        })
+        .then(function(code) {
+          if (status) status.textContent = 'Initializing workspace\u2026';
+          // Replace synchronous boot() at end with deferred boot
+          code = code.replace(/\nboot\(\);\s*$/, '\nrequestAnimationFrame(function(){setTimeout(boot,0);});\n');
+          var blob = new Blob([code], {type: 'application/javascript'});
+          var url = URL.createObjectURL(blob);
+          var script = document.createElement('script');
+          script.src = url;
+          script.onerror = function() { window.__showEvicsError('Failed to execute app.js'); };
+          document.body.appendChild(script);
+        })
+        .catch(function(e) {
+          window.__showEvicsError('Failed to load workspace: ' + e.message);
+        });
+    })();
+    </script>
+
+    <!-- Post-boot scripts (deferred, run after app.js has loaded) -->
+    <script src="workspace-boot-fix.js" defer></script>
+    <script src="vp-executive-assistant.js" defer></script>
+    <script src="vp-board-command-guard.js" defer></script>
+
+    <!-- Recovery and pulse monitor -->
     <script>
     (function() {
       var pulse = document.getElementById('evicsPulse');
@@ -145,65 +139,46 @@
         return app && app.children.length > 0;
       }
 
-      // 10s recovery: if workspace is empty, attempt direct render
+      // 12s recovery
       setTimeout(function() {
         if (checkMounted()) return;
-
+        // Try renderWorkspaceShell
         if (window.__evicsRenderers && typeof renderWorkspaceShell === 'function') {
           try {
             var html = renderWorkspaceShell();
             if (html && html.length > 100) {
-              var app = document.getElementById('app');
-              app.innerHTML = html;
+              document.getElementById('app').innerHTML = html;
               try { bindEvents(); } catch(e) {}
-              var splash = document.getElementById('evics-boot-splash');
-              if (splash) splash.style.display = 'none';
+              var s = document.getElementById('evics-boot-splash');
+              if (s) s.style.display = 'none';
               return;
             }
-          } catch(e) {
-            window.__showEvicsError('Recovery renderWorkspaceShell: ' + e.message);
-          }
+          } catch(e) { window.__showEvicsError('Recovery: ' + e.message); }
         }
-
+        // Try render()
         if (typeof render === 'function') {
-          try {
-            render();
-            if (checkMounted()) return;
-          } catch(e) {
-            window.__showEvicsError('Recovery render(): ' + e.message);
-          }
+          try { render(); if (checkMounted()) return; } catch(e) { window.__showEvicsError('Recovery render(): ' + e.message); }
         }
-
-        var status = document.getElementById('evics-boot-status');
-        if (status) {
-          status.innerHTML = '<span style="color:#ff5a68">Workspace timed out</span><br>' +
-            '<button id="evics-retry-btn" style="margin-top:12px;padding:8px 20px;background:#00c7f5;color:#070b11;border:0;border-radius:6px;font-weight:700;cursor:pointer;">Retry</button>';
-          var btn = document.getElementById('evics-retry-btn');
-          if (btn) btn.onclick = function() {
-            status.textContent = 'Retrying\u2026';
-            try { render(); } catch(e) { status.textContent = 'Error: ' + e.message; }
-          };
+        // Show retry button
+        var st = document.getElementById('evics-boot-status');
+        if (st) {
+          st.innerHTML = '<span style="color:#ff5a68">Workspace timed out</span><br><button onclick="try{render();}catch(e){this.textContent=e.message;}" style="margin-top:12px;padding:8px 20px;background:#00c7f5;color:#070b11;border:0;border-radius:6px;font-weight:700;cursor:pointer;">Retry</button>';
         }
-      }, 10000);
+      }, 12000);
 
+      // 18s: force live data
       setTimeout(function() {
         if (typeof state !== 'undefined' && state.dataSource === 'Demo' && typeof hydrateFromServerApi === 'function') {
-          hydrateFromServerApi().then(function() {
-            if (typeof render === 'function') render();
-          }).catch(function() {});
+          hydrateFromServerApi().then(function() { if (typeof render === 'function') render(); }).catch(function(){});
         }
-      }, 15000);
+      }, 18000);
 
       function refreshPulse() {
-        try {
-          if (pulse) pulse.textContent = 'Live at ' + new Date().toLocaleTimeString() + ' \u00b7 Executive telemetry active';
-        } catch(e) {}
+        try { if (pulse) pulse.textContent = 'Live at ' + new Date().toLocaleTimeString() + ' \u00b7 Telemetry active'; } catch(e) {}
       }
-
       if (new URLSearchParams(window.location.search).get('autoproof') === '1') {
         try { document.body.classList.add('titanium-ui'); } catch(e) {}
       }
-
       refreshPulse();
       setInterval(refreshPulse, 30000);
     })();
