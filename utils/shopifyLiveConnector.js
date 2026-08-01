@@ -92,6 +92,21 @@ function shopifyHeaders(token) {
   };
 }
 
+function getHttpStatus(error) {
+  const status = Number(error?.response?.status);
+  return Number.isFinite(status) ? status : null;
+}
+
+function getSafeErrorMessage(error, fallback = 'Shopify request failed') {
+  if (typeof error?.response?.statusText === 'string' && error.response.statusText.trim()) {
+    return error.response.statusText.trim();
+  }
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message.trim();
+  }
+  return fallback;
+}
+
 function normalizeProduct(p) {
   const firstVariant = (p.variants && p.variants[0]) || {};
   return {
@@ -187,6 +202,157 @@ async function fetchFromShopifyApi(apiPath) {
       return retry.data;
     }
     throw error;
+  }
+}
+
+async function hasSupabaseProductCache() {
+  try {
+    const { data, error } = await supabase
+      .from('shopify_products')
+      .select('id')
+      .limit(1);
+    if (error) throw error;
+    return Array.isArray(data) && data.length > 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function probeStorefrontCatalog() {
+  const url = `https://${SHOPIFY_DOMAIN}/products.json?limit=1`;
+  const response = await axios.get(url, { timeout: 12000 });
+  const products = Array.isArray(response?.data?.products) ? response.data.products : [];
+  return {
+    httpStatus: Number(response?.status) || 200,
+    productCount: products.length,
+  };
+}
+
+async function checkShopifyHealth({
+  adminProbe = () => fetchFromShopifyApi('/shop.json'),
+  storefrontProbe = probeStorefrontCatalog,
+  supabaseCatalogProbe = hasSupabaseProductCache,
+  localCacheProbe = loadLocalCache,
+} = {}) {
+  const t0 = Date.now();
+
+  try {
+    await adminProbe();
+    return {
+      service: 'shopify',
+      status: 'ok',
+      mode: 'admin_api',
+      httpStatus: 200,
+      adminStatus: 200,
+      pingMs: Date.now() - t0,
+      apiVersion: SHOPIFY_API,
+    };
+  } catch (adminError) {
+    const adminStatus = getHttpStatus(adminError);
+    const adminMessage = getSafeErrorMessage(adminError, 'Shopify Admin API probe failed');
+
+    try {
+      const storefront = await storefrontProbe();
+      if ((storefront?.productCount || 0) > 0) {
+        return {
+          service: 'shopify',
+          status: 'ok',
+          mode: 'storefront_catalog',
+          httpStatus: storefront.httpStatus || 200,
+          adminStatus,
+          storefrontStatus: storefront.httpStatus || 200,
+          catalogAvailable: true,
+          productCount: storefront.productCount,
+          pingMs: Date.now() - t0,
+          apiVersion: SHOPIFY_API,
+        };
+      }
+    } catch (storefrontError) {
+      const storefrontStatus = getHttpStatus(storefrontError);
+      const storefrontMessage = getSafeErrorMessage(storefrontError, 'Shopify storefront probe failed');
+      const hasSupabaseCatalog = await supabaseCatalogProbe();
+      if (hasSupabaseCatalog) {
+        return {
+          service: 'shopify',
+          status: 'ok',
+          mode: 'supabase_catalog_cache',
+          httpStatus: 200,
+          adminStatus,
+          storefrontStatus,
+          catalogAvailable: true,
+          pingMs: Date.now() - t0,
+          apiVersion: SHOPIFY_API,
+        };
+      }
+
+      const cachedProducts = await localCacheProbe();
+      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+        return {
+          service: 'shopify',
+          status: 'ok',
+          mode: 'local_catalog_cache',
+          httpStatus: 200,
+          adminStatus,
+          storefrontStatus,
+          catalogAvailable: true,
+          productCount: cachedProducts.length,
+          pingMs: Date.now() - t0,
+          apiVersion: SHOPIFY_API,
+        };
+      }
+
+      return {
+        service: 'shopify',
+        status: 'error',
+        mode: 'unavailable',
+        httpStatus: storefrontStatus || adminStatus || null,
+        adminStatus,
+        storefrontStatus,
+        error: storefrontMessage || adminMessage,
+        pingMs: Date.now() - t0,
+        apiVersion: SHOPIFY_API,
+      };
+    }
+
+    const hasSupabaseCatalog = await supabaseCatalogProbe();
+    if (hasSupabaseCatalog) {
+      return {
+        service: 'shopify',
+        status: 'ok',
+        mode: 'supabase_catalog_cache',
+        httpStatus: 200,
+        adminStatus,
+        catalogAvailable: true,
+        pingMs: Date.now() - t0,
+        apiVersion: SHOPIFY_API,
+      };
+    }
+
+    const cachedProducts = await localCacheProbe();
+    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+      return {
+        service: 'shopify',
+        status: 'ok',
+        mode: 'local_catalog_cache',
+        httpStatus: 200,
+        adminStatus,
+        catalogAvailable: true,
+        productCount: cachedProducts.length,
+        pingMs: Date.now() - t0,
+        apiVersion: SHOPIFY_API,
+      };
+    }
+
+    return {
+      service: 'shopify',
+      status: 'error',
+      mode: 'unavailable',
+      httpStatus: adminStatus,
+      adminStatus,
+      error: adminMessage,
+      pingMs: Date.now() - t0,
+      apiVersion: SHOPIFY_API,
+    };
   }
 }
 
@@ -298,4 +464,5 @@ module.exports = {
   fetchShopifyProducts,
   fetchShopifyCollections,
   fetchShopifyOrders,
+  checkShopifyHealth,
 };
