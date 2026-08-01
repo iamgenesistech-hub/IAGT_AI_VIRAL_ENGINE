@@ -199,7 +199,7 @@
           else window.addEventListener('DOMContentLoaded', ready);
         }
 
-        bootstrapMediaProof();
+        if (new URLSearchParams(window.location.search).get('autoproof') === '1') bootstrapMediaProof();
         refreshExecutiveMonitors();
         setInterval(refreshExecutiveMonitors, 30000);
       })();
