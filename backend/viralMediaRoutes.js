@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('path');
+
 const {
   readViralMediaState,
   writeViralMediaState,
@@ -75,6 +77,22 @@ function registerViralMediaRoutes(app) {
     return catalog.slice(0, max);
   }
 
+  function resolveProductHandle(value) {
+    return String(value && (value.productHandle || value.handle || value.product_handle) || '').toLowerCase();
+  }
+
+  function mergeCatalogWithPersistedProducts(catalog, persistedProducts) {
+    const byHandle = new Map();
+    (Array.isArray(persistedProducts) ? persistedProducts : []).forEach(function (item) {
+      const handle = resolveProductHandle(item);
+      if (handle) byHandle.set(handle, item);
+    });
+    return (Array.isArray(catalog) ? catalog : []).map(function (product) {
+      const persisted = byHandle.get(resolveProductHandle(product));
+      return Object.assign({}, product, persisted || {});
+    });
+  }
+
   async function resolveSingleProduct(body, fallbackLimit) {
     const limit = Number(body && body.limit ? body.limit : fallbackLimit || 1);
     const catalog = await resolveCatalog(Math.max(limit, 5));
@@ -119,9 +137,23 @@ function registerViralMediaRoutes(app) {
     return sendJson(res, 200, currentSnapshot());
   });
 
-  app.get('/api/viral-media/dashboard', function (_req, res) {
+  app.get('/api/viral-media/dashboard', async function (req, res) {
     console.log('[EVICS ViralMedia] GET /api/viral-media/dashboard called');
-    return sendJson(res, 200, currentSnapshot());
+    try {
+      const state = readViralMediaState();
+      const snapshot = getDashboardSnapshot(state);
+      const limit = Number(req.query.limit || 25);
+      const catalog = await resolveCatalog(limit);
+      const merged = mergeCatalogWithPersistedProducts(catalog, state.products);
+      snapshot.products = merged;
+      snapshot.summary = Object.assign({}, snapshot.summary, { totalProducts: merged.length });
+      return sendJson(res, 200, snapshot);
+    } catch (error) {
+      return sendJson(res, 500, {
+        success: false,
+        error: error.message
+      });
+    }
   });
 
   app.get('/api/viral-media/products', async function (req, res) {
@@ -130,16 +162,12 @@ function registerViralMediaRoutes(app) {
       const limit = Number(req.query.limit || 25);
       const catalog = await resolveCatalog(limit);
       const state = readViralMediaState();
-      const byHandle = new Map(state.products.map(function (item) { return [String(item.productHandle || '').toLowerCase(), item]; }));
-      const merged = catalog.map(function (product) {
-        const status = byHandle.get(String(product.productHandle || '').toLowerCase());
-        return Object.assign({}, product, status || {});
-      });
+      const merged = mergeCatalogWithPersistedProducts(catalog, state.products);
       return sendJson(res, 200, {
         success: true,
         count: merged.length,
         products: merged,
-        summary: state.summary,
+        summary: Object.assign({}, state.summary, { totalProducts: merged.length }),
         publishingMode: state.publishingMode,
         jordanAvatar: state.jordanAvatar
       });
@@ -573,7 +601,12 @@ function registerViralMediaRoutes(app) {
     }
   });
 
-  console.log('[EVICS ViralMedia] Route registration complete - 19 routes registered');
+  app.get(/^\/viral-media\/.+/, function (_req, res) {
+    noStore(res);
+    return res.sendFile(path.join(__dirname, '../dashboard/viral-media/index.html'));
+  });
+
+  console.log('[EVICS ViralMedia] Route registration complete - ' + routes.length + ' routes registered');
   console.log('[EVICS ViralMedia] Routes registered:', routes);
   
   // RESTORE ORIGINAL METHODS
