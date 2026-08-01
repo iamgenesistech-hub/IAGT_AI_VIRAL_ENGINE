@@ -3030,6 +3030,62 @@ app.get('/api/admin/avatar-requests', requireAdminAccess, (req, res) => {
   }
 });
 
+// GET /api/admin/async-job-errors → recent async job errors from avatar requests and product video records
+app.get('/api/admin/async-job-errors', requireAdminAccess, (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 25));
+    const errors = [];
+
+    // Collect error-like avatar request records
+    try {
+      const avatarReqs = getAvatarRequests();
+      for (const r of avatarReqs) {
+        const errorMsg = r.error || r.lastError || r.lastAdvanceError || r.failureReason || r.errorMessage || '';
+        const status = String(r.status || '').toLowerCase();
+        if (!errorMsg && status !== 'failed' && status !== 'error') continue;
+        errors.push({
+          jobType: 'avatar-request',
+          affiliateCode: r.affiliateCode || r.affiliateId || r.profileId || null,
+          requestId: r.requestId || null,
+          videoJobId: null,
+          status: r.status || null,
+          error: errorMsg || null,
+          updatedAt: r.updatedAt || r.completedAt || r.createdAt || null,
+        });
+      }
+    } catch (_) { /* guard against missing/corrupt data */ }
+
+    // Collect error-like product video records
+    try {
+      for (const r of PRODUCT_VIDEO_RECORDS.values()) {
+        const errorMsg = r.error || r.lastError || r.lastAdvanceError || r.failureReason || r.errorMessage || '';
+        const status = String(r.status || '').toLowerCase();
+        if (!errorMsg && status !== 'failed' && status !== 'error') continue;
+        errors.push({
+          jobType: 'product-video',
+          affiliateCode: r.affiliateCode || r.affiliateId || null,
+          requestId: r.requestId || null,
+          videoJobId: r.videoJobId || null,
+          status: r.status || null,
+          error: errorMsg || null,
+          updatedAt: r.updatedAt || r.completedAt || r.createdAt || null,
+        });
+      }
+    } catch (_) { /* guard against missing/corrupt data */ }
+
+    // Sort newest first
+    errors.sort((a, b) => {
+      const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    const sliced = errors.slice(0, limit);
+    res.json({ success: true, errors: sliced, count: sliced.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 console.log('? [EVICS] HeyGen cost tracking routes registered at /api/admin/costs');
 
 // ===== REGISTER VIRAL MEDIA ROUTES =====
