@@ -350,7 +350,7 @@
       try {
         const [renderRes, tierRes, proofRes] = await Promise.all([
           fetch(`${API}/api/renders/phone-app?affiliateCode=${encodeURIComponent(affiliateCode || '')}`, { headers: { Accept: 'application/json' } }),
-          fetch(`${API}/api/affiliates/tier-progress?affiliateCode=${encodeURIComponent(affiliateCode || 'ROLAND787')}`, { headers: { Accept: 'application/json' } }),
+          fetch(`${API}/api/affiliates/tier-progress?affiliateId=${encodeURIComponent(affiliateCode || 'ROLAND787')}`, { headers: { Accept: 'application/json' } }),
           fetch(`${API}/api/evidence/heygen?affiliateCode=${encodeURIComponent(affiliateCode || '')}`, { headers: { Accept: 'application/json' } })
         ]);
         const renders = await renderRes.json();
