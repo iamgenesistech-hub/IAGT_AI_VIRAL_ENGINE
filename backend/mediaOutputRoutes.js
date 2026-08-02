@@ -766,6 +766,12 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
   // inserts placeholder row (status='rendering'), returns immediately.
   // Background poller + poll-rendering endpoint below completes the row.
   // Admin-gated: requires x-admin-key header matching ADMIN_API_KEY.
+  //
+  // Body options for product resolution:
+  //   { "shopifyHandle": "sea-moss-capsules" }   -> resolve by exact handle
+  //   { "shopifyRandom": true,
+  //     "excludeAlreadyRendered": true }         -> pick a single un-rendered product
+  //   { "product": { "title": "...", "url": "...", ... } }   -> caller supplies
   app.post('/api/media-output/create-render', async (req, res) => {
     try {
       if (!isAdminAuthorized(req)) {
@@ -778,13 +784,99 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
         return res.status(503).json({ success: false, error: 'Supabase is not configured; cannot persist render.' });
       }
       const body = req.body || {};
+
+      // Resolve product context from Shopify when the caller asks for it.
+      let resolvedProduct = body.product || null;
+      let shopifyResolution = null;
+      if (!resolvedProduct && (body.shopifyHandle || body.shopifyRandom)) {
+        try {
+          const shopify = require('../utils/shopifyLiveConnector');
+          const products = await shopify.fetchShopifyProducts();
+          const singles = (products || []).filter(p => {
+            const title = String(p.title || '').toLowerCase();
+            const type = String(p.product_type || '').toLowerCase();
+            const tags = Array.isArray(p.tags) ? p.tags.map(t => String(t).toLowerCase()) : [];
+            const looksBundle =
+              title.includes('bundle') || title.includes('kit') || title.includes('pack ') ||
+              type.includes('bundle') || tags.includes('bundle') || tags.includes('kit');
+            return !looksBundle;
+          });
+
+          let picked = null;
+          if (body.shopifyHandle) {
+            const needle = String(body.shopifyHandle).toLowerCase();
+            picked = (products || []).find(p =>
+              String(p.handle || '').toLowerCase() === needle ||
+              String(p.title || '').toLowerCase().includes(needle.replace(/-/g, ' '))
+            ) || null;
+          } else if (body.shopifyRandom) {
+            let candidates = singles;
+            if (body.excludeAlreadyRendered) {
+              try {
+                const { data: existing } = await SupabaseConnector
+                  .from('evics_renders')
+                  .select('product_name, status')
+                  .in('status', ['approved', 'awaiting_review', 'rendering']);
+                const seen = new Set((existing || []).map(r => String(r.product_name || '').toLowerCase()));
+                const filtered = candidates.filter(p => !seen.has(String(p.title || '').toLowerCase()));
+                if (filtered.length > 0) candidates = filtered;
+              } catch (_e) { /* best effort */ }
+            }
+            if (candidates.length > 0) {
+              picked = candidates[Math.floor(Math.random() * candidates.length)];
+            }
+          }
+
+          if (picked) {
+            resolvedProduct = {
+              title: picked.title,
+              url: picked.productUrl || picked.affiliateLink || `https://iamgenesistech.com/products/${picked.handle}`,
+              productPageUrl: picked.productUrl || picked.affiliateLink || `https://iamgenesistech.com/products/${picked.handle}`,
+              handle: picked.handle,
+              imageUrl: picked.image || picked.imageUrl || null,
+              productImageUrl: picked.image || picked.imageUrl || null,
+              productType: picked.product_type,
+              tags: picked.tags,
+              price: picked.price,
+              sku: picked.sku
+            };
+            shopifyResolution = {
+              matched: true,
+              handle: picked.handle,
+              title: picked.title,
+              url: resolvedProduct.url,
+              image: resolvedProduct.imageUrl,
+              via: body.shopifyHandle ? 'handle' : 'random-single'
+            };
+          } else {
+            shopifyResolution = {
+              matched: false,
+              reason: body.shopifyHandle ? 'handle-not-found' : 'no-eligible-single-products',
+              totalCandidates: singles.length
+            };
+          }
+        } catch (shopErr) {
+          console.warn('[media-output/create-render] shopify resolve failed:', shopErr && shopErr.message ? shopErr.message : shopErr);
+          shopifyResolution = { matched: false, error: shopErr && shopErr.message ? shopErr.message : String(shopErr) };
+        }
+      }
+
+      if ((body.shopifyHandle || body.shopifyRandom) && !resolvedProduct) {
+        return res.status(400).json({
+          success: false,
+          error: 'Could not resolve a Shopify product from the request.',
+          shopify: shopifyResolution
+        });
+      }
+
       const opts = {
-        product: body.product || null,
+        product: resolvedProduct,
         script: body.script || null,
         avatarId: body.avatarId || body.avatar_id || null,
         voiceId: body.voiceId || body.voice_id || null,
         aspect: body.aspect || '9:16',
         test: body.test === true,
+        allowBundle: body.allowBundle === true,
         actor: body.actor || req.headers['x-actor'] || 'admin'
       };
       const result = await mediaRenderCreator.createProductVideoRender(opts, SupabaseConnector, console);
@@ -803,6 +895,9 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
         id: result.id,
         status: result.status,
         heygen: result.heygen,
+        avatar: result.avatar,
+        product: result.product,
+        shopify: shopifyResolution,
         async: true,
         pollUrl: '/api/media-output/poll-rendering',
         output: normalized
@@ -811,7 +906,8 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
       console.error('[media-output/create-render] failed:', err && err.stack ? err.stack : err);
       const code = err && err.code ? err.code : 'RENDER_FAILED';
       const status = code === 'RENDERER_UNAVAILABLE' || code === 'SUPABASE_UNAVAILABLE' ? 503 :
-                     code === 'HEYGEN_AUTH_MISSING' ? 502 : 500;
+                     code === 'HEYGEN_AUTH_MISSING' ? 502 :
+                     code === 'VOICE_MISMATCH' || code === 'VOICE_UNRESOLVED' || code === 'BUNDLE_REJECTED' ? 400 : 500;
       res.status(status).json({
         success: false,
         error: err && err.message ? err.message : String(err),
