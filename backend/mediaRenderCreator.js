@@ -3,32 +3,27 @@
 /**
  * mediaRenderCreator.js
  *
- * Async render pipeline for the EVICS Workspace Renderer:
- *   1. Resolve product info (from caller or defaults)
- *   2. Prepare / auto-upgrade the presenter script to A+
- *   3. SUBMIT to HeyGen and return immediately (do NOT block the request)
- *   4. Insert a placeholder row in `evics_renders` with status='rendering'
- *   5. Fire a best-effort background poll that updates the row when HeyGen
- *      completes; also expose pollPendingRenders() for on-demand catch-up
- *   6. When the render completes, grade it, promote status to
- *      awaiting_review, and (if A+ AND AUTO_APPROVE_APLUS) auto-approve +
- *      push to publishing_queue.
+ * Async render pipeline for the EVICS Workspace Renderer.
  *
- * IMPORTANT: HeyGen renders routinely take 2-5 minutes. Cloud Run's request
- * timeout is 300s, so we cannot afford to poll to completion inside the
- * request handler. This module therefore:
- *   - inserts the row synchronously (so the UI sees a "rendering" card
- *     right away)
- *   - fires an unawaited background poll for a best-effort short-lived
- *     Cloud Run container
- *   - additionally provides pollPendingRenders() so a periodic UI refresh
- *     or scheduler can catch up any renders whose background poller was
- *     killed by a cold-shutdown of the container
+ *  HARD RULE — AVATAR ↔ VOICE BINDING:
+ *  Every avatar (stock, AI-generated, or custom) has exactly ONE
+ *  assigned voice. That voice is the only voice that may be used with
+ *  that avatar. You may not put a male voice on a female avatar or
+ *  vice-versa, and you may not reuse the Jordan voice on any avatar
+ *  other than the Jordan avatar itself. This rule is enforced by
+ *  looking up the avatar's `default_voice_id` on HeyGen at render time.
+ *  If the caller supplies a voice that does not match, the render is
+ *  refused with code=VOICE_MISMATCH. If the registry lookup fails and
+ *  the caller did not supply a voice, the render is refused with
+ *  code=VOICE_UNRESOLVED.
  *
- * Avatar defaults for the WORKSPACE RENDERER use stock AI avatars
- * (Abigail_expressive_2024112501). The Jordan avatar is reserved for the
- * Affiliate Hub and phone app — do NOT default to it here.
+ *  The Jordan avatar is reserved for the Affiliate Hub and phone app.
+ *  The workspace renderer uses AI-generated stock avatars only.
  */
+
+const httpFetch = (typeof globalThis.fetch === 'function')
+  ? globalThis.fetch.bind(globalThis)
+  : null;
 
 let internalVideoRenderer = null;
 try {
@@ -47,9 +42,13 @@ try {
 const A_PLUS_RENDER_MINIMUM =
   (renderQualityValidator && renderQualityValidator.A_PLUS_RENDER_MINIMUM) || 95;
 
-// ── Workspace-renderer defaults ─────────────────────────────────────────
+// Stock HeyGen avatar available on the account (validated).
 const WORKSPACE_DEFAULT_AVATAR_ID = 'Abigail_expressive_2024112501';
-const WORKSPACE_DEFAULT_VOICE_ID  = 'fd407cedebcc4f29bdbd75ba45c01ea7';
+
+// NOTE: There is intentionally no default voice ID. The voice is ALWAYS
+// resolved from the avatar's assigned voice on HeyGen (see
+// fetchAssignedVoiceForAvatar below). This enforces the avatar↔voice
+// binding rule.
 
 function autoApproveEnabled() {
   return String(process.env.AUTO_APPROVE_APLUS || 'false').toLowerCase() === 'true';
@@ -63,7 +62,86 @@ function isTrustedHeyGenUrl(value) {
   } catch { return false; }
 }
 
+// ── HeyGen avatar → voice registry (cached in-memory) ────────────────────
+const AVATAR_REGISTRY_TTL_MS = 60 * 60 * 1000; // 1 hour
+let _avatarRegistry = { fetchedAt: 0, list: null, error: null };
+
+async function fetchHeyGenAvatarList() {
+  if (!httpFetch) throw new Error('global fetch unavailable (need Node 18+)');
+  const apiKey = process.env.HEYGEN_API_KEY;
+  if (!apiKey) throw new Error('HEYGEN_API_KEY not set');
+  const res = await httpFetch('https://api.heygen.com/v2/avatars', {
+    headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' }
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err = new Error(`HeyGen /v2/avatars HTTP ${res.status}`);
+    err.body = body;
+    throw err;
+  }
+  const data = (body && body.data) ? body.data : body || {};
+  const list = []
+    .concat(Array.isArray(data.avatars) ? data.avatars : [])
+    .concat(Array.isArray(data.talking_photos) ? data.talking_photos : [])
+    .concat(Array.isArray(data) ? data : []);
+  return list;
+}
+
+async function loadAvatarRegistry() {
+  const now = Date.now();
+  if (_avatarRegistry.list && (now - _avatarRegistry.fetchedAt) < AVATAR_REGISTRY_TTL_MS) {
+    return _avatarRegistry.list;
+  }
+  try {
+    const list = await fetchHeyGenAvatarList();
+    _avatarRegistry = { fetchedAt: now, list, error: null };
+    return list;
+  } catch (err) {
+    _avatarRegistry.error = err;
+    if (_avatarRegistry.list) return _avatarRegistry.list; // stale is better than nothing
+    throw err;
+  }
+}
+
+function pickAvatarRecord(list, avatarId) {
+  if (!Array.isArray(list) || !avatarId) return null;
+  return list.find(a =>
+    a && (
+      a.avatar_id === avatarId ||
+      a.talking_photo_id === avatarId ||
+      a.id === avatarId ||
+      a.avatar_name === avatarId
+    )
+  ) || null;
+}
+
+/**
+ * Return the HeyGen voice_id that is ASSIGNED to the given avatar.
+ * This is the ONLY voice that is allowed to be used with the avatar.
+ * Returns null if the registry lookup failed AND we have no cached copy.
+ */
+async function fetchAssignedVoiceForAvatar(avatarId) {
+  if (!avatarId) return null;
+  try {
+    const list = await loadAvatarRegistry();
+    const rec = pickAvatarRecord(list, avatarId);
+    if (!rec) return null;
+    return rec.default_voice_id ||
+           rec.voice_id ||
+           (rec.voice && (rec.voice.voice_id || rec.voice.id)) ||
+           null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+// ── Product context / script prep (unchanged) ────────────────────────────
+
 function resolveProductContext(input = {}) {
+  // Accept either an object or a bare title string.
+  if (typeof input === 'string') {
+    input = { title: input };
+  }
   const p = input && typeof input === 'object' ? input : {};
   const title =
     p.title || p.productTitle || p.productName || p.name ||
@@ -78,13 +156,28 @@ function resolveProductContext(input = {}) {
     'https://iamgenesistech.com/cdn/shop/files/logo.png';
   const handle = p.handle || p.slug || null;
   const companyLabel = p.companyLabel || p.brandLabel || 'I AM GENESIS TECH';
+  const productType = p.productType || p.product_type || p.type || null;
+  const tags = Array.isArray(p.tags) ? p.tags : (typeof p.tags === 'string' ? p.tags.split(',').map(s => s.trim()).filter(Boolean) : []);
   return {
     productTitle: String(title).trim(),
     productPageUrl: String(url).trim(),
     productImageUrl: String(imageUrl).trim(),
     productHandle: handle ? String(handle).trim() : null,
-    companyLabel: String(companyLabel).trim()
+    companyLabel: String(companyLabel).trim(),
+    productType,
+    tags,
+    isBundle: detectBundle({ title, productType, tags })
   };
+}
+
+function detectBundle({ title, productType, tags }) {
+  const t = String(title || '').toLowerCase();
+  const type = String(productType || '').toLowerCase();
+  const tagsLc = (tags || []).map(x => String(x).toLowerCase());
+  if (t.includes('bundle') || t.includes('kit') || t.includes('pack')) return true;
+  if (type.includes('bundle')) return true;
+  if (tagsLc.includes('bundle') || tagsLc.includes('kit')) return true;
+  return false;
 }
 
 function buildDefaultTrustScript(ctx) {
@@ -155,14 +248,6 @@ function parseParams(value) {
   try { return JSON.parse(value); } catch { return {}; }
 }
 
-/**
- * Retry a Supabase insert progressively dropping columns that the
- * remote schema does not know about. Supabase's error text for a
- * missing column looks like:
- *   "Could not find the 'foo' column of 'evics_renders' in the schema cache"
- * We parse the column name, fold that column's value into `parameters`,
- * drop it from the insert row, and retry — up to a few rounds.
- */
 async function insertRenderRowWithFallback(SupabaseConnector, row, logger) {
   const log = logger || console;
   let attempt = row;
@@ -181,9 +266,8 @@ async function insertRenderRowWithFallback(SupabaseConnector, row, logger) {
     const m = msg.match(/Could not find the '([^']+)' column/i);
     if (!m) throw error;
     const col = m[1];
-    if (col === 'parameters' || col === 'status') throw error; // don't drop essentials
+    if (col === 'parameters' || col === 'status') throw error;
     droppedColumns.push(col);
-    // fold value into parameters JSON so we still have it downstream
     if (attempt[col] !== undefined && attempt[col] !== null) {
       params[`_dropped_${col}`] = attempt[col];
     }
@@ -195,12 +279,6 @@ async function insertRenderRowWithFallback(SupabaseConnector, row, logger) {
   throw new Error('evics_renders insert failed after 8 schema-fallback attempts');
 }
 
-/**
- * Given a row that is currently `status='rendering'` and has
- * parameters.heygenVideoId, poll HeyGen for the current status. If it's
- * finished (or failed), update the row with real video_url + thumbnail +
- * duration + grade + final status. Best-effort; safe to call repeatedly.
- */
 async function pollRenderingRow(row, SupabaseConnector, logger) {
   const log = logger || console;
   const params = parseParams(row.parameters);
@@ -248,8 +326,6 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     heygenLastPolledAt: new Date().toISOString(),
     heygenError: status.error || null,
     completedAt: new Date().toISOString(),
-    // Mirror onto parameters so the UI can render even when the row
-    // itself lacks certain columns.
     playbackUrl: videoUrl,
     videoUrl: videoUrl,
     posterUrl: thumbnailUrl,
@@ -278,9 +354,6 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     if (error) throw error;
     updated = data;
   } catch (err) {
-    // Fall back: if the update fails because of missing columns, retry
-    // with the offending columns dropped from the patch. Everything of
-    // value is already mirrored into `parameters` above.
     const msg = String(err && err.message || '');
     const m = msg.match(/Could not find the '([^']+)' column/i);
     if (m) {
@@ -330,10 +403,6 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
   };
 }
 
-/**
- * Fetch all rows with status='rendering' and try to progress each one.
- * Safe to call periodically or on user-triggered refresh.
- */
 async function pollPendingRenders(SupabaseConnector, logger) {
   const log = logger || console;
   if (!internalVideoRenderer || typeof internalVideoRenderer.getHeyGenVideoStatus !== 'function') {
@@ -372,14 +441,6 @@ async function pollPendingRenders(SupabaseConnector, logger) {
   };
 }
 
-/**
- * Fire the async render:
- *   - prepare script
- *   - submit to HeyGen (fast — returns video_id in ~1-2s)
- *   - insert placeholder row with status='rendering'
- *   - kick off a best-effort background poll (unawaited)
- *   - return immediately with the placeholder row + heygen video_id
- */
 async function createProductVideoRender(opts, SupabaseConnector, logger) {
   const log = logger || console;
   if (!internalVideoRenderer || typeof internalVideoRenderer.startHeyGenRender !== 'function') {
@@ -394,22 +455,56 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
   }
 
   const ctx = resolveProductContext(opts.product || {});
+
+  // Enforce single-product rule: no bundles during grading loop.
+  if (ctx.isBundle && !opts.allowBundle) {
+    const err = new Error(`Product "${ctx.productTitle}" appears to be a bundle. Bundles are not rendered during the grading loop. Pass allowBundle:true to override.`);
+    err.code = 'BUNDLE_REJECTED';
+    throw err;
+  }
+
   const { script, scriptQuality } = prepareScript(opts.script, ctx);
 
   const avatarId = opts.avatarId ||
     process.env.EVICS_DEFAULT_AVATAR_ID ||
     process.env.HEYGEN_AVATAR_ID ||
     WORKSPACE_DEFAULT_AVATAR_ID;
-  const voiceId = opts.voiceId ||
+
+  // ── AVATAR ↔ VOICE BINDING (HARD RULE) ──────────────────────────────
+  const assignedVoiceId = await fetchAssignedVoiceForAvatar(avatarId);
+  const requestedVoiceId = opts.voiceId ||
     process.env.EVICS_DEFAULT_VOICE_ID ||
     process.env.HEYGEN_VOICE_ID ||
-    WORKSPACE_DEFAULT_VOICE_ID;
+    null;
+
+  if (requestedVoiceId && assignedVoiceId && requestedVoiceId !== assignedVoiceId) {
+    const err = new Error(
+      `Voice ${requestedVoiceId} is not the assigned voice for avatar ${avatarId} ` +
+      `(assigned=${assignedVoiceId}). Avatars must only use their HeyGen-assigned voice.`
+    );
+    err.code = 'VOICE_MISMATCH';
+    err.detail = { avatarId, requestedVoiceId, assignedVoiceId };
+    throw err;
+  }
+
+  const voiceId = assignedVoiceId || requestedVoiceId || null;
+  if (!voiceId) {
+    const err = new Error(
+      `Could not resolve the assigned voice for avatar ${avatarId} ` +
+      `(HeyGen /v2/avatars registry lookup failed and no voiceId was supplied). ` +
+      `Refusing to guess — avatars must only use their HeyGen-assigned voice.`
+    );
+    err.code = 'VOICE_UNRESOLVED';
+    err.detail = { avatarId, registryError: _avatarRegistry.error && _avatarRegistry.error.message };
+    throw err;
+  }
+
+  const voiceSource = assignedVoiceId ? 'heygen-assigned' : 'caller-supplied';
   const aspect = opts.aspect || '9:16';
   const test = opts.test === true;
 
-  log.log(`[mediaRenderCreator] Submitting async render -> product="${ctx.productTitle}" avatar=${avatarId} voice=${voiceId} aspect=${aspect} test=${test}`);
+  log.log(`[mediaRenderCreator] Submitting async render -> product="${ctx.productTitle}" avatar=${avatarId} voice=${voiceId} (source=${voiceSource}) aspect=${aspect} test=${test}`);
 
-  // ── Step 1: submit to HeyGen (fast) ─────────────────────────────────────
   let started;
   try {
     started = await internalVideoRenderer.startHeyGenRender({
@@ -441,8 +536,11 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     productImageUrl: ctx.productImageUrl,
     productHandle: ctx.productHandle,
     companyLabel: ctx.companyLabel,
+    productType: ctx.productType,
+    productTags: ctx.tags,
     avatarId,
     voiceId,
+    voiceSource,
     aspect,
     heygenVideoId: started.video_id || null,
     heygenIdempotencyKey: started.idempotency_key || null,
@@ -451,10 +549,6 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     createdBy: opts.actor || 'api'
   };
 
-  // ── Step 2: insert placeholder row ──────────────────────────────────────
-  // Only include columns we're confident exist. Anything the schema
-  // doesn't have will get folded into `parameters` by
-  // insertRenderRowWithFallback().
   const row = {
     platform: 'heygen',
     status: 'rendering',
@@ -489,7 +583,6 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
 
   log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}${droppedColumns.length ? ' droppedColumns=' + droppedColumns.join(',') : ''}`);
 
-  // ── Step 3: fire best-effort background poll (unawaited) ────────────────
   scheduleBackgroundPoll(inserted, SupabaseConnector, log);
 
   return {
@@ -506,6 +599,7 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
       thumbnail_url: null,
       duration: null
     },
+    avatar: { id: avatarId, voice_id: voiceId, voice_source: voiceSource },
     scriptQuality,
     script,
     product: ctx,
@@ -551,7 +645,8 @@ module.exports = {
   resolveProductContext,
   prepareScript,
   buildDefaultTrustScript,
+  fetchAssignedVoiceForAvatar,
+  loadAvatarRegistry,
   A_PLUS_RENDER_MINIMUM,
-  WORKSPACE_DEFAULT_AVATAR_ID,
-  WORKSPACE_DEFAULT_VOICE_ID
+  WORKSPACE_DEFAULT_AVATAR_ID
 };
