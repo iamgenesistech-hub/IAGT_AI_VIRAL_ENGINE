@@ -3,20 +3,31 @@
 /**
  * mediaRenderCreator.js
  *
- * End-to-end pipeline that produces a REAL product video render:
- *   1. Resolve product info (from caller or Shopify defaults)
- *   2. Generate / validate / auto-upgrade the presenter script to A+
- *   3. Submit to HeyGen via internalVideoRenderer.renderInternalVideo (real API)
- *   4. Grade the finished render with renderQualityValidator.gradeCompletedRender
- *   5. Persist a REAL row to Supabase `evics_renders` with proper
- *      video_url / thumbnail_url / duration / render_grade / parameters
- *   6. If tier === 'A+' AND AUTO_APPROVE_APLUS=true -> mark 'approved' and
- *      push to publishing_queue; else 'awaiting_review'
+ * Async render pipeline for the EVICS Workspace Renderer:
+ *   1. Resolve product info (from caller or defaults)
+ *   2. Prepare / auto-upgrade the presenter script to A+
+ *   3. SUBMIT to HeyGen and return immediately (do NOT block the request)
+ *   4. Insert a placeholder row in `evics_renders` with status='rendering'
+ *   5. Fire a best-effort background poll that updates the row when HeyGen
+ *      completes; also expose pollPendingRenders() for on-demand catch-up
+ *   6. When the render completes, grade it, promote status to
+ *      awaiting_review, and (if A+ AND AUTO_APPROVE_APLUS) auto-approve +
+ *      push to publishing_queue.
  *
- * This is the missing link that was removed during the
- * "test recovery" refactor. Without this file, `evics_renders`
- * never receives real renders and the Media Review UI has nothing
- * playable to review.
+ * IMPORTANT: HeyGen renders routinely take 2-5 minutes. Cloud Run's request
+ * timeout is 300s, so we cannot afford to poll to completion inside the
+ * request handler. This module therefore:
+ *   - inserts the row synchronously (so the UI sees a "rendering" card
+ *     right away)
+ *   - fires an unawaited background poll for a best-effort short-lived
+ *     Cloud Run container
+ *   - additionally provides pollPendingRenders() so a periodic UI refresh
+ *     or scheduler can catch up any renders whose background poller was
+ *     killed by a cold-shutdown of the container
+ *
+ * Avatar defaults for the WORKSPACE RENDERER use stock AI avatars
+ * (Abigail_expressive_2024112501). The Jordan avatar is reserved for the
+ * Affiliate Hub and phone app — do NOT default to it here.
  */
 
 let internalVideoRenderer = null;
@@ -35,6 +46,16 @@ try {
 
 const A_PLUS_RENDER_MINIMUM =
   (renderQualityValidator && renderQualityValidator.A_PLUS_RENDER_MINIMUM) || 95;
+
+// ── Workspace-renderer defaults ─────────────────────────────────────────
+// Stock HeyGen avatar available on the account (validated). Jordan is NOT
+// used here; the affiliate hub / phone app is the only place that must
+// route through the Jordan avatar.
+const WORKSPACE_DEFAULT_AVATAR_ID = 'Abigail_expressive_2024112501';
+// The Jordan voice ID is a general TTS voice (independent of avatar) and
+// was accepted by HeyGen in our validation. Kept as default so audio still
+// sounds consistent across the two products.
+const WORKSPACE_DEFAULT_VOICE_ID  = 'fd407cedebcc4f29bdbd75ba45c01ea7';
 
 function autoApproveEnabled() {
   return String(process.env.AUTO_APPROVE_APLUS || 'false').toLowerCase() === 'true';
@@ -134,9 +155,168 @@ async function pushToPublishingQueue(SupabaseConnector, output, logger) {
   }
 }
 
+function parseParams(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return {}; }
+}
+
+/**
+ * Given a row that is currently `status='rendering'` and has
+ * parameters.heygenVideoId, poll HeyGen for the current status. If it's
+ * finished (or failed), update the row with real video_url + thumbnail +
+ * duration + grade + final status. Best-effort; safe to call repeatedly.
+ */
+async function pollRenderingRow(row, SupabaseConnector, logger) {
+  const log = logger || console;
+  const params = parseParams(row.parameters);
+  const videoId = params.heygenVideoId || (row.job_id && row.job_id.startsWith('heygen_') ? row.job_id.slice('heygen_'.length) : null);
+  if (!videoId) {
+    return { id: String(row.id), skipped: true, reason: 'no-heygen-video-id' };
+  }
+
+  let status;
+  try {
+    status = await internalVideoRenderer.getHeyGenVideoStatus(videoId);
+  } catch (err) {
+    log.warn(`[mediaRenderCreator] poll for row ${row.id} (heygen ${videoId}) failed:`, err && err.message ? err.message : err);
+    return { id: String(row.id), skipped: true, reason: 'heygen-status-error', error: err && err.message ? err.message : String(err) };
+  }
+
+  if (!status || (status.status !== 'completed' && status.status !== 'failed')) {
+    return { id: String(row.id), pending: true, heygenStatus: status ? status.status : null };
+  }
+
+  const videoUrl = status.video_url || null;
+  const thumbnailUrl = status.thumbnail_url || null;
+  const duration = Number(status.duration) || null;
+  const failed = status.status === 'failed' || !videoUrl;
+
+  const grade = renderQualityValidator && typeof renderQualityValidator.gradeCompletedRender === 'function'
+    ? renderQualityValidator.gradeCompletedRender({
+        videoUrl,
+        thumbnailUrl,
+        duration,
+        scriptQuality: params.scriptQuality || null
+      })
+    : { score: 0, tier: 'needs-review', approvedForPublishing: false, minimum: A_PLUS_RENDER_MINIMUM, evidence: {} };
+
+  const autoApprove = autoApproveEnabled() && grade.tier === 'A+' && !failed;
+  const nextStatus = failed ? 'failed' : autoApprove ? 'approved' : 'awaiting_review';
+
+  const nextParams = Object.assign({}, params, {
+    tier: grade.tier,
+    tierLabel: grade.tier === 'A+' ? 'A+ Elite' : grade.tier,
+    gradeEvidence: grade.evidence,
+    approvedState: nextStatus === 'approved' ? 'approved' : nextStatus === 'failed' ? 'rejected' : 'pending',
+    heygenTrustedUrl: isTrustedHeyGenUrl(videoUrl),
+    heygenLastStatus: status.status,
+    heygenLastPolledAt: new Date().toISOString(),
+    heygenError: status.error || null,
+    completedAt: new Date().toISOString()
+  });
+
+  const patch = {
+    status: nextStatus,
+    video_url: videoUrl,
+    thumbnail_url: thumbnailUrl,
+    duration,
+    render_grade: grade.score,
+    parameters: nextParams,
+    updated_at: new Date().toISOString()
+  };
+
+  let updated = null;
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .update(patch)
+      .eq('id', row.id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    updated = data;
+  } catch (err) {
+    log.error(`[mediaRenderCreator] failed to update row ${row.id}:`, err && err.message ? err.message : err);
+    return { id: String(row.id), skipped: true, reason: 'supabase-update-failed', error: err && err.message ? err.message : String(err) };
+  }
+
+  let publishing = { queued: false };
+  if (autoApprove && updated) {
+    publishing = await pushToPublishingQueue(SupabaseConnector, {
+      id: updated.id,
+      productTitle: params.productTitle,
+      video_url: videoUrl,
+      thumbnail_url: thumbnailUrl
+    }, log);
+  }
+
+  log.log(`[mediaRenderCreator] Poll updated row ${row.id} -> status=${nextStatus} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} queued=${publishing.queued}`);
+
+  return {
+    id: String(row.id),
+    updated: true,
+    status: nextStatus,
+    grade,
+    autoApproved: autoApprove,
+    publishing,
+    heygen: { video_id: videoId, status: status.status, video_url: videoUrl, thumbnail_url: thumbnailUrl, duration }
+  };
+}
+
+/**
+ * Fetch all rows with status='rendering' and try to progress each one.
+ * Safe to call periodically or on user-triggered refresh.
+ */
+async function pollPendingRenders(SupabaseConnector, logger) {
+  const log = logger || console;
+  if (!internalVideoRenderer || typeof internalVideoRenderer.getHeyGenVideoStatus !== 'function') {
+    return { success: false, error: 'internalVideoRenderer unavailable' };
+  }
+  if (!SupabaseConnector) {
+    return { success: false, error: 'SupabaseConnector unavailable' };
+  }
+  let rows = [];
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .select('*')
+      .eq('status', 'rendering')
+      .limit(200);
+    if (error) throw error;
+    rows = Array.isArray(data) ? data : [];
+  } catch (err) {
+    log.error('[mediaRenderCreator] pollPendingRenders fetch failed:', err && err.message ? err.message : err);
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+
+  const details = [];
+  let updated = 0, pending = 0, skipped = 0;
+  for (const row of rows) {
+    const result = await pollRenderingRow(row, SupabaseConnector, log);
+    if (result.updated) updated++;
+    else if (result.pending) pending++;
+    else skipped++;
+    details.push(result);
+  }
+  return {
+    success: true,
+    summary: { scanned: rows.length, updated, pending, skipped },
+    details
+  };
+}
+
+/**
+ * Fire the async render:
+ *   - prepare script
+ *   - submit to HeyGen (fast — returns video_id in ~1-2s)
+ *   - insert placeholder row with status='rendering'
+ *   - kick off a best-effort background poll (unawaited)
+ *   - return immediately with the placeholder row + heygen video_id
+ */
 async function createProductVideoRender(opts, SupabaseConnector, logger) {
   const log = logger || console;
-  if (!internalVideoRenderer || typeof internalVideoRenderer.renderInternalVideo !== 'function') {
+  if (!internalVideoRenderer || typeof internalVideoRenderer.startHeyGenRender !== 'function') {
     const error = new Error('internalVideoRenderer is not available; cannot run HeyGen renders.');
     error.code = 'RENDERER_UNAVAILABLE';
     throw error;
@@ -151,60 +331,42 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
   const { script, scriptQuality } = prepareScript(opts.script, ctx);
 
   const avatarId = opts.avatarId ||
+    process.env.EVICS_DEFAULT_AVATAR_ID ||
     process.env.HEYGEN_AVATAR_ID ||
-    internalVideoRenderer.JORDAN_AVATAR_ID;
+    WORKSPACE_DEFAULT_AVATAR_ID;
   const voiceId = opts.voiceId ||
+    process.env.EVICS_DEFAULT_VOICE_ID ||
     process.env.HEYGEN_VOICE_ID ||
-    internalVideoRenderer.JORDAN_VOICE_ID;
+    WORKSPACE_DEFAULT_VOICE_ID;
   const aspect = opts.aspect || '9:16';
   const test = opts.test === true;
-  const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 4 * 60 * 1000;
 
-  log.log(`[mediaRenderCreator] Submitting render -> product="${ctx.productTitle}" avatar=${avatarId} voice=${voiceId} aspect=${aspect} test=${test}`);
+  log.log(`[mediaRenderCreator] Submitting async render -> product="${ctx.productTitle}" avatar=${avatarId} voice=${voiceId} aspect=${aspect} test=${test}`);
 
-  let renderResult;
+  // ── Step 1: submit to HeyGen (fast) ─────────────────────────────────────
+  let started;
   try {
-    renderResult = await internalVideoRenderer.renderInternalVideo({
+    started = await internalVideoRenderer.startHeyGenRender({
       script,
       avatar_id: avatarId,
       voice_id: voiceId,
-      config: { aspect, test, timeoutMs }
+      config: { aspect, test }
     });
   } catch (err) {
-    log.error('[mediaRenderCreator] HeyGen render failed:', err && err.message ? err.message : err);
-    const error = new Error(`HeyGen render failed: ${err && err.message ? err.message : 'unknown error'}`);
-    error.code = err && err.code ? err.code : 'HEYGEN_RENDER_FAILED';
+    log.error('[mediaRenderCreator] HeyGen submit failed:', err && err.message ? err.message : err);
+    const error = new Error(`HeyGen submit failed: ${err && err.message ? err.message : 'unknown error'}`);
+    error.code = err && err.code ? err.code : 'HEYGEN_SUBMIT_FAILED';
     error.detail = err && err.payload ? err.payload : null;
     throw error;
   }
 
-  const videoUrl = renderResult.video_url || null;
-  const thumbnailUrl = renderResult.thumbnail_url || null;
-  const duration = Number(renderResult.duration) || null;
-
-  const grade = renderQualityValidator && typeof renderQualityValidator.gradeCompletedRender === 'function'
-    ? renderQualityValidator.gradeCompletedRender({
-        videoUrl,
-        thumbnailUrl,
-        duration,
-        scriptQuality
-      })
-    : { score: 0, tier: 'needs-review', approvedForPublishing: false, minimum: A_PLUS_RENDER_MINIMUM, evidence: {} };
-
-  const failed = renderResult.status === 'failed' || !videoUrl;
-  const autoApprove = autoApproveEnabled() && grade.tier === 'A+' && !failed;
-  const status = failed
-    ? 'failed'
-    : autoApprove ? 'approved' : 'awaiting_review';
-
   const nowIso = new Date().toISOString();
   const parameters = {
-    tier: grade.tier,
-    tierLabel: grade.tier === 'A+' ? 'A+ Elite' : grade.tier,
-    gradeEvidence: grade.evidence,
+    tier: 'rendering',
+    tierLabel: 'Rendering',
     aPlusMinimum: A_PLUS_RENDER_MINIMUM,
     autonomyMode: autoApproveEnabled() ? 'auto-approve-a-plus' : 'manual',
-    approvedState: status === 'approved' ? 'approved' : status === 'failed' ? 'rejected' : 'pending',
+    approvedState: 'pending',
     scriptQuality: scriptQuality || null,
     script,
     productTitle: ctx.productTitle,
@@ -215,29 +377,29 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     avatarId,
     voiceId,
     aspect,
-    heygenVideoId: renderResult.video_id || null,
-    heygenIdempotencyKey: renderResult.idempotency_key || null,
-    heygenTrustedUrl: isTrustedHeyGenUrl(videoUrl),
+    heygenVideoId: started.video_id || null,
+    heygenIdempotencyKey: started.idempotency_key || null,
     testMode: test,
-    renderedAt: nowIso,
+    submittedAt: nowIso,
     createdBy: opts.actor || 'api'
   };
 
+  // ── Step 2: insert placeholder row ──────────────────────────────────────
   const row = {
     platform: 'heygen',
-    status,
-    video_url: videoUrl,
-    thumbnail_url: thumbnailUrl,
-    duration,
-    render_grade: grade.score,
-    render_name: `${ctx.productTitle} - Jordan Trust`,
+    status: 'rendering',
+    video_url: null,
+    thumbnail_url: null,
+    duration: null,
+    render_grade: null,
+    render_name: `${ctx.productTitle} - AI Presenter`,
     product_name: ctx.productTitle,
     product_url: ctx.productPageUrl,
     media_type: 'video',
     script,
     parameters: JSON.stringify(parameters),
     source: 'evics-media-renderer',
-    job_id: renderResult.video_id ? `heygen_${renderResult.video_id}` : null,
+    job_id: started.video_id ? `heygen_${started.video_id}` : null,
     created_at: nowIso,
     updated_at: nowIso
   };
@@ -255,46 +417,76 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     log.error('[mediaRenderCreator] Supabase insert failed:', err && err.message ? err.message : err);
     const error = new Error(`Supabase insert failed: ${err && err.message ? err.message : 'unknown error'}`);
     error.code = 'SUPABASE_INSERT_FAILED';
-    error.renderResult = renderResult;
+    error.heygenVideoId = started.video_id || null;
     throw error;
   }
 
-  let publishing = { queued: false };
-  if (autoApprove) {
-    publishing = await pushToPublishingQueue(SupabaseConnector, {
-      id: inserted.id,
-      productTitle: ctx.productTitle,
-      video_url: videoUrl,
-      thumbnail_url: thumbnailUrl
-    }, log);
-  }
+  log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}`);
 
-  log.log(`[mediaRenderCreator] Persisted evics_renders id=${inserted.id} status=${status} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} queued=${publishing.queued}`);
+  // ── Step 3: fire best-effort background poll (unawaited) ────────────────
+  // Cloud Run keeps warm containers alive between requests; this poll will
+  // usually complete before the container is recycled. Even if it doesn't,
+  // pollPendingRenders() covers the recovery case.
+  scheduleBackgroundPoll(inserted, SupabaseConnector, log);
 
   return {
     id: inserted.id,
     row: inserted,
-    grade,
-    status,
-    autoApproved: autoApprove,
-    publishing,
+    grade: null,
+    status: 'rendering',
+    autoApproved: false,
+    publishing: { queued: false },
     heygen: {
-      video_id: renderResult.video_id,
-      status: renderResult.status,
-      video_url: videoUrl,
-      thumbnail_url: thumbnailUrl,
-      duration
+      video_id: started.video_id,
+      status: 'rendering',
+      video_url: null,
+      thumbnail_url: null,
+      duration: null
     },
     scriptQuality,
     script,
-    product: ctx
+    product: ctx,
+    async: true,
+    pollUrl: '/api/media-output/poll-rendering'
   };
+}
+
+function scheduleBackgroundPoll(row, SupabaseConnector, log) {
+  const startedAt = Date.now();
+  const maxMs = 5 * 60 * 1000;    // give up after 5 min so we never leak
+  const stepMs = 8 * 1000;         // poll every 8 s
+  const tick = async () => {
+    if (Date.now() - startedAt > maxMs) return;
+    try {
+      const { data, error } = await SupabaseConnector
+        .from('evics_renders')
+        .select('*')
+        .eq('id', row.id)
+        .limit(1);
+      if (error || !data || !data[0]) return;
+      const fresh = data[0];
+      if (fresh.status !== 'rendering') return;
+      const result = await pollRenderingRow(fresh, SupabaseConnector, log);
+      if (result.updated) return;   // done
+      setTimeout(tick, stepMs).unref && setTimeout(tick, stepMs).unref();
+    } catch (err) {
+      log.warn('[mediaRenderCreator] background poll tick failed:', err && err.message ? err.message : err);
+      setTimeout(tick, stepMs).unref && setTimeout(tick, stepMs).unref();
+    }
+  };
+  // First poll after 15s (typical HeyGen renders finish in 30-180s)
+  const t = setTimeout(tick, 15 * 1000);
+  if (t && typeof t.unref === 'function') t.unref();
 }
 
 module.exports = {
   createProductVideoRender,
+  pollPendingRenders,
+  pollRenderingRow,
   resolveProductContext,
   prepareScript,
   buildDefaultTrustScript,
-  A_PLUS_RENDER_MINIMUM
+  A_PLUS_RENDER_MINIMUM,
+  WORKSPACE_DEFAULT_AVATAR_ID,
+  WORKSPACE_DEFAULT_VOICE_ID
 };
