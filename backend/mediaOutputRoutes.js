@@ -942,6 +942,55 @@ function registerMediaOutputRoutes(app, SupabaseConnector) {
     }
   });
 
+  // GET /api/media-output/avatar-diagnostic?id=Abigail_expressive_2024112501
+  // Diagnostic — dumps the HeyGen /v2/avatars registry match info for the
+  // given avatar id (or the workspace default if omitted). Admin-gated.
+  app.get('/api/media-output/avatar-diagnostic', async (req, res) => {
+    try {
+      if (!isAdminAuthorized(req)) {
+        return res.status(401).json({ success: false, error: 'Admin key required (x-admin-key header).' });
+      }
+      if (!mediaRenderCreator || typeof mediaRenderCreator.diagnoseAvatarRegistry !== 'function') {
+        return res.status(503).json({ success: false, error: 'mediaRenderCreator.diagnoseAvatarRegistry not available (redeploy required).' });
+      }
+      const id = (req.query.id ? String(req.query.id) : '').trim() ||
+                 mediaRenderCreator.WORKSPACE_DEFAULT_AVATAR_ID ||
+                 'Abigail_expressive_2024112501';
+      const result = await mediaRenderCreator.diagnoseAvatarRegistry(id);
+      noStore(res);
+      res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[media-output/avatar-diagnostic] failed:', err && err.stack ? err.stack : err);
+      res.status(500).json({ success: false, error: err && err.message ? err.message : String(err) });
+    }
+  });
+
+  // DELETE /api/media-output/render/:id — hard-delete an evics_renders row.
+  // Admin-gated. Used to zero out grade-0 (voice-mismatch) violations.
+  app.delete('/api/media-output/render/:id', async (req, res) => {
+    try {
+      if (!isAdminAuthorized(req)) {
+        return res.status(401).json({ success: false, error: 'Admin key required (x-admin-key header).' });
+      }
+      if (!SupabaseConnector) {
+        return res.status(503).json({ success: false, error: 'Supabase is not configured.' });
+      }
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ success: false, error: 'id required' });
+      const { data, error } = await SupabaseConnector
+        .from('evics_renders')
+        .delete()
+        .eq('id', id)
+        .select('id');
+      if (error) throw error;
+      noStore(res);
+      res.json({ success: true, deleted: Array.isArray(data) ? data.length : 0, id });
+    } catch (err) {
+      console.error('[media-output/render/:id DELETE] failed:', err && err.stack ? err.stack : err);
+      res.status(500).json({ success: false, error: err && err.message ? err.message : String(err) });
+    }
+  });
+
   app.post('/api/media-output/telemetry', async (req, res) => {
     try {
       const action = nullIfBlank(req.body.action);
