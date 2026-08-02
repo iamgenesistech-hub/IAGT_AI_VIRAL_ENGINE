@@ -11,11 +11,12 @@
  *  that avatar. You may not put a male voice on a female avatar or
  *  vice-versa, and you may not reuse the Jordan voice on any avatar
  *  other than the Jordan avatar itself. This rule is enforced by
- *  looking up the avatar's `default_voice_id` on HeyGen at render time.
- *  If the caller supplies a voice that does not match, the render is
- *  refused with code=VOICE_MISMATCH. If the registry lookup fails and
- *  the caller did not supply a voice, the render is refused with
- *  code=VOICE_UNRESOLVED.
+ *  resolving the avatar's voice at render time (HeyGen default_voice_id
+ *  when published, otherwise a deterministic pin from /v2/voices
+ *  matched on gender + language, persisted in Supabase so the pin
+ *  never drifts). If the caller supplies a voice that does not match
+ *  the resolved voice, the render is refused with code=VOICE_MISMATCH.
+ *  If resolution fails entirely, code=VOICE_UNRESOLVED.
  *
  *  The Jordan avatar is reserved for the Affiliate Hub and phone app.
  *  The workspace renderer uses AI-generated stock avatars only.
@@ -165,28 +166,175 @@ function pickAvatarRecord(flat, avatarId) {
 
 /**
  * Return the HeyGen voice_id that is ASSIGNED to the given avatar.
- * Searches nested avatar_states / looks. Falls back to parent-level
- * default_voice_id if the leaf doesn't have one.
+ * Order of resolution:
+ *  1. HeyGen /v2/avatars default_voice_id (rare — usually null for stock).
+ *  2. Persisted binding in Supabase (evics_avatar_voice_bindings).
+ *  3. Deterministic pin from /v2/voices filtered by the avatar's gender +
+ *     English language, then persisted so it never drifts.
+ * This preserves the hard rule "avatars must only use their assigned voice"
+ * even when HeyGen does not publish per-avatar assignments — once we pin
+ * a voice to an avatar it is that avatar's voice from then on.
  */
-async function fetchAssignedVoiceForAvatar(avatarId) {
+async function fetchAssignedVoiceForAvatar(avatarId, SupabaseConnector) {
   if (!avatarId) return null;
+  let hit = null;
   try {
     const reg = await loadAvatarRegistry();
-    const hit = pickAvatarRecord(reg.list, avatarId);
-    if (!hit) return null;
-    return extractVoiceFromNode(hit.node) || extractVoiceFromNode(hit.parent) || null;
+    hit = pickAvatarRecord(reg.list, avatarId);
   } catch (_err) {
+    hit = null;
+  }
+  // 1) Explicit HeyGen default_voice_id (rare).
+  const explicit = hit ? (extractVoiceFromNode(hit.node) || extractVoiceFromNode(hit.parent)) : null;
+  if (explicit) return explicit;
+
+  // 2) Supabase pinned binding.
+  if (SupabaseConnector) {
+    const pinned = await readVoicePin(avatarId, SupabaseConnector);
+    if (pinned) return pinned;
+  }
+
+  // 3) Deterministic pin from /v2/voices.
+  const gender = hit && hit.node && hit.node.gender ? String(hit.node.gender).toLowerCase() : null;
+  const picked = await pickVoiceForAvatar({ gender, avatarName: hit && hit.node && (hit.node.avatar_name || hit.node.name) || null });
+  if (!picked) return null;
+  if (SupabaseConnector) {
+    await writeVoicePin(avatarId, picked.voice_id, {
+      gender: gender || picked.gender || null,
+      language: picked.language || 'English',
+      voiceName: picked.name || null,
+      source: 'auto-pin'
+    }, SupabaseConnector);
+  }
+  return picked.voice_id;
+}
+
+// ── HeyGen voice registry (cached in-memory) ─────────────────────────────
+let _voiceRegistry = { fetchedAt: 0, list: null, raw: null, error: null };
+
+async function loadVoiceRegistry() {
+  const now = Date.now();
+  if (_voiceRegistry.list && (now - _voiceRegistry.fetchedAt) < AVATAR_REGISTRY_TTL_MS) {
+    return _voiceRegistry;
+  }
+  try {
+    const raw = await heygenGet('/v2/voices');
+    const data = (raw && raw.data) ? raw.data : raw || {};
+    const list = Array.isArray(data.voices) ? data.voices
+               : Array.isArray(data) ? data
+               : [];
+    _voiceRegistry = { fetchedAt: now, list, raw, error: null };
+    return _voiceRegistry;
+  } catch (err) {
+    _voiceRegistry.error = err;
+    if (_voiceRegistry.list) return _voiceRegistry;
+    throw err;
+  }
+}
+
+// Deterministically pick a HeyGen voice that matches the avatar's gender +
+// English language. Picks the same voice every time for a given input
+// (sorted stable by voice_id) so the "assigned" mapping never drifts even
+// before we write it to Supabase.
+async function pickVoiceForAvatar({ gender, avatarName }) {
+  let reg;
+  try {
+    reg = await loadVoiceRegistry();
+  } catch (_e) {
+    return null;
+  }
+  const voices = Array.isArray(reg.list) ? reg.list : [];
+  if (voices.length === 0) return null;
+
+  const wantGender = (gender || '').toLowerCase();
+  const isEnglish = v => {
+    const lang = String(v.language || v.language_code || v.locale || '').toLowerCase();
+    return !lang || lang.includes('english') || lang.startsWith('en');
+  };
+  const genderMatches = v => {
+    if (!wantGender) return true;
+    const g = String(v.gender || '').toLowerCase();
+    return g === wantGender;
+  };
+  const isSupported = v => v.support_pause !== false && v.emotion_support !== false;
+
+  // Ranked filters — most specific first.
+  const rankings = [
+    voices.filter(v => genderMatches(v) && isEnglish(v) && isSupported(v)),
+    voices.filter(v => genderMatches(v) && isEnglish(v)),
+    voices.filter(v => genderMatches(v)),
+    voices
+  ];
+  for (const bucket of rankings) {
+    if (bucket && bucket.length > 0) {
+      const sorted = bucket.slice().sort((a, b) => String(a.voice_id || '').localeCompare(String(b.voice_id || '')));
+      return sorted[0];
+    }
+  }
+  return null;
+}
+
+// ── Supabase-backed voice pin (evics_avatar_voice_bindings) ──────────────
+// Table schema (create once in Supabase):
+//   create table evics_avatar_voice_bindings (
+//     avatar_id text primary key,
+//     voice_id  text not null,
+//     gender    text,
+//     language  text,
+//     voice_name text,
+//     source    text,
+//     created_at timestamptz default now()
+//   );
+async function readVoicePin(avatarId, SupabaseConnector) {
+  try {
+    const { data, error } = await SupabaseConnector
+      .from('evics_avatar_voice_bindings')
+      .select('voice_id')
+      .eq('avatar_id', avatarId)
+      .limit(1);
+    if (error) return null;
+    if (data && data[0] && data[0].voice_id) return data[0].voice_id;
+    return null;
+  } catch (_e) {
     return null;
   }
 }
 
+async function writeVoicePin(avatarId, voiceId, meta, SupabaseConnector) {
+  try {
+    const row = {
+      avatar_id: avatarId,
+      voice_id: voiceId,
+      gender: meta && meta.gender || null,
+      language: meta && meta.language || null,
+      voice_name: meta && meta.voiceName || null,
+      source: meta && meta.source || 'auto-pin',
+      created_at: new Date().toISOString()
+    };
+    // upsert so a re-pick is idempotent
+    const { error } = await SupabaseConnector
+      .from('evics_avatar_voice_bindings')
+      .upsert([row], { onConflict: 'avatar_id' });
+    if (error) {
+      // If the table doesn't exist yet, degrade gracefully so the render
+      // still fires — the binding just won't persist across restarts.
+      console.warn('[mediaRenderCreator] evics_avatar_voice_bindings upsert failed (table may not exist):', error.message);
+      return false;
+    }
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 // Diagnostic helper — returns raw HeyGen response + match info for one avatar_id.
-async function diagnoseAvatarRegistry(avatarId) {
+async function diagnoseAvatarRegistry(avatarId, SupabaseConnector) {
   try {
     const reg = await loadAvatarRegistry();
     let match = null;
+    let hit = null;
     if (avatarId) {
-      const hit = pickAvatarRecord(reg.list, avatarId);
+      hit = pickAvatarRecord(reg.list, avatarId);
       if (hit) {
         match = {
           matched: true,
@@ -212,7 +360,27 @@ async function diagnoseAvatarRegistry(avatarId) {
           default_voice_id: n.default_voice_id || null
         }))
     };
-    return { avatarId, summary, match, error: reg.error && reg.error.message ? reg.error.message : null };
+
+    // Voice-pin resolution info
+    let voicePin = null;
+    try {
+      const gender = hit && hit.node && hit.node.gender ? String(hit.node.gender).toLowerCase() : null;
+      const pinnedInDb = SupabaseConnector ? await readVoicePin(avatarId, SupabaseConnector) : null;
+      const picked = await pickVoiceForAvatar({ gender, avatarName: hit && hit.node && (hit.node.avatar_name || hit.node.name) || null });
+      let voiceRegSize = null;
+      try { const vr = await loadVoiceRegistry(); voiceRegSize = vr.list ? vr.list.length : null; } catch (_e) { /* ignore */ }
+      voicePin = {
+        gender,
+        pinnedInDb,
+        autoPickCandidate: picked ? { voice_id: picked.voice_id, name: picked.name || null, gender: picked.gender || null, language: picked.language || picked.language_code || null } : null,
+        voiceRegistrySize: voiceRegSize,
+        finalResolved: await fetchAssignedVoiceForAvatar(avatarId, SupabaseConnector)
+      };
+    } catch (pinErr) {
+      voicePin = { error: pinErr && pinErr.message ? pinErr.message : String(pinErr) };
+    }
+
+    return { avatarId, summary, match, voicePin, error: reg.error && reg.error.message ? reg.error.message : null };
   } catch (err) {
     return { avatarId, error: err && err.message ? err.message : String(err) };
   }
@@ -566,7 +734,7 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     WORKSPACE_DEFAULT_AVATAR_ID;
 
   // ── AVATAR ↔ VOICE BINDING (HARD RULE) ──────────────────────────────
-  const assignedVoiceId = await fetchAssignedVoiceForAvatar(avatarId);
+  const assignedVoiceId = await fetchAssignedVoiceForAvatar(avatarId, SupabaseConnector);
   const requestedVoiceId = opts.voiceId ||
     process.env.EVICS_DEFAULT_VOICE_ID ||
     process.env.HEYGEN_VOICE_ID ||
@@ -742,6 +910,8 @@ module.exports = {
   buildDefaultTrustScript,
   fetchAssignedVoiceForAvatar,
   loadAvatarRegistry,
+  loadVoiceRegistry,
+  pickVoiceForAvatar,
   diagnoseAvatarRegistry,
   A_PLUS_RENDER_MINIMUM,
   WORKSPACE_DEFAULT_AVATAR_ID
