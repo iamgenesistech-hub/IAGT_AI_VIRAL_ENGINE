@@ -48,13 +48,7 @@ const A_PLUS_RENDER_MINIMUM =
   (renderQualityValidator && renderQualityValidator.A_PLUS_RENDER_MINIMUM) || 95;
 
 // ── Workspace-renderer defaults ─────────────────────────────────────────
-// Stock HeyGen avatar available on the account (validated). Jordan is NOT
-// used here; the affiliate hub / phone app is the only place that must
-// route through the Jordan avatar.
 const WORKSPACE_DEFAULT_AVATAR_ID = 'Abigail_expressive_2024112501';
-// The Jordan voice ID is a general TTS voice (independent of avatar) and
-// was accepted by HeyGen in our validation. Kept as default so audio still
-// sounds consistent across the two products.
 const WORKSPACE_DEFAULT_VOICE_ID  = 'fd407cedebcc4f29bdbd75ba45c01ea7';
 
 function autoApproveEnabled() {
@@ -162,6 +156,46 @@ function parseParams(value) {
 }
 
 /**
+ * Retry a Supabase insert progressively dropping columns that the
+ * remote schema does not know about. Supabase's error text for a
+ * missing column looks like:
+ *   "Could not find the 'foo' column of 'evics_renders' in the schema cache"
+ * We parse the column name, fold that column's value into `parameters`,
+ * drop it from the insert row, and retry — up to a few rounds.
+ */
+async function insertRenderRowWithFallback(SupabaseConnector, row, logger) {
+  const log = logger || console;
+  let attempt = row;
+  let params = parseParams(attempt.parameters);
+  const droppedColumns = [];
+
+  for (let i = 0; i < 8; i++) {
+    const { data, error } = await SupabaseConnector
+      .from('evics_renders')
+      .insert([attempt])
+      .select('*')
+      .single();
+    if (!error) return { data, droppedColumns };
+
+    const msg = String(error.message || '');
+    const m = msg.match(/Could not find the '([^']+)' column/i);
+    if (!m) throw error;
+    const col = m[1];
+    if (col === 'parameters' || col === 'status') throw error; // don't drop essentials
+    droppedColumns.push(col);
+    // fold value into parameters JSON so we still have it downstream
+    if (attempt[col] !== undefined && attempt[col] !== null) {
+      params[`_dropped_${col}`] = attempt[col];
+    }
+    const next = { ...attempt };
+    delete next[col];
+    attempt = { ...next, parameters: JSON.stringify(params) };
+    log.warn(`[mediaRenderCreator] evics_renders schema missing "${col}" — dropping and retrying insert (attempt ${i + 2}).`);
+  }
+  throw new Error('evics_renders insert failed after 8 schema-fallback attempts');
+}
+
+/**
  * Given a row that is currently `status='rendering'` and has
  * parameters.heygenVideoId, poll HeyGen for the current status. If it's
  * finished (or failed), update the row with real video_url + thumbnail +
@@ -213,7 +247,14 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     heygenLastStatus: status.status,
     heygenLastPolledAt: new Date().toISOString(),
     heygenError: status.error || null,
-    completedAt: new Date().toISOString()
+    completedAt: new Date().toISOString(),
+    // Mirror onto parameters so the UI can render even when the row
+    // itself lacks certain columns.
+    playbackUrl: videoUrl,
+    videoUrl: videoUrl,
+    posterUrl: thumbnailUrl,
+    thumbnailUrl: thumbnailUrl,
+    duration
   });
 
   const patch = {
@@ -237,8 +278,33 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     if (error) throw error;
     updated = data;
   } catch (err) {
-    log.error(`[mediaRenderCreator] failed to update row ${row.id}:`, err && err.message ? err.message : err);
-    return { id: String(row.id), skipped: true, reason: 'supabase-update-failed', error: err && err.message ? err.message : String(err) };
+    // Fall back: if the update fails because of missing columns, retry
+    // with the offending columns dropped from the patch. Everything of
+    // value is already mirrored into `parameters` above.
+    const msg = String(err && err.message || '');
+    const m = msg.match(/Could not find the '([^']+)' column/i);
+    if (m) {
+      const col = m[1];
+      log.warn(`[mediaRenderCreator] update missing column "${col}"; retrying without it.`);
+      const retryPatch = { ...patch };
+      delete retryPatch[col];
+      try {
+        const { data, error: err2 } = await SupabaseConnector
+          .from('evics_renders')
+          .update(retryPatch)
+          .eq('id', row.id)
+          .select('*')
+          .single();
+        if (err2) throw err2;
+        updated = data;
+      } catch (err2) {
+        log.error(`[mediaRenderCreator] retry update also failed for row ${row.id}:`, err2 && err2.message ? err2.message : err2);
+        return { id: String(row.id), skipped: true, reason: 'supabase-update-failed', error: err2 && err2.message ? err2.message : String(err2) };
+      }
+    } else {
+      log.error(`[mediaRenderCreator] failed to update row ${row.id}:`, err && err.message ? err.message : err);
+      return { id: String(row.id), skipped: true, reason: 'supabase-update-failed', error: err && err.message ? err.message : String(err) };
+    }
   }
 
   let publishing = { queued: false };
@@ -371,6 +437,7 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     script,
     productTitle: ctx.productTitle,
     productPageUrl: ctx.productPageUrl,
+    productUrl: ctx.productPageUrl,
     productImageUrl: ctx.productImageUrl,
     productHandle: ctx.productHandle,
     companyLabel: ctx.companyLabel,
@@ -385,6 +452,9 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
   };
 
   // ── Step 2: insert placeholder row ──────────────────────────────────────
+  // Only include columns we're confident exist. Anything the schema
+  // doesn't have will get folded into `parameters` by
+  // insertRenderRowWithFallback().
   const row = {
     platform: 'heygen',
     status: 'rendering',
@@ -394,7 +464,6 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     render_grade: null,
     render_name: `${ctx.productTitle} - AI Presenter`,
     product_name: ctx.productTitle,
-    product_url: ctx.productPageUrl,
     media_type: 'video',
     script,
     parameters: JSON.stringify(parameters),
@@ -405,14 +474,11 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
   };
 
   let inserted = null;
+  let droppedColumns = [];
   try {
-    const { data, error } = await SupabaseConnector
-      .from('evics_renders')
-      .insert([row])
-      .select('*')
-      .single();
-    if (error) throw error;
-    inserted = data;
+    const result = await insertRenderRowWithFallback(SupabaseConnector, row, log);
+    inserted = result.data;
+    droppedColumns = result.droppedColumns || [];
   } catch (err) {
     log.error('[mediaRenderCreator] Supabase insert failed:', err && err.message ? err.message : err);
     const error = new Error(`Supabase insert failed: ${err && err.message ? err.message : 'unknown error'}`);
@@ -421,12 +487,9 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     throw error;
   }
 
-  log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}`);
+  log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}${droppedColumns.length ? ' droppedColumns=' + droppedColumns.join(',') : ''}`);
 
   // ── Step 3: fire best-effort background poll (unawaited) ────────────────
-  // Cloud Run keeps warm containers alive between requests; this poll will
-  // usually complete before the container is recycled. Even if it doesn't,
-  // pollPendingRenders() covers the recovery case.
   scheduleBackgroundPoll(inserted, SupabaseConnector, log);
 
   return {
@@ -447,14 +510,15 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     script,
     product: ctx,
     async: true,
-    pollUrl: '/api/media-output/poll-rendering'
+    pollUrl: '/api/media-output/poll-rendering',
+    droppedColumns
   };
 }
 
 function scheduleBackgroundPoll(row, SupabaseConnector, log) {
   const startedAt = Date.now();
-  const maxMs = 5 * 60 * 1000;    // give up after 5 min so we never leak
-  const stepMs = 8 * 1000;         // poll every 8 s
+  const maxMs = 5 * 60 * 1000;
+  const stepMs = 8 * 1000;
   const tick = async () => {
     if (Date.now() - startedAt > maxMs) return;
     try {
@@ -467,14 +531,15 @@ function scheduleBackgroundPoll(row, SupabaseConnector, log) {
       const fresh = data[0];
       if (fresh.status !== 'rendering') return;
       const result = await pollRenderingRow(fresh, SupabaseConnector, log);
-      if (result.updated) return;   // done
-      setTimeout(tick, stepMs).unref && setTimeout(tick, stepMs).unref();
+      if (result.updated) return;
+      const nextT = setTimeout(tick, stepMs);
+      if (nextT && typeof nextT.unref === 'function') nextT.unref();
     } catch (err) {
       log.warn('[mediaRenderCreator] background poll tick failed:', err && err.message ? err.message : err);
-      setTimeout(tick, stepMs).unref && setTimeout(tick, stepMs).unref();
+      const nextT = setTimeout(tick, stepMs);
+      if (nextT && typeof nextT.unref === 'function') nextT.unref();
     }
   };
-  // First poll after 15s (typical HeyGen renders finish in 30-180s)
   const t = setTimeout(tick, 15 * 1000);
   if (t && typeof t.unref === 'function') t.unref();
 }
