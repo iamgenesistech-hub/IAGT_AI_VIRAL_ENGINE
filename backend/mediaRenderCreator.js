@@ -1008,3 +1008,123 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     productTitle: ctx.productTitle,
     productPageUrl: ctx.productPageUrl,
     productUrl: ctx.productPageUrl,
+    productImageUrl: ctx.productImageUrl,
+    productHandle: ctx.productHandle,
+    companyLabel: ctx.companyLabel,
+    productType: ctx.productType,
+    productTags: ctx.tags,
+    avatarId,
+    voiceId,
+    voiceSource,
+    aspect,
+    heygenVideoId: started.video_id || null,
+    heygenIdempotencyKey: started.idempotency_key || null,
+    testMode: test,
+    submittedAt: nowIso,
+    createdBy: opts.actor || 'api'
+  };
+
+  const row = {
+    platform: 'heygen',
+    status: 'rendering',
+    video_url: null,
+    thumbnail_url: null,
+    duration: null,
+    render_grade: null,
+    render_name: `${ctx.productTitle} - AI Presenter`,
+    product_name: ctx.productTitle,
+    media_type: 'video',
+    script,
+    parameters: JSON.stringify(parameters),
+    source: 'evics-media-renderer',
+    job_id: started.video_id ? `heygen_${started.video_id}` : null,
+    created_at: nowIso,
+    updated_at: nowIso
+  };
+
+  let inserted = null;
+  let droppedColumns = [];
+  try {
+    const result = await insertRenderRowWithFallback(SupabaseConnector, row, log);
+    inserted = result.data;
+    droppedColumns = result.droppedColumns || [];
+  } catch (err) {
+    log.error('[mediaRenderCreator] Supabase insert failed:', err && err.message ? err.message : err);
+    const error = new Error(`Supabase insert failed: ${err && err.message ? err.message : 'unknown error'}`);
+    error.code = 'SUPABASE_INSERT_FAILED';
+    error.heygenVideoId = started.video_id || null;
+    throw error;
+  }
+
+  log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}${droppedColumns.length ? ' droppedColumns=' + droppedColumns.join(',') : ''}`);
+
+  scheduleBackgroundPoll(inserted, SupabaseConnector, log);
+
+  return {
+    id: inserted.id,
+    row: inserted,
+    grade: null,
+    status: 'rendering',
+    autoApproved: false,
+    publishing: { queued: false },
+    heygen: {
+      video_id: started.video_id,
+      status: 'rendering',
+      video_url: null,
+      thumbnail_url: null,
+      duration: null
+    },
+    avatar: { id: avatarId, voice_id: voiceId, voice_source: voiceSource },
+    scriptQuality,
+    script,
+    product: ctx,
+    async: true,
+    pollUrl: '/api/media-output/poll-rendering',
+    droppedColumns
+  };
+}
+
+function scheduleBackgroundPoll(row, SupabaseConnector, log) {
+  const startedAt = Date.now();
+  const maxMs = 5 * 60 * 1000;
+  const stepMs = 8 * 1000;
+  const tick = async () => {
+    if (Date.now() - startedAt > maxMs) return;
+    try {
+      const { data, error } = await SupabaseConnector
+        .from('evics_renders')
+        .select('*')
+        .eq('id', row.id)
+        .limit(1);
+      if (error || !data || !data[0]) return;
+      const fresh = data[0];
+      if (fresh.status !== 'rendering') return;
+      const result = await pollRenderingRow(fresh, SupabaseConnector, log);
+      if (result.updated) return;
+      const nextT = setTimeout(tick, stepMs);
+      if (nextT && typeof nextT.unref === 'function') nextT.unref();
+    } catch (err) {
+      log.warn('[mediaRenderCreator] background poll tick failed:', err && err.message ? err.message : err);
+      const nextT = setTimeout(tick, stepMs);
+      if (nextT && typeof nextT.unref === 'function') nextT.unref();
+    }
+  };
+  const t = setTimeout(tick, 15 * 1000);
+  if (t && typeof t.unref === 'function') t.unref();
+}
+
+module.exports = {
+  createProductVideoRender,
+  pollPendingRenders,
+  pollRenderingRow,
+  resolveProductContext,
+  prepareScript,
+  buildDefaultTrustScript,
+  fetchAssignedVoiceForAvatar,
+  loadAvatarRegistry,
+  loadVoiceRegistry,
+  pickVoiceForAvatar,
+  diagnoseAvatarRegistry,
+  A_PLUS_RENDER_MINIMUM,
+  WORKSPACE_DEFAULT_AVATAR_ID
+};
