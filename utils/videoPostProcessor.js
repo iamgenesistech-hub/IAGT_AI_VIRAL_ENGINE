@@ -4,32 +4,30 @@
  * After the base avatar/cinematic render, this adds:
  *   1. Foreground product presentation (bg-removed mockup, deterministic
  *      300x300 hero cell in the bottom-right)
- *   2. Product title strip (sits directly above the mockup cell)
+ *   2. Product-title strip (right-anchored above the mockup, auto-shrunk
+ *      to always fit fully inside the frame — see fitTitleBox)
  *   3. Buy Now CTA pill (short label, guaranteed to fit any 9:16 or 16:9 frame)
  *   4. Final color grade/export
  *
  * ABSOLUTE CONTRACT:
  *   - If productImageLocalPath (or productImageUrl) cannot be composited into
- *     the final frame, this function returns success:false. Callers must
- *     treat that as a render failure and MUST NOT ship the raw video —
- *     videos without the product mockup and Buy Now pill are not allowed.
+ *     the final frame, this function returns success:false.
+ *   - If the product-title box would extend past the right or left edge of
+ *     the frame even at MIN_TITLE_FONT_SIZE, this function returns
+ *     success:false with code TITLE_OVERFLOWS_FRAME. Callers MUST treat
+ *     that as a render failure — a video with a clipped title never ships.
  *
- * MOCKUP VALIDATION:
- *   Local bg-removed PNGs are validated with `sharp` before use — if the
- *   PNG's mean alpha is below MOCKUP_MIN_MEAN_ALPHA the image is effectively
- *   invisible (over-eager bg removal wiped the product), and we fall back
- *   to the raw productImageUrl. If BOTH are unusable we fail hard.
- *
- * FFMPEG FILTER CONSTANTS CHEATSHEET (why we can't share expressions):
+ * FFMPEG FILTER CONSTANTS CHEATSHEET:
  *   drawbox   : uses  iw / ih          (input width/height)
  *   drawtext  : uses  W  / H  (main_w / main_h)  — DOES NOT accept iw/ih
+ *              and supports text_w / text_h  in its x/y expressions
  *   overlay   : uses  W  / H  (main dims) + w / h  (overlay dims)
  *
  * FILENAME: every processed video's output filename embeds a UTC
  * YYYYMMDDTHHMMSSZ timestamp so operators can trace exactly when a given
  * asset was produced.
  *
- * Uses ffmpeg (installed in the Docker container).
+ * Uses ffmpeg + ffprobe (installed in the Docker container).
  */
 
 'use strict';
@@ -46,19 +44,20 @@ try { sharp = require('sharp'); } catch (_e) { sharp = null; }
 const MEDIA_CACHE_DIR = path.join(__dirname, '../media-cache');
 const PROCESSED_DIR = path.join(__dirname, '../processed-videos');
 
-// Any bg-removed PNG whose mean alpha (0..255) is below this threshold is
-// considered visually empty and will be discarded in favour of the raw
-// productImageUrl. 40 ≈ 15% average opacity; below that, the product is
-// effectively invisible when composited on a dark pedestal.
 const MOCKUP_MIN_MEAN_ALPHA = 40;
-// If the source PNG is smaller than this in bytes AND has an alpha channel,
-// it's almost certainly an over-cropped or empty asset.
 const MOCKUP_MIN_BYTES = 4 * 1024;
+
+// Title-box sizing. We shrink fontsize from MAX→MIN until the projected box
+// width fits inside the safe area. If it still doesn't fit at MIN we fail.
+const MAX_TITLE_FONT_SIZE = 30;
+const MIN_TITLE_FONT_SIZE = 18;
+// DejaVu Sans Bold: average character advance is ~0.58 * fontsize. Widen a
+// little to be safe on wide characters (M, W).
+const CHAR_ADVANCE_RATIO = 0.62;
 
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true });
 
-// UTC timestamp string suitable for filenames: 20260803T164210Z
 function utcStampForFilename(d = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   return (
@@ -73,9 +72,47 @@ function utcStampForFilename(d = new Date()) {
   );
 }
 
-// Inspect a PNG on disk and decide whether it's "visually usable" (i.e.
-// has enough opaque pixels to be worth compositing). Returns:
-//   { usable: boolean, meanAlpha: number|null, width, height, reason }
+// Probe the input video for its width/height using ffprobe so all overlay
+// math can be validated against real pixel dimensions BEFORE ffmpeg runs.
+function probeVideoDimensions(inputPath) {
+  try {
+    const out = execFileSync('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height',
+      '-of', 'csv=p=0:s=x',
+      inputPath
+    ], { timeout: 15000 }).toString().trim();
+    const [w, h] = out.split('x').map((v) => parseInt(v, 10));
+    if (!w || !h) return null;
+    return { width: w, height: h };
+  } catch (err) {
+    console.warn('[PostProcess] ffprobe failed:', err && err.message ? err.message : err);
+    return null;
+  }
+}
+
+// Choose the largest fontsize (from MAX down to MIN) whose projected drawtext
+// box fits inside [xLeftLimit, xRightLimit]. Returns null if even MIN
+// overflows — caller MUST hard-fail the render in that case.
+function fitTitleBox({ text, videoWidth, xLeftLimit, xRightLimit, boxPadding }) {
+  const availableWidth = xRightLimit - xLeftLimit;
+  for (let fontsize = MAX_TITLE_FONT_SIZE; fontsize >= MIN_TITLE_FONT_SIZE; fontsize -= 1) {
+    const estTextWidth = Math.ceil(text.length * fontsize * CHAR_ADVANCE_RATIO);
+    const estBoxWidth = estTextWidth + boxPadding * 2;
+    if (estBoxWidth <= availableWidth) {
+      return {
+        fontsize,
+        estTextWidth,
+        estBoxWidth,
+        availableWidth,
+        videoWidth
+      };
+    }
+  }
+  return null;
+}
+
 async function inspectMockupImage(filePath) {
   const result = { usable: false, meanAlpha: null, width: null, height: null, reason: '' };
   try {
@@ -187,9 +224,15 @@ async function postProcessVideo({
 
   await downloadFile(videoUrl, inputPath);
 
+  // Probe input dims up-front so title/mockup geometry can be validated.
+  const probed = probeVideoDimensions(inputPath) || { width: 720, height: 1280 };
+  const videoWidth = probed.width;
+  const videoHeight = probed.height;
+
   const inputs = ['-i', inputPath];
 
-  const productName = escapeDrawtextValue(productTitle || 'Featured Product');
+  const productTitleText = productTitle || 'Featured Product';
+  const productName = escapeDrawtextValue(productTitleText);
   const cta = escapeDrawtextValue(ctaText || 'BUY NOW');
 
   const fontFile = resolveFontFile();
@@ -205,17 +248,57 @@ async function postProcessVideo({
   }
   const fontfileArg = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-  // ---- LAYOUT CONSTANTS (portrait 9:16 reference) -----------------------
+  // ---- LAYOUT CONSTANTS -------------------------------------------------
   const CELL_SIZE = 300;
   const CELL_RIGHT_MARGIN = 30;
   const CELL_BOTTOM_MARGIN = 240;
   const TITLE_STRIP_HEIGHT = 60;
   const TITLE_STRIP_GAP = 12;
+  const TITLE_BOX_PADDING = 12;
+  const TITLE_SAFE_LEFT_MARGIN = 30; // never draw left of this x
   const CTA_BOTTOM_MARGIN = 90;
   const CTA_FONT_SIZE = 56;
   const CTA_BOX_PADDING = 22;
-  const TITLE_FONT_SIZE = 30;
-  const TITLE_BOX_PADDING = 12;
+
+  // ---- HARD GEOMETRY GUARDS ---------------------------------------------
+  // Mockup pedestal must fit — mockup right edge is at (videoWidth - CELL_RIGHT_MARGIN),
+  // left edge at (videoWidth - CELL_RIGHT_MARGIN - CELL_SIZE). If that goes
+  // negative the video is too narrow to host the pedestal at all.
+  const mockupLeftEdge = videoWidth - CELL_RIGHT_MARGIN - CELL_SIZE;
+  if (mockupLeftEdge < 0) {
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: `Video is too narrow (${videoWidth}px) to fit the product mockup pedestal (${CELL_SIZE}px + ${CELL_RIGHT_MARGIN}px margin).`,
+      code: 'MOCKUP_OVERFLOWS_FRAME',
+      probed
+    };
+  }
+
+  // Title box: right-anchor to the same right margin as the mockup. Fit
+  // fontsize so the projected box width is <= (videoWidth - TITLE_SAFE_LEFT_MARGIN - CELL_RIGHT_MARGIN).
+  const titleRightLimit = videoWidth - CELL_RIGHT_MARGIN;
+  const titleFit = fitTitleBox({
+    text: productTitleText,
+    videoWidth,
+    xLeftLimit: TITLE_SAFE_LEFT_MARGIN,
+    xRightLimit: titleRightLimit,
+    boxPadding: TITLE_BOX_PADDING
+  });
+  if (!titleFit) {
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: `Product title "${productTitleText}" does not fit in the video (${videoWidth}px wide) even at min fontsize ${MIN_TITLE_FONT_SIZE}. Shorten the title or increase resolution.`,
+      code: 'TITLE_OVERFLOWS_FRAME',
+      probed,
+      titleFit: null
+    };
+  }
 
   // ---- SELECT PRODUCT IMAGE ---------------------------------------------
   let productImageInputPath = null;
@@ -279,7 +362,7 @@ async function postProcessVideo({
     };
   }
 
-  // ---- PRODUCT MOCKUP FILTER --------------------------------------------
+  // ---- FILTER CHAIN -----------------------------------------------------
   const productLayerFilter =
     `[1:v]scale=${CELL_SIZE}:${CELL_SIZE}:force_original_aspect_ratio=decrease,` +
     `pad=${CELL_SIZE}:${CELL_SIZE}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,` +
@@ -298,13 +381,20 @@ async function postProcessVideo({
   const productOverlay =
     `overlay=x=W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}:y=H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}:format=auto`;
 
-  // drawtext uses W/H (main_w/main_h) — NOT iw/ih.
-  const titleStripX = `W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  // drawtext: RIGHT-ANCHOR the title box so its right edge always lands at
+  // (W - CELL_RIGHT_MARGIN). ffmpeg's text_w evaluates to the actual rendered
+  // text width, so:
+  //   text left edge = W - text_w - TITLE_BOX_PADDING - CELL_RIGHT_MARGIN
+  //   box right edge = text_left + text_w + TITLE_BOX_PADDING = W - CELL_RIGHT_MARGIN
+  // Guaranteed to end exactly at CELL_RIGHT_MARGIN from the right edge no
+  // matter how wide the text is at the chosen fontsize.
+  const titleFontSize = titleFit.fontsize;
   const titleStripY = `H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
+  const titleYOffset = Math.floor((TITLE_STRIP_HEIGHT - titleFontSize) / 2);
   const productTitleFilter =
-    `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${TITLE_FONT_SIZE}:` +
+    `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${titleFontSize}:` +
     `fontcolor=white:box=1:boxcolor=0x111722dd:boxborderw=${TITLE_BOX_PADDING}:` +
-    `x=${titleStripX}+16:y=${titleStripY}+${Math.floor((TITLE_STRIP_HEIGHT - TITLE_FONT_SIZE) / 2)}`;
+    `x=W-text_w-${TITLE_BOX_PADDING}-${CELL_RIGHT_MARGIN}:y=${titleStripY}+${titleYOffset}`;
 
   const buyPillFilter =
     `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=${CTA_FONT_SIZE}:fontcolor=0x0a0a0a:borderw=0:` +
@@ -347,6 +437,8 @@ async function postProcessVideo({
       fontFile,
       mockupSource,
       mockupInspect,
+      titleFit,
+      probed,
       productDiagnostics,
       code: 'FFMPEG_COMPOSE_FAILED'
     };
@@ -388,6 +480,8 @@ async function postProcessVideo({
     fontFile,
     mockupSource,
     mockupInspect,
+    titleFit,
+    probed,
     productDiagnostics
   };
 }
@@ -400,4 +494,12 @@ function escapeDrawtextValue(text) {
     .replace(/%/g, '\\%');
 }
 
-module.exports = { postProcessVideo, downloadFile, resolveFontFile, utcStampForFilename, inspectMockupImage };
+module.exports = {
+  postProcessVideo,
+  downloadFile,
+  resolveFontFile,
+  utcStampForFilename,
+  inspectMockupImage,
+  probeVideoDimensions,
+  fitTitleBox
+};
