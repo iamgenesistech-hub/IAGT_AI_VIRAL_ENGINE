@@ -127,25 +127,21 @@ function createIdempotencyKey({ script, avatar_id, voice_id, config = {} }) {
     script: String(script || '').trim(),
     avatar_id,
     voice_id,
-    dimension: config.dimension || null,
-    avatar_style: config.avatar_style || config.avatarStyle || 'normal',
+    aspect_ratio: config.aspect || config.aspect_ratio || '9:16',
     background: config.background || null,
-    caption: Boolean(config.caption),
     test: Boolean(config.test)
   });
 
+  // v3 requires idempotency key in [A-Za-z0-9_:.-]{1,255}; sha256 hex fits.
   return crypto.createHash('sha256').update(stablePayload).digest('hex');
 }
 
-function normalizeDimension(config = {}) {
-  if (config.dimension && Number(config.dimension.width) && Number(config.dimension.height)) {
-    return { width: Number(config.dimension.width), height: Number(config.dimension.height) };
-  }
-
-  const aspect = config.aspect || config.aspect_ratio || '16:9';
-  if (aspect === '9:16') return { width: 1080, height: 1920 };
-  if (aspect === '1:1') return { width: 1080, height: 1080 };
-  return { width: 1920, height: 1080 };
+function normalizeAspectRatio(value) {
+  const text = String(value || '').trim();
+  if (!text) return '9:16';
+  if (['16:9', '9:16', '4:5', '5:4', '1:1', 'auto'].includes(text)) return text;
+  if (text === 'square') return '1:1';
+  return '9:16';
 }
 
 function normalizeHeyGenStatus(payload = {}, fallbackVideoId = null) {
@@ -160,14 +156,6 @@ function normalizeHeyGenStatus(payload = {}, fallbackVideoId = null) {
     error: data.error || payload.error || null,
     raw: payload
   };
-}
-
-function normalizeAspectRatio(value) {
-  const text = String(value || '').trim();
-  if (!text) return 'auto';
-  if (['16:9', '9:16', '4:5', '5:4', '1:1', 'auto'].includes(text)) return text;
-  if (text === 'square') return '1:1';
-  return 'auto';
 }
 
 function normalizeHeyGenAgentSession(payload = {}, fallbackSessionId = null) {
@@ -227,7 +215,7 @@ async function heygenFetch(path, options = {}, attempt = 1) {
 
   const payload = await parseJsonResponse(response);
   if (!response.ok) {
-    const message = payload?.message || payload?.error?.message || payload?.error || payload?.raw || ('HeyGen request failed with HTTP ' + response.status);
+    const message = payload?.error?.message || payload?.message || payload?.error || payload?.raw || ('HeyGen request failed with HTTP ' + response.status);
     const error = new Error(message);
     error.statusCode = response.status;
     error.payload = payload;
@@ -243,52 +231,50 @@ async function heygenFetch(path, options = {}, attempt = 1) {
   return payload;
 }
 
+// ─── V3 CREATE VIDEO ─────────────────────────────────────────────────────────
+// Migrated from POST /v2/video/generate (legacy, hard 8/day trial cap) to
+// POST /v3/videos (paid Creator credits honoured). See
+// https://developers.heygen.com/reference/create-video
 async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
   const cleanScript = sanitizeSpokenDialogue(script);
   if (!avatar_id) throw new Error('avatar_id is required.');
   if (!voice_id) throw new Error('voice_id is required.');
 
   const idempotencyKey = createIdempotencyKey({ script: cleanScript, avatar_id, voice_id, config });
-  const dimension = normalizeDimension(config);
+  const aspectRatio = normalizeAspectRatio(config.aspect || config.aspect_ratio || '9:16');
 
-  // Use v2 endpoint — proven working; v3 returns 404 for this account
-  const v2Payload = {
-    video_inputs: [{
-      character: {
-        type: 'avatar',
-        avatar_id,
-        avatar_style: config.avatar_style || config.avatarStyle || 'normal'
-      },
-      voice: {
-        type: 'text',
-        input_text: cleanScript,
-        voice_id
-      },
-      background: config.background || { type: 'color', value: '#0a0a0a' }
-    }],
-    dimension,
-    test: Boolean(config.test)
+  const v3Payload = {
+    type: 'avatar',
+    avatar_id,
+    voice_id,
+    script: cleanScript,
+    aspect_ratio: aspectRatio,
+    output_format: 'mp4'
   };
-  if (typeof config.callback_url === 'string' && config.callback_url.trim()) {
-    v2Payload.callback_id = config.callback_url.trim();
+  if (config.title) v3Payload.title = String(config.title);
+  if (config.background && typeof config.background === 'object') {
+    v3Payload.background = config.background;
   }
+  if (config.resolution) v3Payload.resolution = String(config.resolution);
+  if (config.callback_url) v3Payload.callback_url = String(config.callback_url).trim();
+  if (config.callback_id) v3Payload.callback_id = String(config.callback_id).trim();
 
-  const response = await heygenFetch('/v2/video/generate', {
+  const response = await heygenFetch('/v3/videos', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify(v2Payload)
+    body: JSON.stringify(v3Payload)
   });
 
-  const videoId = response?.data?.video_id || response?.data?.id || response?.video_id || response?.id || null;
+  const videoId = response?.data?.video_id || response?.video_id || response?.data?.id || null;
   if (!videoId) {
-    const error = new Error('HeyGen accepted the request but did not return data.video_id.');
+    const error = new Error('HeyGen accepted the /v3/videos request but did not return data.video_id.');
     error.payload = response;
     throw error;
   }
 
   return {
     video_id: videoId,
-    status: 'rendering',
+    status: response?.data?.status || 'waiting',
     video_url: null,
     thumbnail_url: null,
     duration: null,
@@ -300,18 +286,16 @@ async function startHeyGenRender({ script, avatar_id, voice_id, config = {} }) {
 
 async function getHeyGenVideoStatus(videoId) {
   if (!videoId) throw new Error('video_id is required.');
-  // Use v1 status endpoint — proven working; v3/videos/{id} returns 404
+  // v1 status endpoint accepts video_ids from both v2 and v3 creates.
   const response = await heygenFetch('/v1/video_status.get?video_id=' + encodeURIComponent(videoId), { method: 'GET' });
   return normalizeHeyGenStatus(response, videoId);
 }
 
 async function getHeyGenCurrentUser() {
-  // Try multiple endpoints for user/quota info
   try {
     const response = await heygenFetch('/v2/user/remaining_quota', { method: 'GET' });
     return response && response.data ? response.data : response;
   } catch (_) {
-    // Fallback: confirm auth works via a lightweight call
     const response = await heygenFetch('/v1/video.list?limit=1', { method: 'GET' });
     return { authenticated: true, videos: response?.data?.videos?.length || 0 };
   }
@@ -448,16 +432,15 @@ async function renderInternalVideo({ script, avatar_id, voice_id, config = {} })
 // ─── JORDAN AVATAR VALIDATION ────────────────────────────────────────────────
 async function validateJordanAvatar() {
   try {
-    const response = await heygenFetch('/v2/video/generate', {
+    const response = await heygenFetch('/v3/videos', {
       method: 'POST',
       body: JSON.stringify({
-        video_inputs: [{
-          character: { type: 'avatar', avatar_id: JORDAN_AVATAR_ID, avatar_style: 'normal' },
-          voice: { type: 'text', input_text: 'test', voice_id: JORDAN_VOICE_ID },
-          background: { type: 'color', value: '#000000' }
-        }],
-        dimension: { width: 1920, height: 1080 },
-        test: true
+        type: 'avatar',
+        avatar_id: JORDAN_AVATAR_ID,
+        voice_id: JORDAN_VOICE_ID,
+        script: 'test',
+        aspect_ratio: '16:9',
+        output_format: 'mp4'
       })
     });
     return { valid: true, avatar_id: JORDAN_AVATAR_ID, video_id: response?.data?.video_id };
@@ -470,8 +453,6 @@ async function validateJordanAvatar() {
 }
 
 function resolveAvatarId(requestedId) {
-  // Jordan is the primary presenter avatar. Honour HEYGEN_AVATAR_ID or REACT_APP_JORDAN_AVATAR_ID
-  // env-var overrides so the Cloud Run secret can supply the live ID without a code change.
   const activeJordanId = process.env.HEYGEN_AVATAR_ID || process.env.REACT_APP_JORDAN_AVATAR_ID || JORDAN_AVATAR_ID;
   if (requestedId === JORDAN_AVATAR_ID || requestedId === activeJordanId) {
     return activeJordanId;
