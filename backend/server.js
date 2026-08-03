@@ -13,6 +13,7 @@ const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
+const { registerAvatarStudioRoutes } = require('./avatarStudioRoutes');
 const { registerViralMediaRoutes } = require('./viralMediaRoutes');
 const { buildPublicMediaUrlFromObjectPath } = require('./mediaUrl');
 const {
@@ -516,6 +517,10 @@ app.post('/api/affiliate/session/logout', (req, res) => {
   return res.json({ success: true });
 });
 
+app.get('/avatar-studio', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, '../dashboard/avatar-studio/index.html'));
+});
 // Serve the affiliate hub landing page at /affiliate and /ref/:code
 app.get('/affiliate/workspace', (_req, res) => res.sendFile(path.join(__dirname, '../dashboard/affiliate-hub/workspace.html')));
 app.get(['/affiliate', '/affiliate/'], (req, res) => {
@@ -2687,6 +2692,7 @@ registerEvicsEliteRoutes(app, {
   controlCenterDir: path.join(__dirname, '../dashboard/control-center')
 });
 registerMediaOutputRoutes(app, SupabaseConnector);
+registerAvatarStudioRoutes(app, SupabaseConnector);
 
 let nativeAvatarWorkerRef = null;
 
