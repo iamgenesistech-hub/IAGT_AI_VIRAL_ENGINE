@@ -446,13 +446,14 @@ function detectBundle({ title, productType, tags }) {
 function buildDefaultTrustScript(ctx) {
   const product = ctx.productTitle;
   const brand = ctx.companyLabel;
-  const url = ctx.productPageUrl;
+  // NOTE: We intentionally do NOT speak the productPageUrl. The Buy Now button
+  // overlay is the CTA target; the avatar must never recite raw URLs on-camera.
   return [
     `Stop scrolling -- if you are tired of guessing which wellness upgrade is actually worth your time, ${brand}'s ${product} is the one to try.`,
     `${product} is the simple daily ritual that makes your routine feel cleaner, calmer, and more consistent without extra effort.`,
     `You get a premium daily moment built around ${product}, without the guesswork, without the clutter, and without any confusing routines.`,
     `If you want a simple upgrade that feels intentional and easy to repeat, this is the product I would start with today.`,
-    `Tap the link to visit ${url} and get yours today.`
+    `Tap the Buy Now button below to shop today and get yours delivered.`
   ].join(' ');
 }
 
@@ -774,7 +775,17 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
       script,
       avatar_id: avatarId,
       voice_id: voiceId,
-      config: { aspect, test }
+      config: {
+        aspect,
+        test,
+        // Put the product mockup image into the video as the HeyGen background
+        // so the actual product is visible in-frame throughout the render.
+        // The avatar sits on the product image; ffmpeg post-processing later
+        // adds a "Buy Now" pill overlay linked to ctx.productPageUrl.
+        background: ctx.productImageUrl
+          ? { type: 'image', url: ctx.productImageUrl, fit: 'cover' }
+          : { type: 'color', value: '#0a0a0a' }
+      }
     });
   } catch (err) {
     log.error('[mediaRenderCreator] HeyGen submit failed:', err && err.message ? err.message : err);
