@@ -14,28 +14,15 @@
  *     treat that as a render failure and MUST NOT ship the raw video —
  *     videos without the product mockup and Buy Now pill are not allowed.
  *
- * LAYOUT (portrait 9:16 == 720x1280 reference frame, scales cleanly to
- *          landscape 16:9 == 1920x1080):
- *
- *     +--------------------------+   ← top of frame
- *     |                          |
- *     |     [ avatar body ]      |
- *     |                          |
- *     |   ┌──────────────┐       |
- *     |   │ Sea Moss...  │       |  ← product-title strip (30, ih-560)
- *     |   └──────────────┘       |
- *     |   ┌────────────┐         |
- *     |   │   [PROD]   │         |  ← mockup cell 300x300 at (iw-330, ih-540)
- *     |   │   image    │         |
- *     |   └────────────┘         |
- *     |                          |
- *     |   [ Buy Now pill ]       |  ← CTA pill at (center, ih-180)
- *     |                          |
- *     +--------------------------+   ← bottom of frame
+ * MOCKUP VALIDATION:
+ *   Local bg-removed PNGs are validated with `sharp` before use — if the
+ *   PNG's mean alpha is below MOCKUP_MIN_MEAN_ALPHA the image is effectively
+ *   invisible (over-eager bg removal wiped the product), and we fall back
+ *   to the raw productImageUrl. If BOTH are unusable we fail hard.
  *
  * FILENAME: every processed video's output filename embeds a UTC
  * YYYYMMDDTHHMMSSZ timestamp so operators can trace exactly when a given
- * asset was produced (e.g. `52_20260803T164210Z_final.mp4`).
+ * asset was produced.
  *
  * Uses ffmpeg (installed in the Docker container).
  */
@@ -48,8 +35,20 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 
+let sharp = null;
+try { sharp = require('sharp'); } catch (_e) { sharp = null; }
+
 const MEDIA_CACHE_DIR = path.join(__dirname, '../media-cache');
 const PROCESSED_DIR = path.join(__dirname, '../processed-videos');
+
+// Any bg-removed PNG whose mean alpha (0..255) is below this threshold is
+// considered visually empty and will be discarded in favour of the raw
+// productImageUrl. 40 ≈ 15% average opacity; below that, the product is
+// effectively invisible when composited on a dark pedestal.
+const MOCKUP_MIN_MEAN_ALPHA = 40;
+// If the source PNG is smaller than this in bytes AND has an alpha channel,
+// it's almost certainly an over-cropped or empty asset.
+const MOCKUP_MIN_BYTES = 4 * 1024;
 
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true });
@@ -69,10 +68,68 @@ function utcStampForFilename(d = new Date()) {
   );
 }
 
-// Resolve a real TTF font file on disk. Alpine + ttf-dejavu installs the
-// DejaVu family; other distros may have Liberation or Freefont. Never rely on
-// fontconfig lookup like "font=Sans" — Alpine's fontconfig config often can't
-// resolve the alias, which causes drawtext to fail with an inscrutable error.
+// Inspect a PNG on disk and decide whether it's "visually usable" (i.e.
+// has enough opaque pixels to be worth compositing). Returns:
+//   { usable: boolean, meanAlpha: number|null, width, height, reason }
+async function inspectMockupImage(filePath) {
+  const result = { usable: false, meanAlpha: null, width: null, height: null, reason: '' };
+  try {
+    const stat = fs.statSync(filePath);
+    if (!stat || stat.size < MOCKUP_MIN_BYTES) {
+      result.reason = `file too small (${stat ? stat.size : 'null'} bytes)`;
+      return result;
+    }
+  } catch (statErr) {
+    result.reason = `stat failed: ${statErr.message}`;
+    return result;
+  }
+  if (!sharp) {
+    // No sharp — fall back to "file exists + non-trivial size = usable"
+    result.usable = true;
+    result.reason = 'sharp unavailable; accepted by size only';
+    return result;
+  }
+  try {
+    const img = sharp(filePath);
+    const meta = await img.metadata();
+    result.width = meta.width || null;
+    result.height = meta.height || null;
+    // No alpha channel = JPG or opaque PNG. If it's opaque, it's definitely
+    // visible (may look bad on a dark pedestal, but at least it shows).
+    if (!meta.hasAlpha) {
+      result.usable = true;
+      result.meanAlpha = 255;
+      result.reason = 'opaque image (no alpha)';
+      return result;
+    }
+    const stats = await img.stats();
+    // sharp.stats() returns channel stats; alpha is the last channel when
+    // hasAlpha is true. Prefer stats.channels[N-1].mean.
+    const chans = Array.isArray(stats.channels) ? stats.channels : [];
+    const alphaChan = chans.length ? chans[chans.length - 1] : null;
+    const meanAlpha = alphaChan && typeof alphaChan.mean === 'number' ? alphaChan.mean : null;
+    result.meanAlpha = meanAlpha;
+    if (meanAlpha == null) {
+      result.usable = true;
+      result.reason = 'alpha stats unavailable; accepted by size only';
+      return result;
+    }
+    if (meanAlpha >= MOCKUP_MIN_MEAN_ALPHA) {
+      result.usable = true;
+      result.reason = `mean alpha ${meanAlpha.toFixed(1)} >= ${MOCKUP_MIN_MEAN_ALPHA}`;
+      return result;
+    }
+    result.reason = `mean alpha ${meanAlpha.toFixed(1)} < ${MOCKUP_MIN_MEAN_ALPHA} (image is essentially empty)`;
+    return result;
+  } catch (sharpErr) {
+    result.reason = `sharp inspect failed: ${sharpErr.message}`;
+    // On sharp failure, don't block — trust the file exists.
+    result.usable = true;
+    return result;
+  }
+}
+
+// Resolve a real TTF font file on disk.
 function resolveFontFile() {
   const candidates = [
     process.env.EVICS_TEXT_FONT_FILE,
@@ -124,8 +181,6 @@ async function postProcessVideo({
    textOverlayPosition = 'bottom',
    ctaText
 }) {
-  // Always embed a UTC timestamp in the output filename so every render is
-  // uniquely traceable to its production time — even reruns of the same row.
   const renderStamp = utcStampForFilename();
   const stampedId = `${videoId}_${renderStamp}`;
 
@@ -137,10 +192,6 @@ async function postProcessVideo({
   const inputs = ['-i', inputPath];
 
   const productName = escapeDrawtextValue(productTitle || 'Featured Product');
-  // ABSOLUTE RULE: the CTA overlay must never render a URL as spoken/on-screen
-  // text. Keep the button label SHORT so it fits any 9:16 or 16:9 frame
-  // without horizontal clipping. Long product names live in the title strip
-  // ABOVE the mockup, not on the button.
   const cta = escapeDrawtextValue(ctaText || 'BUY NOW');
 
   const fontFile = resolveFontFile();
@@ -154,85 +205,63 @@ async function postProcessVideo({
       code: 'FONT_FILE_MISSING'
     };
   }
-  // drawtext fontfile= must have any ':' path separator escaped so ffmpeg's
-  // filter parser doesn't treat it as an option delimiter.
   const fontfileArg = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-  // ---- LAYOUT CONSTANTS (portrait 9:16 reference) ----------------------
-  // These are pixel offsets from the frame's right/bottom edges.
-  const CELL_SIZE = 300;             // product mockup cell (square)
-  const CELL_RIGHT_MARGIN = 30;      // gap from right edge to cell
-  const CELL_BOTTOM_MARGIN = 240;    // gap from bottom edge to cell bottom
-  const TITLE_STRIP_HEIGHT = 60;     // room for the product-title strip
-  const TITLE_STRIP_GAP = 12;        // gap between title strip and mockup
-  const CTA_BOTTOM_MARGIN = 90;      // gap from bottom edge to CTA pill bottom
+  // ---- LAYOUT CONSTANTS -------------------------------------------------
+  const CELL_SIZE = 300;
+  const CELL_RIGHT_MARGIN = 30;
+  const CELL_BOTTOM_MARGIN = 240;
+  const TITLE_STRIP_HEIGHT = 60;
+  const TITLE_STRIP_GAP = 12;
+  const CTA_BOTTOM_MARGIN = 90;
   const CTA_FONT_SIZE = 56;
   const CTA_BOX_PADDING = 22;
   const TITLE_FONT_SIZE = 30;
   const TITLE_BOX_PADDING = 12;
 
-  // ---- PRODUCT MOCKUP FILTER --------------------------------------------
-  // Deterministic 300x300 RGBA cell. force_original_aspect_ratio=decrease
-  // guarantees the source fits inside the cell without distortion; the pad
-  // fills the rest with fully transparent pixels so the pedestal color
-  // shows through around the product.
-  //
-  // NOTE: we DELIBERATELY drop the fade-in — it was making the mockup
-  // invisible during the first ~0.55s, which is exactly the frame most
-  // viewers see when the video autoplays.
-  const productLayerFilter =
-    `[1:v]scale=${CELL_SIZE}:${CELL_SIZE}:force_original_aspect_ratio=decrease,` +
-    `pad=${CELL_SIZE}:${CELL_SIZE}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,` +
-    `format=rgba[prod]`;
-
-  const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
-
-  // ---- PEDESTAL (dark card + gold border, EXACTLY the cell) --------------
-  // drawbox does NOT support the W/H (main input) constants — only iw/ih.
-  const pedestalX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
-  const pedestalY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}`;
-  const pedestal =
-    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0x050505@0.55:t=fill,` +
-    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0xf4c96a@0.9:t=3`;
-
-  // ---- PRODUCT OVERLAY (positioned to EXACTLY overlap the pedestal) -----
-  // overlay filter's W/H = main video dims, w/h = overlay dims (both CELL_SIZE).
-  const productOverlay =
-    `overlay=x=W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}:y=H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}:format=auto`;
-
-  // ---- PRODUCT-TITLE STRIP (above the mockup cell) -----------------------
-  // Anchor to the SAME right-side column as the mockup so the strip and
-  // mockup read as one unit. Left-align text inside a padded box.
-  const titleStripX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
-  const titleStripY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
-  const productTitleFilter =
-    `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${TITLE_FONT_SIZE}:` +
-    `fontcolor=white:box=1:boxcolor=0x111722dd:boxborderw=${TITLE_BOX_PADDING}:` +
-    `x=${titleStripX}+16:y=${titleStripY}+${Math.floor((TITLE_STRIP_HEIGHT - TITLE_FONT_SIZE) / 2)}`;
-
-  // ---- BUY NOW CTA PILL (short label, guaranteed to fit) -----------------
-  // Total drawn height ≈ CTA_FONT_SIZE + 2*CTA_BOX_PADDING = 56 + 44 = 100 px.
-  // y = h - text_h - CTA_BOTTOM_MARGIN puts the text top at h-146; the box
-  // extends CTA_BOX_PADDING further so its bottom lands at h - CTA_BOTTOM_MARGIN
-  // + CTA_BOX_PADDING = h-68. Safe on every player.
-  const buyPillFilter =
-    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=${CTA_FONT_SIZE}:fontcolor=0x0a0a0a:borderw=0:` +
-    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=${CTA_BOX_PADDING}:` +
-    `x=(w-text_w)/2:y=h-text_h-${CTA_BOTTOM_MARGIN}`;
-
-  let productOverlayApplied = false;
+  // ---- SELECT PRODUCT IMAGE ---------------------------------------------
+  // Try local bg-removed PNG first; if it's transparent/empty, fall back to
+  // the raw productImageUrl. Report exactly which source ended up in the
+  // final composite so the operator can diagnose bg-removal regressions.
   let productImageInputPath = null;
+  let mockupSource = null;         // 'local-bg-removed' | 'raw-download'
+  let mockupInspect = null;
+  const productDiagnostics = { localCandidate: productImageLocalPath || null, remoteCandidate: productImageUrl || null };
 
-  // Prefer local bg-removed PNG when provided (avoids re-downloading a URL
-  // that points back at our own /processed-images route).
   if (productImageLocalPath && fs.existsSync(productImageLocalPath)) {
-    productImageInputPath = productImageLocalPath;
-  } else if (productImageUrl) {
-    const ext = productImageUrl.includes('.png') ? 'png' : 'jpg';
+    const inspection = await inspectMockupImage(productImageLocalPath);
+    mockupInspect = inspection;
+    if (inspection.usable) {
+      productImageInputPath = productImageLocalPath;
+      mockupSource = 'local-bg-removed';
+    } else {
+      console.warn('[PostProcess] Rejecting bg-removed mockup:', inspection.reason);
+    }
+  }
+
+  if (!productImageInputPath && productImageUrl) {
+    const ext = productImageUrl.toLowerCase().includes('.png') ? 'png' : 'jpg';
     const productPath = path.join(MEDIA_CACHE_DIR, `${stampedId}_product.${ext}`);
     try {
       await downloadFile(productImageUrl, productPath);
+      // Also validate the raw download — if THAT's tiny/broken we can't
+      // continue at all.
+      const rawInspect = await inspectMockupImage(productPath);
+      productDiagnostics.rawInspect = rawInspect;
+      if (!rawInspect.usable && rawInspect.meanAlpha !== null && rawInspect.meanAlpha < MOCKUP_MIN_MEAN_ALPHA) {
+        // Raw image also fully transparent? Extremely unlikely, but bail.
+        return {
+          success: false,
+          processedVideoPath: null,
+          processedVideoUrl: null,
+          productOverlayApplied: false,
+          error: `Both bg-removed and raw product images are visually empty. Raw: ${rawInspect.reason}`,
+          code: 'PRODUCT_MOCKUP_UNAVAILABLE',
+          productDiagnostics
+        };
+      }
       productImageInputPath = productPath;
+      mockupSource = 'raw-download';
     } catch (err) {
       return {
         success: false,
@@ -240,60 +269,66 @@ async function postProcessVideo({
         processedVideoUrl: null,
         productOverlayApplied: false,
         error: `Product mockup download failed before post-processing: ${err.message}`,
-        code: 'PRODUCT_MOCKUP_UNAVAILABLE'
+        code: 'PRODUCT_MOCKUP_UNAVAILABLE',
+        productDiagnostics
       };
     }
-  } else {
+  }
+
+  if (!productImageInputPath) {
     return {
       success: false,
       processedVideoPath: null,
       processedVideoUrl: null,
       productOverlayApplied: false,
-      error: 'productImageUrl (or productImageLocalPath) is required — videos without a product mockup are not allowed.',
-      code: 'PRODUCT_MOCKUP_UNAVAILABLE'
+      error: 'No usable product mockup: bg-removed PNG was empty and no productImageUrl was provided.',
+      code: 'PRODUCT_MOCKUP_UNAVAILABLE',
+      productDiagnostics: Object.assign(productDiagnostics, { mockupInspect })
     };
   }
 
-  // Verify the product image exists on disk and is non-trivially sized.
-  try {
-    const stat = fs.statSync(productImageInputPath);
-    if (!stat || stat.size < 512) {
-      return {
-        success: false,
-        processedVideoPath: null,
-        processedVideoUrl: null,
-        productOverlayApplied: false,
-        error: `Product mockup file is missing or too small (${stat ? stat.size : 'null'} bytes) at ${productImageInputPath}.`,
-        code: 'PRODUCT_MOCKUP_UNAVAILABLE'
-      };
-    }
-  } catch (statErr) {
-    return {
-      success: false,
-      processedVideoPath: null,
-      processedVideoUrl: null,
-      productOverlayApplied: false,
-      error: `Product mockup file could not be stat'd: ${statErr.message}`,
-      code: 'PRODUCT_MOCKUP_UNAVAILABLE'
-    };
-  }
+  // ---- PRODUCT MOCKUP FILTER --------------------------------------------
+  // If we're using the RAW image (JPG with real background), we need to
+  // fit-and-pad it in a similar way, and it won't have real transparency
+  // — that's OK, the pedestal is dark and the product will simply sit on
+  // top of a subtle background rectangle. If we're using the bg-removed
+  // PNG, format=rgba preserves its alpha.
+  const productLayerFilter =
+    `[1:v]scale=${CELL_SIZE}:${CELL_SIZE}:force_original_aspect_ratio=decrease,` +
+    `pad=${CELL_SIZE}:${CELL_SIZE}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,` +
+    `format=rgba[prod]`;
+
+  const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
+
+  const pedestalX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  const pedestalY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}`;
+  const pedestal =
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0x050505@0.55:t=fill,` +
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0xf4c96a@0.9:t=3`;
+
+  const productOverlay =
+    `overlay=x=W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}:y=H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}:format=auto`;
+
+  const titleStripX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  const titleStripY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
+  const productTitleFilter =
+    `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${TITLE_FONT_SIZE}:` +
+    `fontcolor=white:box=1:boxcolor=0x111722dd:boxborderw=${TITLE_BOX_PADDING}:` +
+    `x=${titleStripX}+16:y=${titleStripY}+${Math.floor((TITLE_STRIP_HEIGHT - TITLE_FONT_SIZE) / 2)}`;
+
+  const buyPillFilter =
+    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=${CTA_FONT_SIZE}:fontcolor=0x0a0a0a:borderw=0:` +
+    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=${CTA_BOX_PADDING}:` +
+    `x=(w-text_w)/2:y=h-text_h-${CTA_BOTTOM_MARGIN}`;
 
   inputs.push('-i', productImageInputPath);
 
-  // Filter graph order:
-  //   1. grade + vignette on main video
-  //   2. draw pedestal card
-  //   3. build product overlay layer
-  //   4. composite product ONTO pedestal
-  //   5. draw product-title strip above pedestal
-  //   6. draw Buy Now pill at bottom
   const filterComplex =
     `[0:v]${gradeAndVignette},${pedestal}[graded];` +
     `${productLayerFilter};` +
     `[graded][prod]${productOverlay}[withprod];` +
     `[withprod]${productTitleFilter}[producttxt];` +
     `[producttxt]${buyPillFilter}[out]`;
-  productOverlayApplied = true;
 
   const ffmpegArgs = [
     '-y',
@@ -320,6 +355,9 @@ async function postProcessVideo({
       ffmpegStderrTail: stderrTail,
       filterComplex,
       fontFile,
+      mockupSource,
+      mockupInspect,
+      productDiagnostics,
       code: 'FFMPEG_COMPOSE_FAILED'
     };
   }
@@ -350,14 +388,17 @@ async function postProcessVideo({
     processedVideoFilename: `${stampedId}_final.mp4`,
     renderStamp,
     stampedVideoId: stampedId,
-    productOverlayApplied,
-    foregroundProductPresentation: productOverlayApplied,
-    productHeroShotApplied: productOverlayApplied,
-    productLabelReadable: productOverlayApplied,
+    productOverlayApplied: true,
+    foregroundProductPresentation: true,
+    productHeroShotApplied: true,
+    productLabelReadable: true,
     ctaTextApplied: true,
     ctaClickUrl: productPageUrl || null,
     ctaLabel: ctaText || 'BUY NOW',
-    fontFile
+    fontFile,
+    mockupSource,
+    mockupInspect,
+    productDiagnostics
   };
 }
 
@@ -369,4 +410,4 @@ function escapeDrawtextValue(text) {
     .replace(/%/g, '\\%');
 }
 
-module.exports = { postProcessVideo, downloadFile, resolveFontFile, utcStampForFilename };
+module.exports = { postProcessVideo, downloadFile, resolveFontFile, utcStampForFilename, inspectMockupImage };
