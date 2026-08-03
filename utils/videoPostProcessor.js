@@ -2,10 +2,10 @@
  * videoPostProcessor.js — EVICS Video Post-Processing Engine
  *
  * After the base avatar/cinematic render, this adds:
- *   1. Foreground product presentation (bg-removed mockup, large + centered
- *      above the CTA)
- *   2. Product title label
- *   3. Buy Now CTA pill (raised into the safe zone so nothing clips)
+ *   1. Foreground product presentation (bg-removed mockup, deterministic
+ *      300x300 hero cell in the bottom-right)
+ *   2. Product title strip (sits directly above the mockup cell)
+ *   3. Buy Now CTA pill (short label, guaranteed to fit any 9:16 or 16:9 frame)
  *   4. Final color grade/export
  *
  * ABSOLUTE CONTRACT:
@@ -14,8 +14,27 @@
  *     treat that as a render failure and MUST NOT ship the raw video —
  *     videos without the product mockup and Buy Now pill are not allowed.
  *
+ * LAYOUT (portrait 9:16 == 720x1280 reference frame, scales cleanly to
+ *          landscape 16:9 == 1920x1080):
+ *
+ *     +--------------------------+   ← top of frame
+ *     |                          |
+ *     |     [ avatar body ]      |
+ *     |                          |
+ *     |   ┌──────────────┐       |
+ *     |   │ Sea Moss...  │       |  ← product-title strip (30, ih-560)
+ *     |   └──────────────┘       |
+ *     |   ┌────────────┐         |
+ *     |   │   [PROD]   │         |  ← mockup cell 300x300 at (iw-330, ih-540)
+ *     |   │   image    │         |
+ *     |   └────────────┘         |
+ *     |                          |
+ *     |   [ Buy Now pill ]       |  ← CTA pill at (center, ih-180)
+ *     |                          |
+ *     +--------------------------+   ← bottom of frame
+ *
  * FILENAME: every processed video's output filename embeds a UTC
- * YYYYMMDD_HHMMSS timestamp so operators can trace exactly when a given
+ * YYYYMMDDTHHMMSSZ timestamp so operators can trace exactly when a given
  * asset was produced (e.g. `52_20260803T164210Z_final.mp4`).
  *
  * Uses ffmpeg (installed in the Docker container).
@@ -119,12 +138,10 @@ async function postProcessVideo({
 
   const productName = escapeDrawtextValue(productTitle || 'Featured Product');
   // ABSOLUTE RULE: the CTA overlay must never render a URL as spoken/on-screen
-  // text. The URL is the click target stored alongside the video; the
-  // on-screen button always reads "Buy Now — Shop {product}".
-  const cta = escapeDrawtextValue(ctaText || `Buy Now - Shop ${productTitle || 'Now'}`);
-
-  const overlayPlacement = resolveFaceSafeTextPlacement(textOverlayPosition);
-  const titleY = overlayPlacement.titleY;
+  // text. Keep the button label SHORT so it fits any 9:16 or 16:9 frame
+  // without horizontal clipping. Long product names live in the title strip
+  // ABOVE the mockup, not on the button.
+  const cta = escapeDrawtextValue(ctaText || 'BUY NOW');
 
   const fontFile = resolveFontFile();
   if (!fontFile) {
@@ -141,51 +158,67 @@ async function postProcessVideo({
   // filter parser doesn't treat it as an option delimiter.
   const fontfileArg = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-  const normalizedEffects = Array.isArray(specialEffects)
-    ? specialEffects.map((effect) => String(effect || '').trim().toLowerCase())
-    : [];
-  const withProductEntranceFade = normalizedEffects.includes('product-entrance-fade');
+  // ---- LAYOUT CONSTANTS (portrait 9:16 reference) ----------------------
+  // These are pixel offsets from the frame's right/bottom edges.
+  const CELL_SIZE = 300;             // product mockup cell (square)
+  const CELL_RIGHT_MARGIN = 30;      // gap from right edge to cell
+  const CELL_BOTTOM_MARGIN = 240;    // gap from bottom edge to cell bottom
+  const TITLE_STRIP_HEIGHT = 60;     // room for the product-title strip
+  const TITLE_STRIP_GAP = 12;        // gap between title strip and mockup
+  const CTA_BOTTOM_MARGIN = 90;      // gap from bottom edge to CTA pill bottom
+  const CTA_FONT_SIZE = 56;
+  const CTA_BOX_PADDING = 22;
+  const TITLE_FONT_SIZE = 30;
+  const TITLE_BOX_PADDING = 12;
 
-  // Product mockup: scaled to ~460px wide (up from 320) and positioned in the
-  // bottom-right hero zone, ABOVE the CTA pill. Force alpha=1 fully so a
-  // partially transparent bg-removed PNG still reads at full opacity.
-  const productLayerFilter = withProductEntranceFade
-    ? '[1:v]scale=460:-1,format=rgba,fade=t=in:st=0:d=0.55:alpha=1[prod]'
-    : '[1:v]scale=460:-1,format=rgba[prod]';
+  // ---- PRODUCT MOCKUP FILTER --------------------------------------------
+  // Deterministic 300x300 RGBA cell. force_original_aspect_ratio=decrease
+  // guarantees the source fits inside the cell without distortion; the pad
+  // fills the rest with fully transparent pixels so the pedestal color
+  // shows through around the product.
+  //
+  // NOTE: we DELIBERATELY drop the fade-in — it was making the mockup
+  // invisible during the first ~0.55s, which is exactly the frame most
+  // viewers see when the video autoplays.
+  const productLayerFilter =
+    `[1:v]scale=${CELL_SIZE}:${CELL_SIZE}:force_original_aspect_ratio=decrease,` +
+    `pad=${CELL_SIZE}:${CELL_SIZE}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,` +
+    `format=rgba[prod]`;
 
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
 
-  // Layout math (all measured from bottom of frame):
-  //   CTA pill safe-zone bottom margin ...... 180 px  (was 40 → was clipping)
-  //   Product mockup bottom edge above pill .. 300 px  (leaves ~120 px gap)
-  //
+  // ---- PEDESTAL (dark card + gold border, EXACTLY the cell) --------------
   // drawbox does NOT support the W/H (main input) constants — only iw/ih.
-  // overlay supports W/H (main) + w/h (overlay input), so its expression stays.
-  const PEDESTAL_W = 520;
-  const PEDESTAL_H = 520;
-  const PEDESTAL_BOTTOM_MARGIN = 300;
-  // Pedestal top-left: iw-PEDESTAL_W-30, ih-PEDESTAL_BOTTOM_MARGIN-PEDESTAL_H
-  const pedestalX = `iw-${PEDESTAL_W}-30`;
-  const pedestalY = `ih-${PEDESTAL_BOTTOM_MARGIN}-${PEDESTAL_H}`;
+  const pedestalX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  const pedestalY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}`;
   const pedestal =
-    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${PEDESTAL_W}:h=${PEDESTAL_H}:color=0x050505@0.32:t=fill,` +
-    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${PEDESTAL_W}:h=${PEDESTAL_H}:color=0xf4c96a@0.28:t=4`;
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0x050505@0.55:t=fill,` +
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0xf4c96a@0.9:t=3`;
 
-  // Product overlay uses overlay-filter constants: W/H = main video dims,
-  // w/h = product image dims after scale. Center product horizontally inside
-  // the pedestal band and anchor its BOTTOM edge to PEDESTAL_BOTTOM_MARGIN.
+  // ---- PRODUCT OVERLAY (positioned to EXACTLY overlap the pedestal) -----
+  // overlay filter's W/H = main video dims, w/h = overlay dims (both CELL_SIZE).
   const productOverlay =
-    `overlay=x=W-${PEDESTAL_W}-30+((${PEDESTAL_W}-w)/2):y=H-h-${PEDESTAL_BOTTOM_MARGIN}:format=auto`;
+    `overlay=x=W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}:y=H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}:format=auto`;
 
-  // Buy Now pill: solid gold background with black text, centered horizontally
-  // in the bottom safe zone. Total drawn height = fontsize (56) + 2*boxborderw
-  // (36) = 128 px. Setting y = h-text_h-180 puts the box bottom at
-  //   (h-text_h-180) + text_h + 18  = h-162
-  // → ~162 px above the frame bottom, comfortably inside the safe area.
+  // ---- PRODUCT-TITLE STRIP (above the mockup cell) -----------------------
+  // Anchor to the SAME right-side column as the mockup so the strip and
+  // mockup read as one unit. Left-align text inside a padded box.
+  const titleStripX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  const titleStripY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
+  const productTitleFilter =
+    `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${TITLE_FONT_SIZE}:` +
+    `fontcolor=white:box=1:boxcolor=0x111722dd:boxborderw=${TITLE_BOX_PADDING}:` +
+    `x=${titleStripX}+16:y=${titleStripY}+${Math.floor((TITLE_STRIP_HEIGHT - TITLE_FONT_SIZE) / 2)}`;
+
+  // ---- BUY NOW CTA PILL (short label, guaranteed to fit) -----------------
+  // Total drawn height ≈ CTA_FONT_SIZE + 2*CTA_BOX_PADDING = 56 + 44 = 100 px.
+  // y = h - text_h - CTA_BOTTOM_MARGIN puts the text top at h-146; the box
+  // extends CTA_BOX_PADDING further so its bottom lands at h - CTA_BOTTOM_MARGIN
+  // + CTA_BOX_PADDING = h-68. Safe on every player.
   const buyPillFilter =
-    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=56:fontcolor=0x0a0a0a:borderw=0:` +
-    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=18:` +
-    `x=(w-text_w)/2:y=h-text_h-180`;
+    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=${CTA_FONT_SIZE}:fontcolor=0x0a0a0a:borderw=0:` +
+    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=${CTA_BOX_PADDING}:` +
+    `x=(w-text_w)/2:y=h-text_h-${CTA_BOTTOM_MARGIN}`;
 
   let productOverlayApplied = false;
   let productImageInputPath = null;
@@ -221,9 +254,7 @@ async function postProcessVideo({
     };
   }
 
-  // Verify the product image exists on disk and is non-trivially sized. A
-  // 0-byte or tiny file will silently vanish inside the overlay filter and
-  // the operator will see "no mockup" without any error.
+  // Verify the product image exists on disk and is non-trivially sized.
   try {
     const stat = fs.statSync(productImageInputPath);
     if (!stat || stat.size < 512) {
@@ -248,8 +279,19 @@ async function postProcessVideo({
   }
 
   inputs.push('-i', productImageInputPath);
-  const filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];` +
-    `[withprod]drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}[producttxt];` +
+
+  // Filter graph order:
+  //   1. grade + vignette on main video
+  //   2. draw pedestal card
+  //   3. build product overlay layer
+  //   4. composite product ONTO pedestal
+  //   5. draw product-title strip above pedestal
+  //   6. draw Buy Now pill at bottom
+  const filterComplex =
+    `[0:v]${gradeAndVignette},${pedestal}[graded];` +
+    `${productLayerFilter};` +
+    `[graded][prod]${productOverlay}[withprod];` +
+    `[withprod]${productTitleFilter}[producttxt];` +
     `[producttxt]${buyPillFilter}[out]`;
   productOverlayApplied = true;
 
@@ -265,15 +307,9 @@ async function postProcessVideo({
   try {
     execFileSync('ffmpeg', ffmpegArgs, { timeout: 180000, stdio: 'pipe' });
   } catch (err) {
-    // Capture the tail of stderr — ffmpeg puts the actual filter error at the
-    // END of its output after a long banner, so slicing from the front loses
-    // the diagnostic. Take the last 1500 chars instead.
     const stderrAll = err && err.stderr ? err.stderr.toString() : '';
     const stderrTail = stderrAll ? stderrAll.slice(-1500) : (err && err.message ? err.message : 'ffmpeg unknown error');
     console.error('[PostProcess] ffmpeg failed (tail):', stderrTail);
-    // Do NOT return the raw video URL — that would ship a video without the
-    // required product mockup + Buy Now overlays. Signal failure and let
-    // the caller mark the render as failed.
     try { fs.unlinkSync(inputPath); } catch {}
     return {
       success: false,
@@ -288,7 +324,6 @@ async function postProcessVideo({
     };
   }
 
-  // Verify the output actually exists and has non-zero size.
   try {
     const stat = fs.statSync(outputPath);
     if (!stat || stat.size < 1024) {
@@ -321,7 +356,7 @@ async function postProcessVideo({
     productLabelReadable: productOverlayApplied,
     ctaTextApplied: true,
     ctaClickUrl: productPageUrl || null,
-    ctaLabel: ctaText || `Buy Now - Shop ${productTitle || 'Now'}`,
+    ctaLabel: ctaText || 'BUY NOW',
     fontFile
   };
 }
@@ -332,18 +367,6 @@ function escapeDrawtextValue(text) {
     .replace(/'/g, "\\'")
     .replace(/:/g, '\\:')
     .replace(/%/g, '\\%');
-}
-
-function resolveFaceSafeTextPlacement(_textOverlayPosition) {
-  // Product title strip sits directly ABOVE the pedestal that holds the
-  // product mockup (mockup bottom is at h-300, pedestal top is at h-820).
-  // Placing the title at h-text_h-830 puts it just above the pedestal, on
-  // the darker side of the frame.
-  return {
-    x: '40',
-    y: 'h-text_h-92',
-    titleY: 'h-text_h-830'
-  };
 }
 
 module.exports = { postProcessVideo, downloadFile, resolveFontFile, utcStampForFilename };
