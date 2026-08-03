@@ -18,6 +18,14 @@
  *  the resolved voice, the render is refused with code=VOICE_MISMATCH.
  *  If resolution fails entirely, code=VOICE_UNRESOLVED.
  *
+ *  HARD RULE — OVERLAY CONTRACT:
+ *  Every rendered video MUST contain the product mockup (bg-removed)
+ *  and a Buy Now CTA pill linked to the Shopify product page. Renders
+ *  where either overlay cannot be composited are marked status=failed
+ *  and never expose the raw HeyGen URL as playbackUrl. Pre-render
+ *  submission is refused with code=PRODUCT_ASSETS_REQUIRED if the
+ *  productImageUrl or productPageUrl is missing.
+ *
  *  The Jordan avatar is reserved for the Affiliate Hub and phone app.
  *  The workspace renderer uses AI-generated stock avatars only.
  */
@@ -38,6 +46,41 @@ try {
   renderQualityValidator = require('./renderQualityValidator');
 } catch (_e) {
   renderQualityValidator = null;
+}
+
+let videoPostProcessor = null;
+try {
+  videoPostProcessor = require('../utils/videoPostProcessor');
+} catch (_e) {
+  videoPostProcessor = null;
+}
+
+let productBgRemover = null;
+try {
+  productBgRemover = require('../utils/productBgRemover');
+} catch (_e) {
+  productBgRemover = null;
+}
+
+const path = require('path');
+
+// Absolute public host for constructing processed-video URLs. Cloud Run
+// sets HOST at deploy time; fall back to the known service URL.
+function publicHost() {
+  return String(
+    process.env.PUBLIC_HOST ||
+    process.env.HOST ||
+    'https://evics-api-480958062306.us-central1.run.app'
+  ).replace(/\/+$/, '');
+}
+
+// Convert a /processed-images/{hash}.png URL to a local file path so ffmpeg
+// can read it directly without a network round-trip.
+function processedImageLocalPath(processedUrl) {
+  if (!processedUrl || typeof processedUrl !== 'string') return null;
+  if (!processedUrl.startsWith('/processed-images/')) return null;
+  const filename = processedUrl.slice('/processed-images/'.length);
+  return path.join(__dirname, '..', 'data', 'processed-images', filename);
 }
 
 const A_PLUS_RENDER_MINIMUM =
@@ -398,7 +441,7 @@ function shallowSummary(node) {
   return out;
 }
 
-// ── Product context / script prep (unchanged) ────────────────────────────
+// ── Product context / script prep ────────────────────────────────────────
 
 function resolveProductContext(input = {}) {
   // Accept either an object or a bare title string.
@@ -568,17 +611,65 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
   const duration = Number(status.duration) || null;
   const failed = status.status === 'failed' || !videoUrl;
 
+  // ── HARD OVERLAY CONTRACT ────────────────────────────────────────────
+  // If HeyGen returned a completed video, we MUST composite the product
+  // mockup (bg-removed) and the Buy Now pill on top before we expose the
+  // playback URL. A raw HeyGen mp4 (avatar-only, no product, no CTA button)
+  // is not shippable and must never be surfaced as playbackUrl.
+  let postProcess = { success: false, code: 'NOT_ATTEMPTED' };
+  let processedPublicUrl = null;
+  if (!failed && videoUrl && videoPostProcessor && typeof videoPostProcessor.postProcessVideo === 'function') {
+    let productImageLocalPath = null;
+    if (productBgRemover && typeof productBgRemover.removeBackground === 'function' && params.productImageUrl) {
+      try {
+        const bg = await productBgRemover.removeBackground(params.productImageUrl);
+        if (bg && bg.success && bg.processedUrl) {
+          productImageLocalPath = processedImageLocalPath(bg.processedUrl);
+          params.bgRemoval = { method: bg.method, processedUrl: bg.processedUrl };
+        }
+      } catch (bgErr) {
+        log.warn('[mediaRenderCreator] bg removal failed, falling back to raw product image:', bgErr && bgErr.message ? bgErr.message : bgErr);
+      }
+    }
+
+    try {
+      postProcess = await videoPostProcessor.postProcessVideo({
+        videoUrl,
+        videoId: `${row.id}_${videoId}`,
+        productImageLocalPath,
+        productImageUrl: params.productImageUrl,
+        productTitle: params.productTitle,
+        productPageUrl: params.productPageUrl,
+        specialEffects: ['product-entrance-fade']
+      });
+    } catch (ppErr) {
+      postProcess = { success: false, error: ppErr && ppErr.message ? ppErr.message : String(ppErr), code: 'POSTPROCESS_THREW' };
+    }
+
+    if (postProcess.success && postProcess.processedVideoUrl) {
+      processedPublicUrl = `${publicHost()}${postProcess.processedVideoUrl}`;
+    }
+  }
+
+  // If HeyGen succeeded but post-processing did not, this render fails
+  // the hard overlay contract. Mark the row failed and do NOT expose the
+  // raw HeyGen URL — the workspace must never ship a video without the
+  // product mockup + Buy Now overlay.
+  const overlaysMissing = !failed && !postProcess.success;
+  const finalVideoUrl = processedPublicUrl || null;
+  const shippableStatus = failed || overlaysMissing;
+
   const grade = renderQualityValidator && typeof renderQualityValidator.gradeCompletedRender === 'function'
     ? renderQualityValidator.gradeCompletedRender({
-        videoUrl,
+        videoUrl: finalVideoUrl,
         thumbnailUrl,
         duration,
         scriptQuality: params.scriptQuality || null
       })
     : { score: 0, tier: 'needs-review', approvedForPublishing: false, minimum: A_PLUS_RENDER_MINIMUM, evidence: {} };
 
-  const autoApprove = autoApproveEnabled() && grade.tier === 'A+' && !failed;
-  const nextStatus = failed ? 'failed' : autoApprove ? 'approved' : 'awaiting_review';
+  const autoApprove = autoApproveEnabled() && grade.tier === 'A+' && !shippableStatus;
+  const nextStatus = shippableStatus ? 'failed' : autoApprove ? 'approved' : 'awaiting_review';
 
   const nextParams = Object.assign({}, params, {
     tier: grade.tier,
@@ -589,20 +680,37 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     heygenLastStatus: status.status,
     heygenLastPolledAt: new Date().toISOString(),
     heygenError: status.error || null,
+    heygenRawVideoUrl: videoUrl,
     completedAt: new Date().toISOString(),
-    playbackUrl: videoUrl,
-    videoUrl: videoUrl,
+    playbackUrl: finalVideoUrl,
+    videoUrl: finalVideoUrl,
     posterUrl: thumbnailUrl,
     thumbnailUrl: thumbnailUrl,
-    duration
+    duration,
+    postProcess: {
+      success: postProcess.success,
+      code: postProcess.code || null,
+      error: postProcess.error || null,
+      processedVideoUrl: postProcess.processedVideoUrl || null,
+      productOverlayApplied: postProcess.productOverlayApplied || false,
+      ctaLabel: postProcess.ctaLabel || null,
+      ctaClickUrl: postProcess.ctaClickUrl || null
+    },
+    overlayContract: {
+      productMockupPresent: !!postProcess.productOverlayApplied,
+      buyNowPillPresent: !!postProcess.ctaTextApplied,
+      ctaClickTarget: postProcess.ctaClickUrl || params.productPageUrl || null,
+      enforced: true,
+      failureReason: shippableStatus ? (failed ? 'heygen-render-failed' : (postProcess.code || 'postprocess-failed')) : null
+    }
   });
 
   const patch = {
     status: nextStatus,
-    video_url: videoUrl,
+    video_url: finalVideoUrl,
     thumbnail_url: thumbnailUrl,
     duration,
-    render_grade: grade.score,
+    render_grade: shippableStatus ? 0 : grade.score,
     parameters: nextParams,
     updated_at: new Date().toISOString()
   };
@@ -649,12 +757,12 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     publishing = await pushToPublishingQueue(SupabaseConnector, {
       id: updated.id,
       productTitle: params.productTitle,
-      video_url: videoUrl,
+      video_url: finalVideoUrl,
       thumbnail_url: thumbnailUrl
     }, log);
   }
 
-  log.log(`[mediaRenderCreator] Poll updated row ${row.id} -> status=${nextStatus} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} queued=${publishing.queued}`);
+  log.log(`[mediaRenderCreator] Poll updated row ${row.id} -> status=${nextStatus} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} overlays=${postProcess.success ? 'ok' : (postProcess.code || 'missing')} queued=${publishing.queued}`);
 
   return {
     id: String(row.id),
@@ -663,7 +771,9 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     grade,
     autoApproved: autoApprove,
     publishing,
-    heygen: { video_id: videoId, status: status.status, video_url: videoUrl, thumbnail_url: thumbnailUrl, duration }
+    heygen: { video_id: videoId, status: status.status, video_url: videoUrl, thumbnail_url: thumbnailUrl, duration },
+    postProcess,
+    overlayContract: nextParams.overlayContract
   };
 }
 
@@ -719,6 +829,31 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
   }
 
   const ctx = resolveProductContext(opts.product || {});
+
+  // ── HARD PRODUCT-ASSETS GUARDRAIL ──────────────────────────────────
+  // Every rendered video MUST contain (1) the product mockup and (2) a
+  // Buy Now CTA pill linked to the Shopify product page. If either input
+  // is missing or is a placeholder default, refuse to create the render.
+  const isPlaceholderImage = /\/cdn\/shop\/files\/logo\.png$/i.test(ctx.productImageUrl || '');
+  const isRootLanding = /^https?:\/\/[^/]+\/?$/i.test(ctx.productPageUrl || '');
+  if (!ctx.productImageUrl || isPlaceholderImage) {
+    const err = new Error(
+      `Refusing to render "${ctx.productTitle}" — a real Shopify product mockup image is required. ` +
+      `Every shipped video must contain the product mockup with a removed background.`
+    );
+    err.code = 'PRODUCT_ASSETS_REQUIRED';
+    err.detail = { missing: 'productImageUrl', productTitle: ctx.productTitle };
+    throw err;
+  }
+  if (!ctx.productPageUrl || isRootLanding) {
+    const err = new Error(
+      `Refusing to render "${ctx.productTitle}" — a Shopify product page URL is required for the Buy Now CTA. ` +
+      `Every shipped video must contain a Buy Now button that links to the product page.`
+    );
+    err.code = 'PRODUCT_ASSETS_REQUIRED';
+    err.detail = { missing: 'productPageUrl', productTitle: ctx.productTitle };
+    throw err;
+  }
 
   // Enforce single-product rule: no bundles during grading loop.
   if (ctx.isBundle && !opts.allowBundle) {
