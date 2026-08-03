@@ -62,6 +62,22 @@ try {
   productBgRemover = null;
 }
 
+let durableVideoStorage = null;
+try {
+  durableVideoStorage = require('../utils/durableVideoStorage');
+} catch (loadErr) {
+  console.warn('[mediaRenderCreator] durableVideoStorage require failed:', loadErr && loadErr.message);
+  durableVideoStorage = null;
+}
+
+let ctaResolver = null;
+try {
+  ctaResolver = require('../utils/ctaResolver');
+} catch (loadErr) {
+  console.warn('[mediaRenderCreator] ctaResolver require failed:', loadErr && loadErr.message);
+  ctaResolver = null;
+}
+
 const path = require('path');
 
 // Absolute public host for constructing processed-video URLs. Cloud Run
@@ -618,6 +634,8 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
   // is not shippable and must never be surfaced as playbackUrl.
   let postProcess = { success: false, code: 'NOT_ATTEMPTED' };
   let processedPublicUrl = null;
+  let durable = null;
+  let ctaResolution = null;
   if (!failed && videoUrl && videoPostProcessor && typeof videoPostProcessor.postProcessVideo === 'function') {
     let productImageLocalPath = null;
     if (productBgRemover && typeof productBgRemover.removeBackground === 'function' && params.productImageUrl) {
@@ -632,6 +650,27 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
       }
     }
 
+    // Auto-resolve the Buy Now CTA URL against the Shopify catalog so the
+    // ffmpeg overlay ALWAYS bakes a purchasable Shopify link — never the
+    // Squarespace mirror on iamgenesistech.com. If a purchasable URL was
+    // already stored in params, resolveCtaUrlFromRow keeps it verbatim.
+    let resolvedCtaUrl = params.productPageUrl || null;
+    if (ctaResolver && typeof ctaResolver.resolveCtaUrlFromRow === 'function') {
+      try {
+        ctaResolution = await ctaResolver.resolveCtaUrlFromRow(row, params);
+        if (ctaResolution && ctaResolution.url) {
+          resolvedCtaUrl = ctaResolution.url;
+          params.productPageUrl = ctaResolution.url;
+          params.ctaResolutionSource = ctaResolution.source;
+          if (ctaResolution.matchedProduct) {
+            params.ctaMatchedProduct = ctaResolution.matchedProduct;
+          }
+        }
+      } catch (ctaErr) {
+        log.warn('[mediaRenderCreator] CTA resolution failed:', ctaErr && ctaErr.message ? ctaErr.message : ctaErr);
+      }
+    }
+
     try {
       postProcess = await videoPostProcessor.postProcessVideo({
         videoUrl,
@@ -639,7 +678,7 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
         productImageLocalPath,
         productImageUrl: params.productImageUrl,
         productTitle: params.productTitle,
-        productPageUrl: params.productPageUrl,
+        productPageUrl: resolvedCtaUrl,
         specialEffects: ['product-entrance-fade']
       });
     } catch (ppErr) {
@@ -648,6 +687,29 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
 
     if (postProcess.success && postProcess.processedVideoUrl) {
       processedPublicUrl = `${publicHost()}${postProcess.processedVideoUrl}`;
+    }
+
+    // ── DURABLE STORAGE ────────────────────────────────────────────────
+    // Upload the finalized mp4 to Supabase Storage so the playback URL
+    // survives Cloud Run redeploys / instance recycling. Falls through
+    // silently on failure — processedPublicUrl still points at the
+    // ephemeral Cloud Run path as a fallback.
+    if (postProcess.success && postProcess.processedVideoPath && durableVideoStorage
+        && typeof durableVideoStorage.uploadProcessedVideo === 'function') {
+      try {
+        const uploaded = await durableVideoStorage.uploadProcessedVideo({
+          localPath: postProcess.processedVideoPath,
+          renderId: row.id,
+          videoId: postProcess.stampedVideoId || `render_${row.id}_${Date.now()}`
+        });
+        durable = uploaded;
+        if (uploaded && uploaded.publicUrl) {
+          processedPublicUrl = uploaded.publicUrl;
+        }
+      } catch (upErr) {
+        durable = { error: upErr && upErr.message ? upErr.message : String(upErr), code: 'UPLOAD_THREW' };
+        log.warn('[mediaRenderCreator] durable upload threw:', durable.error);
+      }
     }
   }
 
@@ -696,6 +758,10 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
       ctaLabel: postProcess.ctaLabel || null,
       ctaClickUrl: postProcess.ctaClickUrl || null
     },
+    durableVideoUrl: durable && durable.publicUrl ? durable.publicUrl : null,
+    durableStorage: durable,
+    ctaResolutionSource: ctaResolution ? ctaResolution.source : null,
+    ctaMatchedProduct: ctaResolution ? ctaResolution.matchedProduct : null,
     overlayContract: {
       productMockupPresent: !!postProcess.productOverlayApplied,
       buyNowPillPresent: !!postProcess.ctaTextApplied,
@@ -762,7 +828,7 @@ async function pollRenderingRow(row, SupabaseConnector, logger) {
     }, log);
   }
 
-  log.log(`[mediaRenderCreator] Poll updated row ${row.id} -> status=${nextStatus} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} overlays=${postProcess.success ? 'ok' : (postProcess.code || 'missing')} queued=${publishing.queued}`);
+  log.log(`[mediaRenderCreator] Poll updated row ${row.id} -> status=${nextStatus} grade=${grade.score} tier=${grade.tier} autoApproved=${autoApprove} overlays=${postProcess.success ? 'ok' : (postProcess.code || 'missing')} durable=${durable && durable.publicUrl ? 'ok' : (durable && durable.error ? durable.code : 'skipped')} cta=${ctaResolution ? ctaResolution.source : 'none'} queued=${publishing.queued}`);
 
   return {
     id: String(row.id),
@@ -942,123 +1008,3 @@ async function createProductVideoRender(opts, SupabaseConnector, logger) {
     productTitle: ctx.productTitle,
     productPageUrl: ctx.productPageUrl,
     productUrl: ctx.productPageUrl,
-    productImageUrl: ctx.productImageUrl,
-    productHandle: ctx.productHandle,
-    companyLabel: ctx.companyLabel,
-    productType: ctx.productType,
-    productTags: ctx.tags,
-    avatarId,
-    voiceId,
-    voiceSource,
-    aspect,
-    heygenVideoId: started.video_id || null,
-    heygenIdempotencyKey: started.idempotency_key || null,
-    testMode: test,
-    submittedAt: nowIso,
-    createdBy: opts.actor || 'api'
-  };
-
-  const row = {
-    platform: 'heygen',
-    status: 'rendering',
-    video_url: null,
-    thumbnail_url: null,
-    duration: null,
-    render_grade: null,
-    render_name: `${ctx.productTitle} - AI Presenter`,
-    product_name: ctx.productTitle,
-    media_type: 'video',
-    script,
-    parameters: JSON.stringify(parameters),
-    source: 'evics-media-renderer',
-    job_id: started.video_id ? `heygen_${started.video_id}` : null,
-    created_at: nowIso,
-    updated_at: nowIso
-  };
-
-  let inserted = null;
-  let droppedColumns = [];
-  try {
-    const result = await insertRenderRowWithFallback(SupabaseConnector, row, log);
-    inserted = result.data;
-    droppedColumns = result.droppedColumns || [];
-  } catch (err) {
-    log.error('[mediaRenderCreator] Supabase insert failed:', err && err.message ? err.message : err);
-    const error = new Error(`Supabase insert failed: ${err && err.message ? err.message : 'unknown error'}`);
-    error.code = 'SUPABASE_INSERT_FAILED';
-    error.heygenVideoId = started.video_id || null;
-    throw error;
-  }
-
-  log.log(`[mediaRenderCreator] Placeholder inserted evics_renders id=${inserted.id} heygenVideoId=${started.video_id}${droppedColumns.length ? ' droppedColumns=' + droppedColumns.join(',') : ''}`);
-
-  scheduleBackgroundPoll(inserted, SupabaseConnector, log);
-
-  return {
-    id: inserted.id,
-    row: inserted,
-    grade: null,
-    status: 'rendering',
-    autoApproved: false,
-    publishing: { queued: false },
-    heygen: {
-      video_id: started.video_id,
-      status: 'rendering',
-      video_url: null,
-      thumbnail_url: null,
-      duration: null
-    },
-    avatar: { id: avatarId, voice_id: voiceId, voice_source: voiceSource },
-    scriptQuality,
-    script,
-    product: ctx,
-    async: true,
-    pollUrl: '/api/media-output/poll-rendering',
-    droppedColumns
-  };
-}
-
-function scheduleBackgroundPoll(row, SupabaseConnector, log) {
-  const startedAt = Date.now();
-  const maxMs = 5 * 60 * 1000;
-  const stepMs = 8 * 1000;
-  const tick = async () => {
-    if (Date.now() - startedAt > maxMs) return;
-    try {
-      const { data, error } = await SupabaseConnector
-        .from('evics_renders')
-        .select('*')
-        .eq('id', row.id)
-        .limit(1);
-      if (error || !data || !data[0]) return;
-      const fresh = data[0];
-      if (fresh.status !== 'rendering') return;
-      const result = await pollRenderingRow(fresh, SupabaseConnector, log);
-      if (result.updated) return;
-      const nextT = setTimeout(tick, stepMs);
-      if (nextT && typeof nextT.unref === 'function') nextT.unref();
-    } catch (err) {
-      log.warn('[mediaRenderCreator] background poll tick failed:', err && err.message ? err.message : err);
-      const nextT = setTimeout(tick, stepMs);
-      if (nextT && typeof nextT.unref === 'function') nextT.unref();
-    }
-  };
-  const t = setTimeout(tick, 15 * 1000);
-  if (t && typeof t.unref === 'function') t.unref();
-}
-
-module.exports = {
-  createProductVideoRender,
-  pollPendingRenders,
-  pollRenderingRow,
-  resolveProductContext,
-  prepareScript,
-  buildDefaultTrustScript,
-  fetchAssignedVoiceForAvatar,
-  loadAvatarRegistry,
-  loadVoiceRegistry,
-  pickVoiceForAvatar,
-  diagnoseAvatarRegistry,
-  A_PLUS_RENDER_MINIMUM,
-  WORKSPACE_DEFAULT_AVATAR_ID
-};
