@@ -7,7 +7,8 @@
  *   Body: { id, productPageUrl? }
  *   Rerun ONLY the ffmpeg overlay pipeline against an existing row's cached
  *   HeyGen URL. Auto-resolves the Buy Now CTA target from the Shopify
- *   catalog if productPageUrl is not provided.
+ *   catalog if productPageUrl is not provided. Uploads the finalized mp4
+ *   to Supabase Storage so the URL survives Cloud Run redeploys.
  *
  * POST /api/media-output/set-cta-url
  *   Body: { id, productPageUrl? }
@@ -25,6 +26,8 @@
  */
 
 const path = require('path');
+let durableVideoStorage = null;
+try { durableVideoStorage = require('../utils/durableVideoStorage'); } catch (_e) { /* optional */ }
 
 function parseJsonMaybe(value, fallback = {}) {
   if (!value) return fallback;
@@ -79,14 +82,11 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '');
 }
 
-// Non-purchasable hosts: pointing a Buy Now here would break the funnel.
 const BLOCKED_CTA_HOSTS = new Set([
   'iamgenesistech.com',
   'www.iamgenesistech.com'
 ]);
 
-// Purchasable hosts we trust for a Buy Now. Anything else is only accepted
-// when the user explicitly overrides.
 const PURCHASE_HOST_ALLOWLIST = [
   /\.myshopify\.com$/i,
   /^shop\./i
@@ -118,15 +118,6 @@ function normalizeCtaUrl(raw) {
   return { ok: true, url: url.toString(), host: url.hostname.toLowerCase() };
 }
 
-/**
- * Resolve the canonical Buy Now URL for a render row by consulting:
- *  1. Stored productPageUrl if it's on a purchasable host
- *  2. Shopify live catalog (title / handle / shopify_id match)
- *  3. Explicit handle field on the row → https://{checkoutHost}/products/{handle}
- *  4. Slugified title fallback → https://{checkoutHost}/products/{slug}
- *
- * Returns { url, source, matchedProduct? } or { url:null, source:'none' }.
- */
 async function resolveCtaUrlFromRow(row, params) {
   const stored = params.productPageUrl || (params.postProcess && params.postProcess.ctaClickUrl);
   if (stored) {
@@ -188,7 +179,6 @@ function register(app, ctx) {
   }
   const adminGate = typeof isAdminAuthorized === 'function' ? isAdminAuthorized : defaultAdminGate;
 
-  // --- Public preview / click-verification page -------------------------
   app.get('/render-preview/:id', async (req, res) => {
     try {
       if (!SupabaseConnector) {
@@ -205,10 +195,12 @@ function register(app, ctx) {
         return res.status(404).type('text/html').send(`<h1>Render ${htmlEscape(id)} not found</h1>`);
       }
       const params = parseJsonMaybe(row.parameters, {});
-      const videoUrl = row.video_url || params.playbackUrl || null;
-      // Preview page also auto-resolves so it never falls back to a broken URL
+      const videoUrl = params.durableVideoUrl || row.video_url || params.playbackUrl || null;
       let productUrl = params.productPageUrl || (params.postProcess && params.postProcess.ctaClickUrl);
-      if (!productUrl || BLOCKED_CTA_HOSTS.has(new URL(productUrl).hostname.toLowerCase())) {
+      let storedBlocked = false;
+      try { storedBlocked = productUrl && BLOCKED_CTA_HOSTS.has(new URL(productUrl).hostname.toLowerCase()); }
+      catch { storedBlocked = false; }
+      if (!productUrl || storedBlocked) {
         const resolved = await resolveCtaUrlFromRow(row, params);
         productUrl = resolved.url || productUrl || '#';
       }
@@ -253,7 +245,6 @@ function register(app, ctx) {
     }
   });
 
-  // --- Dry-run resolver (no side effects) ------------------------------
   app.post('/api/media-output/resolve-cta', async (req, res) => {
     try {
       if (!adminGate(req)) return res.status(401).json({ success: false, error: 'Admin key required.' });
@@ -284,7 +275,6 @@ function register(app, ctx) {
     }
   });
 
-  // --- Fast CTA-URL patch (no re-render) --------------------------------
   app.post('/api/media-output/set-cta-url', async (req, res) => {
     try {
       if (!adminGate(req)) return res.status(401).json({ success: false, error: 'Admin key required.' });
@@ -350,7 +340,6 @@ function register(app, ctx) {
     }
   });
 
-  // --- Reprocess overlays (admin-only) ----------------------------------
   app.post('/api/media-output/reprocess-overlays', async (req, res) => {
     try {
       if (!adminGate(req)) return res.status(401).json({ success: false, error: 'Admin key required.' });
@@ -424,14 +413,38 @@ function register(app, ctx) {
         specialEffects: ['product-entrance-fade']
       });
 
+      let durable = null;
+      if (pp && pp.success && pp.processedVideoPath && durableVideoStorage && typeof durableVideoStorage.uploadProcessedVideo === 'function') {
+        try {
+          durable = await durableVideoStorage.uploadProcessedVideo({
+            localPath: pp.processedVideoPath,
+            renderId: id,
+            videoId: pp.stampedVideoId || videoIdForFile
+          });
+          if (durable && durable.error) {
+            console.warn(`[reprocess-overlays] durable upload failed (${durable.code}): ${durable.error}`);
+          }
+        } catch (upErr) {
+          durable = { error: upErr && upErr.message ? upErr.message : String(upErr), code: 'UPLOAD_THREW' };
+          console.warn('[reprocess-overlays] durable upload threw:', durable.error);
+        }
+      }
+
       let updated = null;
       const previewUrl = pp && pp.success ? `${publicHost()}/render-preview/${id}` : null;
 
       if (pp && pp.success && pp.processedVideoUrl) {
-        const finalUrl = `${publicHost()}${pp.processedVideoUrl}`;
+        const localFinalUrl = `${publicHost()}${pp.processedVideoUrl}`;
+        const durableUrl = durable && durable.publicUrl ? durable.publicUrl : null;
+        const finalUrl = durableUrl || localFinalUrl;
         const nextParams = Object.assign({}, params, {
           playbackUrl: finalUrl,
           videoUrl: finalUrl,
+          localVideoUrl: localFinalUrl,
+          durableVideoUrl: durableUrl,
+          durableStorage: durable && durable.publicUrl
+            ? { bucket: durable.bucket, storagePath: durable.storagePath, bytes: durable.bytes }
+            : (durable && durable.error ? { error: durable.error, code: durable.code } : null),
           previewPageUrl: previewUrl,
           productPageUrl: productPageUrl || params.productPageUrl,
           heygenRawVideoUrl: heygenUrl,
@@ -482,6 +495,7 @@ function register(app, ctx) {
         ctaResolutionSource,
         matchedProduct,
         previewPageUrl: previewUrl,
+        durableStorage: durable,
         bgRemoval: bgRemovalMeta,
         postProcess: pp,
         updatedRow: updated ? { id: updated.id, status: updated.status, video_url: updated.video_url } : null
