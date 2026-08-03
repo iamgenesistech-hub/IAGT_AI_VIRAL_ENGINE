@@ -13,6 +13,7 @@ const { registerEvicsRecoveryRoutes } = require('./evicsRecoveryRoutes');
 const { registerEvicsEvieRoutes } = require('./evicsEvieRoutes');
 const { registerEvicsEliteRoutes } = require('./evicsEliteRoutes');
 const { registerMediaOutputRoutes } = require('./mediaOutputRoutes');
+const { register: registerReprocessOverlaysRoute } = require('./reprocessOverlaysRoute');
 const { registerAvatarStudioRoutes } = require('./avatarStudioRoutes');
 const { registerViralMediaRoutes } = require('./viralMediaRoutes');
 const { buildPublicMediaUrlFromObjectPath } = require('./mediaUrl');
@@ -2692,6 +2693,7 @@ registerEvicsEliteRoutes(app, {
   controlCenterDir: path.join(__dirname, '../dashboard/control-center')
 });
 registerMediaOutputRoutes(app, SupabaseConnector);
+registerReprocessOverlaysRoute(app, { SupabaseConnector });
 registerAvatarStudioRoutes(app, SupabaseConnector);
 
 let nativeAvatarWorkerRef = null;
