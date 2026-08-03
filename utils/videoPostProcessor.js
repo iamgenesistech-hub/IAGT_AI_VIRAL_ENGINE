@@ -2,9 +2,10 @@
  * videoPostProcessor.js — EVICS Video Post-Processing Engine
  *
  * After the base avatar/cinematic render, this adds:
- *   1. Foreground product presentation (bg-removed mockup)
+ *   1. Foreground product presentation (bg-removed mockup, large + centered
+ *      above the CTA)
  *   2. Product title label
- *   3. Buy Now CTA pill (bottom safe zone)
+ *   3. Buy Now CTA pill (raised into the safe zone so nothing clips)
  *   4. Final color grade/export
  *
  * ABSOLUTE CONTRACT:
@@ -12,6 +13,10 @@
  *     the final frame, this function returns success:false. Callers must
  *     treat that as a render failure and MUST NOT ship the raw video —
  *     videos without the product mockup and Buy Now pill are not allowed.
+ *
+ * FILENAME: every processed video's output filename embeds a UTC
+ * YYYYMMDD_HHMMSS timestamp so operators can trace exactly when a given
+ * asset was produced (e.g. `52_20260803T164210Z_final.mp4`).
  *
  * Uses ffmpeg (installed in the Docker container).
  */
@@ -29,6 +34,21 @@ const PROCESSED_DIR = path.join(__dirname, '../processed-videos');
 
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true });
+
+// UTC timestamp string suitable for filenames: 20260803T164210Z
+function utcStampForFilename(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return (
+    d.getUTCFullYear().toString() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    'T' +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    'Z'
+  );
+}
 
 // Resolve a real TTF font file on disk. Alpine + ttf-dejavu installs the
 // DejaVu family; other distros may have Liberation or Freefont. Never rely on
@@ -85,8 +105,13 @@ async function postProcessVideo({
    textOverlayPosition = 'bottom',
    ctaText
 }) {
-  const inputPath = path.join(MEDIA_CACHE_DIR, `${videoId}_raw.mp4`);
-  const outputPath = path.join(PROCESSED_DIR, `${videoId}_final.mp4`);
+  // Always embed a UTC timestamp in the output filename so every render is
+  // uniquely traceable to its production time — even reruns of the same row.
+  const renderStamp = utcStampForFilename();
+  const stampedId = `${videoId}_${renderStamp}`;
+
+  const inputPath = path.join(MEDIA_CACHE_DIR, `${stampedId}_raw.mp4`);
+  const outputPath = path.join(PROCESSED_DIR, `${stampedId}_final.mp4`);
 
   await downloadFile(videoUrl, inputPath);
 
@@ -121,20 +146,46 @@ async function postProcessVideo({
     : [];
   const withProductEntranceFade = normalizedEffects.includes('product-entrance-fade');
 
+  // Product mockup: scaled to ~460px wide (up from 320) and positioned in the
+  // bottom-right hero zone, ABOVE the CTA pill. Force alpha=1 fully so a
+  // partially transparent bg-removed PNG still reads at full opacity.
   const productLayerFilter = withProductEntranceFade
-    ? '[1:v]scale=320:-1,format=rgba,fade=t=in:st=0:d=0.55:alpha=1,colorchannelmixer=aa=0.99[prod]'
-    : '[1:v]scale=320:-1,format=rgba,colorchannelmixer=aa=0.99[prod]';
+    ? '[1:v]scale=460:-1,format=rgba,fade=t=in:st=0:d=0.55:alpha=1[prod]'
+    : '[1:v]scale=460:-1,format=rgba[prod]';
+
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
-  // NOTE: drawbox does NOT support the W/H (main input) constants — only iw/ih.
+
+  // Layout math (all measured from bottom of frame):
+  //   CTA pill safe-zone bottom margin ...... 180 px  (was 40 → was clipping)
+  //   Product mockup bottom edge above pill .. 300 px  (leaves ~120 px gap)
+  //
+  // drawbox does NOT support the W/H (main input) constants — only iw/ih.
   // overlay supports W/H (main) + w/h (overlay input), so its expression stays.
-  const pedestal = 'drawbox=x=iw-420:y=ih-520:w=380:h=380:color=0x050505@0.26:t=fill,drawbox=x=iw-420:y=ih-520:w=380:h=380:color=0xf4c96a@0.14:t=3';
-  const productOverlay = 'overlay=x=W-w-34:y=H-h-170:format=auto';
+  const PEDESTAL_W = 520;
+  const PEDESTAL_H = 520;
+  const PEDESTAL_BOTTOM_MARGIN = 300;
+  // Pedestal top-left: iw-PEDESTAL_W-30, ih-PEDESTAL_BOTTOM_MARGIN-PEDESTAL_H
+  const pedestalX = `iw-${PEDESTAL_W}-30`;
+  const pedestalY = `ih-${PEDESTAL_BOTTOM_MARGIN}-${PEDESTAL_H}`;
+  const pedestal =
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${PEDESTAL_W}:h=${PEDESTAL_H}:color=0x050505@0.32:t=fill,` +
+    `drawbox=x=${pedestalX}:y=${pedestalY}:w=${PEDESTAL_W}:h=${PEDESTAL_H}:color=0xf4c96a@0.28:t=4`;
+
+  // Product overlay uses overlay-filter constants: W/H = main video dims,
+  // w/h = product image dims after scale. Center product horizontally inside
+  // the pedestal band and anchor its BOTTOM edge to PEDESTAL_BOTTOM_MARGIN.
+  const productOverlay =
+    `overlay=x=W-${PEDESTAL_W}-30+((${PEDESTAL_W}-w)/2):y=H-h-${PEDESTAL_BOTTOM_MARGIN}:format=auto`;
+
   // Buy Now pill: solid gold background with black text, centered horizontally
-  // above the product-title strip in the bottom safe zone.
+  // in the bottom safe zone. Total drawn height = fontsize (56) + 2*boxborderw
+  // (36) = 128 px. Setting y = h-text_h-180 puts the box bottom at
+  //   (h-text_h-180) + text_h + 18  = h-162
+  // → ~162 px above the frame bottom, comfortably inside the safe area.
   const buyPillFilter =
-    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=44:fontcolor=0x0a0a0a:borderw=0:` +
-    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=22:` +
-    `x=(w-text_w)/2:y=h-text_h-40`;
+    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=56:fontcolor=0x0a0a0a:borderw=0:` +
+    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=18:` +
+    `x=(w-text_w)/2:y=h-text_h-180`;
 
   let productOverlayApplied = false;
   let productImageInputPath = null;
@@ -145,7 +196,7 @@ async function postProcessVideo({
     productImageInputPath = productImageLocalPath;
   } else if (productImageUrl) {
     const ext = productImageUrl.includes('.png') ? 'png' : 'jpg';
-    const productPath = path.join(MEDIA_CACHE_DIR, `${videoId}_product.${ext}`);
+    const productPath = path.join(MEDIA_CACHE_DIR, `${stampedId}_product.${ext}`);
     try {
       await downloadFile(productImageUrl, productPath);
       productImageInputPath = productPath;
@@ -166,6 +217,32 @@ async function postProcessVideo({
       processedVideoUrl: null,
       productOverlayApplied: false,
       error: 'productImageUrl (or productImageLocalPath) is required — videos without a product mockup are not allowed.',
+      code: 'PRODUCT_MOCKUP_UNAVAILABLE'
+    };
+  }
+
+  // Verify the product image exists on disk and is non-trivially sized. A
+  // 0-byte or tiny file will silently vanish inside the overlay filter and
+  // the operator will see "no mockup" without any error.
+  try {
+    const stat = fs.statSync(productImageInputPath);
+    if (!stat || stat.size < 512) {
+      return {
+        success: false,
+        processedVideoPath: null,
+        processedVideoUrl: null,
+        productOverlayApplied: false,
+        error: `Product mockup file is missing or too small (${stat ? stat.size : 'null'} bytes) at ${productImageInputPath}.`,
+        code: 'PRODUCT_MOCKUP_UNAVAILABLE'
+      };
+    }
+  } catch (statErr) {
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: `Product mockup file could not be stat'd: ${statErr.message}`,
       code: 'PRODUCT_MOCKUP_UNAVAILABLE'
     };
   }
@@ -234,7 +311,10 @@ async function postProcessVideo({
   return {
     success: true,
     processedVideoPath: outputPath,
-    processedVideoUrl: `/processed-videos/${videoId}_final.mp4`,
+    processedVideoUrl: `/processed-videos/${stampedId}_final.mp4`,
+    processedVideoFilename: `${stampedId}_final.mp4`,
+    renderStamp,
+    stampedVideoId: stampedId,
     productOverlayApplied,
     foregroundProductPresentation: productOverlayApplied,
     productHeroShotApplied: productOverlayApplied,
@@ -255,11 +335,15 @@ function escapeDrawtextValue(text) {
 }
 
 function resolveFaceSafeTextPlacement(_textOverlayPosition) {
+  // Product title strip sits directly ABOVE the pedestal that holds the
+  // product mockup (mockup bottom is at h-300, pedestal top is at h-820).
+  // Placing the title at h-text_h-830 puts it just above the pedestal, on
+  // the darker side of the frame.
   return {
     x: '40',
     y: 'h-text_h-92',
-    titleY: 'h-text_h-158'
+    titleY: 'h-text_h-830'
   };
 }
 
-module.exports = { postProcessVideo, downloadFile, resolveFontFile };
+module.exports = { postProcessVideo, downloadFile, resolveFontFile, utcStampForFilename };
