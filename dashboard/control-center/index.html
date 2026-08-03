@@ -3,63 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EVICS Executive Command Workspace</title>
-    <meta name="evics-workspace-build" content="2026-08-01-evics-command-shell-restored" />
-    <meta name="description" content="Elite Viral Intelligence Command Workspace with live operational monitors." />
+    <title>EVICS Control Center — I AM GENESIS TECH</title>
+    <meta name="description" content="EVICS AI Viral Engine — Elite Affiliate Intelligence Dashboard" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="media-output.css" media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="vp-executive-assistant.css" media="print" onload="this.media='all'" />
-    <style>
-      #evics-boot-splash { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; color: #eff5fb; gap: 18px; padding: 40px; }
-      #evics-boot-splash .splash-logo { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 10px; background: linear-gradient(135deg, #f0d898 0%, #d9bf7a 55%, #9a7a32 100%); color: #070b11; font-weight: 900; font-size: 18px; letter-spacing: -0.5px; box-shadow: 0 0 22px rgba(217,191,122,.3); }
-      #evics-boot-splash .splash-title { font-size: 18px; font-weight: 700; color: #eff5fb; }
-      #evics-boot-splash .splash-sub { font-size: 12px; color: #90a4bb; letter-spacing: 0.08em; text-transform: uppercase; }
-      #evics-boot-splash .splash-spinner { width: 28px; height: 28px; border: 3px solid rgba(0,199,245,.15); border-top-color: #00c7f5; border-radius: 50%; animation: evics-spin 0.8s linear infinite; }
-      @keyframes evics-spin { to { transform: rotate(360deg); } }
-      .safe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
-      .safe-card { border: 1px solid var(--border-dim); border-radius: 14px; background: var(--card2); padding: 14px; min-width: 0; }
-      .safe-card h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; }
-      .safe-card p { margin: 0 0 8px; color: var(--text-sub); }
-      .safe-card small { color: var(--muted); overflow-wrap: anywhere; }
-      .safe-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: rgba(255,255,255,.05); margin-bottom: 10px; }
-      .safe-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-      .safe-alert { border: 1px solid rgba(255,90,104,.35); background: rgba(255,90,104,.08); color: #ffb8bf; border-radius: 12px; padding: 12px; margin-bottom: 14px; }
-      .safe-ok { color: var(--green); }
-      .safe-warn { color: var(--orange); }
-      .safe-badge { display: inline-flex; align-items: center; border: 1px solid var(--border-dim); border-radius: 999px; padding: 2px 9px; color: var(--text-sub); font-size: 12px; margin: 2px 4px 2px 0; }
-      .safe-table { width: 100%; border-collapse: collapse; }
-      .safe-table th, .safe-table td { text-align: left; border-bottom: 1px solid var(--border-dim); padding: 9px; vertical-align: top; }
-      .safe-table th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-      .safe-muted { color: var(--muted); }
-    </style>
+    <link rel="stylesheet" href="media-output.css" />
   </head>
-  <body class="exec-shell-body">
-    <header class="exec-shell-header">
-      <div class="exec-shell-brand"><span class="exec-mark">EVICS</span><div><strong>I AM GENESIS TECH</strong><small>ELITE VIRAL INTELLIGENCE CONTROL SYSTEM</small></div></div>
-      <nav class="exec-shell-nav"><a href="/workspace" aria-current="page">EVICS</a><a href="/viral-media">Viral Media</a><a href="/affiliate">Affiliate Hub</a><a href="/phone-app">Phone App</a><a href="/admin-hub">Affiliate AdminHub</a><a href="/discoverability">SEO Grader</a></nav>
-      <div class="exec-shell-pulse" id="evicsPulse">Initializing live monitors&hellip;</div>
-    </header>
-    <main class="exec-shell-main">
-      <div id="evics-boot-splash"><div class="splash-logo">EVICS</div><div class="splash-title">I AM GENESIS TECH</div><div class="splash-sub">Elite Viral Intelligence Control System</div><div class="splash-spinner"></div><div class="splash-sub" id="evics-boot-status">Loading live workspace&hellip;</div></div>
-      <div id="app"></div>
-    </main>
-    <script>
-      window.__showEvicsError = function(message) {
-        var panel = document.getElementById('evics-error-panel');
-        if (!panel) {
-          panel = document.createElement('div');
-          panel.id = 'evics-error-panel';
-          panel.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#1a1a2e;color:#ff5a68;font:12px/1.6 monospace;padding:16px;max-height:50vh;overflow:auto;border-bottom:3px solid #ff5a68;';
-          panel.innerHTML = '<h3 style="color:#ff5a68;margin:0 0 8px;font-size:14px;">EVICS Workspace Error</h3>';
-          document.body.insertBefore(panel, document.body.firstChild);
-        }
-        var line = document.createElement('div');
-        line.textContent = String(message);
-        line.style.cssText = 'margin-bottom:4px;word-break:break-all;';
-        panel.appendChild(line);
-      };
-      window.onerror = function(message, source, line) { window.__showEvicsError(String(message) + ' at ' + String(source || '?').split('/').pop() + ':' + line); };
-    </script>
-    <script src="workspace-safe.js?v=20260801-evics-command-shell-restored"></script>
+  <body>
+    <div id="app"></div>
+    <a
+      href="/live-ops"
+      style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#00c7f5;color:#070b11;padding:12px 16px;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:900;font-size:13px;border-radius:10px;letter-spacing:.3px;box-shadow:0 8px 24px rgba(0,199,245,.35)"
+    >⚡ Live Ops</a>
+    <script src="config.js"></script>
+    <script src="supabase.js"></script>
+    <script src="media-output.js"></script>
+    <script src="app.js"></script>
+    <script src="workspace-render-controls.js"></script>
   </body>
 </html>
