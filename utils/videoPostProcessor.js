@@ -2,11 +2,18 @@
  * videoPostProcessor.js — EVICS Video Post-Processing Engine
  *
  * After the base avatar/cinematic render, this adds:
- *   1. Foreground product presentation
- *   2. CTA text overlay
- *   3. Final color grade/export
+ *   1. Foreground product presentation (bg-removed mockup)
+ *   2. Product title label
+ *   3. Buy Now CTA pill (bottom safe zone)
+ *   4. Final color grade/export
  *
- * Uses ffmpeg (available in the Docker container).
+ * ABSOLUTE CONTRACT:
+ *   - If productImageLocalPath (or productImageUrl) cannot be composited into
+ *     the final frame, this function returns success:false. Callers must
+ *     treat that as a render failure and MUST NOT ship the raw video —
+ *     videos without the product mockup and Buy Now pill are not allowed.
+ *
+ * Uses ffmpeg (installed in the Docker container).
  */
 
 'use strict';
@@ -46,6 +53,7 @@ async function postProcessVideo({
    videoUrl,
    videoId,
    productImageUrl,
+   productImageLocalPath,
    productTitle = '',
    productPageUrl = '',
    affiliateCode = '',
@@ -59,11 +67,12 @@ async function postProcessVideo({
   await downloadFile(videoUrl, inputPath);
 
   const inputs = ['-i', inputPath];
-  let filterComplex = '';
 
   const productName = escapeDrawtextValue(productTitle || 'Featured Product');
-  const destination = escapeDrawtextValue(productPageUrl || `Shop Now - iamgenesistech.com${affiliateCode ? '/?ref=' + affiliateCode : ''}`);
-  const cta = escapeDrawtextValue(ctaText || destination);
+  // ABSOLUTE RULE: the CTA overlay must never render a URL as spoken/on-screen
+  // text. The URL is the click target stored alongside the video; the
+  // on-screen button always reads "Buy Now — Shop {product}".
+  const cta = escapeDrawtextValue(ctaText || `Buy Now - Shop ${productTitle || 'Now'}`);
 
   const overlayPlacement = resolveFaceSafeTextPlacement(textOverlayPosition);
   const ctaX = overlayPlacement.x;
@@ -81,32 +90,52 @@ async function postProcessVideo({
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
   const pedestal = 'drawbox=x=W-420:y=H-520:w=380:h=380:color=0x050505@0.26:t=fill,drawbox=x=W-420:y=H-520:w=380:h=380:color=0xf4c96a@0.14:t=3';
   const productOverlay = 'overlay=x=W-w-34:y=H-h-170:format=auto';
-  let productOverlayApplied = false;
+  // Buy Now pill: solid gold background with black text, centered horizontally
+  // above the product-title strip in the bottom safe zone (below y=1720 for 1080x1920).
+  const buyPillFilter =
+    `drawtext=text='${cta}':fontsize=44:fontcolor=0x0a0a0a:borderw=0:` +
+    `box=1:boxcolor=0xf4c96a@0.98:boxborderw=22:` +
+    `x=(w-text_w)/2:y=h-text_h-40:font=Sans`;
 
-  if (productImageUrl) {
+  let productOverlayApplied = false;
+  let productImageInputPath = null;
+
+  // Prefer local bg-removed PNG when provided (avoids re-downloading a URL
+  // that points back at our own /processed-images route).
+  if (productImageLocalPath && fs.existsSync(productImageLocalPath)) {
+    productImageInputPath = productImageLocalPath;
+  } else if (productImageUrl) {
     const ext = productImageUrl.includes('.png') ? 'png' : 'jpg';
     const productPath = path.join(MEDIA_CACHE_DIR, `${videoId}_product.${ext}`);
     try {
       await downloadFile(productImageUrl, productPath);
-      inputs.push('-i', productPath);
-      filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];` +
-        `[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
-        `[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
-      productOverlayApplied = true;
+      productImageInputPath = productPath;
     } catch (err) {
       return {
         success: false,
-        processedVideoPath: inputPath,
-        processedVideoUrl: videoUrl,
+        processedVideoPath: null,
+        processedVideoUrl: null,
         productOverlayApplied: false,
-        error: `Product mockup download failed before post-processing: ${err.message}`
+        error: `Product mockup download failed before post-processing: ${err.message}`,
+        code: 'PRODUCT_MOCKUP_UNAVAILABLE'
       };
     }
   } else {
-    filterComplex = `[0:v]${gradeAndVignette}[graded];` +
-      `[graded]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
-      `[producttxt]drawtext=text='${cta}':fontsize=32:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=0x00000099:x=${ctaX}:y=${ctaY}:font=Sans[out]`;
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: 'productImageUrl (or productImageLocalPath) is required — videos without a product mockup are not allowed.',
+      code: 'PRODUCT_MOCKUP_UNAVAILABLE'
+    };
   }
+
+  inputs.push('-i', productImageInputPath);
+  const filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];` +
+    `[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
+    `[producttxt]${buyPillFilter}[out]`;
+  productOverlayApplied = true;
 
   const ffmpegArgs = [
     '-y',
@@ -118,16 +147,39 @@ async function postProcessVideo({
   ];
 
   try {
-    execFileSync('ffmpeg', ffmpegArgs, { timeout: 120000, stdio: 'pipe' });
+    execFileSync('ffmpeg', ffmpegArgs, { timeout: 180000, stdio: 'pipe' });
   } catch (err) {
     const stderr = err && err.stderr ? err.stderr.toString().slice(0, 2000) : '';
     console.error('[PostProcess] ffmpeg failed:', stderr || err.message);
+    // Do NOT return the raw video URL — that would ship a video without the
+    // required product mockup + Buy Now overlays. Signal failure and let
+    // the caller mark the render as failed.
+    try { fs.unlinkSync(inputPath); } catch {}
     return {
       success: false,
-      processedVideoPath: inputPath,
-      processedVideoUrl: videoUrl,
+      processedVideoPath: null,
+      processedVideoUrl: null,
       productOverlayApplied: false,
-      error: 'Post-processing failed, returning raw video'
+      error: `ffmpeg compose failed: ${stderr.slice(0, 500) || err.message}`,
+      code: 'FFMPEG_COMPOSE_FAILED'
+    };
+  }
+
+  // Verify the output actually exists and has non-zero size.
+  try {
+    const stat = fs.statSync(outputPath);
+    if (!stat || stat.size < 1024) {
+      throw new Error(`Post-processed video is missing or too small (${stat ? stat.size : 'null'} bytes).`);
+    }
+  } catch (verifyErr) {
+    try { fs.unlinkSync(inputPath); } catch {}
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: `Post-processed video verification failed: ${verifyErr.message}`,
+      code: 'PROCESSED_VIDEO_INVALID'
     };
   }
 
@@ -141,7 +193,9 @@ async function postProcessVideo({
     foregroundProductPresentation: productOverlayApplied,
     productHeroShotApplied: productOverlayApplied,
     productLabelReadable: productOverlayApplied,
-    ctaTextApplied: true
+    ctaTextApplied: true,
+    ctaClickUrl: productPageUrl || null,
+    ctaLabel: ctaText || `Buy Now - Shop ${productTitle || 'Now'}`
   };
 }
 
