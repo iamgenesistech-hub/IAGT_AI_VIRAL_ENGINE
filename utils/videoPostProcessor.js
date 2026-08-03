@@ -125,7 +125,9 @@ async function postProcessVideo({
     ? '[1:v]scale=320:-1,format=rgba,fade=t=in:st=0:d=0.55:alpha=1,colorchannelmixer=aa=0.99[prod]'
     : '[1:v]scale=320:-1,format=rgba,colorchannelmixer=aa=0.99[prod]';
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
-  const pedestal = 'drawbox=x=W-420:y=H-520:w=380:h=380:color=0x050505@0.26:t=fill,drawbox=x=W-420:y=H-520:w=380:h=380:color=0xf4c96a@0.14:t=3';
+  // NOTE: drawbox does NOT support the W/H (main input) constants — only iw/ih.
+  // overlay supports W/H (main) + w/h (overlay input), so its expression stays.
+  const pedestal = 'drawbox=x=iw-420:y=ih-520:w=380:h=380:color=0x050505@0.26:t=fill,drawbox=x=iw-420:y=ih-520:w=380:h=380:color=0xf4c96a@0.14:t=3';
   const productOverlay = 'overlay=x=W-w-34:y=H-h-170:format=auto';
   // Buy Now pill: solid gold background with black text, centered horizontally
   // above the product-title strip in the bottom safe zone.
