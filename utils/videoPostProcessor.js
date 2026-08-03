@@ -20,6 +20,11 @@
  *   invisible (over-eager bg removal wiped the product), and we fall back
  *   to the raw productImageUrl. If BOTH are unusable we fail hard.
  *
+ * FFMPEG FILTER CONSTANTS CHEATSHEET (why we can't share expressions):
+ *   drawbox   : uses  iw / ih          (input width/height)
+ *   drawtext  : uses  W  / H  (main_w / main_h)  — DOES NOT accept iw/ih
+ *   overlay   : uses  W  / H  (main dims) + w / h  (overlay dims)
+ *
  * FILENAME: every processed video's output filename embeds a UTC
  * YYYYMMDDTHHMMSSZ timestamp so operators can trace exactly when a given
  * asset was produced.
@@ -84,7 +89,6 @@ async function inspectMockupImage(filePath) {
     return result;
   }
   if (!sharp) {
-    // No sharp — fall back to "file exists + non-trivial size = usable"
     result.usable = true;
     result.reason = 'sharp unavailable; accepted by size only';
     return result;
@@ -94,8 +98,6 @@ async function inspectMockupImage(filePath) {
     const meta = await img.metadata();
     result.width = meta.width || null;
     result.height = meta.height || null;
-    // No alpha channel = JPG or opaque PNG. If it's opaque, it's definitely
-    // visible (may look bad on a dark pedestal, but at least it shows).
     if (!meta.hasAlpha) {
       result.usable = true;
       result.meanAlpha = 255;
@@ -103,8 +105,6 @@ async function inspectMockupImage(filePath) {
       return result;
     }
     const stats = await img.stats();
-    // sharp.stats() returns channel stats; alpha is the last channel when
-    // hasAlpha is true. Prefer stats.channels[N-1].mean.
     const chans = Array.isArray(stats.channels) ? stats.channels : [];
     const alphaChan = chans.length ? chans[chans.length - 1] : null;
     const meanAlpha = alphaChan && typeof alphaChan.mean === 'number' ? alphaChan.mean : null;
@@ -123,13 +123,11 @@ async function inspectMockupImage(filePath) {
     return result;
   } catch (sharpErr) {
     result.reason = `sharp inspect failed: ${sharpErr.message}`;
-    // On sharp failure, don't block — trust the file exists.
     result.usable = true;
     return result;
   }
 }
 
-// Resolve a real TTF font file on disk.
 function resolveFontFile() {
   const candidates = [
     process.env.EVICS_TEXT_FONT_FILE,
@@ -207,7 +205,7 @@ async function postProcessVideo({
   }
   const fontfileArg = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-  // ---- LAYOUT CONSTANTS -------------------------------------------------
+  // ---- LAYOUT CONSTANTS (portrait 9:16 reference) -----------------------
   const CELL_SIZE = 300;
   const CELL_RIGHT_MARGIN = 30;
   const CELL_BOTTOM_MARGIN = 240;
@@ -220,11 +218,8 @@ async function postProcessVideo({
   const TITLE_BOX_PADDING = 12;
 
   // ---- SELECT PRODUCT IMAGE ---------------------------------------------
-  // Try local bg-removed PNG first; if it's transparent/empty, fall back to
-  // the raw productImageUrl. Report exactly which source ended up in the
-  // final composite so the operator can diagnose bg-removal regressions.
   let productImageInputPath = null;
-  let mockupSource = null;         // 'local-bg-removed' | 'raw-download'
+  let mockupSource = null;
   let mockupInspect = null;
   const productDiagnostics = { localCandidate: productImageLocalPath || null, remoteCandidate: productImageUrl || null };
 
@@ -244,12 +239,9 @@ async function postProcessVideo({
     const productPath = path.join(MEDIA_CACHE_DIR, `${stampedId}_product.${ext}`);
     try {
       await downloadFile(productImageUrl, productPath);
-      // Also validate the raw download — if THAT's tiny/broken we can't
-      // continue at all.
       const rawInspect = await inspectMockupImage(productPath);
       productDiagnostics.rawInspect = rawInspect;
       if (!rawInspect.usable && rawInspect.meanAlpha !== null && rawInspect.meanAlpha < MOCKUP_MIN_MEAN_ALPHA) {
-        // Raw image also fully transparent? Extremely unlikely, but bail.
         return {
           success: false,
           processedVideoPath: null,
@@ -288,11 +280,6 @@ async function postProcessVideo({
   }
 
   // ---- PRODUCT MOCKUP FILTER --------------------------------------------
-  // If we're using the RAW image (JPG with real background), we need to
-  // fit-and-pad it in a similar way, and it won't have real transparency
-  // — that's OK, the pedestal is dark and the product will simply sit on
-  // top of a subtle background rectangle. If we're using the bg-removed
-  // PNG, format=rgba preserves its alpha.
   const productLayerFilter =
     `[1:v]scale=${CELL_SIZE}:${CELL_SIZE}:force_original_aspect_ratio=decrease,` +
     `pad=${CELL_SIZE}:${CELL_SIZE}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,` +
@@ -300,17 +287,20 @@ async function postProcessVideo({
 
   const gradeAndVignette = 'eq=contrast=1.08:saturation=1.12:brightness=-0.018,vignette=PI/5';
 
+  // drawbox uses iw/ih:
   const pedestalX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
   const pedestalY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}`;
   const pedestal =
     `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0x050505@0.55:t=fill,` +
     `drawbox=x=${pedestalX}:y=${pedestalY}:w=${CELL_SIZE}:h=${CELL_SIZE}:color=0xf4c96a@0.9:t=3`;
 
+  // overlay uses W/H (main) + w/h (overlay):
   const productOverlay =
     `overlay=x=W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}:y=H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}:format=auto`;
 
-  const titleStripX = `iw-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
-  const titleStripY = `ih-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
+  // drawtext uses W/H (main_w/main_h) — NOT iw/ih.
+  const titleStripX = `W-${CELL_RIGHT_MARGIN}-${CELL_SIZE}`;
+  const titleStripY = `H-${CELL_BOTTOM_MARGIN}-${CELL_SIZE}-${TITLE_STRIP_GAP}-${TITLE_STRIP_HEIGHT}`;
   const productTitleFilter =
     `drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=${TITLE_FONT_SIZE}:` +
     `fontcolor=white:box=1:boxcolor=0x111722dd:boxborderw=${TITLE_BOX_PADDING}:` +
