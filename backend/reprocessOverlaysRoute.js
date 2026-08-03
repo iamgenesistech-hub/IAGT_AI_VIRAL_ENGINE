@@ -34,22 +34,32 @@ function publicHost() {
   ).replace(/\/+$/, '');
 }
 
+// Match the env vars + header names used by mediaOutputRoutes.isAdminAuthorized.
+function defaultAdminGate(req) {
+  const expected = String(
+    process.env.ADMIN_API_KEY ||
+    process.env.EVICS_ADMIN_KEY ||
+    process.env.EVICS_APP_AUTOMATION_TOKEN ||
+    ''
+  ).trim();
+  if (!expected) return false;
+  const provided = String(
+    req.headers['x-admin-key'] ||
+    req.headers['X-Admin-Key'] ||
+    req.headers['x-api-key'] ||
+    req.query.admin_key ||
+    ''
+  ).trim();
+  return provided && provided === expected;
+}
+
 function register(app, ctx) {
   const { SupabaseConnector, isAdminAuthorized } = ctx || {};
   if (!app || typeof app.post !== 'function') {
     throw new Error('reprocessOverlaysRoute.register requires an Express app');
   }
 
-  const adminGate = (req) => {
-    if (typeof isAdminAuthorized === 'function') return isAdminAuthorized(req);
-    // Fallback admin check — matches the pattern used elsewhere in the app.
-    const key = req.headers['x-admin-key'] || req.headers['X-Admin-Key'] || req.query.admin_key;
-    const expected = process.env.EVICS_ADMIN_KEY ||
-                     process.env.ADMIN_KEY ||
-                     process.env.EVICS_APP_AUTOMATION_TOKEN ||
-                     null;
-    return !!expected && String(key || '') === String(expected);
-  };
+  const adminGate = typeof isAdminAuthorized === 'function' ? isAdminAuthorized : defaultAdminGate;
 
   app.post('/api/media-output/reprocess-overlays', async (req, res) => {
     try {
