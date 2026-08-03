@@ -63,9 +63,13 @@ async function uploadProcessedVideo({ localPath, renderId, videoId, bucket }) {
   }
 
   const filename = path.basename(localPath);
+  const rawName = videoId || filename;
+  // Always end with .mp4 so browsers, download prompts, and CDNs pick the
+  // right handler. pp.stampedVideoId is passed in without an extension.
+  const safeName = /\.mp4$/i.test(rawName) ? rawName : `${rawName}.mp4`;
   const storagePath = renderId
-    ? `renders/${renderId}/${videoId || filename}`
-    : `renders/anonymous/${videoId || filename}`;
+    ? `renders/${renderId}/${safeName}`
+    : `renders/anonymous/${safeName}`;
 
   try {
     const buffer = fs.readFileSync(localPath);
