@@ -3,30 +3,32 @@
 /**
  * reprocessOverlaysRoute.js
  *
- * POST /api/media-output/reprocess-overlays  { id }
+ * POST /api/media-output/reprocess-overlays
+ *   Body: { id, productPageUrl? }
+ *   Diagnostic + recovery: rerun ONLY the ffmpeg overlay pipeline against an
+ *   existing evics_renders row's cached HeyGen URL. Useful when the HeyGen
+ *   render itself succeeded but the post-processing failed (or the row was
+ *   written before the overlay contract was in place). Does NOT spend a
+ *   HeyGen credit. If productPageUrl is provided it overrides the stored
+ *   CTA click target (persists to parameters + drives ctaClickUrl in the
+ *   overlay pipeline).
  *
- * Diagnostic + recovery: rerun ONLY the ffmpeg overlay pipeline against an
- * existing evics_renders row's cached HeyGen URL. Useful when the HeyGen
- * render itself succeeded but the post-processing failed (or the row was
- * written before the overlay contract was in place). Does NOT spend a
- * HeyGen credit.
+ * POST /api/media-output/set-cta-url
+ *   Body: { id, productPageUrl }
+ *   Point-and-shoot: update ONLY the Buy Now click target for a row without
+ *   re-rendering. The URL is not painted into the video pixels, so this is
+ *   sufficient to fix a Buy Now target on an existing render (the preview
+ *   page + downstream publishers read this field).
  *
  * GET /render-preview/:id
- *
- * Public HTML preview page: wraps the processed video in a landing page
- * where the entire video AND a dedicated "Buy Now" button are functional
- * clickable links to the product page. This is the canonical way to
- * verify the CTA behaviour — mp4 files themselves cannot embed clickable
- * regions, so the "BUY NOW" painted into the video pixels only becomes
- * functional when the video is embedded in a container that provides a
- * click target (a landing page like this one, or a platform's
- * product-link sticker).
- *
- * Registered from backend/server.js:
- *   require('./reprocessOverlaysRoute').register(app, {
- *     SupabaseConnector,
- *     isAdminAuthorized
- *   });
+ *   Public HTML preview page: wraps the processed video in a landing page
+ *   where the entire video AND a dedicated "Buy Now" button are functional
+ *   clickable links to the product page. This is the canonical way to
+ *   verify the CTA behaviour — mp4 files themselves cannot embed clickable
+ *   regions, so the "BUY NOW" painted into the video pixels only becomes
+ *   functional when the video is embedded in a container that provides a
+ *   click target (a landing page like this one, or a platform's
+ *   product-link sticker).
  */
 
 const path = require('path');
@@ -65,6 +67,32 @@ function defaultAdminGate(req) {
 
 function htmlEscape(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Reject non-purchasable hosts. The Squarespace mirror doesn't resolve
+// /products/{handle} to a working add-to-cart page, so surfacing it as a
+// Buy Now target would break the purchase flow.
+const BLOCKED_CTA_HOSTS = new Set([
+  'iamgenesistech.com',
+  'www.iamgenesistech.com'
+]);
+
+function normalizeCtaUrl(raw) {
+  if (!raw) return { ok: false, reason: 'empty' };
+  let url;
+  try { url = new URL(String(raw).trim()); }
+  catch { return { ok: false, reason: 'invalid_url' }; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return { ok: false, reason: 'unsupported_protocol' };
+  }
+  if (BLOCKED_CTA_HOSTS.has(url.hostname.toLowerCase())) {
+    return {
+      ok: false,
+      reason: 'blocked_host',
+      message: `${url.hostname} is not a purchasable checkout host. Use a Shopify checkout URL (e.g. iamgenesistech.myshopify.com/products/{handle}).`
+    };
+  }
+  return { ok: true, url: url.toString() };
 }
 
 function register(app, ctx) {
@@ -137,6 +165,62 @@ function register(app, ctx) {
     }
   });
 
+  // --- Fast CTA-URL patch (no re-render) --------------------------------
+  app.post('/api/media-output/set-cta-url', async (req, res) => {
+    try {
+      if (!adminGate(req)) {
+        return res.status(401).json({ success: false, error: 'Admin key required (x-admin-key header).' });
+      }
+      if (!SupabaseConnector) {
+        return res.status(503).json({ success: false, error: 'Supabase is not configured.' });
+      }
+      const id = String((req.body && req.body.id) || req.query.id || '').trim();
+      const raw = String((req.body && req.body.productPageUrl) || req.query.productPageUrl || '').trim();
+      if (!id) return res.status(400).json({ success: false, error: 'id required' });
+      const check = normalizeCtaUrl(raw);
+      if (!check.ok) {
+        return res.status(400).json({ success: false, error: check.message || `productPageUrl invalid (${check.reason})` });
+      }
+      const finalUrl = check.url;
+
+      const { data: row, error: fetchErr } = await SupabaseConnector
+        .from('evics_renders')
+        .select('id, parameters')
+        .eq('id', id)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (!row) return res.status(404).json({ success: false, error: `evics_renders id=${id} not found` });
+
+      const params = parseJsonMaybe(row.parameters, {});
+      const nextParams = Object.assign({}, params, {
+        productPageUrl: finalUrl,
+        previewPageUrl: `${publicHost()}/render-preview/${id}`,
+        postProcess: Object.assign({}, params.postProcess || {}, { ctaClickUrl: finalUrl }),
+        overlayContract: Object.assign({}, params.overlayContract || {}, { ctaClickTarget: finalUrl })
+      });
+
+      const { data: upd, error: updErr } = await SupabaseConnector
+        .from('evics_renders')
+        .update({ parameters: nextParams, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id, video_url, parameters')
+        .single();
+      if (updErr) throw updErr;
+
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({
+        success: true,
+        id,
+        productPageUrl: finalUrl,
+        previewPageUrl: `${publicHost()}/render-preview/${id}`,
+        updatedRow: { id: upd.id, video_url: upd.video_url }
+      });
+    } catch (err) {
+      console.error('[media-output/set-cta-url] failed:', err && err.stack ? err.stack : err);
+      res.status(500).json({ success: false, error: err && err.message ? err.message : String(err) });
+    }
+  });
+
   // --- Reprocess overlays (admin-only) ----------------------------------
   app.post('/api/media-output/reprocess-overlays', async (req, res) => {
     try {
@@ -177,6 +261,17 @@ function register(app, ctx) {
         });
       }
 
+      // Optional CTA URL override. If provided, must be a valid purchasable host.
+      const rawOverride = (req.body && req.body.productPageUrl) || req.query.productPageUrl;
+      let productPageUrl = params.productPageUrl || null;
+      if (rawOverride) {
+        const check = normalizeCtaUrl(String(rawOverride));
+        if (!check.ok) {
+          return res.status(400).json({ success: false, error: check.message || `productPageUrl invalid (${check.reason})` });
+        }
+        productPageUrl = check.url;
+      }
+
       let productImageLocalPath = null;
       let bgRemovalMeta = null;
       if (productBgRemover && typeof productBgRemover.removeBackground === 'function' && params.productImageUrl) {
@@ -199,7 +294,7 @@ function register(app, ctx) {
         productImageLocalPath,
         productImageUrl: params.productImageUrl,
         productTitle: params.productTitle,
-        productPageUrl: params.productPageUrl,
+        productPageUrl,
         specialEffects: ['product-entrance-fade']
       });
 
@@ -212,6 +307,7 @@ function register(app, ctx) {
           playbackUrl: finalUrl,
           videoUrl: finalUrl,
           previewPageUrl: previewUrl,
+          productPageUrl: productPageUrl || params.productPageUrl,
           heygenRawVideoUrl: heygenUrl,
           reprocessedAt: new Date().toISOString(),
           postProcess: {
@@ -229,7 +325,7 @@ function register(app, ctx) {
           overlayContract: {
             productMockupPresent: !!pp.productOverlayApplied,
             buyNowPillPresent: !!pp.ctaTextApplied,
-            ctaClickTarget: pp.ctaClickUrl || params.productPageUrl || null,
+            ctaClickTarget: pp.ctaClickUrl || productPageUrl || params.productPageUrl || null,
             enforced: true,
             failureReason: null
           }
@@ -255,6 +351,7 @@ function register(app, ctx) {
         success: true,
         id,
         heygenSourceUrl: heygenUrl,
+        productPageUrl,
         previewPageUrl: previewUrl,
         bgRemoval: bgRemovalMeta,
         postProcess: pp,
