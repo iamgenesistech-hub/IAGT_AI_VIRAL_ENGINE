@@ -30,6 +30,30 @@ const PROCESSED_DIR = path.join(__dirname, '../processed-videos');
 if (!fs.existsSync(MEDIA_CACHE_DIR)) fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true });
 
+// Resolve a real TTF font file on disk. Alpine + ttf-dejavu installs the
+// DejaVu family; other distros may have Liberation or Freefont. Never rely on
+// fontconfig lookup like "font=Sans" — Alpine's fontconfig config often can't
+// resolve the alias, which causes drawtext to fail with an inscrutable error.
+function resolveFontFile() {
+  const candidates = [
+    process.env.EVICS_TEXT_FONT_FILE,
+    '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    '/usr/share/fonts/gnu-free/FreeSansBold.ttf',
+    '/usr/share/fonts/TTF/Vera.ttf',
+    '/System/Library/Fonts/Helvetica.ttc'
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch { /* noop */ }
+  }
+  return null;
+}
+
 function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
     const proto = url.startsWith('https') ? https : http;
@@ -75,9 +99,22 @@ async function postProcessVideo({
   const cta = escapeDrawtextValue(ctaText || `Buy Now - Shop ${productTitle || 'Now'}`);
 
   const overlayPlacement = resolveFaceSafeTextPlacement(textOverlayPosition);
-  const ctaX = overlayPlacement.x;
-  const ctaY = overlayPlacement.y;
   const titleY = overlayPlacement.titleY;
+
+  const fontFile = resolveFontFile();
+  if (!fontFile) {
+    return {
+      success: false,
+      processedVideoPath: null,
+      processedVideoUrl: null,
+      productOverlayApplied: false,
+      error: 'No TTF font file found on disk. Install ttf-dejavu (Alpine) or fonts-dejavu (Debian) in the Docker image.',
+      code: 'FONT_FILE_MISSING'
+    };
+  }
+  // drawtext fontfile= must have any ':' path separator escaped so ffmpeg's
+  // filter parser doesn't treat it as an option delimiter.
+  const fontfileArg = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
 
   const normalizedEffects = Array.isArray(specialEffects)
     ? specialEffects.map((effect) => String(effect || '').trim().toLowerCase())
@@ -91,11 +128,11 @@ async function postProcessVideo({
   const pedestal = 'drawbox=x=W-420:y=H-520:w=380:h=380:color=0x050505@0.26:t=fill,drawbox=x=W-420:y=H-520:w=380:h=380:color=0xf4c96a@0.14:t=3';
   const productOverlay = 'overlay=x=W-w-34:y=H-h-170:format=auto';
   // Buy Now pill: solid gold background with black text, centered horizontally
-  // above the product-title strip in the bottom safe zone (below y=1720 for 1080x1920).
+  // above the product-title strip in the bottom safe zone.
   const buyPillFilter =
-    `drawtext=text='${cta}':fontsize=44:fontcolor=0x0a0a0a:borderw=0:` +
+    `drawtext=fontfile='${fontfileArg}':text='${cta}':fontsize=44:fontcolor=0x0a0a0a:borderw=0:` +
     `box=1:boxcolor=0xf4c96a@0.98:boxborderw=22:` +
-    `x=(w-text_w)/2:y=h-text_h-40:font=Sans`;
+    `x=(w-text_w)/2:y=h-text_h-40`;
 
   let productOverlayApplied = false;
   let productImageInputPath = null;
@@ -133,7 +170,7 @@ async function postProcessVideo({
 
   inputs.push('-i', productImageInputPath);
   const filterComplex = `[0:v]${gradeAndVignette},${pedestal}[graded];${productLayerFilter};[graded][prod]${productOverlay}[withprod];` +
-    `[withprod]drawtext=text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}:font=Sans[producttxt];` +
+    `[withprod]drawtext=fontfile='${fontfileArg}':text='${productName}':fontsize=40:fontcolor=white:borderw=2:bordercolor=0x000000@0.8:box=1:boxcolor=0x111722bb:x=40:y=${titleY}[producttxt];` +
     `[producttxt]${buyPillFilter}[out]`;
   productOverlayApplied = true;
 
@@ -149,8 +186,12 @@ async function postProcessVideo({
   try {
     execFileSync('ffmpeg', ffmpegArgs, { timeout: 180000, stdio: 'pipe' });
   } catch (err) {
-    const stderr = err && err.stderr ? err.stderr.toString().slice(0, 2000) : '';
-    console.error('[PostProcess] ffmpeg failed:', stderr || err.message);
+    // Capture the tail of stderr — ffmpeg puts the actual filter error at the
+    // END of its output after a long banner, so slicing from the front loses
+    // the diagnostic. Take the last 1500 chars instead.
+    const stderrAll = err && err.stderr ? err.stderr.toString() : '';
+    const stderrTail = stderrAll ? stderrAll.slice(-1500) : (err && err.message ? err.message : 'ffmpeg unknown error');
+    console.error('[PostProcess] ffmpeg failed (tail):', stderrTail);
     // Do NOT return the raw video URL — that would ship a video without the
     // required product mockup + Buy Now overlays. Signal failure and let
     // the caller mark the render as failed.
@@ -160,7 +201,10 @@ async function postProcessVideo({
       processedVideoPath: null,
       processedVideoUrl: null,
       productOverlayApplied: false,
-      error: `ffmpeg compose failed: ${stderr.slice(0, 500) || err.message}`,
+      error: `ffmpeg compose failed: ${stderrTail}`,
+      ffmpegStderrTail: stderrTail,
+      filterComplex,
+      fontFile,
       code: 'FFMPEG_COMPOSE_FAILED'
     };
   }
@@ -195,7 +239,8 @@ async function postProcessVideo({
     productLabelReadable: productOverlayApplied,
     ctaTextApplied: true,
     ctaClickUrl: productPageUrl || null,
-    ctaLabel: ctaText || `Buy Now - Shop ${productTitle || 'Now'}`
+    ctaLabel: ctaText || `Buy Now - Shop ${productTitle || 'Now'}`,
+    fontFile
   };
 }
 
@@ -215,4 +260,4 @@ function resolveFaceSafeTextPlacement(_textOverlayPosition) {
   };
 }
 
-module.exports = { postProcessVideo, downloadFile };
+module.exports = { postProcessVideo, downloadFile, resolveFontFile };
