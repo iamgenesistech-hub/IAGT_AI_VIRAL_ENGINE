@@ -7,8 +7,7 @@
  *   Body: { id, productPageUrl? }
  *   Rerun ONLY the ffmpeg overlay pipeline against an existing row's cached
  *   HeyGen URL. Auto-resolves the Buy Now CTA target from the Shopify
- *   catalog if productPageUrl is not provided. Uploads the finalized mp4
- *   to Supabase Storage so the URL survives Cloud Run redeploys.
+ *   catalog if productPageUrl is not provided.
  *
  * POST /api/media-output/set-cta-url
  *   Body: { id, productPageUrl? }
@@ -27,7 +26,13 @@
 
 const path = require('path');
 let durableVideoStorage = null;
-try { durableVideoStorage = require('../utils/durableVideoStorage'); } catch (_e) { /* optional */ }
+let durableVideoStorageLoadError = null;
+try {
+  durableVideoStorage = require('../utils/durableVideoStorage');
+} catch (loadErr) {
+  durableVideoStorageLoadError = loadErr && loadErr.message ? loadErr.message : String(loadErr);
+  console.warn('[reprocessOverlaysRoute] durableVideoStorage require failed:', durableVideoStorageLoadError);
+}
 
 function parseJsonMaybe(value, fallback = {}) {
   if (!value) return fallback;
@@ -413,8 +418,18 @@ function register(app, ctx) {
         specialEffects: ['product-entrance-fade']
       });
 
+      // Upload to durable storage so the URL survives Cloud Run redeploys.
+      // Always emit a diagnostic object so operators can see why null.
       let durable = null;
-      if (pp && pp.success && pp.processedVideoPath && durableVideoStorage && typeof durableVideoStorage.uploadProcessedVideo === 'function') {
+      if (!pp || !pp.success) {
+        durable = { skipped: true, reason: 'postProcess did not succeed' };
+      } else if (!pp.processedVideoPath) {
+        durable = { skipped: true, reason: 'postProcess did not return processedVideoPath', ppKeys: Object.keys(pp || {}) };
+      } else if (!durableVideoStorage) {
+        durable = { skipped: true, reason: 'durableVideoStorage module failed to load', loadError: durableVideoStorageLoadError };
+      } else if (typeof durableVideoStorage.uploadProcessedVideo !== 'function') {
+        durable = { skipped: true, reason: 'uploadProcessedVideo is not a function', moduleKeys: Object.keys(durableVideoStorage || {}) };
+      } else {
         try {
           durable = await durableVideoStorage.uploadProcessedVideo({
             localPath: pp.processedVideoPath,
@@ -444,7 +459,7 @@ function register(app, ctx) {
           durableVideoUrl: durableUrl,
           durableStorage: durable && durable.publicUrl
             ? { bucket: durable.bucket, storagePath: durable.storagePath, bytes: durable.bytes }
-            : (durable && durable.error ? { error: durable.error, code: durable.code } : null),
+            : (durable && durable.error ? { error: durable.error, code: durable.code } : (durable && durable.skipped ? { skipped: true, reason: durable.reason, loadError: durable.loadError } : null)),
           previewPageUrl: previewUrl,
           productPageUrl: productPageUrl || params.productPageUrl,
           heygenRawVideoUrl: heygenUrl,
