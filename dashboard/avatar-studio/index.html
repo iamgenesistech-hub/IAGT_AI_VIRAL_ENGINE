@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVICS Avatar Studio</title>
+  <meta name="description" content="Register avatars and voice files for use in EVICS renders. Enforces avatar-voice guardrail." />
+  <style>
+    :root {
+      --bg: #070b11;
+      --bg2: #0d131c;
+      --card: #101826;
+      --card2: #131c2d;
+      --border: #253248;
+      --border-dim: #1a2334;
+      --text: #eff5fb;
+      --text-sub: #b6c3d6;
+      --muted: #7a8ba4;
+      --gold: #d9bf7a;
+      --gold-2: #f0d898;
+      --cyan: #00c7f5;
+      --green: #22c55e;
+      --red: #ff5a68;
+      --orange: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header.top {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 22px;
+      background: linear-gradient(180deg, #0b1220 0%, #070b11 100%);
+      border-bottom: 1px solid var(--border-dim);
+      position: sticky; top: 0; z-index: 20;
+    }
+    header.top .brand {
+      display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--gold-2) 0%, var(--gold) 55%, #9a7a32 100%);
+      color: #070b11; font-weight: 900; font-size: 14px; letter-spacing: -0.5px;
+      box-shadow: 0 0 18px rgba(217,191,122,.25);
+    }
+    header.top h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    header.top .sub { font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+    header.top nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+    header.top nav a { padding: 6px 12px; border-radius: 8px; color: var(--text-sub); font-size: 13px; }
+    header.top nav a.on { background: var(--card); color: var(--text); border: 1px solid var(--border-dim); }
+
+    main { padding: 22px; max-width: 1400px; margin: 0 auto; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
+
+    .row { display: grid; grid-template-columns: 1fr; gap: 18px; }
+    @media (min-width: 900px) { .row.two { grid-template-columns: 1fr 1fr; } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border-dim);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .card h2 { display: flex; align-items: center; gap: 8px; }
+    .card .hint { color: var(--muted); font-size: 12px; margin-top: -4px; margin-bottom: 12px; }
+
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .field label { font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+    .field input, .field select, .field textarea {
+      background: var(--bg2); border: 1px solid var(--border-dim); border-radius: 8px;
+      color: var(--text); padding: 9px 11px; font: inherit;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0,199,245,.15);
+    }
+    .field textarea { min-height: 80px; resize: vertical; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+      padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card2); color: var(--text); font: inherit; font-weight: 600; font-size: 13px;
+      transition: all .12s;
+    }
+    .btn:hover { background: #1b2740; border-color: #3a4b6a; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.primary { background: linear-gradient(135deg, #00c7f5 0%, #0891b2 100%); border-color: transparent; color: #06131a; }
+    .btn.primary:hover { filter: brightness(1.05); }
+    .btn.gold { background: linear-gradient(135deg, var(--gold-2) 0%, var(--gold) 100%); border-color: transparent; color: #070b11; }
+    .btn.danger { background: rgba(255,90,104,.14); border-color: rgba(255,90,104,.4); color: #ffb8bf; }
+    .btn.danger:hover { background: rgba(255,90,104,.22); }
+    .btn.ghost { background: transparent; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      background: var(--card2); border: 1px solid var(--border-dim); color: var(--text-sub);
+    }
+    .badge.ok { color: var(--green); border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.08); }
+    .badge.warn { color: var(--orange); border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
+    .badge.err { color: var(--red); border-color: rgba(255,90,104,.4); background: rgba(255,90,104,.08); }
+    .badge.gold { color: var(--gold); border-color: rgba(217,191,122,.4); background: rgba(217,191,122,.08); }
+
+    .grid {
+      display: grid; gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+    .avatar-card {
+      background: var(--card2); border: 1px solid var(--border-dim); border-radius: 12px;
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .avatar-card .thumb {
+      width: 100%; aspect-ratio: 3/4; border-radius: 10px;
+      background: linear-gradient(135deg, #1b2740, #0d131c);
+      background-size: cover; background-position: center; overflow: hidden;
+      display: grid; place-items: center; color: var(--muted); font-size: 12px;
+    }
+    .avatar-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-card .name { font-weight: 700; font-size: 14px; }
+    .avatar-card .meta { font-size: 11px; color: var(--muted); word-break: break-all; }
+    .avatar-card .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+    .avatar-card .actions .btn { padding: 6px 10px; font-size: 12px; }
+
+    .recorder {
+      display: flex; flex-direction: column; gap: 12px;
+      background: var(--bg2); border: 1px dashed var(--border); border-radius: 12px; padding: 16px;
+    }
+    .rec-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .rec-timer { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; color: var(--gold); }
+    .waveform {
+      height: 60px; width: 100%;
+      background: linear-gradient(180deg, transparent 0%, transparent 45%, rgba(0,199,245,.06) 50%, transparent 55%, transparent 100%);
+      border-radius: 8px; border: 1px solid var(--border-dim);
+      display: grid; place-items: center; color: var(--muted); font-size: 12px;
+    }
+    .waveform canvas { width: 100%; height: 100%; display: block; }
+
+    .drop {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 22px; text-align: center;
+      background: var(--bg2); color: var(--muted); cursor: pointer;
+    }
+    .drop.drag { border-color: var(--cyan); color: var(--text); background: rgba(0,199,245,.06); }
+    .drop small { display: block; margin-top: 4px; font-size: 11px; }
+
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 100;
+      background: var(--card); border: 1px solid var(--border-dim); border-radius: 10px;
+      padding: 12px 16px; min-width: 260px; max-width: 400px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    }
+    .toast.ok { border-color: rgba(34,197,94,.5); }
+    .toast.err { border-color: rgba(255,90,104,.5); }
+
+    .empty { color: var(--muted); text-align: center; padding: 40px; font-size: 13px; }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px; font-size: 12px; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; word-break: break-all; }
+
+    details.raw { margin-top: 10px; }
+    details.raw summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+    details.raw pre { background: #06090f; border: 1px solid var(--border-dim); border-radius: 8px; padding: 10px; overflow: auto; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">EV</div>
+    <div>
+      <h1>Avatar Studio</h1>
+      <div class="sub">EVICS &middot; Elite Viral Intelligence Control System</div>
+    </div>
+    <nav>
+      <a href="/">Workspace</a>
+      <a href="/avatar-studio" class="on">Avatar Studio</a>
+      <a href="/publishing">Publishing</a>
+      <a href="/affiliate">Affiliate</a>
+      <a href="/phone-app">Phone App</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card" style="margin-bottom:18px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:260px;margin:0;">
+          <label>Admin key (x-admin-key)</label>
+          <input type="password" id="adminKey" placeholder="paste admin key" autocomplete="off"/>
+        </div>
+        <button class="btn primary" id="saveKey">Save &amp; Load</button>
+        <span id="loadStatus" class="badge">idle</span>
+      </div>
+      <p class="hint" style="margin-top:10px;">
+        Every avatar registered here is voice-locked: the voice_id you pin is the ONLY voice that avatar will ever use, enforced by the render pipeline.
+      </p>
+    </div>
+
+    <div class="row two" style="margin-bottom:18px;">
+      <!-- Voice recorder -->
+      <div class="card">
+        <h2>&#127908; Voice Recorder</h2>
+        <p class="hint">Record 15-60 seconds of clean speech. This will be sent to HeyGen Instant Voice Clone to produce a permanent voice_id.</p>
+        <div class="recorder">
+          <div class="rec-controls">
+            <button class="btn primary" id="recStart">&#9679; Record</button>
+            <button class="btn" id="recStop" disabled>&#9632; Stop</button>
+            <button class="btn ghost" id="recPlay" disabled>&#9654; Play</button>
+            <span class="rec-timer" id="recTimer">00:00</span>
+          </div>
+          <div class="waveform"><canvas id="wave"></canvas></div>
+          <audio id="recPreview" controls style="width:100%;display:none;"></audio>
+        </div>
+
+        <div style="margin-top:14px;">
+          <div class="field">
+            <label>Voice name</label>
+            <input id="voiceName" placeholder="e.g. Roland Casual"/>
+          </div>
+          <div class="field">
+            <label>Pin to avatar (optional)</label>
+            <select id="voicePinAvatar"><option value="">- none -</option></select>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn gold" id="voiceCloneBtn" disabled>Clone via HeyGen</button>
+            <label class="btn ghost">
+              Upload audio file
+              <input type="file" id="voiceFileInput" accept="audio/*" style="display:none;"/>
+            </label>
+          </div>
+          <div id="voiceResult" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+        </div>
+      </div>
+
+      <!-- Avatar upload -->
+      <div class="card">
+        <h2>&#128100; Register Avatar</h2>
+        <p class="hint">Upload a portrait image to create a HeyGen Photo Avatar, or paste a stock HeyGen avatar_id.</p>
+
+        <div class="drop" id="avatarDrop">
+          Drop image (or short video) here or click to select.
+          <small>JPG/PNG/WebP &middot; MP4/MOV for talking-photo. Max 50 MB.</small>
+          <input type="file" id="avatarFileInput" accept="image/*,video/*" style="display:none;"/>
+          <div id="avatarPreview" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="field" style="margin-top:12px;">
+          <label>Display name</label>
+          <input id="avatarName" placeholder="e.g. Roland (Owner)"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field">
+            <label>Gender</label>
+            <select id="avatarGender">
+              <option value="">-</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="neutral">Neutral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Voice to bind (optional)</label>
+            <input id="avatarVoiceId" placeholder="HeyGen voice_id"/>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn gold" id="uploadAvatarBtn" disabled>Upload &amp; Create in HeyGen</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border-dim);margin:18px 0;"/>
+
+        <h3>Register existing HeyGen avatar</h3>
+        <p class="hint">For stock or already-created HeyGen avatars (like Jordan), paste the avatar_id.</p>
+        <div class="field">
+          <label>HeyGen avatar_id</label>
+          <input id="stockAvatarId" placeholder="e.g. Jordan_expressive_..."/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field">
+            <label>Name</label>
+            <input id="stockName" placeholder="e.g. Jordan"/>
+          </div>
+          <div class="field">
+            <label>Gender</label>
+            <select id="stockGender">
+              <option value="">-</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="neutral">Neutral</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Voice ID (pinned)</label>
+          <input id="stockVoiceId" placeholder="HeyGen voice_id"/>
+        </div>
+        <button class="btn primary" id="registerStockBtn">Register</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <h2 style="margin:0;">Registered Avatars</h2>
+        <button class="btn ghost" id="refreshBtn">Refresh</button>
+        <span id="regStatus" class="badge">-</span>
+      </div>
+      <div id="avatarGrid" class="grid"><div class="empty">Enter admin key above to load your registered avatars.</div></div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script>
+  (function(){
+    const state = {
+      adminKey: localStorage.getItem('evicsAdminKey') || '',
+      audioBlob: null,
+      mediaRecorder: null,
+      recTimer: 0,
+      recTicker: null,
+      audioCtx: null,
+      analyser: null,
+      avatarFile: null,
+      avatars: []
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const toast = (msg, kind) => {
+      kind = kind || 'ok';
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'toast ' + kind;
+      t.style.display = 'block';
+      clearTimeout(t._t);
+      t._t = setTimeout(function(){ t.style.display = 'none'; }, 4500);
+    };
+
+    async function api(path, opts) {
+      opts = opts || {};
+      if (!state.adminKey) throw new Error('Admin key not set');
+      const headers = Object.assign({ 'x-admin-key': state.adminKey }, opts.headers || {});
+      if (opts.body && !(opts.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+      const r = await fetch(path, Object.assign({}, opts, { headers: headers }));
+      const text = await r.text();
+      let json; try { json = JSON.parse(text); } catch (e) { json = { raw: text }; }
+      if (!r.ok || json.success === false) throw new Error(json.error || ('HTTP ' + r.status));
+      return json;
+    }
+
+    // Admin key
+    $('adminKey').value = state.adminKey;
+    $('saveKey').onclick = async function(){
+      state.adminKey = $('adminKey').value.trim();
+      localStorage.setItem('evicsAdminKey', state.adminKey);
+      $('loadStatus').textContent = 'loading...';
+      $('loadStatus').className = 'badge warn';
+      try { await loadAvatars(); toast('Loaded avatars', 'ok'); }
+      catch (e) { toast(e.message, 'err'); $('loadStatus').textContent = 'error'; $('loadStatus').className = 'badge err'; }
+    };
+
+    async function loadAvatars() {
+      const j = await api('/api/avatar-studio/registry');
+      state.avatars = j.avatars || [];
+      $('loadStatus').textContent = 'ok - ' + state.avatars.length;
+      $('loadStatus').className = 'badge ok';
+      $('regStatus').textContent = state.avatars.length + ' registered';
+      $('regStatus').className = 'badge';
+      renderAvatars();
+      renderVoicePinDropdown();
+    }
+
+    function renderVoicePinDropdown() {
+      const sel = $('voicePinAvatar');
+      sel.innerHTML = '<option value="">- none -</option>' +
+        state.avatars.map(function(a){ return '<option value="' + a.avatar_id + '">' + escapeHtml(a.name) + ' (' + a.avatar_id + ')</option>'; }).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; });
+    }
+
+    function renderAvatars() {
+      const grid = $('avatarGrid');
+      if (!state.avatars.length) {
+        grid.innerHTML = '<div class="empty">No avatars registered yet. Add one on the left.</div>';
+        return;
+      }
+      grid.innerHTML = state.avatars.map(function(a){
+        return '' +
+          '<div class="avatar-card">' +
+            '<div class="thumb">' + (a.preview_url ? ('<img src="' + escapeHtml(a.preview_url) + '" alt=""/>') : ((a.name || '').slice(0,2).toUpperCase())) + '</div>' +
+            '<div>' +
+              '<div class="name">' + escapeHtml(a.name) + ' ' + (a.is_default ? '<span class="badge gold">default</span>' : '') + '</div>' +
+              '<div class="meta">' + escapeHtml(a.avatar_id) + '</div>' +
+              '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">' +
+                '<span class="badge ' + (a.active ? 'ok' : 'err') + '">' + (a.active ? 'active' : 'inactive') + '</span>' +
+                '<span class="badge">' + escapeHtml(a.source || 'unknown') + '</span>' +
+                (a.gender ? ('<span class="badge">' + escapeHtml(a.gender) + '</span>') : '') +
+                (a.voice_id ? '<span class="badge ok">voice pinned</span>' : '<span class="badge warn">no voice</span>') +
+              '</div>' +
+              (a.voice_id ? ('<div class="meta" style="margin-top:4px;">voice: ' + escapeHtml(a.voice_id) + '</div>') : '') +
+            '</div>' +
+            '<div class="actions">' +
+              '<button class="btn ' + (a.active ? '' : 'primary') + '" data-id="' + a.avatar_id + '" data-act="toggle-active">' + (a.active ? 'Deactivate' : 'Activate') + '</button>' +
+              (a.is_default ? '' : ('<button class="btn" data-id="' + a.avatar_id + '" data-act="make-default">Make default</button>')) +
+              '<button class="btn" data-id="' + a.avatar_id + '" data-act="pin-voice">Change voice</button>' +
+              '<button class="btn" data-id="' + a.avatar_id + '" data-act="test">Test render</button>' +
+              '<button class="btn danger" data-id="' + a.avatar_id + '" data-act="delete">Delete</button>' +
+            '</div>' +
+          '</div>';
+      }).join('');
+
+      grid.querySelectorAll('button[data-act]').forEach(function(btn){
+        btn.onclick = function(){ handleAvatarAction(btn.dataset.act, btn.dataset.id); };
+      });
+    }
+
+    async function handleAvatarAction(act, id) {
+      try {
+        if (act === 'toggle-active') {
+          const cur = state.avatars.find(function(a){ return a.avatar_id === id; });
+          await api('/api/avatar-studio/set-active', { method: 'POST', body: { avatarId: id, active: !cur.active } });
+          toast('Updated', 'ok');
+          await loadAvatars();
+        } else if (act === 'make-default') {
+          await api('/api/avatar-studio/set-default', { method: 'POST', body: { avatarId: id } });
+          toast('Default set', 'ok');
+          await loadAvatars();
+        } else if (act === 'pin-voice') {
+          const voiceId = prompt('Enter HeyGen voice_id to pin to this avatar (this becomes the only voice it can use):');
+          if (!voiceId) return;
+          await api('/api/avatar-studio/pin', { method: 'POST', body: { avatarId: id, voiceId: voiceId.trim() } });
+          toast('Voice pinned', 'ok');
+          await loadAvatars();
+        } else if (act === 'delete') {
+          if (!confirm('Delete this avatar from the registry? HeyGen record is not deleted.')) return;
+          await api('/api/avatar-studio/avatar/' + encodeURIComponent(id), { method: 'DELETE' });
+          toast('Deleted', 'ok');
+          await loadAvatars();
+        } else if (act === 'test') {
+          toast('Firing test render...', 'ok');
+          const j = await api('/api/avatar-studio/test-render', { method: 'POST', body: { avatarId: id } });
+          toast('Test render submitted: ' + ((j.result && j.result.output && j.result.output.id) || 'ok'), 'ok');
+        }
+      } catch (e) { toast(e.message, 'err'); }
+    }
+
+    $('refreshBtn').onclick = function(){ loadAvatars().catch(function(e){ toast(e.message, 'err'); }); };
+
+    // Voice recorder
+    function fmtTime(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return m + ':' + s;
+    }
+
+    $('recStart').onclick = async function(){
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const chunks = [];
+        const mr = new MediaRecorder(stream);
+        state.mediaRecorder = mr;
+        mr.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
+        mr.onstop = function(){
+          state.audioBlob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
+          const url = URL.createObjectURL(state.audioBlob);
+          const audio = $('recPreview');
+          audio.src = url;
+          audio.style.display = 'block';
+          $('recPlay').disabled = false;
+          $('voiceCloneBtn').disabled = false;
+          stream.getTracks().forEach(function(t){ t.stop(); });
+          stopWave();
+        };
+        mr.start();
+        state.recTimer = 0;
+        $('recTimer').textContent = fmtTime(0);
+        state.recTicker = setInterval(function(){
+          state.recTimer++;
+          $('recTimer').textContent = fmtTime(state.recTimer);
+          if (state.recTimer >= 90) $('recStop').click();
+        }, 1000);
+        $('recStart').disabled = true;
+        $('recStop').disabled = false;
+        startWaveform(stream);
+      } catch (e) { toast('Mic access failed: ' + e.message, 'err'); }
+    };
+
+    $('recStop').onclick = function(){
+      if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
+      clearInterval(state.recTicker);
+      $('recStart').disabled = false;
+      $('recStop').disabled = true;
+    };
+
+    $('recPlay').onclick = function(){ $('recPreview').play(); };
+
+    $('voiceFileInput').onchange = function(e){
+      const f = e.target.files[0]; if (!f) return;
+      state.audioBlob = f;
+      const url = URL.createObjectURL(f);
+      const audio = $('recPreview');
+      audio.src = url;
+      audio.style.display = 'block';
+      $('recPlay').disabled = false;
+      $('voiceCloneBtn').disabled = false;
+      toast('Audio file loaded: ' + f.name, 'ok');
+    };
+
+    function startWaveform(stream) {
+      if (!window.AudioContext) return;
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 256;
+      src.connect(an);
+      state.audioCtx = ctx;
+      state.analyser = an;
+      const canvas = $('wave');
+      const c = canvas.getContext('2d');
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = 60;
+      const data = new Uint8Array(an.frequencyBinCount);
+      function loop() {
+        if (!state.analyser) return;
+        an.getByteFrequencyData(data);
+        c.fillStyle = 'rgba(6,9,15,0.9)';
+        c.fillRect(0, 0, canvas.width, canvas.height);
+        const w = canvas.width / data.length;
+        for (let i = 0; i < data.length; i++) {
+          const h = (data[i] / 255) * canvas.height;
+          c.fillStyle = 'rgba(0,199,245,0.85)';
+          c.fillRect(i * w, canvas.height - h, w * 0.8, h);
+        }
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+    function stopWave() {
+      if (state.audioCtx) { try { state.audioCtx.close(); } catch (e) {} }
+      state.audioCtx = null; state.analyser = null;
+    }
+
+    $('voiceCloneBtn').onclick = async function(){
+      if (!state.audioBlob) return toast('No audio to upload', 'err');
+      const name = ($('voiceName').value || '').trim() || ('EVICS Voice ' + Date.now());
+      const pinAvatar = $('voicePinAvatar').value;
+      const fd = new FormData();
+      const filename = state.audioBlob.name || ('voice-' + Date.now() + '.webm');
+      fd.append('file', state.audioBlob, filename);
+      fd.append('name', name);
+      if (pinAvatar) fd.append('avatarId', pinAvatar);
+      $('voiceCloneBtn').disabled = true;
+      $('voiceResult').textContent = 'Uploading & cloning...';
+      try {
+        const j = await api('/api/avatar-studio/voice/upload', { method: 'POST', body: fd });
+        $('voiceResult').innerHTML = '<span class="badge ok">voice_id</span> ' + escapeHtml(j.voice.voice_id) + ' ' + (j.pinned_to_avatar ? ('- pinned to ' + escapeHtml(j.pinned_to_avatar)) : '');
+        toast('Voice cloned', 'ok');
+        await loadAvatars();
+      } catch (e) {
+        $('voiceResult').innerHTML = '<span class="badge err">error</span> ' + escapeHtml(e.message);
+        toast(e.message, 'err');
+      } finally {
+        $('voiceCloneBtn').disabled = false;
+      }
+    };
+
+    // Avatar upload
+    const drop = $('avatarDrop');
+    drop.onclick = function(){ $('avatarFileInput').click(); };
+    drop.ondragover = function(e){ e.preventDefault(); drop.classList.add('drag'); };
+    drop.ondragleave = function(){ drop.classList.remove('drag'); };
+    drop.ondrop = function(e){
+      e.preventDefault(); drop.classList.remove('drag');
+      const f = e.dataTransfer.files[0]; if (f) acceptAvatarFile(f);
+    };
+    $('avatarFileInput').onchange = function(e){ const f = e.target.files[0]; if (f) acceptAvatarFile(f); };
+
+    function acceptAvatarFile(f) {
+      state.avatarFile = f;
+      $('uploadAvatarBtn').disabled = false;
+      const url = URL.createObjectURL(f);
+      const p = $('avatarPreview');
+      if (f.type.startsWith('video/')) {
+        p.innerHTML = '<video src="' + url + '" controls style="max-width:200px;border-radius:8px;"></video>';
+      } else {
+        p.innerHTML = '<img src="' + url + '" style="max-width:200px;border-radius:8px;"/>';
+      }
+    }
+
+    $('uploadAvatarBtn').onclick = async function(){
+      if (!state.avatarFile) return;
+      const fd = new FormData();
+      fd.append('file', state.avatarFile);
+      fd.append('name', ($('avatarName').value || 'Untitled Avatar').trim());
+      fd.append('gender', $('avatarGender').value);
+      const vid = ($('avatarVoiceId').value || '').trim();
+      if (vid) fd.append('voiceId', vid);
+      $('uploadAvatarBtn').disabled = true;
+      toast('Uploading to HeyGen...', 'ok');
+      try {
+        const j = await api('/api/avatar-studio/avatar/upload', { method: 'POST', body: fd });
+        toast('Avatar registered: ' + (j.avatar && j.avatar.avatar_id), 'ok');
+        state.avatarFile = null;
+        $('avatarPreview').innerHTML = '';
+        await loadAvatars();
+      } catch (e) {
+        toast(e.message, 'err');
+      } finally {
+        $('uploadAvatarBtn').disabled = false;
+      }
+    };
+
+    // Register existing stock avatar
+    $('registerStockBtn').onclick = async function(){
+      const avatarId = ($('stockAvatarId').value || '').trim();
+      const name = ($('stockName').value || '').trim();
+      const gender = $('stockGender').value || null;
+      const voiceId = ($('stockVoiceId').value || '').trim() || null;
+      if (!avatarId || !name) return toast('avatar_id and name required', 'err');
+      try {
+        await api('/api/avatar-studio/register', {
+          method: 'POST',
+          body: { avatarId: avatarId, name: name, gender: gender, voiceId: voiceId, source: 'heygen_stock', active: true }
+        });
+        toast('Registered', 'ok');
+        $('stockAvatarId').value = ''; $('stockName').value = ''; $('stockVoiceId').value = '';
+        await loadAvatars();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+
+    // Init
+    if (state.adminKey) loadAvatars().catch(function(e){
+      $('loadStatus').textContent = 'error';
+      $('loadStatus').className = 'badge err';
+      console.error(e);
+    });
+  })();
+  </script>
+</body>
+</html>
