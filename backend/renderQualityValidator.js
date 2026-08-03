@@ -116,7 +116,7 @@ function validateScriptQuality(script) {
   );
   const ctaClarity = clampScore(
     35 +
-    scoreMatches(lower, [/tap/, /link/, /shop/, /get yours/, /try/, /visit/, /choose/, /claim/, /today/], 50) +
+    scoreMatches(lower, [/tap/, /button/, /buy now/, /shop/, /get yours/, /try/, /choose/, /claim/, /today/], 50) +
     (/(now|today|limited|before)/.test(lower) ? 15 : 0)
   );
   const pacing = clampScore(
@@ -162,11 +162,11 @@ function validateScriptQuality(script) {
 function upgradeScriptForAPlus(script, context = {}) {
   const clean = removeProhibitedClaims(script);
   const productName = normalizeText(context.productName || context.product || 'this premium wellness product');
-  const ctaUrl = normalizeText(context.productPageUrl || context.ctaUrl || context.destinationUrl);
   const companyLabel = normalizeText(context.companyLabel || 'I AM GENESIS TECH');
-  const cta = ctaUrl
-    ? `Tap the link to visit ${ctaUrl} and finish your order today.`
-    : 'Tap the link to finish your order today.';
+  // The avatar must NEVER recite the productPageUrl on-camera. The Buy Now
+  // button overlay is the clickable CTA target; the avatar directs viewers
+  // to the button, not to a spoken URL.
+  const cta = 'Tap the Buy Now button below to shop today and get yours delivered.';
 
   const coreBenefit = clean.length > 20
     ? clean
@@ -198,9 +198,10 @@ function buildAPlusVideoAgentPrompt(prompt, context = {}) {
     `Create an A+ portrait product video for ${platform}, about ${duration}, for ${companyLabel}'s ${productName}.`,
     'Use a natural direct-to-camera story, not a rigid timestamped scene list. The presenter should sound confident, conversational, and premium -- like a creator sharing a product they genuinely believe belongs in a daily routine.',
     'Open with a bold, scroll-stopping statement. Flow into a simple product benefit, the actual primary product mockup, and a direct shop-today call to action. Avoid medical claims, guarantees, cure/treat language, military-owned/operated claims, and clutter.',
+    'The presenter must NEVER speak or recite raw URLs on camera. The CTA is the on-screen "Buy Now" button; the presenter directs the viewer to that button, not to a URL.',
     'The company label must be visible in the frame throughout the render. Text overlays must appear ONLY below the avatar\'s neck (bottom 20% of frame — below y=1530 in a 1080×1920 portrait video). Text must NEVER appear across the face, head, or neck of the avatar. No text in the upper 80% of the frame.',
     'Let Video Agent handle production choices, but keep the feel high-contrast, polished, premium, caption-friendly, and optimized for TikTok/Reels/Shorts.',
-    productPageUrl ? `Destination: ${productPageUrl}` : '',
+    productPageUrl ? `Destination (for the Buy Now button target, not to be spoken): ${productPageUrl}` : '',
     `Core brief: ${cleanPrompt}`,
     'Orientation: portrait.'
   ].filter(Boolean).join('\n');
