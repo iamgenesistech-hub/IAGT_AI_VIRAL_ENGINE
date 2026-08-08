@@ -344,6 +344,23 @@ app.get('/viral-media', (_req, res) => res.sendFile(path.join(__dirname, '../das
 app.use('/viral-media', express.static(path.join(__dirname, '../dashboard/viral-media'), {
   setHeaders: function (res) { res.setHeader('Cache-Control', 'no-store'); }
 }));
+const viralMediaWorkspaceRoutes = new Set([
+  'dashboard',
+  'batch-builder',
+  'jordan-avatar',
+  'ai-commercials',
+  'briefs',
+  'scoreboard',
+  'render-queue',
+  'publishing',
+  'board-review',
+  'learning-loop',
+  'regeneration'
+]);
+app.get('/viral-media/:workspace', (req, res, next) => {
+  if (!viralMediaWorkspaceRoutes.has(req.params.workspace)) return next();
+  return res.sendFile(path.join(__dirname, '../dashboard/viral-media/index.html'));
+});
 app.use('/phone-app', express.static(path.join(__dirname, '../dashboard/phone-app'), {
   index: false
 }));
@@ -2578,6 +2595,10 @@ app.get('/api/production-closeout/status', async (_req, res) => {
   }
 
   res.json({ success: true, checks, timestamp: new Date().toISOString() });
+});
+
+app.get('/shopify/reconnect', (_req, res) => {
+  res.redirect('/api/shopify/diagnostics');
 });
 
 app.get('/api/shopify/diagnostics', async (_req, res) => {
