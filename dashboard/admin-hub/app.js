@@ -26,6 +26,27 @@
     messages: []
   };
 
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+  }
+
+  function getAdminKeyValue() {
+    const input = document.getElementById('adminVideoMgmtKey');
+    return input ? String(input.value || '').trim() : '';
+  }
+
+  function sanitizeHttpUrl(urlValue) {
+    const raw = String(urlValue || '').trim();
+    if (!raw) return '';
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+      return parsed.href;
+    } catch {
+      return '';
+    }
+  }
+
   function setControlState(el, state, autoOffMs = 0) {
     if (!el) return;
     el.classList.remove('state-running', 'state-completed', 'state-off');
@@ -45,9 +66,16 @@
   }
 
   async function apiJson(url, options) {
+    const adminKey = getAdminKeyValue();
+    const mergedHeaders = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(options && options.headers ? options.headers : {})
+    };
+    if (adminKey) mergedHeaders['x-admin-key'] = adminKey;
     const response = await fetch(url, {
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      ...options
+      ...(options || {}),
+      headers: mergedHeaders
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success === false) {
@@ -92,9 +120,12 @@
     conversationFeed.innerHTML = commsState.messages.map((message) => {
       const role = String(message.senderRole || 'ai').toLowerCase();
       const roleLabel = role === 'affiliate' ? 'Affiliate' : role === 'admin' ? 'Admin' : 'AI Agent';
+      const safeVideoUrl = sanitizeHttpUrl(message.videoUrl);
       const body = message.type === 'video'
-        ? `<a href="${message.videoUrl}" target="_blank" rel="noopener">Open shared video</a>`
-        : String(message.text || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+        ? (safeVideoUrl
+          ? `<a href="${safeVideoUrl}" target="_blank" rel="noopener">Open shared video</a>`
+          : '<em>[invalid video URL]</em>')
+        : escapeHtml(message.text || '');
       return `<div class="conversation-msg ${role}">
         <div class="meta">${roleLabel} · ${new Date(message.createdAt).toLocaleTimeString()}</div>
         <div>${body}</div>
@@ -198,8 +229,12 @@
       healthEl.textContent = `Health: ${(health.status || 'unknown').toUpperCase()} · Integrations ${health.connected_integrations || 0}/${health.total_integrations || 0}`;
       auditEl.textContent = `Audit target: A+ >=95 · Current ${audit.overall ? `${audit.overall.grade} ${audit.overall.score}` : 'not run yet'}`;
       if (proof.available && proof.latest) {
-        const proofUrl = proof.latest.videoUrl || proof.latest.video_url || proof.latest.proofUrl || proof.latest.proof_url || '/generated/evics-sea-moss-proof-render.mp4';
-        proofEl.innerHTML = `HeyGen proof: <span class="good">verified</span> · <a href="${proofUrl}" target="_blank" rel="noopener" style="color:#d9bf7a">open evidence</a>`;
+        const proofUrl = sanitizeHttpUrl(proof.latest.videoUrl || proof.latest.video_url || proof.latest.proofUrl || proof.latest.proof_url);
+        if (proofUrl) {
+          proofEl.innerHTML = `HeyGen proof: <span class="good">verified</span> · <a href="${proofUrl}" target="_blank" rel="noopener" style="color:#d9bf7a">open evidence</a>`;
+        } else {
+          proofEl.textContent = 'HeyGen proof: pending live record.';
+        }
       } else {
         proofEl.textContent = 'HeyGen proof: pending live record.';
       }

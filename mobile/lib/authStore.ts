@@ -13,12 +13,18 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-import { api } from './api';
+import { API_BASE } from '@/constants/config';
+
+type AuthUser = {
+  userId: string;
+  affiliateId?: string;
+  role?: string;
+  [key: string]: unknown;
+};
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: any | null;
+  user: AuthUser | null;
   role: string | null;
   loading: boolean;
   error: string | null;
@@ -30,19 +36,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const USER_KEY = 'user';
+const EXPIRES_AT_KEY = 'tokenExpiresAt';
+
+async function postAuth(path: string, body: Record<string, unknown>) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) {
+    throw new Error(data.error || `${path} failed (${res.status})`);
+  }
+  return data;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Auto-refresh token before expiry
   useEffect(() => {
     const checkTokenExpiry = async () => {
       try {
-        const accessToken = await SecureStore.getItemAsync('accessToken');
-        const expiresAt = await AsyncStorage.getItem('tokenExpiresAt');
+        const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+        const expiresAt = await AsyncStorage.getItem(EXPIRES_AT_KEY);
 
         if (accessToken && expiresAt) {
           const now = Date.now();
@@ -70,17 +94,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const restoreSession = async () => {
     try {
-      const accessToken = await SecureStore.getItemAsync('accessToken');
-      const userJson = await AsyncStorage.getItem('user');
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const userJson = await AsyncStorage.getItem(USER_KEY);
 
       if (accessToken && userJson) {
-        const userData = JSON.parse(userJson);
+        const userData = JSON.parse(userJson) as AuthUser;
         setUser(userData);
-        setRole(userData.role);
+        setRole(String(userData.role || 'AFFILIATE').toUpperCase());
         setIsAuthenticated(true);
-
-        // Set auth header for API client
-        api.setAuthToken(accessToken);
       }
     } catch (err) {
       console.error('Session restore failed:', err);
@@ -95,23 +116,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
 
       // Call backend login endpoint
-      const response = await api.post('/api/auth/login', { userId, password });
-      const { accessToken, refreshToken, expiresIn, user: userData } = response.data;
+      const response = await postAuth('/api/auth/login', { userId, password });
+      const accessToken = String(response.accessToken || '');
+      const refreshToken = String(response.refreshToken || '');
+      const expiresIn = Number(response.expiresIn || 3600);
+      const userData = (response.user || { userId, role: 'AFFILIATE' }) as AuthUser;
+      if (!accessToken || !refreshToken) {
+        throw new Error('Authentication response missing tokens');
+      }
 
-      // Store tokens securely
-      await SecureStore.setItemAsync('accessToken', accessToken);
-      await SecureStore.setItemAsync('refreshToken', refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-      await AsyncStorage.setItem('tokenExpiresAt', (Date.now() + expiresIn * 1000).toString());
-
-      // Set auth header
-      api.setAuthToken(accessToken);
+      await AsyncStorage.multiSet([
+        [ACCESS_TOKEN_KEY, accessToken],
+        [REFRESH_TOKEN_KEY, refreshToken],
+        [USER_KEY, JSON.stringify(userData)],
+        [EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()],
+      ]);
 
       setUser(userData);
-      setRole(userData.role);
+      setRole(String(userData.role || 'AFFILIATE').toUpperCase());
       setIsAuthenticated(true);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Login failed';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Login failed';
       setError(errorMsg);
       throw err;
     } finally {
@@ -122,21 +147,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       // Call backend logout
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       if (refreshToken) {
-        await api.post('/api/auth/logout', { refreshToken }).catch(() => {
+        await postAuth('/api/auth/logout', { refreshToken }).catch(() => {
           // Logout endpoint may fail if token invalid, ignore
         });
       }
 
       // Clear storage
-      await SecureStore.deleteItemAsync('accessToken');
-      await SecureStore.deleteItemAsync('refreshToken');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('tokenExpiresAt');
-
-      // Clear auth state
-      api.setAuthToken(null);
+      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, EXPIRES_AT_KEY]);
       setUser(null);
       setRole(null);
       setIsAuthenticated(false);
@@ -147,18 +166,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshToken = async () => {
     try {
-      const refreshTokenStr = await SecureStore.getItemAsync('refreshToken');
+      const refreshTokenStr = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       if (!refreshTokenStr) throw new Error('No refresh token');
 
-      const response = await api.post('/api/auth/refresh', { refreshToken: refreshTokenStr });
-      const { accessToken, refreshToken: newRefreshToken, expiresIn } = response.data;
+      const response = await postAuth('/api/auth/refresh', { refreshToken: refreshTokenStr });
+      const accessToken = String(response.accessToken || '');
+      const newRefreshToken = String(response.refreshToken || '');
+      const expiresIn = Number(response.expiresIn || 3600);
+      if (!accessToken || !newRefreshToken) {
+        throw new Error('Token refresh failed');
+      }
 
       // Update tokens
-      await SecureStore.setItemAsync('accessToken', accessToken);
-      await SecureStore.setItemAsync('refreshToken', newRefreshToken);
-      await AsyncStorage.setItem('tokenExpiresAt', (Date.now() + expiresIn * 1000).toString());
-
-      api.setAuthToken(accessToken);
+      await AsyncStorage.multiSet([
+        [ACCESS_TOKEN_KEY, accessToken],
+        [REFRESH_TOKEN_KEY, newRefreshToken],
+        [EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()],
+      ]);
     } catch (err) {
       // Token refresh failed, logout user
       await logout();

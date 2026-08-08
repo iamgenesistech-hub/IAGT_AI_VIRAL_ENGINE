@@ -476,19 +476,47 @@ app.get(['/affiliate-login', '/affiliate-login/'], (_req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/affiliate-auth/login.html'));
 });
 
-app.post('/api/affiliate/session/login', (req, res) => {
+const AFFILIATE_LOGIN_NEXT_ALLOWLIST = new Set(['/phone-app', '/affiliate', '/affiliate/workspace']);
+
+function sanitizeAffiliateNextPath(nextPath) {
+  const raw = String(nextPath || '/phone-app').trim();
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/phone-app';
+  const [pathOnly, queryString] = raw.split('?');
+  if (!AFFILIATE_LOGIN_NEXT_ALLOWLIST.has(pathOnly)) return '/phone-app';
+  return queryString ? `${pathOnly}?${queryString}` : pathOnly;
+}
+
+app.post('/api/affiliate/session/login', async (req, res) => {
   const code = normalizeAffiliateCode(req.body && (req.body.affiliateCode || req.body.code));
   if (!code) {
     return res.status(400).json({ success: false, error: 'Affiliate code is required.' });
   }
+
   const profile = getAffiliateProfile(code);
-  const fallbackName = profile && profile.name ? profile.name : code;
+  let knownAffiliate = Boolean(profile);
+  let dbAffiliate = null;
+  if (!knownAffiliate) {
+    try {
+      const { data } = await SupabaseConnector
+        .from('affiliates')
+        .select('code,name,status')
+        .eq('code', code)
+        .eq('status', 'active')
+        .limit(1);
+      dbAffiliate = Array.isArray(data) ? data[0] : null;
+      knownAffiliate = Boolean(dbAffiliate);
+    } catch {}
+  }
+  if (!knownAffiliate) {
+    return res.status(401).json({ success: false, error: 'Affiliate code not found or inactive.' });
+  }
+
+  const fallbackName = (profile && profile.name) || (dbAffiliate && dbAffiliate.name) || code;
   const requestedName = String((req.body && req.body.affiliateName) || fallbackName).trim().slice(0, 64);
   const affiliateName = requestedName || fallbackName;
   const secureCookie = req.secure || String(req.get('x-forwarded-proto') || '').toLowerCase() === 'https';
   writeAffiliateWebSession(res, { affiliateCode: code, affiliateName }, secureCookie);
-  const next = String((req.body && req.body.next) || '/phone-app').trim();
-  const safeNext = next.startsWith('/') ? next : '/phone-app';
+  const safeNext = sanitizeAffiliateNextPath(req.body && req.body.next);
   const separator = safeNext.includes('?') ? '&' : '?';
   const redirectUrl = `${safeNext}${separator}affiliateCode=${encodeURIComponent(code)}&affiliateName=${encodeURIComponent(affiliateName)}`;
   return res.json({
@@ -10324,7 +10352,7 @@ app.get('/api/affiliate/stats', async (req, res) => {
 
 // POST /api/affiliates/register
 app.post('/api/affiliates/register', async (req, res) => {
-  const { name, email, btcAddress, referralCode } = req.body || {};
+  const { name, email, btcAddress, referralCode, platform, handle } = req.body || {};
   if (!email || !name) return res.status(400).json({ success: false, error: 'name and email are required' });
 
   try {
@@ -10335,6 +10363,8 @@ app.post('/api/affiliates/register', async (req, res) => {
       id: affiliateId, code, name, email,
       btc_address: btcAddress || null,
       referral_code: referralCode || null,
+      platform: platform || null,
+      handle: handle || null,
       tier: 'starter', status: 'active',
       total_clicks: 0, total_conversions: 0, total_earnings: 0,
       created_at: new Date().toISOString()
@@ -10388,7 +10418,7 @@ app.get('/api/affiliates/payout-summary', async (req, res) => {
 // GET /api/affiliates/tier-progress?affiliateId=<id>
 app.get('/api/affiliates/tier-progress', async (req, res) => {
   noStore(res);
-  const affiliateId = req.query.affiliateId;
+  const affiliateId = req.query.affiliateId || req.query.affiliateCode;
   if (!affiliateId) return res.status(400).json({ success: false, error: 'affiliateId is required' });
 
   try {
@@ -10807,7 +10837,7 @@ app.post('/api/affiliate/comms/session/end', (req, res) => {
   }
 });
 
-app.get('/api/affiliate/comms/active-users', (req, res) => {
+app.get('/api/affiliate/comms/active-users', requireAdminAccess, (req, res) => {
   noStore(res);
   try {
     const state = loadAffiliateCommsState();
@@ -10871,6 +10901,26 @@ app.post('/api/affiliate/comms/message/send', (req, res) => {
     if (!['affiliate', 'admin'].includes(senderRole)) {
       return res.status(400).json({ success: false, error: 'senderRole must be affiliate or admin' });
     }
+    if (senderRole === 'admin') {
+      const expectedAdminKey = String(process.env.ADMIN_API_KEY || '').trim();
+      const providedAdminKey = String(req.headers['x-admin-key'] || '').trim();
+      let authorizedAsAdmin = Boolean(expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey);
+      if (!authorizedAsAdmin) {
+        const authHeader = req.headers.authorization || '';
+        if (authHeader.startsWith('Bearer ')) {
+          const authEngine = phase2Integration.getAuthEngine && phase2Integration.getAuthEngine();
+          if (authEngine && typeof authEngine.validateToken === 'function') {
+            try {
+              const claims = authEngine.validateToken(authHeader);
+              authorizedAsAdmin = String(claims.role || '').toUpperCase() === 'ADMIN';
+            } catch {}
+          }
+        }
+      }
+      if (!authorizedAsAdmin) {
+        return res.status(403).json({ success: false, error: 'Admin authorization required for senderRole=admin.' });
+      }
+    }
     if (!['text', 'video'].includes(type)) {
       return res.status(400).json({ success: false, error: 'type must be text or video' });
     }
@@ -10879,6 +10929,16 @@ app.post('/api/affiliate/comms/message/send', (req, res) => {
     }
     if (type === 'video' && !videoUrl) {
       return res.status(400).json({ success: false, error: 'videoUrl is required for video messages' });
+    }
+    if (type === 'video') {
+      try {
+        const parsed = new URL(videoUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ success: false, error: 'videoUrl must be http(s).' });
+        }
+      } catch {
+        return res.status(400).json({ success: false, error: 'videoUrl must be a valid absolute URL.' });
+      }
     }
 
     const state = loadAffiliateCommsState();
