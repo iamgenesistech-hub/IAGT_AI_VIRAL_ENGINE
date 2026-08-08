@@ -6319,18 +6319,78 @@ app.get('/api/shopify/collections', async (_req, res) => {
 app.get('/api/shopify/synced-products', async (_req, res) => {
   try {
     const raw = await fetchShopifyProducts();
-    const products = raw.map((p) => ({
-      id: p.id || p.shopify_id || String(Math.random()),
+    const normalizedFromShopify = raw.map((p) => ({
+      id: p.id || p.shopify_id || p.handle || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: p.title || p.name || 'Unnamed Product',
       title: p.title || p.name || 'Unnamed Product',
       sku: p.sku || p.variants?.[0]?.sku || p.handle || 'UNKNOWN',
       price: p.price || p.variants?.[0]?.price || '0.00',
-      image: p.image || p.images?.[0]?.src || null,
+      image: p.image || p.images?.[0]?.src || p.image_url || null,
+      image_url: p.image_url || p.image || p.images?.[0]?.src || null,
       category: p.product_type || p.category || 'General',
+      product_type: p.product_type || p.category || 'General',
+      tags: Array.isArray(p.tags) ? p.tags : (typeof p.tags === 'string' ? p.tags.split(',').map((t) => t.trim()).filter(Boolean) : []),
       status: p.status || 'active',
       handle: p.handle || '',
-      synced_at: p.synced_at || new Date().toISOString()
+      synced_at: p.synced_at || new Date().toISOString(),
+      source: 'shopify'
     }));
+
+    let evicsProducts = [];
+    try {
+      const { data, error } = await SupabaseConnector
+        .from('evics_products')
+        .select('id,name,title,category,product_type,image_url,tags,status,handle,sku,price,updated_at,created_at')
+        .limit(1000);
+      if (!error && Array.isArray(data)) evicsProducts = data;
+    } catch {}
+
+    const mapKey = (p) => {
+      const handle = String(p.handle || '').trim().toLowerCase();
+      const sku = String(p.sku || '').trim().toLowerCase();
+      const title = String(p.title || p.name || '').trim().toLowerCase();
+      return handle || sku || title;
+    };
+
+    const merged = new Map();
+    for (const product of normalizedFromShopify) {
+      merged.set(mapKey(product), product);
+    }
+
+    for (const product of evicsProducts) {
+      const normalized = {
+        id: product.id || product.handle || product.sku || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: product.name || product.title || 'Unnamed Product',
+        title: product.title || product.name || 'Unnamed Product',
+        sku: product.sku || product.handle || 'UNKNOWN',
+        price: product.price || '0.00',
+        image: product.image_url || null,
+        image_url: product.image_url || null,
+        category: product.category || product.product_type || 'General',
+        product_type: product.product_type || product.category || 'General',
+        tags: Array.isArray(product.tags) ? product.tags : (typeof product.tags === 'string' ? product.tags.split(',').map((t) => t.trim()).filter(Boolean) : []),
+        status: product.status || 'active',
+        handle: product.handle || '',
+        synced_at: product.updated_at || product.created_at || new Date().toISOString(),
+        source: 'supabase'
+      };
+
+      const key = mapKey(normalized);
+      if (!merged.has(key)) {
+        merged.set(key, normalized);
+      } else {
+        const existing = merged.get(key);
+        merged.set(key, {
+          ...normalized,
+          ...existing,
+          image: existing.image || normalized.image,
+          image_url: existing.image_url || normalized.image_url,
+          tags: (existing.tags && existing.tags.length) ? existing.tags : normalized.tags
+        });
+      }
+    }
+
+    const products = Array.from(merged.values());
     noStore(res);
     res.json({ success: true, count: products.length, products });
   } catch (e) {
