@@ -13,6 +13,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { API_BASE } from '@/constants/config';
 
 type AuthUser = {
@@ -41,6 +42,18 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_KEY = 'user';
 const EXPIRES_AT_KEY = 'tokenExpiresAt';
 
+async function getSecureItem(key: string): Promise<string | null> {
+  return SecureStore.getItemAsync(key);
+}
+
+async function setSecureItem(key: string, value: string): Promise<void> {
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function deleteSecureItem(key: string): Promise<void> {
+  await SecureStore.deleteItemAsync(key);
+}
+
 async function postAuth(path: string, body: Record<string, unknown>) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -65,8 +78,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkTokenExpiry = async () => {
       try {
-        const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-        const expiresAt = await AsyncStorage.getItem(EXPIRES_AT_KEY);
+        const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
+        const expiresAt = await getSecureItem(EXPIRES_AT_KEY);
 
         if (accessToken && expiresAt) {
           const now = Date.now();
@@ -94,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const restoreSession = async () => {
     try {
-      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
       const userJson = await AsyncStorage.getItem(USER_KEY);
 
       if (accessToken && userJson) {
@@ -125,11 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Authentication response missing tokens');
       }
 
-      await AsyncStorage.multiSet([
-        [ACCESS_TOKEN_KEY, accessToken],
-        [REFRESH_TOKEN_KEY, refreshToken],
-        [USER_KEY, JSON.stringify(userData)],
-        [EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()],
+      await Promise.all([
+        setSecureItem(ACCESS_TOKEN_KEY, accessToken),
+        setSecureItem(REFRESH_TOKEN_KEY, refreshToken),
+        setSecureItem(EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(userData)),
       ]);
 
       setUser(userData);
@@ -147,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       // Call backend logout
-      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      const refreshToken = await getSecureItem(REFRESH_TOKEN_KEY);
       if (refreshToken) {
         await postAuth('/api/auth/logout', { refreshToken }).catch(() => {
           // Logout endpoint may fail if token invalid, ignore
@@ -155,7 +168,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Clear storage
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, EXPIRES_AT_KEY]);
+      await Promise.all([
+        deleteSecureItem(ACCESS_TOKEN_KEY),
+        deleteSecureItem(REFRESH_TOKEN_KEY),
+        deleteSecureItem(EXPIRES_AT_KEY),
+        AsyncStorage.removeItem(USER_KEY),
+      ]);
       setUser(null);
       setRole(null);
       setIsAuthenticated(false);
@@ -166,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshToken = async () => {
     try {
-      const refreshTokenStr = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      const refreshTokenStr = await getSecureItem(REFRESH_TOKEN_KEY);
       if (!refreshTokenStr) throw new Error('No refresh token');
 
       const response = await postAuth('/api/auth/refresh', { refreshToken: refreshTokenStr });
@@ -178,10 +196,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Update tokens
-      await AsyncStorage.multiSet([
-        [ACCESS_TOKEN_KEY, accessToken],
-        [REFRESH_TOKEN_KEY, newRefreshToken],
-        [EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()],
+      await Promise.all([
+        setSecureItem(ACCESS_TOKEN_KEY, accessToken),
+        setSecureItem(REFRESH_TOKEN_KEY, newRefreshToken),
+        setSecureItem(EXPIRES_AT_KEY, (Date.now() + expiresIn * 1000).toString()),
       ]);
     } catch (err) {
       // Token refresh failed, logout user
