@@ -144,7 +144,7 @@ window.IAGT_FEATURES = {
     geminiOmni:  false,  // enable once GEMINI_API_KEY is set in Railway
     predisAi:    false,  // enable once PREDIS_AI_API_KEY is set in Railway
     vizard:      false,  // enable once VIZARD_API_KEY is set in Railway
-    openai:      false,  // enable once OPENAI_API_KEY is set in Railway
+    openai:      true,   // Sprint 2: GPT-4o copilot path is wired with safe fallback
     shopify:     true,   // backend integration live
   },
 };
