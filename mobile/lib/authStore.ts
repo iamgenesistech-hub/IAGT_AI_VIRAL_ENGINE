@@ -208,9 +208,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return allowed.includes(role);
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
+  return React.createElement(
+    AuthContext.Provider,
+    {
+      value: {
         isAuthenticated,
         user,
         role,
@@ -220,10 +221,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         refreshToken,
         hasPermission,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+      },
+    },
+    children
   );
 };
 
