@@ -6319,8 +6319,12 @@ app.get('/api/shopify/collections', async (_req, res) => {
 app.get('/api/shopify/synced-products', async (_req, res) => {
   try {
     const raw = await fetchShopifyProducts();
+    const fallbackId = (value, prefix = 'product') => {
+      const base = String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      return base ? `${prefix}-${base}` : `${prefix}-unknown`;
+    };
     const normalizedFromShopify = raw.map((p) => ({
-      id: p.id || p.shopify_id || p.handle || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: p.id || p.shopify_id || fallbackId(p.handle || p.sku || p.title, 'shopify'),
       name: p.title || p.name || 'Unnamed Product',
       title: p.title || p.name || 'Unnamed Product',
       sku: p.sku || p.variants?.[0]?.sku || p.handle || 'UNKNOWN',
@@ -6359,7 +6363,7 @@ app.get('/api/shopify/synced-products', async (_req, res) => {
 
     for (const product of evicsProducts) {
       const normalized = {
-        id: product.id || product.handle || product.sku || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: product.id || fallbackId(product.handle || product.sku || product.title || product.name, 'evics'),
         name: product.name || product.title || 'Unnamed Product',
         title: product.title || product.name || 'Unnamed Product',
         sku: product.sku || product.handle || 'UNKNOWN',
