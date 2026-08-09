@@ -1,7 +1,7 @@
 # EVICS + EVIE Final Validation Summary
 
-Started: 2026-07-06T22:59:24.222Z
-Completed: 2026-07-06T22:59:30.918Z
+Started: 2026-08-09T03:49:09.150Z
+Completed: 2026-08-09T03:49:09.839Z
 Verdict: pass-with-external-blockers
 Passed: 12
 Failed: 0
@@ -12,7 +12,8 @@ Failed: 0
 
 ## Blockers
 
-- Supabase shared/render schema is not fully applied.
+- HEYGEN_API_KEY is not configured.
+- Shopify reconnect required for null: current Admin token rejected (missing), and no primary Supabase session exists.
 
 ## Production Closeout
 
@@ -22,13 +23,13 @@ Failed: 0
 - Office manages: yes
 - Pipeline flows: yes
 - Evidence proves app-side paths: yes
-- Shopify store: iamgenesistech.myshopify.com
-- Shopify reconnect ready: yes
-- Shopify reconnect path: /shopify/reconnect -> iamgenesistech.myshopify.com/admin/oauth/authorize
-- Shopify client fingerprint: f30a8d...838b
-- Supabase render table: blocked
-- Supabase shared tables: blocked
-- HeyGen configured: yes
+- Shopify store: null
+- Shopify reconnect ready: no
+- Shopify reconnect path: /shopify/reconnect -> null/admin/oauth/authorize
+- Shopify client fingerprint: unknown...unknown
+- Supabase render table: ready
+- Supabase shared tables: ready
+- HeyGen configured: no
 - EVICS production-ready: yes, application-side with external-only blockers documented
 - EVIE production-ready: yes, application-side with external-only blockers documented
 - Live HeyGen proof succeeded: yes

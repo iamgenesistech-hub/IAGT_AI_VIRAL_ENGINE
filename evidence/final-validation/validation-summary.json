@@ -1,87 +1,87 @@
 {
-  "startedAt": "2026-07-06T22:59:24.222Z",
-  "completedAt": "2026-07-06T22:59:30.918Z",
+  "startedAt": "2026-08-09T03:49:09.150Z",
+  "completedAt": "2026-08-09T03:49:09.839Z",
   "verdict": "pass-with-external-blockers",
   "passCount": 12,
   "failCount": 0,
   "blockers": [
-    "Supabase shared/render schema is not fully applied."
+    "HEYGEN_API_KEY is not configured.",
+    "Shopify reconnect required for null: current Admin token rejected (missing), and no primary Supabase session exists."
   ],
   "closeoutStatus": {
     "success": true,
     "checks": {
       "shopify": {
-        "expectedStore": "iamgenesistech.myshopify.com",
-        "host": "https://lint-salon-breeding.ngrok-free.dev",
-        "clientId": {
-          "prefix": "f30a8d",
-          "suffix": "838b",
-          "length": 32
-        },
-        "hasClientSecret": true,
-        "hasAdminToken": true,
-        "scopes": "read_all_orders,read_analytics,read_app_proxy,write_app_proxy,read_apps,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_audit_events,read_customer_events,read_cart_transforms,write_cart_transforms,read_all_cart_transforms,read_validations,write_validations,read_cash_tracking,write_cash_tracking,read_channels,write_channels,read_checkout_and_accounts_configurations,write_checkout_and_accounts_configurations,read_checkout_branding_settings,write_checkout_branding_settings,write_checkouts,read_checkouts,read_companies,write_companies,read_custom_fulfillment_services,write_custom_fulfillment_services,read_custom_pixels,write_custom_pixels,read_customers,write_customers,read_customer_data_erasure,write_customer_data_erasure,read_customer_payment_methods,read_customer_merge,write_customer_merge,read_delivery_customizations,write_delivery_customizations,read_price_rules,write_price_rules,read_discounts,write_discounts,read_discounts_allocator_functions,write_discounts_allocator_functions,read_discovery,write_discovery,write_draft_orders,read_draft_orders,read_files,write_files,read_fulfillment_constraint_rules,write_fulfillment_constraint_rules,read_fulfillments,write_fulfillments,read_gift_card_transactions,write_gift_card_transactions,read_gift_cards,write_gift_cards,write_inventory,read_inventory,write_inventory_shipments,read_inventory_shipments,write_inventory_shipments_received_items,read_inventory_shipments_received_items,write_inventory_transfers,read_inventory_transfers,read_legal_policies,write_legal_policies,read_delivery_option_generators,write_delivery_option_generators,read_locales,write_locales,write_locations,read_locations,read_marketing_integrated_campaigns,write_marketing_integrated_campaigns,write_marketing_events,read_marketing_events,read_markets,write_markets,read_markets_home,write_markets_home,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_metaobject_definitions,write_metaobject_definitions,read_metaobjects,write_metaobjects,read_online_store_navigation,write_online_store_navigation,read_online_store_pages,write_online_store_pages,write_order_edits,read_order_edits,read_orders,write_orders,write_packing_slip_templates,read_packing_slip_templates,write_payment_mandate,read_payment_mandate,read_payment_terms,write_payment_terms,read_payment_customizations,write_payment_customizations,read_privacy_settings,write_privacy_settings,read_product_feeds,write_product_feeds,read_product_listings,write_product_listings,read_products,write_products,read_publications,write_publications,read_purchase_options,write_purchase_options,write_reports,read_reports,read_resource_feedbacks,write_resource_feedbacks,read_returns,write_returns,read_script_tags,write_script_tags,read_shopify_payments_provider_accounts_sensitive,read_shipping,write_shipping,read_shopify_payments_accounts,read_shopify_payments_payouts,read_shopify_payments_bank_accounts,read_shopify_payments_disputes,write_shopify_payments_disputes,read_content,write_content,read_store_credit_account_transactions,write_store_credit_account_transactions,read_store_credit_accounts,write_own_subscription_contracts,read_own_subscription_contracts,write_theme_code,read_themes,write_themes,read_third_party_fulfillment_orders,write_third_party_fulfillment_orders,read_translations,write_translations,read_pixels,write_pixels,customer_read_companies,customer_write_companies,customer_write_customers,customer_read_customers,customer_read_draft_orders,customer_read_markets,customer_read_metaobjects,customer_read_orders,customer_write_orders,customer_read_quick_sale,customer_write_quick_sale,customer_read_store_credit_account_transactions,customer_read_store_credit_accounts,customer_write_own_subscription_contracts,customer_read_own_subscription_contracts,unauthenticated_write_bulk_operations,unauthenticated_read_bulk_operations,unauthenticated_read_bundles,unauthenticated_write_checkouts,unauthenticated_read_checkouts,unauthenticated_write_customers,unauthenticated_read_customers,unauthenticated_read_customer_tags,unauthenticated_read_metaobjects,unauthenticated_read_product_pickup_locations,unauthenticated_read_product_inventory,unauthenticated_read_product_listings,unauthenticated_read_product_tags,unauthenticated_read_selling_plans,unauthenticated_read_shop_pay_installments_pricing,unauthenticated_read_content",
+        "expectedStore": null,
+        "host": null,
+        "clientId": null,
+        "hasClientSecret": false,
+        "hasAdminToken": false,
+        "scopes": "read_products,read_orders",
         "reconnectUrl": "/shopify/reconnect"
       },
       "supabase": {
-        "configured": true,
-        "urlHost": "mvfkwlidwqcyqczlauii.supabase.co",
-        "renderTable": {
+        "configured": false,
+        "url": null,
+        "urlHost": null,
+        "urlValid": false,
+        "urlError": "SUPABASE_URL not configured.",
+        "dns": {
           "ok": false,
-          "error": "TypeError: fetch failed"
+          "host": null,
+          "error": "No host to resolve."
+        },
+        "renderTable": {
+          "ok": true,
+          "sampleColumns": []
         },
         "sharedTables": [
           {
             "table": "evics_evie_entities",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           },
           {
             "table": "evics_evie_rankings",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           },
           {
             "table": "evics_evie_prompt_versions",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           },
           {
             "table": "evics_evie_scripts",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           },
           {
             "table": "evics_evie_render_jobs",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           },
           {
             "table": "evics_evie_evidence_records",
-            "ok": false,
-            "error": "TypeError: fetch failed"
+            "ok": true,
+            "error": null
           }
-        ]
+        ],
+        "blocker": null
       },
       "heygen": {
-        "configured": true,
+        "configured": false,
         "auth": {
-          "mode": "cli_api_key",
+          "mode": "not_configured",
           "priority_order": [
             "cli_api_key",
             "oauth_bearer",
             "cli_fallback_session"
           ],
-          "available_modes": [
-            "cli_api_key"
-          ],
+          "available_modes": [],
           "mcp_endpoint": "https://mcp.heygen.com/mcp/v1/"
         },
-        "key": {
-          "prefix": "sk_V2_",
-          "suffix": "gnDE",
-          "length": 54
-        },
+        "key": null,
         "liveProofAvailable": true,
         "proofUrl": "https://files2.heygen.ai/aws_pacific/avatar_tmp/9ca421623079479f8dee4b0f5faffdda/46eba111cac041558a5d41b3a068308c.mp4?Expires=1783646332&Signature=qCqVhnCYfkX7Wnt6R5XEeD8kg2ZwdKLW2uQKLqF2slPZXrVNHE4pe0JYBR9ZTGPr2Gwt4q-pLCjLXJac~woAWS4dXqJzyt3bpk2usNm3M5SnAkMlqFMZ~2C5nWw3b22pNdcpLMR4M2xPmhKthS2DffeFULVy~dJijW4lBtj2QuImthI9hwvbmLso535R3LBrFAL5HQsDoHgl10yzgOpptkeN0kbykCzF-VJEgnCyF3FBzaPQriiWa55bqD01b3FuXxHaXBkeJmZCPAJJ-0F2XwHkOkGcKtRB0ChtVqOhtFQOGI0OrwZGo6kPbY9fEjP3hAV2iDDoMrsHOnaL-UgIWg__&Key-Pair-Id=K38HBHX5LX3X2H",
         "proof": {
@@ -95,13 +95,11 @@
           "source": "status-poll",
           "updated_at": "2026-07-03T01:19:22.238Z"
         },
-        "proofLookupErrors": [
-          "TypeError: fetch failed"
-        ],
-        "blocker": null
+        "proofLookupErrors": [],
+        "blocker": "HEYGEN_API_KEY is not configured."
       }
     },
-    "timestamp": "2026-07-06T22:59:30.911Z"
+    "timestamp": "2026-08-09T03:49:09.834Z"
   },
   "commands": [
     "node --check backend/server.js",
@@ -124,19 +122,19 @@
     },
     {
       "name": "mocked-action-flow",
-      "flowId": "flow_a91fba30600af531",
+      "flowId": "flow_4ee37d1d08d0315f",
       "videoUrl": "/generated/evics-sea-moss-proof-render.mp4",
       "status": "pass"
     },
     {
       "name": "faceless-first-class",
-      "flowId": "flow_31dd9e6bb3833e39",
+      "flowId": "flow_61808b06d2d110c7",
       "format": "Faceless product ritual montage",
       "status": "pass"
     },
     {
       "name": "live-heygen-provider",
-      "jobId": "render_job_f96f1e1cc7fc0dec",
+      "jobId": "render_job_148068c81d59edc1",
       "videoId": "46eba111cac041558a5d41b3a068308c",
       "proofSource": "status-poll",
       "renderGrade": 95,
@@ -147,7 +145,7 @@
     {
       "name": "copilot-orchestration",
       "route": "EVIE",
-      "flowId": "flow_1a129b1e4bbf811b",
+      "flowId": "flow_92585ad39cca4665",
       "status": "pass"
     },
     {
@@ -161,13 +159,13 @@
         "visualStyle": 80,
         "overall": 80
       },
-      "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-      "wisdomVersion": 1038,
-      "promptVersionCount": 516,
-      "learningCount": 521,
+      "dataDir": "/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/data/evics-evie",
+      "wisdomVersion": 1050,
+      "promptVersionCount": 522,
+      "learningCount": 527,
       "mockRenderAvailable": true,
-      "liveHeygenConfigured": true,
-      "timestamp": "2026-07-06T22:59:30.585Z",
+      "liveHeygenConfigured": false,
+      "timestamp": "2026-08-09T03:49:09.752Z",
       "status": "pass"
     },
     {
@@ -183,19 +181,19 @@
           "visualStyle": 80,
           "overall": 80
         },
-        "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-        "wisdomVersion": 1038,
-        "promptVersionCount": 516,
-        "learningCount": 521,
+        "dataDir": "/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/data/evics-evie",
+        "wisdomVersion": 1050,
+        "promptVersionCount": 522,
+        "learningCount": 527,
         "mockRenderAvailable": true,
-        "liveHeygenConfigured": true,
-        "timestamp": "2026-07-06T22:59:30.602Z"
+        "liveHeygenConfigured": false,
+        "timestamp": "2026-08-09T03:49:09.758Z"
       }
     },
     {
       "name": "api-action-flow",
       "status": "pass",
-      "flowId": "flow_a9485d36f76c7cc1"
+      "flowId": "flow_35f85d6eb48a70d5"
     },
     {
       "name": "api-copilot-orchestration",
@@ -206,7 +204,7 @@
       "name": "api-mocked-render-provider",
       "httpStatus": 202,
       "url": "/generated/evics-sea-moss-proof-render.mp4",
-      "renderId": "mock_1783378770877",
+      "renderId": "mock_1786247349828",
       "renderLogColumns": [
         "video_id",
         "script_text",
@@ -232,19 +230,19 @@
     {
       "name": "production-closeout-status",
       "httpStatus": 200,
-      "shopifyStore": "iamgenesistech.myshopify.com",
-      "supabaseRenderTableOk": false,
-      "supabaseSharedTablesOk": false,
-      "heygenConfigured": true,
+      "shopifyStore": null,
+      "supabaseRenderTableOk": true,
+      "supabaseSharedTablesOk": true,
+      "heygenConfigured": false,
       "status": "pass"
     },
     {
       "name": "shopify-reconnect-diagnostics",
       "httpStatus": 200,
-      "expectedStore": "iamgenesistech.myshopify.com",
-      "envTokenAccepted": true,
-      "primarySessionAccepted": true,
-      "oauthReady": true,
+      "expectedStore": null,
+      "envTokenAccepted": false,
+      "primarySessionAccepted": false,
+      "oauthReady": false,
       "status": "pass"
     }
   ]

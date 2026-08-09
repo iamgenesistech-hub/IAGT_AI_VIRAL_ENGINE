@@ -8,11 +8,11 @@
     "visualStyle": 80,
     "overall": 80
   },
-  "dataDir": "C:\\Users\\rolan\\OneDrive\\GitHub For I AM GENESIS TECH\\GenesisAI folder\\IAGT_AI_VIRAL_ENGINE\\data\\evics-evie",
-  "wisdomVersion": 1042,
-  "promptVersionCount": 518,
-  "learningCount": 523,
+  "dataDir": "/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/data/evics-evie",
+  "wisdomVersion": 1054,
+  "promptVersionCount": 524,
+  "learningCount": 529,
   "mockRenderAvailable": true,
-  "liveHeygenConfigured": true,
-  "timestamp": "2026-07-06T22:59:30.932Z"
+  "liveHeygenConfigured": false,
+  "timestamp": "2026-08-09T03:49:09.841Z"
 }

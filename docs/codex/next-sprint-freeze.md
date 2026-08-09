@@ -23,5 +23,5 @@ Production activation is considered fully complete only when all criteria below 
 - Deploy/verify queue worker and queue routes in target runtime
 - Verify async render flow (`QUEUED -> IN_PROGRESS -> COMPLETE`) end-to-end
 - Verify queue stats and failure retry behavior in runtime
-- Run `node tests/product-video-pipeline-validation.js`
+- Run `npm test` and `node tests/media-gallery-routes-validation.js`
 - Capture and store updated evidence after successful integration
