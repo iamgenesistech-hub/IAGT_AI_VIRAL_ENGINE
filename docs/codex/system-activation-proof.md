@@ -1,5 +1,7 @@
 # EVICS + EVIE System Activation Proof
 
+> Status note: This document is historical context. Canonical source of truth is `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/docs/codex/canonical-status.md` plus latest `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/evidence/final-validation/validation-summary.json`.
+
 ## Activation Summary
 - System is production-ready pending external provider credits and Shopify authorization.
 - EVICS works end-to-end at the application level.

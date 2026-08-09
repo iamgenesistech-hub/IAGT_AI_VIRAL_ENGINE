@@ -1,5 +1,7 @@
 # EVICS + EVIE Production Closeout
 
+> Status note: This document is historical context. Canonical source of truth is `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/docs/codex/canonical-status.md` plus latest `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/evidence/final-validation/validation-summary.json`.
+
 ## 1. Executive Summary
 - Final verdict: GO for production-closeout.
 - EVICS production-ready: yes, application-side, with external-only live blockers documented.

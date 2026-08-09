@@ -1,5 +1,7 @@
 # Phase 10c - HeyGen Closeout
 
+> Status note: This phase note is historical context. Canonical source of truth is `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/docs/codex/canonical-status.md` plus latest `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/evidence/final-validation/validation-summary.json`.
+
 ## Checks Performed
 - Verified `/api/video/generate` handles `platform: heygen`.
 - Verified `HEYGEN_API_KEY` is checked before live provider use.

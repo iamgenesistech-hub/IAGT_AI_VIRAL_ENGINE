@@ -1,5 +1,7 @@
 # Phase 10b - Supabase Closeout
 
+> Status note: This phase note is historical context. Canonical source of truth is `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/docs/codex/canonical-status.md` plus latest `/home/runner/work/IAGT_AI_VIRAL_ENGINE/IAGT_AI_VIRAL_ENGINE/evidence/final-validation/validation-summary.json`.
+
 ## Checks Performed
 - Verified Supabase environment is configured.
 - Verified current Supabase host is reachable.
