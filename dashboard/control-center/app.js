@@ -8508,6 +8508,23 @@ async function boot() {
       if (res.ok) {
         state.systemHealth = await res.json();
         state.systemHealthLastFetch = Date.now();
+        // Auto-sync feature flags from backend integrations map so UI reflects
+        // which API keys are actually configured in Railway/environment.
+        const integrations = state.systemHealth.integrations || {};
+        if (window.IAGT_FEATURES && window.IAGT_FEATURES.externalApis) {
+          const ea = window.IAGT_FEATURES.externalApis;
+          if (integrations.openai  !== undefined) ea.openai    = integrations.openai;
+          if (integrations.vizard  !== undefined) ea.vizard    = integrations.vizard;
+          if (integrations.predis  !== undefined) ea.predisAi  = integrations.predis;
+          if (integrations.canva   !== undefined) ea.canva     = integrations.canva;
+          if (integrations.gemini  !== undefined) ea.geminiOmni = integrations.gemini;
+          if (integrations.tiktok  !== undefined) ea.tiktok    = integrations.tiktok;
+          if (integrations.meta    !== undefined) ea.meta      = integrations.meta;
+        }
+        // Auto-enable liveData flag when Supabase is connected
+        if (integrations.supabase && window.IAGT_FEATURES) {
+          window.IAGT_FEATURES.liveData = true;
+        }
       }
     } catch { /* offline */ }
   }

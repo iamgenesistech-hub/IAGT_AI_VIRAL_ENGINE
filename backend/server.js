@@ -193,7 +193,9 @@ app.get('/status', async (_req, res) => {
     vizard:    Boolean(process.env.VIZARD_API_KEY),
     predis:    Boolean(process.env.PREDIS_AI_API_KEY),
     canva:     Boolean(process.env.CANVA_API_KEY),
-    gemini:    Boolean(process.env.GEMINI_API_KEY)
+    gemini:    Boolean(process.env.GEMINI_API_KEY),
+    tiktok:    Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET),
+    meta:      Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET)
   };
 
   // Concurrent health checks â€” Supabase + Shopify + HeyGen
@@ -3078,6 +3080,213 @@ app.post('/api/gemini/analyze-video', async (req, res) => {
   });
 });
 
+// =============================================================
+// Social Publishing — TikTok Content Posting API + Meta Instagram
+// Priority 3 integration: set these env vars in Railway to go live:
+//   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET         (TikTok Login Kit)
+//   META_APP_ID, META_APP_SECRET,
+//   META_PAGE_ACCESS_TOKEN, META_INSTAGRAM_ACCOUNT_ID (Meta Graph API)
+// =============================================================
+
+// GET /api/tiktok/status — check TikTok credential state
+app.get('/api/tiktok/status', (_req, res) => {
+  noStore(res);
+  const configured = Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
+  res.json({
+    success: true,
+    integration: 'tiktok',
+    configured,
+    message: configured
+      ? 'TikTok credentials present. Use POST /api/tiktok/publish to post a video.'
+      : 'Set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in Railway to activate TikTok publishing.',
+    scopes_required: ['video.upload', 'video.publish']
+  });
+});
+
+// POST /api/tiktok/publish — publish video via TikTok Content Posting API v2
+// Body: { video_url, title, description, privacy_level, access_token }
+// access_token is the per-user OAuth token from TikTok Login Kit.
+app.post('/api/tiktok/publish', async (req, res) => {
+  const { video_url, title = '', description = '', privacy_level = 'SELF_ONLY', access_token } = req.body;
+  if (!video_url) return res.status(400).json({ success: false, error: 'video_url is required' });
+
+  if (process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET && access_token) {
+    try {
+      const axios = require('axios');
+      const initResp = await axios.post(
+        'https://open.tiktokapis.com/v2/post/publish/video/init/',
+        {
+          post_info: {
+            title: title || description,
+            privacy_level,
+            disable_duet: false,
+            disable_comment: false,
+            disable_stitch: false,
+            video_cover_timestamp_ms: 1000
+          },
+          source_info: { source: 'PULL_FROM_URL', video_url }
+        },
+        {
+          headers: {
+            Authorization: 'Bearer ' + access_token,
+            'Content-Type': 'application/json; charset=UTF-8'
+          },
+          timeout: 20000
+        }
+      );
+      noStore(res);
+      return res.json({
+        success: true, integration: 'tiktok', live: true,
+        publish_id: initResp.data?.data?.publish_id,
+        data: initResp.data
+      });
+    } catch (e) {
+      console.warn('[tiktok] publish failed:', e.response?.data || e.message);
+      return res.status(502).json({
+        success: false, integration: 'tiktok',
+        error: e.response?.data?.error?.message || e.message
+      });
+    }
+  }
+
+  noStore(res);
+  res.json({
+    success: true, integration: 'tiktok', live: false, stub: true,
+    message: process.env.TIKTOK_CLIENT_KEY
+      ? 'Provide a per-user access_token (TikTok OAuth) to publish live.'
+      : 'Set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in Railway to enable TikTok publishing.',
+    simulated: { publish_id: `stub_${Date.now()}`, status: 'STUB', video_url, title, privacy_level }
+  });
+});
+
+// GET /api/tiktok/publish-status/:publishId — poll TikTok publish job status
+app.get('/api/tiktok/publish-status/:publishId', async (req, res) => {
+  const { publishId } = req.params;
+  const { access_token } = req.query;
+  if (!access_token || !process.env.TIKTOK_CLIENT_KEY) {
+    return res.json({ success: true, stub: true, status: 'STUB', publish_id: publishId });
+  }
+  try {
+    const axios = require('axios');
+    const resp = await axios.post(
+      'https://open.tiktokapis.com/v2/post/publish/status/fetch/',
+      { publish_id: publishId },
+      {
+        headers: {
+          Authorization: 'Bearer ' + access_token,
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        timeout: 10000
+      }
+    );
+    noStore(res);
+    return res.json({ success: true, integration: 'tiktok', live: true, data: resp.data });
+  } catch (e) {
+    return res.status(502).json({ success: false, error: e.response?.data?.error?.message || e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+
+// GET /api/meta/status — check Meta/Instagram credential state
+app.get('/api/meta/status', (_req, res) => {
+  noStore(res);
+  const configured = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET);
+  const tokenReady  = Boolean(process.env.META_PAGE_ACCESS_TOKEN);
+  res.json({
+    success: true, integration: 'meta', configured, token_ready: tokenReady,
+    message: tokenReady
+      ? 'Meta credentials and page access token present. Ready to publish to Instagram.'
+      : configured
+        ? 'App credentials configured. Set META_PAGE_ACCESS_TOKEN to enable publishing.'
+        : 'Set META_APP_ID, META_APP_SECRET, and META_PAGE_ACCESS_TOKEN in Railway.',
+    endpoints: {
+      publish: 'POST /api/meta/publish',
+      status:  'GET /api/meta/publish-status/:containerId'
+    }
+  });
+});
+
+// POST /api/meta/publish — publish video/image to Instagram via Meta Content Publishing API
+// Body: { video_url|image_url, caption, instagram_account_id, access_token, media_type }
+app.post('/api/meta/publish', async (req, res) => {
+  const {
+    video_url, image_url, caption = '',
+    instagram_account_id, access_token,
+    media_type = 'REELS'
+  } = req.body;
+
+  const pageToken   = access_token || process.env.META_PAGE_ACCESS_TOKEN;
+  const igAccountId = instagram_account_id || process.env.META_INSTAGRAM_ACCOUNT_ID;
+
+  if (!pageToken || !igAccountId) {
+    noStore(res);
+    return res.json({
+      success: true, integration: 'meta', live: false, stub: true,
+      message: 'Set META_PAGE_ACCESS_TOKEN and META_INSTAGRAM_ACCOUNT_ID in Railway (or pass in request body).',
+      simulated: { container_id: `stub_${Date.now()}`, status: 'STUB', caption }
+    });
+  }
+  if (!video_url && !image_url) {
+    return res.status(400).json({ success: false, error: 'video_url or image_url is required' });
+  }
+
+  try {
+    const axios = require('axios');
+    const baseUrl = 'https://graph.facebook.com/v19.0';
+    const containerPayload = { caption, access_token: pageToken };
+    if (media_type === 'REELS' && video_url) {
+      Object.assign(containerPayload, { media_type: 'REELS', video_url, share_to_feed: true });
+    } else if (image_url) {
+      containerPayload.image_url = image_url;
+    } else {
+      Object.assign(containerPayload, { video_url, media_type: 'VIDEO' });
+    }
+    const containerResp = await axios.post(`${baseUrl}/${igAccountId}/media`, containerPayload, { timeout: 20000 });
+    const containerId   = containerResp.data?.id;
+    if (!containerId) {
+      return res.status(502).json({ success: false, error: 'Failed to create media container', data: containerResp.data });
+    }
+    const publishResp = await axios.post(
+      `${baseUrl}/${igAccountId}/media_publish`,
+      { creation_id: containerId, access_token: pageToken },
+      { timeout: 15000 }
+    );
+    noStore(res);
+    return res.json({
+      success: true, integration: 'meta', live: true,
+      container_id: containerId, post_id: publishResp.data?.id, data: publishResp.data
+    });
+  } catch (e) {
+    console.warn('[meta] publish failed:', e.response?.data || e.message);
+    return res.status(502).json({
+      success: false, integration: 'meta',
+      error: e.response?.data?.error?.message || e.message,
+      details: e.response?.data
+    });
+  }
+});
+
+// GET /api/meta/publish-status/:containerId — check Instagram container processing status
+app.get('/api/meta/publish-status/:containerId', async (req, res) => {
+  const { containerId } = req.params;
+  const token = req.query.access_token || process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) {
+    return res.json({ success: true, stub: true, status: 'STUB', container_id: containerId });
+  }
+  try {
+    const axios = require('axios');
+    const resp = await axios.get(
+      `https://graph.facebook.com/v19.0/${containerId}`,
+      { params: { fields: 'status_code,status', access_token: token }, timeout: 10000 }
+    );
+    noStore(res);
+    return res.json({ success: true, integration: 'meta', live: true, data: resp.data });
+  } catch (e) {
+    return res.status(502).json({ success: false, error: e.response?.data?.error?.message || e.message });
+  }
+});
+
 
 // =============================================================
 // Phone App API â€” connects evics-affiliate-app (Expo/React Native)
@@ -4970,13 +5179,24 @@ app.listen(PORT, () => {
     { key: 'RUNWAY_API_KEY',             impact: 'Runway video generation unavailable' },
     { key: 'KLING_API_KEY',              impact: 'Kling video generation unavailable' },
   ];
+  const optionalChecks = [
+    { key: 'TIKTOK_CLIENT_KEY',      impact: 'TikTok publishing unavailable' },
+    { key: 'META_PAGE_ACCESS_TOKEN', impact: 'Instagram/Meta publishing unavailable' },
+    { key: 'VIZARD_API_KEY',         impact: 'Vizard video repurposing unavailable' },
+    { key: 'PREDIS_AI_API_KEY',      impact: 'Predis AI performance prediction unavailable' },
+    { key: 'CANVA_API_KEY',          impact: 'Canva static ad generation unavailable' },
+    { key: 'GEMINI_API_KEY',         impact: 'Gemini video analysis unavailable' },
+  ];
   const missingEnv = envChecks.filter(c => !process.env[c.key]);
   if (missingEnv.length) {
-    console.warn(`[EVICS Config] âš ï¸  ${missingEnv.length} env var(s) missing:`);
-    missingEnv.forEach(c => console.warn(`   â€¢ ${c.key} â€” ${c.impact}`));
+    console.warn(`[EVICS Config] ⚠️  ${missingEnv.length} required env var(s) missing:`);
+    missingEnv.forEach(c => console.warn(`   • ${c.key} — ${c.impact}`));
   } else {
-    console.log('[EVICS Config] âœ… All key environment variables configured.');
+    console.log('[EVICS Config] ✅ All required environment variables configured.');
   }
+  const activeOptional = optionalChecks.filter(c => process.env[c.key]);
+  console.log(`[EVICS Config] 🔌 Optional integrations: ${activeOptional.length}/${optionalChecks.length} active.`);
+  optionalChecks.filter(c => !process.env[c.key]).forEach(c => console.log(`   ○ ${c.key} — ${c.impact}`));
 
   console.log(`âž¡ï¸  Products:            http://127.0.0.1:${PORT}/api/products`);
   console.log(`âž¡ï¸  Renders:             http://127.0.0.1:${PORT}/api/renders`);
@@ -5016,4 +5236,12 @@ app.listen(PORT, () => {
   console.log(`âž¡ï¸  Analytics summary:   http://127.0.0.1:${PORT}/api/analytics/summary`);
   console.log(`âž¡ï¸  Quality report:      http://127.0.0.1:${PORT}/api/analytics/quality-report`);
   console.log(`âž¡ï¸  Quality validate:    POST http://127.0.0.1:${PORT}/api/quality/validate`);
+  console.log(`âž¡ï¸  TikTok publish:      POST http://127.0.0.1:${PORT}/api/tiktok/publish`);
+  console.log(`âž¡ï¸  TikTok status:       GET  http://127.0.0.1:${PORT}/api/tiktok/status`);
+  console.log(`âž¡ï¸  Meta/IG publish:     POST http://127.0.0.1:${PORT}/api/meta/publish`);
+  console.log(`âž¡ï¸  Meta/IG status:      GET  http://127.0.0.1:${PORT}/api/meta/status`);
+  console.log(`âž¡ï¸  Vizard repurpose:    POST http://127.0.0.1:${PORT}/api/vizard/repurpose`);
+  console.log(`âž¡ï¸  Predis predict:      POST http://127.0.0.1:${PORT}/api/predis/predict`);
+  console.log(`âž¡ï¸  Canva generate:      POST http://127.0.0.1:${PORT}/api/canva/generate`);
+  console.log(`âž¡ï¸  Gemini analyze:      POST http://127.0.0.1:${PORT}/api/gemini/analyze-video`);
 });

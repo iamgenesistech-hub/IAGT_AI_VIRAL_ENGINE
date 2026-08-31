@@ -140,5 +140,9 @@ window.IAGT_FEATURES = {
     vizard:      false,  // enable once VIZARD_API_KEY is set in Railway
     openai:      false,  // enable once OPENAI_API_KEY is set in Railway
     shopify:     true,   // backend integration live
+    tiktok:      false,  // enable once TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET are set in Railway
+    meta:        false,  // enable once META_APP_ID + META_APP_SECRET + META_PAGE_ACCESS_TOKEN are set
+    // Note: flags above are auto-updated at runtime by fetchSystemHealth() in app.js
+    //       which reads /status from the backend — no manual edits needed after keys are set.
   },
 };
