@@ -145,6 +145,8 @@ const state = {
   analyticsData: null,
   analyticsLoading: false,
   analyticsTab: "overview",
+  roasData: null,      // populated by POST /api/agent/roas-report
+  roasLoading: false,
 
   // Quality Thresholds & Validation
   qualityThresholds: {
@@ -217,6 +219,10 @@ const state = {
   // Phone App Render Monitor
   phoneRenders: [],
   phoneRendersLoading: false,
+
+  // DB Render status (evics_renders table) — polled every 10s when pending jobs exist
+  dbRenders: [],
+  dbRendersLastFetch: 0,
   wisdomDaily: null,
   wisdomLoading: false,
   communityStats: null,
@@ -1518,10 +1524,19 @@ async function loadPublishedMedia() {
 
 async function loadAnalyticsData() {
   state.analyticsLoading = true;
+  state.roasLoading = true;
   render();
+
+  // Fetch analytics summary and ROAS report in parallel
+  const [summaryResult, roasResult] = await Promise.allSettled([
+    fetch("/api/analytics/summary"),
+    fetch("/api/agent/roas-report", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+  ]);
+
+  // Analytics summary
   try {
-    const res = await fetch("/api/analytics/summary");
-    if (res.ok) {
+    const res = summaryResult.status === "fulfilled" ? summaryResult.value : null;
+    if (res && res.ok) {
       const data = await res.json();
       state.analyticsData = data.summary || DEMO_ANALYTICS;
     } else {
@@ -1530,7 +1545,33 @@ async function loadAnalyticsData() {
   } catch {
     state.analyticsData = DEMO_ANALYTICS;
   }
+
+  // ROAS report — merge into analyticsData so the KPI cards use real values
+  try {
+    const res = roasResult.status === "fulfilled" ? roasResult.value : null;
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data.success && data.creatives) {
+        state.roasData = data.creatives;
+        // Compute aggregate ROAS to surface in the KPI card
+        const withRoas = data.creatives.filter(c => c.roas !== null && c.roas > 0);
+        if (withRoas.length) {
+          const avgRoas = withRoas.reduce((s, c) => s + c.roas, 0) / withRoas.length;
+          const totalRevenue = data.creatives.reduce((s, c) => s + (c.revenue || 0), 0);
+          const totalOrders  = data.creatives.reduce((s, c) => s + (c.orders  || 0), 0);
+          state.analyticsData = {
+            ...(state.analyticsData || DEMO_ANALYTICS),
+            roasEstimate:     Math.round(avgRoas * 10) / 10,
+            revenueAttributed: totalRevenue || state.analyticsData.revenueAttributed,
+            totalOrders:      totalOrders  || state.analyticsData.totalOrders,
+          };
+        }
+      }
+    }
+  } catch { /* ROAS is non-fatal — analytics still works without it */ }
+
   state.analyticsLoading = false;
+  state.roasLoading = false;
   render();
 }
 
@@ -5737,6 +5778,10 @@ function bindEvents() {
       state.selectedMediaId = null;
       state.mediaActionStatus = null;
       render();
+      // Auto-load analytics data on first visit to Analytics section
+      if (state.currentSection === "analytics" && !state.analyticsData && !state.analyticsLoading) {
+        loadAnalyticsData();
+      }
     });
   });
 
@@ -8562,6 +8607,32 @@ async function boot() {
   }
   fetchPhoneRenders();
   setInterval(fetchPhoneRenders, 60000);
+
+  // DB render status polling — polls /api/renders every 10s when any render is pending/processing.
+  // Updates state.dbRenders so the UI stays current without manual refresh.
+  async function fetchDbRenders() {
+    try {
+      const res = await fetch(`${API_BASE}/api/renders`);
+      if (res.ok) {
+        const data = await res.json();
+        const renders = data.renders || data.data || [];
+        const hadPending = state.dbRenders.some(r => r.status === "pending" || r.status === "processing");
+        state.dbRenders = renders;
+        state.dbRendersLastFetch = Date.now();
+        // Only trigger a re-render if the renders list changed or pending jobs resolved
+        const hasPending = renders.some(r => r.status === "pending" || r.status === "processing");
+        if (hadPending || hasPending) render();
+      }
+    } catch { /* offline — skip */ }
+  }
+  fetchDbRenders();
+  // Poll every 10s — reduces to 60s cadence when no pending renders via the hasPending check above
+  setInterval(() => {
+    const hasPending = state.dbRenders.some(r => r.status === "pending" || r.status === "processing");
+    if (hasPending || Date.now() - state.dbRendersLastFetch > 55000) {
+      fetchDbRenders();
+    }
+  }, 10000);
 
   // Wisdom + Community — fetch on boot and every 5 minutes
   async function fetchWisdomDaily() {
