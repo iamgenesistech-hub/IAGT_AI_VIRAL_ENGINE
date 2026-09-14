@@ -19,6 +19,44 @@ async function agentGet(endpoint) {
   return res.json();
 }
 
+const VP_POSITION_STORAGE_KEY = "evics_vp_copilot_position";
+const VP_OPEN_STORAGE_KEY = "evics_vp_copilot_open";
+
+function loadVpPosition() {
+  try {
+    const raw = localStorage.getItem(VP_POSITION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const x = Number(parsed?.x);
+    const y = Number(parsed?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
+  } catch {
+    return null;
+  }
+}
+
+function saveVpPosition(position) {
+  try {
+    if (!position) return;
+    localStorage.setItem(VP_POSITION_STORAGE_KEY, JSON.stringify(position));
+  } catch {}
+}
+
+function loadVpOpen() {
+  try {
+    return localStorage.getItem(VP_OPEN_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveVpOpen(isOpen) {
+  try {
+    localStorage.setItem(VP_OPEN_STORAGE_KEY, isOpen ? "1" : "0");
+  } catch {}
+}
+
 const state = {
   // ── Navigation ──
   currentSection: "viral-intelligence",
@@ -120,11 +158,11 @@ const state = {
   autoGenerateResult: null,
 
   // Copilot (merged — was duplicated)
-  copilotOpen: false,
+  copilotOpen: loadVpOpen(),
   copilotQuestion: "",
   copilotAnswer: null,
   copilotNextActions: [],
-  copilotPosition: null,
+  copilotPosition: loadVpPosition(),
 
   // Agent Orchestration Dashboard
   agentStatusOpen: false,
@@ -5513,6 +5551,9 @@ function render() {
   };
   const renderer = sectionRenderers[state.currentSection] || renderViralIntelligence;
   const sectionContent = sectionWithBoundary(renderer, state.currentSection);
+  if (state.copilotPosition) {
+    state.copilotPosition = clampFloatingPosition(state.copilotPosition.x, state.copilotPosition.y, 380, 420);
+  }
   const vpPanelStyle = state.copilotPosition
     ? `left:${state.copilotPosition.x}px;top:${state.copilotPosition.y}px;right:auto;bottom:auto;`
     : "";
@@ -6871,6 +6912,7 @@ function bindEvents() {
   if (copilotToggleBtn) {
     copilotToggleBtn.addEventListener("click", () => {
       state.copilotOpen = !state.copilotOpen;
+      saveVpOpen(state.copilotOpen);
       if (state.copilotOpen && !state.copilotPosition) {
         state.copilotPosition = clampFloatingPosition(
           window.innerWidth - 408,
@@ -6878,6 +6920,7 @@ function bindEvents() {
           380,
           420
         );
+        saveVpPosition(state.copilotPosition);
       }
       render();
     });
@@ -6887,6 +6930,7 @@ function bindEvents() {
   if (vpFab) {
     vpFab.addEventListener("click", () => {
       state.copilotOpen = !state.copilotOpen;
+      saveVpOpen(state.copilotOpen);
       if (state.copilotOpen && !state.copilotPosition) {
         state.copilotPosition = clampFloatingPosition(
           window.innerWidth - 408,
@@ -6894,6 +6938,7 @@ function bindEvents() {
           380,
           420
         );
+        saveVpPosition(state.copilotPosition);
       }
       render();
     });
@@ -6904,6 +6949,7 @@ function bindEvents() {
   if (closeCopilot) {
     closeCopilot.addEventListener("click", () => {
       state.copilotOpen = false;
+      saveVpOpen(false);
       render();
     });
   }
@@ -6940,6 +6986,7 @@ function bindEvents() {
       dragging = false;
       vpWindow.classList.remove("vp-dragging");
       state.copilotPosition = lastPos;
+      saveVpPosition(lastPos);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
