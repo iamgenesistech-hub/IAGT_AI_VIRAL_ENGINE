@@ -124,6 +124,7 @@ const state = {
   copilotQuestion: "",
   copilotAnswer: null,
   copilotNextActions: [],
+  copilotPosition: null,
 
   // Agent Orchestration Dashboard
   agentStatusOpen: false,
@@ -5512,6 +5513,9 @@ function render() {
   };
   const renderer = sectionRenderers[state.currentSection] || renderViralIntelligence;
   const sectionContent = sectionWithBoundary(renderer, state.currentSection);
+  const vpPanelStyle = state.copilotPosition
+    ? `left:${state.copilotPosition.x}px;top:${state.copilotPosition.y}px;right:auto;bottom:auto;`
+    : "";
 
   app.innerHTML = `
     ${demoBanner()}
@@ -5548,7 +5552,7 @@ function render() {
             <b>${state.dataSource}</b>
             <span>${state.syncMessage}</span>
           </div>
-          <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} Copilot</button>
+          <button class="ghost copilot-toggle-btn" id="copilot-toggle-btn">${icon("spark")} VP Copilot</button>
           <button class="ghost" id="connect-sources-btn">${icon("key")} Connect Sources</button>
         </div>
       </header>
@@ -5563,10 +5567,13 @@ function render() {
       </div>
 
       ${state.copilotOpen ? `
-      <section class="copilot-panel panel">
-        <div class="panel-head compact">
-          <h2>${icon("spark")} AI Copilot</h2>
-          <button class="toggle-link" id="close-copilot">✕ Close</button>
+      <section class="copilot-panel panel vp-copilot-window" id="vp-window" style="${vpPanelStyle}">
+        <div class="panel-head compact vp-window-head" id="vp-drag-handle">
+          <h2>${icon("spark")} VP Copilot</h2>
+          <div class="vp-window-controls">
+            <span class="vp-drag-hint">Drag</span>
+            <button class="toggle-link" id="close-copilot">✕ Close</button>
+          </div>
         </div>
         <p class="copilot-desc">Ask the AI anything about your workspace — trends, creatives, products, or next steps.</p>
         <div class="copilot-input-row">
@@ -5594,6 +5601,7 @@ function render() {
       ${renderMediaGallery()}
     </main>
     ${renderConnectSourcesModal()}
+    <button class="vp-fab" id="vp-fab" title="Open VP Copilot">${icon("spark")} VP</button>
   `;
 
   bindEvents();
@@ -5629,6 +5637,15 @@ function select(name, options, value) {
 }
 
 let renderPollTimeout = null;
+
+function clampFloatingPosition(x, y, width, height, margin = 12) {
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    x: Math.min(Math.max(margin, x), maxX),
+    y: Math.min(Math.max(margin, y), maxY)
+  };
+}
 
 function mapBackendRenderStatus(status) {
   if (status === "completed" || status === "complete") return "complete";
@@ -6854,6 +6871,30 @@ function bindEvents() {
   if (copilotToggleBtn) {
     copilotToggleBtn.addEventListener("click", () => {
       state.copilotOpen = !state.copilotOpen;
+      if (state.copilotOpen && !state.copilotPosition) {
+        state.copilotPosition = clampFloatingPosition(
+          window.innerWidth - 408,
+          window.innerHeight - 520,
+          380,
+          420
+        );
+      }
+      render();
+    });
+  }
+
+  const vpFab = document.getElementById("vp-fab");
+  if (vpFab) {
+    vpFab.addEventListener("click", () => {
+      state.copilotOpen = !state.copilotOpen;
+      if (state.copilotOpen && !state.copilotPosition) {
+        state.copilotPosition = clampFloatingPosition(
+          window.innerWidth - 408,
+          window.innerHeight - 520,
+          380,
+          420
+        );
+      }
       render();
     });
   }
@@ -6864,6 +6905,56 @@ function bindEvents() {
     closeCopilot.addEventListener("click", () => {
       state.copilotOpen = false;
       render();
+    });
+  }
+
+  const vpWindow = document.getElementById("vp-window");
+  const vpDragHandle = document.getElementById("vp-drag-handle");
+  if (vpWindow && vpDragHandle) {
+    let dragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+    let lastPos = state.copilotPosition || {
+      x: vpWindow.getBoundingClientRect().left,
+      y: vpWindow.getBoundingClientRect().top
+    };
+
+    const onPointerMove = (e) => {
+      if (!dragging) return;
+      const rect = vpWindow.getBoundingClientRect();
+      const next = clampFloatingPosition(
+        e.clientX - offsetX,
+        e.clientY - offsetY,
+        rect.width,
+        rect.height
+      );
+      lastPos = next;
+      vpWindow.style.left = `${next.x}px`;
+      vpWindow.style.top = `${next.y}px`;
+      vpWindow.style.right = "auto";
+      vpWindow.style.bottom = "auto";
+    };
+
+    const onPointerUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      vpWindow.classList.remove("vp-dragging");
+      state.copilotPosition = lastPos;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+
+    vpDragHandle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const rect = vpWindow.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      dragging = true;
+      vpWindow.classList.add("vp-dragging");
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerUp);
     });
   }
 

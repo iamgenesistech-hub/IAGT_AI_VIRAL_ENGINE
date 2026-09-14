@@ -1155,12 +1155,60 @@ textarea { resize: vertical; min-height: 90px; width: 100%; }
   position: fixed;
   bottom: 76px; right: 20px;
   width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--card);
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
   z-index: 200;
   overflow: hidden;
+}
+
+.vp-copilot-window {
+  z-index: 1200;
+}
+
+.vp-window-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.vp-window-head:active {
+  cursor: grabbing;
+}
+
+.vp-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vp-drag-hint {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.vp-dragging {
+  opacity: .97;
+}
+
+.vp-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1250;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(0,199,245,.18), rgba(10,15,24,.95));
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .3px;
+  padding: 12px 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
 }
 
 .copilot-header {
